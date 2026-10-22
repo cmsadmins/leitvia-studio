@@ -1,0 +1,7 @@
+{
+	"usage": {
+		"useWhen": "Contact pages or location lists that show one or more places.",
+		"avoidWhen": "Decorative maps without places, or directions that need routing; link to a map service instead.",
+		"a11y": "The list of places with addresses is the accessible content; the interactive map loads only after consent and is an extra."
+	}
+}

@@ -1,0 +1,1 @@
+{ "version": 1, "postTypes": { "event": { "label": "Events", "singularLabel": "Event", "fields": { "event_level": { "type": "select", "label": "Level" } } } } }

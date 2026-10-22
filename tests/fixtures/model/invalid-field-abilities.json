@@ -1,0 +1,1 @@
+{ "version": 1, "postTypes": { "event": { "label": "Events", "singularLabel": "Event", "fields": { "event_venue": { "type": "text", "label": "Venue", "showInAbilities": true } } } } }

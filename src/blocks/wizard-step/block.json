@@ -1,0 +1,52 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "leitvia/wizard-step",
+	"version": "0.1.0",
+	"title": "Wizard step",
+	"category": "leitvia",
+	"icon": "editor-ol",
+	"description": "One step of a wizard: a group of fields with a legend, any blocks and an optional list of choices.",
+	"keywords": [ "step", "question", "fieldset" ],
+	"textdomain": "leitvia-studio",
+	"parent": [ "leitvia/wizard" ],
+	"attributes": {
+		"legend": {
+			"type": "rich-text",
+			"source": "rich-text",
+			"selector": "legend"
+		},
+		"name": {
+			"type": "string",
+			"default": ""
+		},
+		"type": {
+			"type": "string",
+			"enum": [ "radio", "checkbox" ],
+			"default": "radio"
+		},
+		"required": {
+			"type": "boolean",
+			"default": false
+		},
+		"options": {
+			"type": "array",
+			"default": [],
+			"items": {
+				"type": "object",
+				"properties": {
+					"label": { "type": "string" },
+					"value": { "type": "string" }
+				}
+			}
+		}
+	},
+	"supports": {
+		"html": false,
+		"reusable": false
+	},
+	"example": {
+		"attributes": { "legend": "What do you need?", "name": "need", "options": [ { "label": "Website", "value": "website" }, { "label": "Shop", "value": "shop" } ] }
+	},
+	"editorScript": "file:./index.js"
+}

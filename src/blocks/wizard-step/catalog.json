@@ -1,0 +1,7 @@
+{
+	"usage": {
+		"useWhen": "One step of a wizard with a group of choices.",
+		"avoidWhen": "Outside a wizard; it only works as its child.",
+		"a11y": "Write the legend as a question; choices are native radio buttons or checkboxes with labels."
+	}
+}

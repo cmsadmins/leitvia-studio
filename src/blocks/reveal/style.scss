@@ -1,0 +1,32 @@
+// Scroll-driven, CSS only, opacity and transform only. Without support for view timelines or with reduced motion no
+// rule below applies and the content is simply there. The effect ends at the latest when the element reaches the middle of the viewport;
+// stagger starts each child a little later, up to the sixth child.
+@supports (animation-timeline: view()) {
+	@media (prefers-reduced-motion: no-preference) {
+		.wp-block-leitvia-reveal.is-effect-fade,
+		.wp-block-leitvia-reveal.is-effect-rise,
+		.wp-block-leitvia-reveal.is-effect-stagger > * {
+			animation: leitvia-reveal linear both;
+			animation-timeline: view();
+			animation-range: entry calc(var(--leitvia-reveal-step, 0) * 10%) cover calc(25% + var(--leitvia-reveal-step, 0) * 5%);
+		}
+
+		.wp-block-leitvia-reveal.is-effect-rise,
+		.wp-block-leitvia-reveal.is-effect-stagger > * {
+			--leitvia-reveal-shift: 2rem;
+		}
+
+		@for $i from 2 through 6 {
+			.wp-block-leitvia-reveal.is-effect-stagger > :nth-child(#{$i}) {
+				--leitvia-reveal-step: #{$i - 1};
+			}
+		}
+	}
+}
+
+@keyframes leitvia-reveal {
+	from {
+		opacity: 0;
+		transform: translateY(var(--leitvia-reveal-shift, 0));
+	}
+}

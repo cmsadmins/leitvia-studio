@@ -1,0 +1,170 @@
+{
+	"name": "shop",
+	"title": "Shop",
+	"description": "An online shop with WooCommerce: the shop header with search, account and mini cart, a home page that leads into the catalogue, about and contact, and the legal pages a shop needs as placeholders to replace. WooCommerce data sharing is switched off.",
+	"requires": [ "woocommerce" ],
+	"variation": "corporate-light",
+	"templateParts": {
+		"header": "leitvia/header-shop",
+		"footer": "leitvia/footer-minimal"
+	},
+	"pages": [
+		{
+			"slug": "home",
+			"title": "Home",
+			"frame": "home",
+			"sections": [
+				{
+					"pattern": "leitvia/shop-product-hero",
+					"edits": [
+						{ "block": "p:0.0.0.3.0", "url": "/shop/" },
+						{ "block": "p:0.0.0.3.1", "url": "/about/" }
+					]
+				},
+				"leitvia/shop-category-tiles",
+				{
+					"pattern": "leitvia/shop-new-arrivals",
+					"edits": [
+						{ "block": "p:0.0.1", "text": "Restocked every month." }
+					]
+				},
+				"leitvia/shop-usp-bar",
+				"leitvia/shop-trust-badges",
+				{
+					"pattern": "leitvia/cta-banner",
+					"edits": [
+						{ "block": "p:0.0.0.0", "text": "Questions before you order" },
+						{ "block": "p:0.0.0.1", "text": "Not sure which product fits? Ask us." },
+						{ "block": "p:0.0.1.0", "text": "Write to us about sizes, materials or delivery. We answer within one working day." },
+						{ "block": "p:0.0.1.1.0", "text": "Contact us", "url": "/contact/" }
+					]
+				}
+			]
+		},
+		{
+			"slug": "about",
+			"title": "About",
+			"frame": "about",
+			"sections": [ "leitvia/hero-editorial", "leitvia/content-two-columns", "leitvia/content-break-image", "leitvia/proof-testimonials-grid", "leitvia/cta-contact" ]
+		},
+		{
+			"slug": "contact",
+			"title": "Contact",
+			"frame": "contact",
+			"kind": "contact",
+			"sections": [ "leitvia/cta-contact", "leitvia/content-faq" ]
+		},
+		{
+			"slug": "imprint",
+			"title": "Imprint",
+			"frame": "contact",
+			"kind": "imprint",
+			"sections": [
+				{
+					"pattern": "leitvia/content-two-columns",
+					"edits": [
+						{ "block": "p:0.0", "text": "Placeholder: replace this text with your imprint" },
+						{ "block": "p:0.2.0.0", "text": "This page is a placeholder and not a valid imprint. Replace it before the shop goes live." },
+						{ "block": "p:0.2.0.1", "text": "Company name, legal form, street, postcode and city." },
+						{ "block": "p:0.2.1.0", "text": "Register court and register number, VAT ID where it applies." },
+						{ "block": "p:0.2.1.1", "text": "Managing directors or other people authorised to represent the company." }
+					]
+				},
+				"leitvia/cta-contact"
+			]
+		},
+		{
+			"slug": "privacy",
+			"title": "Privacy policy",
+			"frame": "contact",
+			"kind": "privacy",
+			"sections": [
+				{
+					"pattern": "leitvia/content-two-columns",
+					"edits": [
+						{ "block": "p:0.0", "text": "Placeholder: replace this text with your privacy policy" },
+						{ "block": "p:0.2.0.0", "text": "This page is a placeholder and not a valid privacy policy. Replace it before the shop goes live." },
+						{ "block": "p:0.2.0.1", "text": "Who is responsible for the data, and how to reach the data protection officer where there is one." },
+						{ "block": "p:0.2.1.0", "text": "Which data the shop processes for orders, payment and shipping, on which legal basis and for how long." },
+						{ "block": "p:0.2.1.1", "text": "Which service providers receive data, and the rights of the people concerned." }
+					]
+				},
+				"leitvia/cta-contact"
+			]
+		},
+		{
+			"slug": "terms",
+			"title": "Terms and conditions",
+			"frame": "contact",
+			"kind": "terms",
+			"sections": [
+				{
+					"pattern": "leitvia/content-two-columns",
+					"edits": [
+						{ "block": "p:0.0", "text": "Placeholder: replace this text with your terms and conditions" },
+						{ "block": "p:0.2.0.0", "text": "This page is a placeholder and not valid terms. Replace it before the shop goes live." },
+						{ "block": "p:0.2.0.1", "text": "Who the contract is with and how it comes about when an order is placed." },
+						{ "block": "p:0.2.1.0", "text": "Prices, payment, delivery and retention of title." },
+						{ "block": "p:0.2.1.1", "text": "Warranty, liability and how disputes are resolved." }
+					]
+				},
+				"leitvia/cta-contact"
+			]
+		},
+		{
+			"slug": "withdrawal",
+			"title": "Right of withdrawal",
+			"frame": "contact",
+			"kind": "withdrawal",
+			"sections": [
+				{
+					"pattern": "leitvia/content-two-columns",
+					"edits": [
+						{ "block": "p:0.0", "text": "Placeholder: replace this text with your cancellation policy" },
+						{ "block": "p:0.2.0.0", "text": "This page is a placeholder and not a valid cancellation policy. Replace it before the shop goes live." },
+						{ "block": "p:0.2.0.1", "text": "The withdrawal period and when it starts." },
+						{ "block": "p:0.2.1.0", "text": "How customers declare the withdrawal, with the model withdrawal form." },
+						{ "block": "p:0.2.1.1", "text": "What happens to payments and goods after a withdrawal, and any exceptions." }
+					]
+				},
+				"leitvia/cta-contact"
+			]
+		},
+		{
+			"slug": "shipping-and-payment",
+			"title": "Shipping and payment",
+			"frame": "contact",
+			"sections": [
+				{
+					"pattern": "leitvia/content-two-columns",
+					"edits": [
+						{ "block": "p:0.0", "text": "Placeholder: replace this text with your shipping and payment details" },
+						{ "block": "p:0.2.0.0", "text": "This page is a placeholder. Replace it before the shop goes live." },
+						{ "block": "p:0.2.0.1", "text": "The countries you deliver to, shipping costs and delivery times." },
+						{ "block": "p:0.2.1.0", "text": "The payment methods you accept and when payment is due." },
+						{ "block": "p:0.2.1.1", "text": "Any restrictions, such as items that cannot be shipped to some countries." }
+					]
+				},
+				"leitvia/cta-contact"
+			]
+		}
+	],
+	"navigation": [ "shop", "about", "contact" ],
+	"reading": {
+		"show_on_front": "page",
+		"page_on_front": "home"
+	},
+	"connect": {
+		"wp_page_for_privacy_policy": "privacy",
+		"woocommerce_terms_page_id": "terms"
+	},
+	"options": {
+		"default_pingback_flag": "0",
+		"default_ping_status": "closed",
+		"default_comment_status": "closed",
+		"woocommerce_feature_order_attribution_enabled": "no",
+		"woocommerce_allow_tracking": "no",
+		"woocommerce_show_marketplace_suggestions": "no",
+		"woocommerce_feature_remote_logging_enabled": "no"
+	}
+}

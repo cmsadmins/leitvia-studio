@@ -1,0 +1,7 @@
+{
+	"usage": {
+		"useWhen": "One dated entry inside a timeline.",
+		"avoidWhen": "Outside a timeline; it only works as its child.",
+		"a11y": "Set the heading level so it fits the heading outline of the page."
+	}
+}

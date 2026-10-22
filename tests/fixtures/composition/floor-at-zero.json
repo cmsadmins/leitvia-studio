@@ -1,0 +1,33 @@
+{
+	"name": "floor-at-zero",
+	"sections": [
+		"core/paragraph",
+		"core/heading",
+		"core/image",
+		"core/list",
+		"core/group"
+	],
+	"issues": [
+		[
+			"unknownPattern",
+			0
+		],
+		[
+			"unknownPattern",
+			1
+		],
+		[
+			"unknownPattern",
+			2
+		],
+		[
+			"unknownPattern",
+			3
+		],
+		[
+			"unknownPattern",
+			4
+		]
+	],
+	"score": 0
+}

@@ -1,0 +1,41 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "leitvia/product-compare",
+	"version": "0.1.0",
+	"title": "Product comparison",
+	"category": "leitvia",
+	"icon": "columns",
+	"description": "Compares two to four WooCommerce products in a table with live prices, rating, chosen attributes, availability and an add to cart link. Shown as cards on small screens.",
+	"keywords": [ "compare", "products", "shop", "woocommerce" ],
+	"textdomain": "leitvia-studio",
+	"attributes": {
+		"caption": {
+			"type": "string",
+			"default": ""
+		},
+		"products": {
+			"type": "array",
+			"items": { "type": "integer" },
+			"default": []
+		},
+		"features": {
+			"type": "array",
+			"items": { "type": "string" },
+			"default": []
+		},
+		"highlight": {
+			"type": "integer",
+			"default": 0
+		}
+	},
+	"supports": {
+		"align": [ "wide" ],
+		"html": false
+	},
+	"example": {
+		"attributes": { "caption": "Vases compared" }
+	},
+	"editorScript": "file:./index.js",
+	"style": "file:./style-index.css"
+}

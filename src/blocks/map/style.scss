@@ -1,0 +1,51 @@
+// The placeholder and the map share one reserved box, its ratio from the height setting. Content that needs more
+// room (the placeholder on a narrow screen) grows the box instead of overflowing.
+$heights: (
+	"small": "21 / 9",
+	"medium": "16 / 9",
+	"large": "4 / 3",
+);
+
+@each $name, $ratio in $heights {
+	.wp-block-leitvia-map.is-height-#{$name} {
+		.leitvia-consent__placeholder,
+		.wp-block-leitvia-map__canvas {
+			aspect-ratio: #{$ratio};
+		}
+	}
+}
+
+.wp-block-leitvia-map__canvas {
+	inline-size: 100%;
+	border: 1px solid var(--wp--preset--color--stroke, currentcolor);
+
+	&:focus-visible {
+		outline: 0.125rem solid var(--wp--preset--color--focus, currentcolor);
+		outline-offset: 0.125rem;
+	}
+}
+
+.wp-block-leitvia-map__marker {
+	box-sizing: border-box;
+	border: 0.1875rem solid var(--wp--preset--color--surface, Canvas);
+	border-radius: 50%;
+	background: var(--wp--preset--color--accent, currentcolor);
+
+	&:focus-visible {
+		outline: 0.125rem solid var(--wp--preset--color--focus, currentcolor);
+		outline-offset: 0.125rem;
+	}
+}
+
+.wp-block-leitvia-map__places {
+	display: grid;
+	gap: var(--wp--preset--spacing--s, 1rem);
+	padding-inline-start: 0;
+	list-style: none;
+
+	li {
+		display: flex;
+		flex-direction: column;
+		gap: var(--wp--preset--spacing--xxs, 0.25rem);
+	}
+}

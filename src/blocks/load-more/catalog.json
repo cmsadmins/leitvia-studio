@@ -1,0 +1,7 @@
+{
+	"usage": {
+		"useWhen": "Below the posts of a Query Loop when visitors browse many posts on one page, such as news or projects.",
+		"avoidWhen": "Short lists that fit one page, or outside a Query Loop; use the pagination block for numbered pages.",
+		"a11y": "The link works without JavaScript. With JavaScript, focus moves to the first new post and the change is announced."
+	}
+}

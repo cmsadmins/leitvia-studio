@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<!-- Paths are relative to this file. -->
+<ruleset name="Leitvia Studio">
+	<file>.</file>
+	<exclude-pattern>*/vendor/*</exclude-pattern>
+	<exclude-pattern>*/node_modules/*</exclude-pattern>
+	<exclude-pattern>*/build/*</exclude-pattern>
+	<arg name="extensions" value="php"/>
+	<arg value="sp"/>
+	<config name="testVersion" value="8.2-"/>
+	<config name="minimum_wp_version" value="7.1"/>
+	<rule ref="WordPress"/>
+	<rule ref="PHPCompatibilityWP"/>
+	<rule ref="WordPress.WP.I18n">
+		<properties><property name="text_domain" type="array"><element value="leitvia-studio"/></property></properties>
+	</rule>
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals">
+		<properties><property name="prefixes" type="array"><element value="leitvia_studio"/><element value="LeitviaStudio"/></property></properties>
+	</rule>
+	<rule ref="WordPress.WP.DeprecatedFunctions"/>
+	<rule ref="WordPress.WP.DeprecatedClasses"/>
+	<rule ref="WordPress.WP.DeprecatedParameters"/>
+	<rule ref="WordPress.WP.DeprecatedParameterValues"/>
+	<!-- Test files are test-*.php with Test_* classes, the layout of the WordPress test suite. -->
+	<rule ref="WordPress.Files.FileName.InvalidClassFileName"><exclude-pattern>*/tests/php/*</exclude-pattern></rule>
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedClassFound"><exclude-pattern>*/tests/php/*</exclude-pattern></rule>
+</ruleset>

@@ -1,0 +1,33 @@
+{
+	"name": "blog",
+	"title": "Blog",
+	"description": "A personal or team blog: the latest posts on the front page, an about page and a contact page.",
+	"variation": "swiss-editorial-light",
+	"templateParts": {
+		"header": "leitvia/header-default",
+		"footer": "leitvia/footer-minimal"
+	},
+	"pages": [
+		{
+			"slug": "about",
+			"title": "About",
+			"frame": "about",
+			"sections": [ "leitvia/hero-editorial", "leitvia/content-two-columns", "leitvia/content-quote", "leitvia/cta-contact" ]
+		},
+		{
+			"slug": "contact",
+			"title": "Contact",
+			"frame": "contact",
+			"kind": "contact",
+			"sections": [ "leitvia/cta-contact", "leitvia/content-faq" ]
+		}
+	],
+	"navigation": [ "about", "contact" ],
+	"reading": {
+		"show_on_front": "posts"
+	},
+	"options": {
+		"default_pingback_flag": "0",
+		"default_ping_status": "closed"
+	}
+}

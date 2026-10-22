@@ -1,0 +1,36 @@
+{
+	"version": 1,
+	"postTypes": {
+		"event": {
+			"label": "Events",
+			"singularLabel": "Event",
+			"public": true,
+			"hasArchive": true,
+			"slug": "events",
+			"supports": [ "title", "editor", "thumbnail", "excerpt" ],
+			"icon": "dashicons-calendar",
+			"showInAbilities": true,
+			"fields": {
+				"event_start": { "type": "datetime", "label": "Start", "required": true },
+				"event_venue": { "type": "text", "label": "Venue", "maxLength": 120 },
+				"event_price": { "type": "number", "label": "Price", "min": 0 },
+				"event_level": { "type": "select", "label": "Level", "options": { "beginner": "Beginner", "advanced": "Advanced" } },
+				"event_poster": { "type": "image", "label": "Poster" }
+			},
+			"repeaters": {
+				"event_agenda": { "postType": "event_session", "label": "Agenda", "singularLabel": "Session", "fields": { "session_time": { "type": "time", "label": "Time" }, "session_speaker": { "type": "text", "label": "Speaker" } } }
+			}
+		},
+		"person": { "label": "People", "singularLabel": "Person", "public": true, "supports": [ "title", "thumbnail" ], "fields": { "person_role": { "type": "text", "label": "Role" } } }
+	},
+	"taxonomies": {
+		"event_type": { "label": "Event types", "singularLabel": "Event type", "hierarchical": true, "postTypes": [ "event" ] }
+	},
+	"relations": {
+		"event_speakers": { "label": "Speakers", "from": "event", "to": "person", "multiple": true }
+	},
+	"settings": {
+		"company_phone": { "type": "text", "label": "Phone", "bindable": true },
+		"company_email": { "type": "email", "label": "Email", "showInAbilities": true }
+	}
+}

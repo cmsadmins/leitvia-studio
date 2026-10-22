@@ -1,0 +1,49 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "leitvia/bento-item",
+	"version": "0.1.0",
+	"title": "Bento tile",
+	"category": "leitvia",
+	"icon": "screenoptions",
+	"description": "One tile of a bento grid in a fixed size.",
+	"keywords": [ "tile", "grid", "card" ],
+	"textdomain": "leitvia-studio",
+	"parent": [ "leitvia/bento" ],
+	"attributes": {
+		"size": {
+			"type": "string",
+			"enum": [ "1x1", "2x1", "1x2", "2x2" ],
+			"default": "1x1"
+		},
+		"mobilePriority": {
+			"type": "boolean",
+			"default": false
+		}
+	},
+	"supports": {
+		"anchor": true,
+		"html": false,
+		"reusable": false,
+		"color": {
+			"background": true,
+			"text": true
+		},
+		"spacing": {
+			"padding": true
+		},
+		"__experimentalBorder": {
+			"radius": true,
+			"width": true,
+			"color": true,
+			"style": true
+		},
+		"shadow": true
+	},
+	"example": {
+		"attributes": { "size": "2x1" },
+		"innerBlocks": [ { "name": "core/heading", "attributes": { "content": "Fast setup", "level": 3 } }, { "name": "core/paragraph", "attributes": { "content": "Ready in one afternoon." } } ]
+	},
+	"editorScript": "file:./index.js",
+	"style": "file:./style-index.css"
+}

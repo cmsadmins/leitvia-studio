@@ -1,0 +1,145 @@
+{
+	"$comment": "Cases for Block_Edit::apply(): markup, block ID, change, and either the expected markup or the rejection code.",
+	"cases": [
+		{
+			"name": "text of a paragraph inside a group keeps the group and its placeholders",
+			"content": "<!-- wp:group -->\n<div class=\"wp-block-group\"><!-- wp:paragraph -->\n<p>Old <strong>text</strong></p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p>Stays</p>\n<!-- /wp:paragraph --></div>\n<!-- /wp:group -->",
+			"block": "p:0.0",
+			"change": { "text": "New & \"better\"" },
+			"expect": "<!-- wp:group -->\n<div class=\"wp-block-group\"><!-- wp:paragraph -->\n<p>New &amp; &quot;better&quot;</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p>Stays</p>\n<!-- /wp:paragraph --></div>\n<!-- /wp:group -->"
+		},
+		{
+			"name": "heading found by leitviaId",
+			"content": "<!-- wp:paragraph -->\n<p>First</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:heading {\"metadata\":{\"leitviaId\":\"abcd1234\"}} -->\n<h2 class=\"wp-block-heading\">Old</h2>\n<!-- /wp:heading -->",
+			"block": "abcd1234",
+			"change": { "text": "New heading" },
+			"expect": "<!-- wp:paragraph -->\n<p>First</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:heading {\"metadata\":{\"leitviaId\":\"abcd1234\"}} -->\n<h2 class=\"wp-block-heading\">New heading</h2>\n<!-- /wp:heading -->"
+		},
+		{
+			"name": "text and link of a button",
+			"content": "<!-- wp:buttons -->\n<div class=\"wp-block-buttons\"><!-- wp:button -->\n<div class=\"wp-block-button\"><a class=\"wp-block-button__link wp-element-button\" href=\"#\">Old</a></div>\n<!-- /wp:button --></div>\n<!-- /wp:buttons -->",
+			"block": "p:0.0",
+			"change": { "text": "Contact us", "url": "/contact/?a=1&b=2" },
+			"expect": "<!-- wp:buttons -->\n<div class=\"wp-block-buttons\"><!-- wp:button -->\n<div class=\"wp-block-button\"><a class=\"wp-block-button__link wp-element-button\" href=\"/contact/?a=1&#038;b=2\">Contact us</a></div>\n<!-- /wp:button --></div>\n<!-- /wp:buttons -->"
+		},
+		{
+			"name": "citation of a quote after its inner blocks",
+			"content": "<!-- wp:quote -->\n<blockquote class=\"wp-block-quote\"><!-- wp:paragraph -->\n<p>Words</p>\n<!-- /wp:paragraph --><cite>Miriam Achterberg, The Harbour Review</cite></blockquote>\n<!-- /wp:quote -->",
+			"block": "p:0",
+			"change": { "text": "Jane Roe & Co" },
+			"expect": "<!-- wp:quote -->\n<blockquote class=\"wp-block-quote\"><!-- wp:paragraph -->\n<p>Words</p>\n<!-- /wp:paragraph --><cite>Jane Roe &amp; Co</cite></blockquote>\n<!-- /wp:quote -->"
+		},
+		{
+			"name": "summary of a details block",
+			"content": "<!-- wp:details -->\n<details class=\"wp-block-details\"><summary>Old question?</summary><!-- wp:paragraph -->\n<p>Answer</p>\n<!-- /wp:paragraph --></details>\n<!-- /wp:details -->",
+			"block": "p:0",
+			"change": { "text": "How long does it take?" },
+			"expect": "<!-- wp:details -->\n<details class=\"wp-block-details\"><summary>How long does it take?</summary><!-- wp:paragraph -->\n<p>Answer</p>\n<!-- /wp:paragraph --></details>\n<!-- /wp:details -->"
+		},
+		{
+			"name": "text and link of a list item with a mail link",
+			"content": "<!-- wp:list -->\n<ul class=\"wp-block-list\"><!-- wp:list-item -->\n<li>Write to <a href=\"mailto:hello@example.com\">hello@example.com</a></li>\n<!-- /wp:list-item --></ul>\n<!-- /wp:list -->",
+			"block": "p:0.0",
+			"change": { "text": "Schreiben Sie an info@firma.de", "link_text": "info@firma.de", "url": "mailto:info@firma.de" },
+			"expect": "<!-- wp:list -->\n<ul class=\"wp-block-list\"><!-- wp:list-item -->\n<li>Schreiben Sie an <a href=\"mailto:info@firma.de\">info@firma.de</a></li>\n<!-- /wp:list-item --></ul>\n<!-- /wp:list -->"
+		},
+		{
+			"name": "new text that still holds the link text keeps the link",
+			"content": "<!-- wp:list -->\n<ul class=\"wp-block-list\"><!-- wp:list-item -->\n<li>Call <a href=\"tel:+442079460958\" class=\"x\">+44 20 7946 0958</a> today</li>\n<!-- /wp:list-item --></ul>\n<!-- /wp:list -->",
+			"block": "p:0.0",
+			"change": { "text": "Ring us on +44 20 7946 0958" },
+			"expect": "<!-- wp:list -->\n<ul class=\"wp-block-list\"><!-- wp:list-item -->\n<li>Ring us on <a href=\"tel:+442079460958\" class=\"x\">+44 20 7946 0958</a></li>\n<!-- /wp:list-item --></ul>\n<!-- /wp:list -->"
+		},
+		{
+			"name": "link of a paragraph link",
+			"content": "<!-- wp:paragraph -->\n<p><a href=\"#\">Read the changelog</a></p>\n<!-- /wp:paragraph -->",
+			"block": "p:0",
+			"change": { "url": "/changelog/" },
+			"expect": "<!-- wp:paragraph -->\n<p><a href=\"/changelog/\">Read the changelog</a></p>\n<!-- /wp:paragraph -->"
+		},
+		{
+			"name": "plain text may replace a sample link to #",
+			"content": "<!-- wp:paragraph -->\n<p><a href=\"#\">See all new products</a></p>\n<!-- /wp:paragraph -->",
+			"block": "p:0",
+			"change": { "text": "Restocked every month." },
+			"expect": "<!-- wp:paragraph -->\n<p>Restocked every month.</p>\n<!-- /wp:paragraph -->"
+		},
+		{
+			"name": "text that would drop a link is refused",
+			"content": "<!-- wp:list -->\n<ul class=\"wp-block-list\"><!-- wp:list-item -->\n<li>Write to <a href=\"mailto:hello@example.com\">hello@example.com</a></li>\n<!-- /wp:list-item --></ul>\n<!-- /wp:list -->",
+			"block": "p:0.0",
+			"change": { "text": "Write to info@firma.de" },
+			"error": "leitvia_invalid_input"
+		},
+		{
+			"name": "link text that is not part of the text is refused",
+			"content": "<!-- wp:list -->\n<ul class=\"wp-block-list\"><!-- wp:list-item -->\n<li>Write to <a href=\"mailto:hello@example.com\">hello@example.com</a></li>\n<!-- /wp:list-item --></ul>\n<!-- /wp:list -->",
+			"block": "p:0.0",
+			"change": { "text": "Write to us", "link_text": "info@firma.de", "url": "mailto:info@firma.de" },
+			"error": "leitvia_invalid_input"
+		},
+		{
+			"name": "text with two links cannot be rebuilt",
+			"content": "<!-- wp:paragraph -->\n<p><a href=\"/a/\">A</a> or <a href=\"/b/\">B</a></p>\n<!-- /wp:paragraph -->",
+			"block": "p:0",
+			"change": { "text": "A or B" },
+			"error": "leitvia_static_markup"
+		},
+		{
+			"name": "a list item with a nested list cannot be rebuilt",
+			"content": "<!-- wp:list -->\n<ul class=\"wp-block-list\"><!-- wp:list-item -->\n<li>Item<!-- wp:list -->\n<ul class=\"wp-block-list\"><!-- wp:list-item -->\n<li>Sub</li>\n<!-- /wp:list-item --></ul>\n<!-- /wp:list --></li>\n<!-- /wp:list-item --></ul>\n<!-- /wp:list -->",
+			"block": "p:0.0",
+			"change": { "text": "New" },
+			"error": "leitvia_static_markup"
+		},
+		{
+			"name": "a paragraph has no link to set",
+			"content": "<!-- wp:paragraph -->\n<p>Text</p>\n<!-- /wp:paragraph -->",
+			"block": "p:0",
+			"change": { "url": "/x/" },
+			"error": "leitvia_static_markup"
+		},
+		{
+			"name": "a javascript link is no valid URL",
+			"content": "<!-- wp:button -->\n<div class=\"wp-block-button\"><a class=\"wp-block-button__link wp-element-button\" href=\"#\">Go</a></div>\n<!-- /wp:button -->",
+			"block": "p:0",
+			"change": { "url": "javascript:alert(1)" },
+			"error": "leitvia_invalid_input"
+		},
+		{
+			"name": "an unknown block",
+			"content": "<!-- wp:paragraph -->\n<p>Text</p>\n<!-- /wp:paragraph -->",
+			"block": "p:3",
+			"change": { "text": "New" },
+			"error": "leitvia_not_found"
+		},
+		{
+			"name": "attributes of a block outside the catalog",
+			"content": "<!-- wp:paragraph -->\n<p>Text</p>\n<!-- /wp:paragraph -->",
+			"block": "p:0",
+			"change": { "attributes": { "dropCap": true } },
+			"error": "leitvia_invalid_input"
+		},
+		{
+			"name": "attributes of a dynamic catalog block",
+			"content": "<!-- wp:leitvia/table-of-contents /-->",
+			"block": "p:0",
+			"change": { "attributes": { "levels": [ 2 ] } },
+			"expect": "<!-- wp:leitvia/table-of-contents {\"levels\":[2]} /-->"
+		},
+		{
+			"name": "an attribute value against the catalog schema",
+			"content": "<!-- wp:leitvia/table-of-contents /-->",
+			"block": "p:0",
+			"change": { "attributes": { "levels": "two" } },
+			"error": "leitvia_invalid_input"
+		},
+		{
+			"name": "an attribute that lives in static markup",
+			"content": "<!-- wp:leitvia/counter -->\n<div class=\"wp-block-leitvia-counter\"><span class=\"wp-block-leitvia-counter__value\">10</span></div>\n<!-- /wp:leitvia/counter -->",
+			"block": "p:0",
+			"change": { "attributes": { "value": "20" } },
+			"error": "leitvia_static_markup"
+		}
+	]
+}

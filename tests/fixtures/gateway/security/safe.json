@@ -1,0 +1,10 @@
+{
+	"attributes": [
+		"a < b \"quoted\" -- back\\slash \\\" & more",
+		"Grüße „Zitat“ \\u003c literal \\n text",
+		"--",
+		"C:\\path\\to\\file",
+		"50 % off, 3 > 2"
+	],
+	"text": "5 &gt; 3 &amp; \"q\" back\\slash -- grün"
+}

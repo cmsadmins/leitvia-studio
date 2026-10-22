@@ -1,0 +1,37 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "leitvia/spotlight-hotspot",
+	"version": "0.1.0",
+	"title": "Spotlight point",
+	"category": "leitvia",
+	"icon": "marker",
+	"description": "A point on the spotlight image with a name and a short text. The name is what screen readers announce.",
+	"keywords": [ "hotspot", "point", "marker" ],
+	"textdomain": "leitvia-studio",
+	"parent": [ "leitvia/spotlight" ],
+	"attributes": {
+		"x": {
+			"type": "number",
+			"default": 50
+		},
+		"y": {
+			"type": "number",
+			"default": 50
+		},
+		"label": {
+			"type": "rich-text",
+			"source": "rich-text",
+			"selector": ".wp-block-leitvia-spotlight-hotspot__label"
+		}
+	},
+	"supports": {
+		"html": false,
+		"reusable": false
+	},
+	"example": {
+		"attributes": { "x": 30, "y": 40, "label": "Charging port" }
+	},
+	"editorScript": "file:./index.js",
+	"style": "file:./style-index.css"
+}

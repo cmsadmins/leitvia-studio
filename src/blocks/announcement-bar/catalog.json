@@ -1,0 +1,7 @@
+{
+	"usage": {
+		"useWhen": "One short, time-bound message with an optional link as a band over the full width at the top of the header, such as an event or a change of opening hours. Use the pattern Header with announcement to place it above the header.",
+		"avoidWhen": "Permanent information, cookie notices or several messages at once; use page content instead. Do not place it inside a section of the page.",
+		"a11y": "The bar is a region; give it a label that names it as an announcement. Keep the text to one sentence with at most one link. Keep the default colors (ink on surface-alt), use the style Inverse (surface on ink) or pick another contract pair; the link stays underlined."
+	}
+}

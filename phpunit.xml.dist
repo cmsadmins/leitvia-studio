@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<phpunit
+	bootstrap="tests/php/bootstrap.php"
+	colors="true"
+	cacheResult="false"
+	failOnSkipped="true"
+	failOnIncomplete="true"
+	failOnWarning="true"
+	failOnRisky="true"
+>
+	<testsuites>
+		<testsuite name="leitvia-studio">
+			<directory prefix="test-" suffix=".php">tests/php</directory>
+		</testsuite>
+	</testsuites>
+</phpunit>

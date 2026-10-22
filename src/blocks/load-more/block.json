@@ -1,0 +1,36 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "leitvia/load-more",
+	"version": "0.1.0",
+	"title": "Load more",
+	"category": "leitvia",
+	"icon": "plus-alt",
+	"description": "A link to the next page of the surrounding Query Loop. With JavaScript the next posts are added below the list instead.",
+	"keywords": [ "pagination", "infinite", "more" ],
+	"textdomain": "leitvia-studio",
+	"ancestor": [ "core/query" ],
+	"usesContext": [ "queryId", "query" ],
+	"attributes": {
+		"text": {
+			"type": "string",
+			"default": ""
+		}
+	},
+	"supports": {
+		"html": false,
+		"reusable": false,
+		"interactivity": {
+			"clientNavigation": true
+		},
+		"spacing": {
+			"margin": true
+		}
+	},
+	"example": {
+		"attributes": { "text": "Load more" }
+	},
+	"editorScript": "file:./index.js",
+	"viewScriptModule": "file:./view.js",
+	"render": "file:./render.php"
+}

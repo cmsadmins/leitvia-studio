@@ -1,0 +1,7 @@
+{
+	"usage": {
+		"useWhen": "On the privacy policy page, so visitors can revoke providers they allowed for embedded content.",
+		"avoidWhen": "Any other page; one place to manage consent is enough.",
+		"a11y": "Keep the intro text so visitors know what the list does before they reach the buttons."
+	}
+}

@@ -1,0 +1,57 @@
+// A card per plan. The recommended plan has a stronger frame and a text badge, so it never relies on colour alone.
+// The badge sits on the top edge of the card, so name, price, text and button start at the same height in every card
+// of a row, and the button closes each card at the bottom.
+.wp-block-leitvia-pricing-plan {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	padding: var(--wp--preset--spacing--m, 1.5rem);
+	border: 1px solid var(--wp--preset--color--stroke, currentcolor);
+
+	&.is-recommended {
+		border: 2px solid var(--wp--preset--color--accent, currentcolor);
+	}
+
+	> * {
+		margin-block: 0 var(--wp--preset--spacing--s, 1rem);
+	}
+}
+
+.wp-block-leitvia-pricing-plan__badge {
+	position: absolute;
+	inset-block-start: 0;
+	inset-inline-start: var(--wp--preset--spacing--m, 1.5rem);
+	translate: 0 -50%;
+	margin: 0;
+	padding: var(--wp--preset--spacing--xxs, 0.25rem) var(--wp--preset--spacing--xs, 0.5rem);
+	background: var(--wp--preset--color--accent, currentcolor);
+	color: var(--wp--preset--color--on-accent, canvas);
+	font-family: var(--wp--preset--font-family--ui, inherit);
+	font-size: 0.75rem;
+	font-weight: 500;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+.wp-block-leitvia-pricing-plan__price {
+	font-size: var(--wp--preset--font-size--heading-s, 1.5rem);
+	font-variant-numeric: tabular-nums;
+	font-weight: 600;
+	line-height: 1.2;
+}
+
+.wp-block-leitvia-pricing-plan__content {
+	display: flex;
+	flex-grow: 1;
+	flex-direction: column;
+	margin-block-end: 0;
+
+	> * {
+		margin-block: 0 var(--wp--preset--spacing--s, 1rem);
+	}
+
+	> .wp-block-buttons:last-child {
+		margin-block: auto 0;
+		padding-block-start: var(--wp--preset--spacing--s, 1rem);
+	}
+}

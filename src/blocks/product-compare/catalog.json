@@ -1,0 +1,7 @@
+{
+	"usage": {
+		"useWhen": "Comparing two to four products of the own WooCommerce shop side by side, with live prices, rating, chosen attributes, availability and an add to cart link.",
+		"avoidWhen": "Plans, services or anything that is not a WooCommerce product, or figures that must not change with the shop; use the comparison table. Not available without WooCommerce.",
+		"a11y": "Give the table a caption that names what is compared. Each add to cart link names its product; the highlighted column is bold, so do not rely on the highlight alone to say which product you recommend."
+	}
+}

@@ -1,0 +1,7 @@
+{
+	"usage": {
+		"useWhen": "Three or four key figures with a short label, such as projects delivered or years in business.",
+		"avoidWhen": "Figures that need explanation or exact values in tables; use text or the comparison table.",
+		"a11y": "The final value is in the markup; the count-up is decorative and skipped with reduced motion. The label must say what the number means."
+	}
+}

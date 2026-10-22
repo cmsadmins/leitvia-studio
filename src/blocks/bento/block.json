@@ -1,0 +1,28 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "leitvia/bento",
+	"version": "0.1.0",
+	"title": "Bento grid",
+	"category": "leitvia",
+	"icon": "grid-view",
+	"description": "Tiles in fixed sizes on a grid. The order of the tiles is the reading order on every screen.",
+	"keywords": [ "grid", "tiles", "cards" ],
+	"textdomain": "leitvia-studio",
+	"allowedBlocks": [ "leitvia/bento-item" ],
+	"supports": {
+		"anchor": true,
+		"align": [ "wide", "full" ],
+		"html": false,
+		"spacing": {
+			"margin": true,
+			"padding": true,
+			"blockGap": true
+		}
+	},
+	"example": {
+		"innerBlocks": [ { "name": "leitvia/bento-item", "attributes": { "size": "2x1" }, "innerBlocks": [ { "name": "core/heading", "attributes": { "content": "Fast setup", "level": 3 } } ] }, { "name": "leitvia/bento-item", "innerBlocks": [ { "name": "core/heading", "attributes": { "content": "Accessible", "level": 3 } } ] }, { "name": "leitvia/bento-item", "innerBlocks": [ { "name": "core/heading", "attributes": { "content": "Private", "level": 3 } } ] } ]
+	},
+	"editorScript": "file:./index.js",
+	"style": "file:./style-index.css"
+}

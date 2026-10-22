@@ -1,0 +1,305 @@
+// Layout and CMS ADMINS brand of the Studio screens. This file loads on Studio screens only (Admin::enqueue()); the
+// brand lives in the admin theme variables of @wordpress/components, set on the Studio wrap and on the popovers and
+// modals it opens, so the admin menu, the toolbar and other plugins keep the colour scheme the user chose.
+@use "sass:color";
+@use "~@wordpress/dataviews/build-style/style";
+
+// Brand accent for light surfaces: #B84A00 instead of the brand orange #FF6800, which reaches only 2.90:1 on white.
+// White text on it 5.22:1 (WCAG 1.4.3), the focus ring on white 5.22:1 (1.4.11). Hover and active get darker, as in
+// the admin colour schemes of core. #FF6800 stays reserved for dark surfaces (plan 6.2).
+$leitvia-studio-accent: #b84a00;
+$leitvia-studio-accent-10: color.adjust($leitvia-studio-accent, $lightness: -5%);
+$leitvia-studio-accent-20: color.adjust($leitvia-studio-accent, $lightness: -10%);
+
+@function leitvia-studio-rgb($c) {
+	@return color.channel($c, "red", $space: rgb), color.channel($c, "green", $space: rgb), color.channel($c, "blue", $space: rgb);
+}
+
+.leitvia-studio,
+.components-popover,
+.components-modal__screen-overlay {
+	--wp-admin-theme-color: #{$leitvia-studio-accent};
+	--wp-admin-theme-color--rgb: #{leitvia-studio-rgb($leitvia-studio-accent)};
+	--wp-admin-theme-color-darker-10: #{$leitvia-studio-accent-10};
+	--wp-admin-theme-color-darker-10--rgb: #{leitvia-studio-rgb($leitvia-studio-accent-10)};
+	--wp-admin-theme-color-darker-20: #{$leitvia-studio-accent-20};
+	--wp-admin-theme-color-darker-20--rgb: #{leitvia-studio-rgb($leitvia-studio-accent-20)};
+
+	// The design tokens of core (wp-includes/css/dist/base-styles/design-tokens.css) stay blue in every colour
+	// scheme; DataViews and the newer components read them first, so the brand roles follow the accent here as well.
+	--wpds-color-background-interactive-brand-strong: #{$leitvia-studio-accent};
+	--wpds-color-background-interactive-brand-strong-active: #{$leitvia-studio-accent-10};
+	--wpds-color-background-interactive-brand-weak-active: #{color.mix($leitvia-studio-accent, #fff, 6%)};
+	--wpds-color-background-surface-brand: #{color.mix($leitvia-studio-accent, #fff, 6%)};
+	--wpds-color-background-thumb-brand: #{$leitvia-studio-accent};
+	--wpds-color-background-thumb-brand-active: #{$leitvia-studio-accent};
+	--wpds-color-foreground-interactive-brand: #{$leitvia-studio-accent};
+	--wpds-color-foreground-interactive-brand-active: #{$leitvia-studio-accent-20};
+	--wpds-color-foreground-interactive-brand-strong: #fff;
+	--wpds-color-foreground-interactive-brand-strong-active: #fff;
+	--wpds-color-stroke-surface-brand: #{color.mix($leitvia-studio-accent, #fff, 35%)};
+	--wpds-color-stroke-surface-brand-strong: #{$leitvia-studio-accent};
+	--wpds-color-stroke-interactive-brand: #{$leitvia-studio-accent};
+	--wpds-color-stroke-interactive-brand-active: #{$leitvia-studio-accent-10};
+	--wpds-color-stroke-focus: #{$leitvia-studio-accent};
+}
+
+// Open Sans (inline @font-face of Admin::enqueue()) for headings only; body text keeps the system font of wp-admin.
+.leitvia-studio :is(h1, h2, h3),
+.leitvia-studio-brand__name {
+	font-family: "Open Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.leitvia-studio h1.wp-heading-inline {
+	font-weight: 700;
+}
+
+.leitvia-studio :is(h2, h3) {
+	font-weight: 600;
+}
+
+// Plain links of the screens in the accent: 5.22:1 on white, 4.59:1 on the admin background #f0f0f1.
+.leitvia-studio a:not(.components-button) {
+	color: var(--wp-admin-theme-color);
+
+	&:hover,
+	&:active {
+		color: var(--wp-admin-theme-color-darker-20);
+	}
+}
+
+// Product line: Leitvia mark, name and maker, closed by a 2 px rule in the accent, like the head of CMS ADMINS documents.
+.leitvia-studio-brand {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 12px;
+	align-items: center;
+	margin: 0 0 8px;
+	padding-bottom: 8px;
+	border-bottom: 2px solid var(--wp-admin-theme-color);
+}
+
+.leitvia-studio-brand__logo {
+	width: auto;
+	height: 20px;
+}
+
+.leitvia-studio-brand__name {
+	font-size: 14px;
+	font-weight: 700;
+}
+
+// "by CMS ADMINS" stays a plain link in the accent (rule above), a size smaller than the name.
+.leitvia-studio-brand__by {
+	font-size: 12px;
+}
+
+.leitvia-studio {
+	.dataviews-wrapper {
+		margin-top: 16px;
+	}
+}
+
+.leitvia-studio__snackbars {
+	position: fixed;
+	bottom: 24px;
+	z-index: 100000;
+}
+
+// The iframe keeps the width of the chosen viewport and is scaled down from the top left corner.
+.leitvia-studio-preview-frame {
+	position: relative;
+	overflow: hidden;
+	width: 100%;
+	min-width: 0;
+
+	iframe {
+		position: absolute;
+		top: 0;
+		left: 0;
+		border: 0;
+		transform-origin: 0 0;
+	}
+
+	.dataviews-view-grid & {
+		height: 100%;
+		pointer-events: none;
+	}
+}
+
+.leitvia-studio-detail,
+.leitvia-studio-settings__form {
+	box-sizing: border-box;
+	margin-top: 16px;
+	padding: 16px;
+	// The surface DataViews uses, so help texts and labels of @wordpress/components keep their contrast.
+	background: var(--wp-components-color-background, #fff);
+
+	@media (min-width: 782px) {
+		padding: 24px;
+	}
+}
+
+// Titles of grid cards are links; give them a 24 px target (WCAG 2.5.8).
+.leitvia-studio .dataviews-view-grid .dataviews-title-field a {
+	display: inline-block;
+	min-height: 24px;
+	line-height: 24px;
+}
+
+// Grid cards show few fields: label and value side by side on one baseline instead of a 35/65 split.
+.leitvia-studio .dataviews-view-grid .dataviews-view-grid__field {
+	gap: 8px;
+	align-items: baseline;
+
+	.dataviews-view-grid__field-name,
+	.dataviews-view-grid__field-value {
+		width: auto;
+		padding-top: 0;
+	}
+}
+
+.leitvia-studio-detail__title {
+	margin: 0;
+	font-size: 1.3em;
+}
+
+.leitvia-studio-detail__status {
+	margin: 0;
+}
+
+.leitvia-studio-detail__layout {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 32px;
+
+	@media (min-width: 1280px) {
+		grid-template-columns: minmax(0, 1fr) 320px;
+	}
+}
+
+.leitvia-studio-detail__main,
+.leitvia-studio-detail__side {
+	min-width: 0;
+
+	h3 {
+		margin: 0;
+	}
+}
+
+// Five and more panel tabs wrap instead of widening the page at 320 px (WCAG 1.4.10).
+.leitvia-studio-lab-panels .components-tab-panel__tabs {
+	flex-wrap: wrap;
+}
+
+.leitvia-studio-lab-panels__content {
+	padding-top: 16px;
+}
+
+.leitvia-studio-changelog,
+.leitvia-studio-variants,
+.leitvia-studio-states,
+.leitvia-studio-check-list,
+.leitvia-studio-usage {
+	margin: 0;
+	padding-left: 1.2em;
+	list-style: disc;
+}
+
+// Long rule names and selectors wrap instead of widening the table.
+.leitvia-studio-checks-table {
+	overflow-wrap: anywhere;
+
+	caption {
+		text-align: left;
+		font-weight: 600;
+		padding-bottom: 8px;
+	}
+}
+
+// Hidden frame of the accessibility check: laid out at its real width, out of view.
+.leitvia-studio-axe-frame {
+	position: absolute;
+	top: 0;
+	left: -100000px;
+	border: 0;
+}
+
+.leitvia-studio-changelog__new {
+	margin: 0;
+	padding: 0;
+	border: 0;
+
+	legend {
+		margin-bottom: 8px;
+		font-weight: 600;
+
+		// Focused by script after a removal (tabindex -1); the focus ring of the admin theme marks it.
+		&:focus-visible {
+			outline: 2px solid var(--wp-admin-theme-color);
+			outline-offset: 2px;
+		}
+	}
+}
+
+.leitvia-studio-meta-form__label {
+	font-weight: 600;
+}
+
+.leitvia-studio-detail__controls .components-toggle-group-control {
+	min-width: 260px;
+}
+
+.leitvia-studio-gallery__header {
+	margin-top: 16px;
+}
+
+.leitvia-studio-annotations {
+	margin: 0;
+	padding-left: 1.2em;
+}
+
+.leitvia-studio-annotations__entry {
+	margin: 0 0 16px;
+	padding: 0;
+	border: 0;
+
+	legend {
+		margin-bottom: 8px;
+		font-weight: 600;
+	}
+}
+
+.leitvia-studio-annotations__heading,
+.leitvia-studio-usage__heading {
+	margin: 0;
+}
+
+.leitvia-studio-import__label {
+	display: block;
+	margin-bottom: 8px;
+	font-weight: 600;
+}
+
+// Inputs and selects of the bundled DataViews (@wordpress/components 42) draw their focus ring through a stylesheet
+// rule that the wp-components stylesheet of WordPress 7.1 does not have yet; without it the search field and the page
+// select show no focus (WCAG 2.4.7).
+.leitvia-studio .components-input-control__container:focus-within:not(:has(:is(.components-input-control__prefix, .components-input-control__suffix):focus-within)) .components-input-control__backdrop {
+	outline: var(--wp-admin-border-width-focus, 2px) solid var(--wp-admin-theme-color, #3858e9);
+	outline-offset: var(--wp-admin-border-width-focus, 2px);
+}
+
+// The admin bar and the footer of DataViews stick to the viewport; focused elements scroll clear of both (WCAG 2.4.11).
+.leitvia-studio .dataviews-wrapper * {
+	scroll-margin-top: 48px;
+	scroll-margin-bottom: 80px;
+}
+
+// Titles wrap instead of ending in an ellipsis, so enlarged text stays readable (WCAG 1.4.4, 1.4.12).
+.leitvia-studio .dataviews-title-field,
+.leitvia-studio .dataviews-title-field a {
+	overflow: visible;
+	white-space: normal;
+	text-overflow: clip;
+	overflow-wrap: anywhere;
+}

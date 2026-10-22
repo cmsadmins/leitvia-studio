@@ -1,0 +1,8 @@
+// The table, its cards below 600 px and the hidden cell labels come from the
+// comparison table, whose classes the rendered block carries. Only the
+// highlighted product column is new.
+.wp-block-leitvia-product-compare td.is-highlighted-column,
+.wp-block-leitvia-product-compare th.is-highlighted-column {
+	background: var(--wp--preset--color--surface-alt, transparent);
+	font-weight: 600;
+}

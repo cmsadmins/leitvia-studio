@@ -1,0 +1,1 @@
+{ "version": 1, "postTypes": { "event_with_a_long_key": { "label": "Events", "singularLabel": "Event" } } }

@@ -1,0 +1,49 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "leitvia/query-filter",
+	"version": "0.1.0",
+	"title": "Query filter",
+	"category": "leitvia",
+	"icon": "filter",
+	"description": "Lets visitors filter the posts of the surrounding Query Loop by terms and custom fields. The filters live in the URL and work without JavaScript.",
+	"keywords": [ "facets", "filter", "search" ],
+	"textdomain": "leitvia-studio",
+	"ancestor": [ "core/query" ],
+	"usesContext": [ "queryId", "query" ],
+	"attributes": {
+		"label": {
+			"type": "string",
+			"default": ""
+		},
+		"facets": {
+			"type": "array",
+			"default": [ { "key": "category", "control": "checkbox" } ],
+			"items": {
+				"type": "object",
+				"properties": {
+					"key": { "type": "string" },
+					"control": { "type": "string", "enum": [ "checkbox", "select" ] }
+				}
+			}
+		}
+	},
+	"supports": {
+		"html": false,
+		"reusable": false,
+		"interactivity": {
+			"clientNavigation": true
+		},
+		"spacing": {
+			"margin": true,
+			"padding": true
+		}
+	},
+	"example": {
+		"attributes": { "label": "Filter posts" }
+	},
+	"editorScript": "file:./index.js",
+	"style": "file:./style-index.css",
+	"viewScriptModule": "file:./view.js",
+	"render": "file:./render.php"
+}

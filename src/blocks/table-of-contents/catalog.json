@@ -1,0 +1,7 @@
+{
+	"usage": {
+		"useWhen": "Long pages or articles with several h2 and h3 headings.",
+		"avoidWhen": "Short pages with fewer than three headings.",
+		"a11y": "The list is a navigation landmark with links to the headings; the section being read is marked."
+	}
+}

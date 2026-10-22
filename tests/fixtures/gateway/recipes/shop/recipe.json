@@ -1,0 +1,14 @@
+{
+	"name": "shop",
+	"title": "Test shop",
+	"description": "A recipe of a test add-on that needs a plugin which is not installed.",
+	"requires": [ "leitvia-test-missing-plugin" ],
+	"pages": [
+		{
+			"slug": "shop-home",
+			"title": "Shop",
+			"frame": "contact",
+			"sections": [ "leitvia/content-faq" ]
+		}
+	]
+}

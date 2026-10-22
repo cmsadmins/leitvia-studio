@@ -1,0 +1,29 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "leitvia/marquee",
+	"version": "0.1.0",
+	"title": "Marquee",
+	"category": "leitvia",
+	"icon": "leftright",
+	"description": "A list of logos or short statements that scrolls sideways, with a Pause button. Without JavaScript or with reduced motion it stays a still list.",
+	"keywords": [ "ticker", "logos", "carousel" ],
+	"textdomain": "leitvia-studio",
+	"allowedBlocks": [ "core/list" ],
+	"supports": {
+		"anchor": true,
+		"align": [ "wide", "full" ],
+		"html": false,
+		"interactivity": true,
+		"spacing": {
+			"margin": true,
+			"padding": true
+		}
+	},
+	"example": {
+		"innerBlocks": [ { "name": "core/list", "innerBlocks": [ { "name": "core/list-item", "attributes": { "content": "Fast setup" } }, { "name": "core/list-item", "attributes": { "content": "Accessible" } }, { "name": "core/list-item", "attributes": { "content": "Private" } } ] } ]
+	},
+	"editorScript": "file:./index.js",
+	"style": "file:./style-index.css",
+	"viewScriptModule": "file:./view.js"
+}

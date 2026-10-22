@@ -1,0 +1,44 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "leitvia/feature-item",
+	"version": "0.1.0",
+	"title": "Feature",
+	"category": "leitvia",
+	"icon": "yes",
+	"description": "One feature with title, text and the plan that includes it.",
+	"keywords": [ "feature", "benefit" ],
+	"textdomain": "leitvia-studio",
+	"parent": [ "leitvia/feature-group" ],
+	"attributes": {
+		"title": {
+			"type": "rich-text",
+			"source": "rich-text",
+			"selector": ".wp-block-leitvia-feature-item__title"
+		},
+		"text": {
+			"type": "rich-text",
+			"source": "rich-text",
+			"selector": ".wp-block-leitvia-feature-item__text"
+		},
+		"plan": {
+			"type": "string",
+			"source": "text",
+			"selector": ".wp-block-leitvia-feature-item__badge",
+			"default": ""
+		},
+		"planIndex": {
+			"type": "number",
+			"default": 0
+		}
+	},
+	"supports": {
+		"html": false,
+		"reusable": false
+	},
+	"example": {
+		"attributes": { "title": "Unlimited pages", "text": "Add as many pages as you need." }
+	},
+	"editorScript": "file:./index.js",
+	"style": "file:./style-index.css"
+}

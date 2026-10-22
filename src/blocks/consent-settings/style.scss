@@ -1,0 +1,90 @@
+// Also the style of the consent placeholder (Consent::placeholder() enqueues it), which belongs to no block.
+
+// The placeholder keeps the aspect ratio of the embed, so loading the content does not shift the page. Core reserves
+// it with a padding on the wrapper; the placeholder takes over until the content loads and the class goes away.
+.wp-embed-responsive .wp-block-embed.has-leitvia-consent .wp-block-embed__wrapper::before {
+	content: none;
+}
+
+$ratios: (
+	"21-9": "21 / 9",
+	"18-9": "18 / 9",
+	"16-9": "16 / 9",
+	"4-3": "4 / 3",
+	"1-1": "1 / 1",
+	"9-16": "9 / 16",
+	"1-2": "1 / 2",
+);
+
+@each $name, $ratio in $ratios {
+	.wp-embed-aspect-#{$name} .leitvia-consent__placeholder {
+		aspect-ratio: #{$ratio};
+	}
+}
+
+.leitvia-consent__placeholder {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	gap: var(--wp--preset--spacing--xs, 0.5rem);
+	box-sizing: border-box;
+	padding: var(--wp--preset--spacing--m, 1.5rem);
+	border: 1px solid var(--wp--preset--color--stroke, currentcolor);
+	background: var(--wp--preset--color--surface-alt, transparent);
+	color: var(--wp--preset--color--ink, inherit);
+
+	> p {
+		margin: 0;
+	}
+
+	&[hidden] {
+		display: none;
+	}
+}
+
+// Controls without JavaScript carry hidden and only take their space, so showing them after hydration shifts nothing.
+.leitvia-consent__actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--wp--preset--spacing--s, 1rem);
+
+	&[hidden] {
+		visibility: hidden;
+	}
+}
+
+// The sentence for visitors without JavaScript and the list share one cell for the same reason.
+.wp-block-leitvia-consent-settings__state {
+	display: grid;
+
+	> * {
+		grid-area: 1 / 1;
+	}
+
+	> [hidden] {
+		display: block;
+		visibility: hidden;
+	}
+}
+
+.wp-block-leitvia-consent-settings__list {
+	padding-inline-start: 0;
+	list-style: none;
+
+	li {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--wp--preset--spacing--s, 1rem);
+		padding-block: var(--wp--preset--spacing--xs, 0.5rem);
+		border-block-end: 1px solid var(--wp--preset--color--stroke, currentcolor);
+	}
+}
+
+// Focus ring in the focus role of the contract, as the theme draws it on links and buttons (WCAG 2.4.7, 2.4.13).
+:is(.leitvia-consent__placeholder, .wp-block-leitvia-consent-settings) :is(input, button):focus-visible {
+	outline: 0.125rem solid var(--wp--preset--color--focus, currentcolor);
+	outline-offset: 0.125rem;
+}

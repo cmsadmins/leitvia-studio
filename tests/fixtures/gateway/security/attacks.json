@@ -1,0 +1,41 @@
+{
+	"attributes": [
+		"<script>alert(1)</script>",
+		"\"><script>alert(1)</script>",
+		"\" onmouseover=\"alert(1)",
+		"' onfocus='alert(1)' autofocus='",
+		"<img src=x onerror=alert(1)>",
+		"<svg onload=alert(1)>",
+		"<svg><a xlink:href=\"javascript:alert(1)\"><text>x</text></a></svg>",
+		"javascript:alert(1)",
+		"JaVaScRiPt:alert(1)",
+		" java\tscript:alert(1)",
+		"java&#x73;cript:alert(1)",
+		"&#106;avascript:alert(1)",
+		"vbscript:msgbox(1)",
+		"data:text/html,<script>alert(1)</script>",
+		"data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==",
+		"url(javascript:alert(1))",
+		"--><script>alert(1)</script><!--",
+		"\\u003cscript\\u003ealert(1)\\u003c/script\\u003e"
+	],
+	"markup": {
+		"script": "<!-- wp:paragraph --><p>Hi<script>alert(1)</script></p><!-- /wp:paragraph -->",
+		"event": "<!-- wp:paragraph --><p onclick=\"alert(1)\">Hi</p><!-- /wp:paragraph -->",
+		"javascript_href": "<!-- wp:paragraph --><p><a href=\"javascript:alert(1)\">Hi</a></p><!-- /wp:paragraph -->",
+		"entity_href": "<!-- wp:paragraph --><p><a href=\"&#106;avascript:alert(1)\">Hi</a></p><!-- /wp:paragraph -->",
+		"data_attribute": "<!-- wp:paragraph --><p data-href=\"javascript:alert(1)\">Hi</p><!-- /wp:paragraph -->",
+		"data_attribute_tab": "<!-- wp:paragraph --><p data-url=\"java&#9;script:alert(1)\">Hi</p><!-- /wp:paragraph -->",
+		"svg": "<!-- wp:paragraph --><p><svg onload=\"alert(1)\"><circle r=\"1\"/></svg></p><!-- /wp:paragraph -->",
+		"svg_image": "<!-- wp:image --><figure class=\"wp-block-image\"><img src=\"data:image/svg+xml,%3Csvg onload=alert(1)%3E\" alt=\"Dot\"/></figure><!-- /wp:image -->",
+		"iframe": "<!-- wp:paragraph --><p><iframe src=\"https://example.com\"></iframe></p><!-- /wp:paragraph -->",
+		"style": "<!-- wp:paragraph --><p style=\"background:url(javascript:alert(1))\">Hi</p><!-- /wp:paragraph -->",
+		"base64": "<!-- wp:image --><figure class=\"wp-block-image\"><img src=\"data:image/png;base64,iVBORw0KGgo=\" alt=\"Dot\"/></figure><!-- /wp:image -->",
+		"html_block": "<!-- wp:html --><p>Raw</p><!-- /wp:html -->",
+		"classic": "<p onclick=\"alert(1)\">Loose markup</p>",
+		"unicode_attribute": "<!-- wp:paragraph {\"metadata\":{\"name\":\"\\u003cscript\\u003ealert(1)\\u003c/script\\u003e\"}} --><p>Hi</p><!-- /wp:paragraph -->",
+		"unicode_url": "<!-- wp:navigation-link {\"label\":\"Home\",\"url\":\"\\u006aavascript:alert(1)\",\"kind\":\"custom\"} /-->",
+		"comment_break": "<!-- wp:paragraph --><p>--><script>alert(1)</script><!--</p><!-- /wp:paragraph -->",
+		"nested": "<!-- wp:group --><div class=\"wp-block-group\"><!-- wp:paragraph --><p>Fine</p><!-- /wp:paragraph --><!-- wp:image {\"url\":\"javascript:alert(1)\"} --><figure class=\"wp-block-image\"><img alt=\"x\"/></figure><!-- /wp:image --></div><!-- /wp:group -->"
+	}
+}

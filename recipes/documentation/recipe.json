@@ -1,0 +1,58 @@
+{
+	"name": "documentation",
+	"title": "Documentation",
+	"description": "Product documentation: a home page, a documentation section with a page tree and search beside the content, and a contact page.",
+	"variation": "swiss-editorial-light",
+	"templateParts": {
+		"header": "leitvia/header-search",
+		"footer": "leitvia/footer-minimal"
+	},
+	"pages": [
+		{
+			"slug": "home",
+			"title": "Home",
+			"frame": "home",
+			"sections": [ "leitvia/hero-editorial", "leitvia/content-feature-grid", "leitvia/content-quote", "leitvia/content-steps", "leitvia/cta-contact" ]
+		},
+		{
+			"slug": "docs",
+			"title": "Documentation",
+			"frame": "contact",
+			"template": "page-docs",
+			"sections": [ "leitvia/content-two-columns", "leitvia/content-steps" ]
+		},
+		{
+			"slug": "getting-started",
+			"title": "Getting started",
+			"frame": "contact",
+			"template": "page-docs",
+			"parent": "docs",
+			"sections": [ "leitvia/content-steps", "leitvia/content-faq" ]
+		},
+		{
+			"slug": "configuration",
+			"title": "Configuration",
+			"frame": "contact",
+			"template": "page-docs",
+			"parent": "docs",
+			"sections": [ "leitvia/content-two-columns", "leitvia/content-faq" ]
+		},
+		{
+			"slug": "contact",
+			"title": "Contact",
+			"frame": "contact",
+			"kind": "contact",
+			"sections": [ "leitvia/cta-contact", "leitvia/content-faq" ]
+		}
+	],
+	"navigation": [ "docs", "contact" ],
+	"reading": {
+		"show_on_front": "page",
+		"page_on_front": "home"
+	},
+	"options": {
+		"default_pingback_flag": "0",
+		"default_ping_status": "closed",
+		"default_comment_status": "closed"
+	}
+}

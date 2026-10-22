@@ -1,0 +1,7 @@
+{
+	"usage": {
+		"useWhen": "One plan inside a pricing block, with its prices and features.",
+		"avoidWhen": "Outside a pricing block; it only works as its child.",
+		"a11y": "Mark the recommended plan with the badge text, not by color alone."
+	}
+}

@@ -1,0 +1,16 @@
+{
+	"name": "example-home",
+	"template": "page-landing",
+	"sections": [
+		"leitvia/hero-split-image",
+		"leitvia/proof-logos",
+		"leitvia/teaser-services",
+		"leitvia/proof-testimonial",
+		"leitvia/content-text-media",
+		"leitvia/content-stats",
+		"leitvia/teaser-posts-list",
+		"leitvia/cta-banner"
+	],
+	"issues": [],
+	"score": 100
+}

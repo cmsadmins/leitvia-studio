@@ -1,0 +1,22 @@
+.wp-block-leitvia-counter__number {
+	margin: 0;
+	font-size: var(--wp--preset--font-size--heading-l, 2.5rem);
+	font-weight: 700;
+	line-height: 1.1;
+	font-variant-numeric: tabular-nums;
+}
+
+// The value keeps its end width (min-inline-size in ch from save.js); view.js lays the counting copy over it.
+.wp-block-leitvia-counter__value {
+	display: inline-block;
+	position: relative;
+}
+
+.wp-block-leitvia-counter__count {
+	position: absolute;
+	inset: 0;
+}
+
+.wp-block-leitvia-counter__label {
+	margin-block: 0.25em 0;
+}

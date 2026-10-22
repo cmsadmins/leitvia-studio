@@ -1,0 +1,95 @@
+// Wide tables scroll inside the figure, which is focusable so the arrow keys scroll it (as core--table.css in the
+// theme). Below 600 px every row becomes a card; the column names come from data-label and, for assistive technology,
+// from the visually hidden label in each cell.
+.wp-block-leitvia-comparison-table {
+	overflow-x: auto;
+
+	&:focus-visible {
+		outline: 0.125rem solid var(--wp--preset--color--focus, currentcolor);
+		outline-offset: 0.125rem;
+	}
+
+	table {
+		inline-size: 100%;
+		border-collapse: collapse;
+		font-variant-numeric: tabular-nums;
+	}
+
+	caption {
+		margin-block-end: var(--wp--preset--spacing--xs, 0.5rem);
+		font-weight: 600;
+		text-align: start;
+	}
+
+	th,
+	td {
+		padding: var(--wp--preset--spacing--xs, 0.5rem) var(--wp--preset--spacing--s, 1rem);
+		border-block-end: 1px solid var(--wp--preset--color--stroke, currentcolor);
+		text-align: start;
+		vertical-align: baseline;
+	}
+
+	thead th {
+		border-block-end-color: var(--wp--preset--color--ink, currentcolor);
+	}
+
+	.is-highlighted > * {
+		background: var(--wp--preset--color--surface-alt, transparent);
+		font-weight: 600;
+	}
+}
+
+.wp-block-leitvia-comparison-table__label {
+	display: none;
+}
+
+.wp-block-leitvia-comparison-table__source {
+	margin-block-start: var(--wp--preset--spacing--xs, 0.5rem);
+	color: var(--wp--preset--color--ink-muted, inherit);
+	font-size: var(--wp--preset--font-size--meta, 0.875rem);
+}
+
+@mixin visually-hidden {
+	position: absolute;
+	inline-size: 1px;
+	block-size: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+@media (max-width: 599px) {
+	.wp-block-leitvia-comparison-table {
+		thead {
+			@include visually-hidden;
+		}
+
+		tr,
+		th,
+		td {
+			display: block;
+		}
+
+		tr {
+			margin-block-end: var(--wp--preset--spacing--s, 1rem);
+			border: 1px solid var(--wp--preset--color--stroke, currentcolor);
+		}
+
+		tr > :last-child {
+			border-block-end: 0;
+		}
+
+		// The visible name; the alternative text "" keeps it out of the accessibility tree, where the hidden label speaks.
+		td[data-label]::before {
+			content: attr(data-label) ": ";
+			content: attr(data-label) ": " / "";
+			font-weight: 600;
+		}
+	}
+
+	.wp-block-leitvia-comparison-table__label {
+		display: inline;
+
+		@include visually-hidden;
+	}
+}

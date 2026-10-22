@@ -1,0 +1,25 @@
+{
+	"name": "density-run",
+	"template": "page-landing",
+	"sections": [
+		"leitvia/hero-centered",
+		"leitvia/content-steps",
+		"leitvia/teaser-cards-3",
+		"leitvia/content-quote",
+		"leitvia/content-text-media",
+		"leitvia/content-feature-grid",
+		"leitvia/teaser-services",
+		"leitvia/cta-banner"
+	],
+	"issues": [
+		[
+			"noAdjacentRepeat",
+			2
+		],
+		[
+			"maxDensityRun",
+			6
+		]
+	],
+	"score": 85
+}

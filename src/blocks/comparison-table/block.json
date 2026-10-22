@@ -1,0 +1,57 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "leitvia/comparison-table",
+	"version": "0.1.0",
+	"title": "Comparison table",
+	"category": "leitvia",
+	"icon": "editor-table",
+	"description": "A table with caption, row and column headers, an optional computed column and its source. Shown as cards on small screens.",
+	"keywords": [ "table", "compare", "matrix" ],
+	"textdomain": "leitvia-studio",
+	"attributes": {
+		"caption": {
+			"type": "string",
+			"default": ""
+		},
+		"columns": {
+			"type": "array",
+			"items": { "type": "string" },
+			"default": [ "", "", "" ]
+		},
+		"rows": {
+			"type": "array",
+			"items": { "type": "array", "items": { "type": "string" } },
+			"default": [ [ "", "", "" ], [ "", "", "" ] ]
+		},
+		"highlightRow": {
+			"type": "number",
+			"default": -1
+		},
+		"computed": {
+			"type": "object",
+			"default": {}
+		},
+		"source": {
+			"type": "string",
+			"default": ""
+		},
+		"sourceDate": {
+			"type": "string",
+			"default": ""
+		},
+		"labels": {
+			"type": "object"
+		}
+	},
+	"supports": {
+		"anchor": true,
+		"align": [ "wide" ],
+		"html": false
+	},
+	"example": {
+		"attributes": { "caption": "Plans compared", "columns": [ "Feature", "Basic", "Pro" ], "rows": [ [ "Users", "1", "10" ], [ "Support", "Email", "Phone" ] ] }
+	},
+	"editorScript": "file:./index.js",
+	"style": "file:./style-index.css"
+}

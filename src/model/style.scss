@@ -1,0 +1,57 @@
+// Layout of the Content Model screen; colours and type come from wp-admin and @wordpress/components.
+.leitvia-studio-model__panel {
+	margin-top: 16px;
+}
+
+.leitvia-studio-model__declaration h2 {
+	margin: 0 0 8px;
+	font-size: 1.1em;
+}
+
+.leitvia-studio-model__code {
+	max-height: 240px;
+	overflow: auto;
+	margin: 0;
+	padding: 8px;
+	background: var(--wp-components-color-background, #fff);
+	border: 1px solid #ddd;
+}
+
+.leitvia-studio-model__label {
+	display: block;
+	font-weight: 600;
+}
+
+.leitvia-studio-model__declaration .CodeMirror {
+	height: 480px;
+	border: 1px solid #8c8f94;
+}
+
+.leitvia-studio-model__errors li {
+	margin-bottom: 4px;
+}
+
+.leitvia-studio-model__settings {
+	max-width: 480px;
+}
+
+.leitvia-studio-model__facts {
+	display: grid;
+	grid-template-columns: max-content 1fr;
+	gap: 4px 16px;
+	margin: 0 0 16px;
+
+	dt {
+		font-weight: 600;
+	}
+
+	dd {
+		margin: 0;
+	}
+}
+
+// DataViews styles its title column as plain bold text; the label stays recognisable as a button.
+.leitvia-studio .dataviews-title-field button.components-button.is-link.leitvia-studio-model__open {
+	min-height: 24px;
+	text-decoration: underline;
+}

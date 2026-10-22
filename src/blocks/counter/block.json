@@ -1,0 +1,59 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "leitvia/counter",
+	"version": "0.1.0",
+	"title": "Counter",
+	"category": "leitvia",
+	"icon": "chart-bar",
+	"description": "A key figure with prefix, suffix and label that counts up once it comes into view.",
+	"keywords": [ "number", "statistic", "key figure" ],
+	"textdomain": "leitvia-studio",
+	"attributes": {
+		"prefix": {
+			"type": "string",
+			"source": "text",
+			"selector": ".wp-block-leitvia-counter__prefix",
+			"default": ""
+		},
+		"value": {
+			"type": "string",
+			"source": "text",
+			"selector": ".wp-block-leitvia-counter__value",
+			"default": ""
+		},
+		"suffix": {
+			"type": "string",
+			"source": "text",
+			"selector": ".wp-block-leitvia-counter__suffix",
+			"default": ""
+		},
+		"label": {
+			"type": "rich-text",
+			"source": "rich-text",
+			"selector": ".wp-block-leitvia-counter__label"
+		}
+	},
+	"supports": {
+		"anchor": true,
+		"html": false,
+		"spacing": {
+			"margin": true,
+			"padding": true
+		},
+		"color": {
+			"background": true,
+			"text": true,
+			"link": false
+		},
+		"typography": {
+			"textAlign": true
+		}
+	},
+	"example": {
+		"attributes": { "value": "1250", "suffix": "+", "label": "Projects delivered" }
+	},
+	"editorScript": "file:./index.js",
+	"style": "file:./style-index.css",
+	"viewScriptModule": "file:./view.js"
+}

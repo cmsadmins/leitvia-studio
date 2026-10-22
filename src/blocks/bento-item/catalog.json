@@ -1,0 +1,7 @@
+{
+	"usage": {
+		"useWhen": "One tile inside a bento grid; choose the size by the weight of its content.",
+		"avoidWhen": "Outside a bento grid; it only works as its child.",
+		"a11y": "Start each tile with a heading of the right level so the grid can be scanned by headings."
+	}
+}

@@ -1,0 +1,22 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"$id": "https://leitvia.com/schemas/news/profile-page.schema.json",
+	"title": "Author profile page",
+	"description": "A ProfilePage whose main entity is the person the page is about, with name and page address and, where there is one, a short biography.",
+	"type": "object",
+	"required": [ "@context", "@type", "mainEntity" ],
+	"properties": {
+		"@context": { "const": "https://schema.org" },
+		"@type": { "const": "ProfilePage" },
+		"mainEntity": {
+			"type": "object",
+			"required": [ "@type", "name", "url" ],
+			"properties": {
+				"@type": { "enum": [ "Person", "Organization" ] },
+				"name": { "type": "string", "minLength": 1 },
+				"url": { "type": "string", "pattern": "^https?://\\S+$" },
+				"description": { "type": "string", "minLength": 1 }
+			}
+		}
+	}
+}

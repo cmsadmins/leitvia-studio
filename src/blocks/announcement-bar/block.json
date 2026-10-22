@@ -1,0 +1,56 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "leitvia/announcement-bar",
+	"version": "0.2.0",
+	"title": "Announcement bar",
+	"category": "leitvia",
+	"icon": "megaphone",
+	"description": "A one-line announcement with an optional link, as a full-width band at the top of the header. Visitors can dismiss it; it returns when its text changes.",
+	"keywords": [ "notice", "banner", "news" ],
+	"textdomain": "leitvia-studio",
+	"attributes": {
+		"text": {
+			"type": "rich-text",
+			"source": "rich-text",
+			"selector": ".wp-block-leitvia-announcement-bar__text"
+		},
+		"label": {
+			"type": "string",
+			"source": "attribute",
+			"selector": "section",
+			"attribute": "aria-label"
+		},
+		"align": {
+			"type": "string",
+			"default": "full"
+		}
+	},
+	"supports": {
+		"anchor": true,
+		"align": [ "full", "wide" ],
+		"html": false,
+		"multiple": false,
+		"color": {
+			"background": true,
+			"text": true,
+			"link": true
+		},
+		"spacing": {
+			"padding": true
+		},
+		"typography": {
+			"fontSize": true
+		}
+	},
+	"styles": [
+		{ "name": "default", "label": "Quiet", "isDefault": true },
+		{ "name": "inverse", "label": "Inverse" }
+	],
+	"example": {
+		"attributes": { "text": "Open day on 14 November.", "label": "Announcement" }
+	},
+	"editorScript": "file:./index.js",
+	"style": "file:./style-index.css",
+	"viewScriptModule": "file:./view.js"
+}

@@ -1,0 +1,68 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "leitvia/map",
+	"version": "0.1.0",
+	"title": "Map",
+	"category": "leitvia",
+	"icon": "location-alt",
+	"description": "A list of places with links to OpenStreetMap, plus an interactive map that loads only after the visitor agrees.",
+	"keywords": [ "openstreetmap", "location", "address" ],
+	"textdomain": "leitvia-studio",
+	"attributes": {
+		"heading": {
+			"type": "rich-text",
+			"source": "rich-text",
+			"selector": ".wp-block-leitvia-map__heading"
+		},
+		"lat": {
+			"type": "number",
+			"default": 52.52
+		},
+		"lng": {
+			"type": "number",
+			"default": 13.405
+		},
+		"zoom": {
+			"type": "integer",
+			"default": 13
+		},
+		"markers": {
+			"type": "array",
+			"default": [],
+			"items": {
+				"type": "object",
+				"properties": {
+					"title": { "type": "string" },
+					"address": { "type": "string" },
+					"lat": { "type": "number" },
+					"lng": { "type": "number" }
+				}
+			}
+		},
+		"linkText": {
+			"type": "string",
+			"default": "View on OpenStreetMap"
+		},
+		"height": {
+			"type": "string",
+			"enum": [ "small", "medium", "large" ],
+			"default": "medium"
+		}
+	},
+	"supports": {
+		"anchor": true,
+		"align": [ "wide", "full" ],
+		"html": false,
+		"spacing": {
+			"margin": true,
+			"padding": true
+		}
+	},
+	"example": {
+		"attributes": { "heading": "Our office", "markers": [ { "title": "Office", "address": "Alexanderplatz 1, Berlin", "lat": 52.5219, "lng": 13.4132 } ] }
+	},
+	"editorScript": "file:./index.js",
+	"style": "file:./style-index.css",
+	"viewScriptModule": "file:./view.js"
+}

@@ -1,0 +1,17 @@
+{
+	"name": "adjacent-repeat",
+	"template": "page-landing",
+	"sections": [
+		"leitvia/hero-centered",
+		"leitvia/content-text-media",
+		"leitvia/content-two-columns",
+		"leitvia/cta-banner"
+	],
+	"issues": [
+		[
+			"noAdjacentRepeat",
+			2
+		]
+	],
+	"score": 90
+}

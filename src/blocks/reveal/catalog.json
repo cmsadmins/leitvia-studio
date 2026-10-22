@@ -1,0 +1,7 @@
+{
+	"usage": {
+		"useWhen": "Subtle emphasis for one or two sections that scroll into view on a landing page.",
+		"avoidWhen": "Every section or content needed right away; motion on every block distracts.",
+		"a11y": "The content is always in the markup; the effect is skipped with reduced motion and in browsers without scroll-driven animation."
+	}
+}

@@ -1,0 +1,439 @@
+{
+	"$schema": "https://www.designtokens.org/schemas/2025.10/format.json",
+	"$description": "Tokens exported by a design tool, with metadata Leitvia does not use.",
+	"$extensions": {
+		"com.leitvia": {
+			"contractVersion": "1.1.0"
+		},
+		"org.example.design-tool": {
+			"fileKey": "a1b2c3",
+			"exportedAt": "2026-10-17T09:00:00Z",
+			"weight": 1.0,
+			"flags": {},
+			"modes": [],
+			"deep": {
+				"a": {
+					"b": {}
+				}
+			},
+			"indexed": {
+				"0": "first"
+			}
+		}
+	},
+	"base": {
+		"$type": "color",
+		"$description": "Primitive colors, referenced by the roles.",
+		"green-700": {
+			"$value": {
+				"colorSpace": "srgb",
+				"components": [
+					0.1843,
+					0.3647,
+					0.3137
+				],
+				"hex": "#2f5d50"
+			}
+		},
+		"blue-700": {
+			"$value": {
+				"colorSpace": "srgb",
+				"components": [
+					0.1137,
+					0.3059,
+					0.8471
+				],
+				"hex": "#1d4ed8"
+			},
+			"$deprecated": "Use the focus role instead."
+		}
+	},
+	"color": {
+		"$type": "color",
+		"$description": "Color roles of the Leitvia contract.",
+		"surface": {
+			"$value": {
+				"colorSpace": "srgb",
+				"components": [
+					0.9686,
+					0.9569,
+					0.9333
+				],
+				"hex": "#f7f4ee"
+			}
+		},
+		"surface-alt": {
+			"$value": {
+				"colorSpace": "srgb",
+				"components": [
+					0.9373,
+					0.9137,
+					0.8706
+				],
+				"hex": "#efe9de"
+			}
+		},
+		"ink": {
+			"$value": {
+				"colorSpace": "srgb",
+				"components": [
+					0.1098,
+					0.102,
+					0.0902
+				],
+				"hex": "#1c1a17"
+			}
+		},
+		"ink-muted": {
+			"$value": {
+				"colorSpace": "srgb",
+				"components": [
+					0.3412,
+					0.3176,
+					0.2902
+				],
+				"hex": "#57514a"
+			}
+		},
+		"accent": {
+			"$value": "{base.green-700}",
+			"$extensions": {
+				"org.example.design-tool": {
+					"variableId": "VariableID:12:34"
+				}
+			}
+		},
+		"on-accent": {
+			"$value": {
+				"colorSpace": "srgb",
+				"components": [
+					1.0,
+					1.0,
+					1.0
+				],
+				"hex": "#ffffff"
+			}
+		},
+		"stroke": {
+			"$value": {
+				"colorSpace": "srgb",
+				"components": [
+					0.8118,
+					0.7765,
+					0.7137
+				],
+				"hex": "#cfc6b6"
+			}
+		},
+		"focus": {
+			"$value": "{base.blue-700}"
+		},
+		"success": {
+			"$value": {
+				"colorSpace": "srgb",
+				"components": [
+					0.1804,
+					0.4196,
+					0.2275
+				],
+				"hex": "#2e6b3a"
+			}
+		},
+		"warning": {
+			"$value": {
+				"colorSpace": "srgb",
+				"components": [
+					0.4784,
+					0.3098,
+					0.0
+				],
+				"hex": "#7a4f00"
+			},
+			"$deprecated": true
+		},
+		"danger": {
+			"$value": {
+				"colorSpace": "srgb",
+				"components": [
+					0.6392,
+					0.1412,
+					0.1686
+				],
+				"hex": "#a3242b"
+			}
+		}
+	},
+	"fontSize": {
+		"$type": "dimension",
+		"meta": {
+			"$value": {
+				"value": 0.875,
+				"unit": "rem"
+			}
+		},
+		"body": {
+			"$value": {
+				"value": 1.125,
+				"unit": "rem"
+			},
+			"$description": "Running text."
+		},
+		"lead": {
+			"$value": {
+				"value": 1.375,
+				"unit": "rem"
+			}
+		},
+		"heading-s": {
+			"$value": {
+				"value": 1.5,
+				"unit": "rem"
+			}
+		},
+		"heading-m": {
+			"$value": {
+				"value": 2.25,
+				"unit": "rem"
+			}
+		},
+		"heading-l": {
+			"$value": {
+				"value": 3.25,
+				"unit": "rem"
+			}
+		},
+		"display": {
+			"$value": {
+				"value": 4.5,
+				"unit": "rem"
+			}
+		}
+	},
+	"fontFamily": {
+		"$type": "fontFamily",
+		"body": {
+			"$value": [
+				"Newsreader",
+				"Georgia",
+				"serif"
+			]
+		},
+		"heading": {
+			"$value": [
+				"Fraunces",
+				"Georgia",
+				"serif"
+			]
+		},
+		"mono": {
+			"$value": [
+				"IBM Plex Mono",
+				"ui-monospace",
+				"monospace"
+			]
+		}
+	},
+	"spacing": {
+		"$type": "dimension",
+		"xxs": {
+			"$value": {
+				"value": 0.25,
+				"unit": "rem"
+			}
+		},
+		"xs": {
+			"$value": {
+				"value": 0.5,
+				"unit": "rem"
+			}
+		},
+		"s": {
+			"$value": {
+				"value": 0.75,
+				"unit": "rem"
+			}
+		},
+		"m": {
+			"$value": {
+				"value": 1.25,
+				"unit": "rem"
+			}
+		},
+		"l": {
+			"$value": {
+				"value": 2,
+				"unit": "rem"
+			}
+		},
+		"xl": {
+			"$value": {
+				"value": 3,
+				"unit": "rem"
+			}
+		},
+		"xxl": {
+			"$value": {
+				"value": 4,
+				"unit": "rem"
+			}
+		},
+		"xxxl": {
+			"$value": {
+				"value": 5,
+				"unit": "rem"
+			}
+		}
+	},
+	"radius": {
+		"$type": "dimension",
+		"none": {
+			"$value": {
+				"value": 0,
+				"unit": "px"
+			}
+		},
+		"s": {
+			"$value": {
+				"value": 0.25,
+				"unit": "rem"
+			}
+		},
+		"m": {
+			"$value": {
+				"value": 0.5,
+				"unit": "rem"
+			}
+		},
+		"l": {
+			"$value": {
+				"value": 1,
+				"unit": "rem"
+			}
+		},
+		"pill": {
+			"$value": {
+				"value": 999,
+				"unit": "rem"
+			}
+		}
+	},
+	"shadow": {
+		"$type": "shadow",
+		"subtle": {
+			"$value": [
+				{
+					"color": {
+						"colorSpace": "srgb",
+						"components": [
+							0,
+							0,
+							0
+						],
+						"alpha": 0.06
+					},
+					"offsetX": {
+						"value": 0,
+						"unit": "px"
+					},
+					"offsetY": {
+						"value": 1,
+						"unit": "px"
+					},
+					"blur": {
+						"value": 2,
+						"unit": "px"
+					},
+					"spread": {
+						"value": 0,
+						"unit": "px"
+					}
+				},
+				{
+					"color": {
+						"colorSpace": "srgb",
+						"components": [
+							0,
+							0,
+							0
+						],
+						"alpha": 0.06
+					},
+					"offsetX": {
+						"value": 0,
+						"unit": "px"
+					},
+					"offsetY": {
+						"value": 2,
+						"unit": "px"
+					},
+					"blur": {
+						"value": 8,
+						"unit": "px"
+					},
+					"spread": {
+						"value": 0,
+						"unit": "px"
+					}
+				}
+			]
+		},
+		"raised": {
+			"$value": [
+				{
+					"color": {
+						"colorSpace": "srgb",
+						"components": [
+							0,
+							0,
+							0
+						],
+						"alpha": 0.08
+					},
+					"offsetX": {
+						"value": 0,
+						"unit": "px"
+					},
+					"offsetY": {
+						"value": 4,
+						"unit": "px"
+					},
+					"blur": {
+						"value": 12,
+						"unit": "px"
+					},
+					"spread": {
+						"value": 0,
+						"unit": "px"
+					}
+				},
+				{
+					"color": {
+						"colorSpace": "srgb",
+						"components": [
+							0,
+							0,
+							0
+						],
+						"alpha": 0.1
+					},
+					"offsetX": {
+						"value": 0,
+						"unit": "px"
+					},
+					"offsetY": {
+						"value": 12,
+						"unit": "px"
+					},
+					"blur": {
+						"value": 32,
+						"unit": "px"
+					},
+					"spread": {
+						"value": 0,
+						"unit": "px"
+					}
+				}
+			]
+		}
+	}
+}

@@ -1,0 +1,90 @@
+// Layout of the Tokens screen; colours, borders and type come from wp-admin and @wordpress/components.
+.leitvia-studio-tokens {
+	h2 {
+		margin: 0 0 8px;
+		font-size: 1.3em;
+	}
+
+	h3 {
+		margin: 0;
+		font-size: 1.1em;
+	}
+}
+
+.leitvia-studio-tokens__editor > form,
+.leitvia-studio-tokens__section {
+	box-sizing: border-box;
+	min-width: 0;
+}
+
+.leitvia-studio-tokens__section {
+	padding: 16px;
+	// The surface DataViews uses, so help texts of @wordpress/components keep their contrast.
+	background: var(--wp-components-color-background, #fff);
+
+	@media (min-width: 782px) {
+		padding: 24px;
+	}
+}
+
+// Long role names and ratios wrap instead of widening the page at 320 px.
+.leitvia-studio-tokens__contrast {
+	th,
+	td {
+		overflow-wrap: anywhere;
+	}
+}
+
+.leitvia-studio-tokens__swatch {
+	width: 40px;
+	height: 40px;
+	flex: 0 0 40px;
+	padding: 2px;
+	cursor: pointer;
+}
+
+.leitvia-studio-tokens__hex {
+	width: 12em;
+	max-width: 100%;
+}
+
+.leitvia-studio-tokens__help {
+	margin: 0;
+}
+
+.leitvia-studio-tokens__reason {
+	margin: 0;
+}
+
+.leitvia-studio-tokens__label {
+	display: block;
+	margin-bottom: 8px;
+	font-weight: 600;
+}
+
+.leitvia-studio-tokens__list,
+.leitvia-studio-tokens__findings ul {
+	margin: 0;
+	padding-left: 1.2em;
+	list-style: disc;
+}
+
+.leitvia-studio-tokens__findings h3 {
+	margin: 0 0 4px;
+	font-size: 1em;
+}
+
+.leitvia-studio-tokens__status {
+	display: inline-flex;
+	gap: 4px;
+	align-items: center;
+	margin-inline-end: 8px;
+}
+
+.leitvia-studio-tokens__viewport {
+	max-width: 360px;
+}
+
+.leitvia-studio-tokens__section h3 {
+	margin-top: 16px;
+}

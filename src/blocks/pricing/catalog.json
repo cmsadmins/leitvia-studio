@@ -1,0 +1,7 @@
+{
+	"usage": {
+		"useWhen": "Two to four plans with monthly and yearly prices on a pricing page.",
+		"avoidWhen": "A single price or prices without periods; use a group with text.",
+		"a11y": "The period switch is a native radio group with a legend and works without JavaScript; prices are text, not images."
+	}
+}

@@ -1,0 +1,43 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "leitvia/timeline",
+	"version": "0.1.0",
+	"title": "Timeline",
+	"category": "leitvia",
+	"icon": "backup",
+	"description": "Dated entries in order, such as milestones or the history of a company.",
+	"keywords": [ "history", "milestones", "chronology" ],
+	"textdomain": "leitvia-studio",
+	"allowedBlocks": [ "leitvia/timeline-item" ],
+	"supports": {
+		"anchor": true,
+		"align": [ "wide" ],
+		"html": false,
+		"spacing": {
+			"margin": true,
+			"padding": true
+		},
+		"color": {
+			"background": true,
+			"text": true,
+			"link": false
+		}
+	},
+	"example": {
+		"innerBlocks": [
+			{
+				"name": "leitvia/timeline-item",
+				"attributes": { "date": "2019", "dateLabel": "2019", "heading": "Founded" },
+				"innerBlocks": [ { "name": "core/paragraph", "attributes": { "content": "Two designers start the studio." } } ]
+			},
+			{
+				"name": "leitvia/timeline-item",
+				"attributes": { "date": "2024", "dateLabel": "2024", "heading": "Twenty people" },
+				"innerBlocks": [ { "name": "core/paragraph", "attributes": { "content": "The team moves into its own office." } } ]
+			}
+		]
+	},
+	"editorScript": "file:./index.js",
+	"style": "file:./style-index.css"
+}

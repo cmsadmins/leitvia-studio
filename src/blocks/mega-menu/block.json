@@ -1,0 +1,41 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "leitvia/mega-menu",
+	"version": "0.1.0",
+	"title": "Mega menu",
+	"category": "leitvia",
+	"parent": [ "core/navigation" ],
+	"icon": "layout",
+	"description": "A menu item that opens a large panel. The panel is a template part in the area Mega menu, designed in the Site Editor. Without JavaScript the item is a plain link.",
+	"keywords": [ "menu", "navigation", "panel", "dropdown" ],
+	"textdomain": "leitvia-studio",
+	"attributes": {
+		"label": {
+			"type": "string",
+			"default": ""
+		},
+		"url": {
+			"type": "string",
+			"default": ""
+		},
+		"slug": {
+			"type": "string",
+			"default": ""
+		},
+		"description": {
+			"type": "string",
+			"default": ""
+		}
+	},
+	"supports": {
+		"html": false,
+		"reusable": false
+	},
+	"example": {
+		"attributes": { "label": "Services", "url": "#" }
+	},
+	"editorScript": "file:./index.js",
+	"style": "file:./style-index.css",
+	"viewScriptModule": "file:./view.js"
+}

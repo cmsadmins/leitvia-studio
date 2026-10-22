@@ -1,0 +1,14 @@
+# Paths are relative to this file.
+parameters:
+  level: 8
+  paths:
+    - leitvia-studio.php
+    - uninstall.php
+    - includes
+  # WP-CLI signatures for includes/cli; the same file stands in for WP-CLI in PHPUnit.
+  # WooCommerce signatures for the product comparison block.
+  scanFiles:
+    - tests/php/stubs/wp-cli.php
+    - tests/php/stubs/woocommerce.php
+  # Own cache per checkout: parallel runs collided writing the shared system temp folder.
+  tmpDir: ../../.cache/phpstan-studio

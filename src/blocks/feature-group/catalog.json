@@ -1,0 +1,7 @@
+{
+	"usage": {
+		"useWhen": "A list of features on a product or pricing page, optionally filtered by plan.",
+		"avoidWhen": "Two or three benefits without plans; use a list with the block style checklist.",
+		"a11y": "The filter uses native radio buttons and works without JavaScript; the heading shows how many features are listed."
+	}
+}

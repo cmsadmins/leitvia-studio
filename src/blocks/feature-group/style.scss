@@ -1,0 +1,76 @@
+// The plan filter hides items through :has(): an unchecked box number n hides every item with data-plan n. Browsers
+// without :has() show all items and no filter. MAX_PLANS in save.js matches the loop.
+
+.wp-block-leitvia-feature-group__count {
+	color: var(--wp--preset--color--ink-muted, inherit);
+	font-size: var(--wp--preset--font-size--meta, 0.875rem);
+	font-weight: 400;
+	white-space: nowrap;
+}
+
+.wp-block-leitvia-feature-group__filter {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--wp--preset--spacing--xs, 0.5rem) var(--wp--preset--spacing--s, 1rem);
+	margin: 0 0 var(--wp--preset--spacing--s, 1rem);
+	padding: 0;
+	border: 0;
+
+	legend {
+		float: inline-start;
+		margin-inline-end: var(--wp--preset--spacing--s, 1rem);
+		padding: 0;
+		font-weight: 600;
+	}
+
+	label {
+		display: inline-flex;
+		gap: var(--wp--preset--spacing--xxs, 0.25rem);
+		align-items: center;
+		min-block-size: 2.75rem;
+		cursor: pointer;
+	}
+
+	input {
+		inline-size: 1.25rem;
+		block-size: 1.25rem;
+		margin: 0;
+		accent-color: var(--wp--preset--color--accent, currentcolor);
+	}
+}
+
+@supports not selector(:has(*)) {
+	.wp-block-leitvia-feature-group__filter {
+		display: none;
+	}
+}
+
+@for $i from 1 through 8 {
+	.wp-block-leitvia-feature-group:has(.wp-block-leitvia-feature-group__filter input[value="#{$i}"]:not(:checked)) .wp-block-leitvia-feature-item[data-plan="#{$i}"] {
+		display: none;
+	}
+}
+
+.wp-block-leitvia-feature-group__list {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
+	column-gap: var(--wp--preset--spacing--m, 1.5rem);
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.wp-block-leitvia-feature-group__status {
+	position: absolute;
+	inline-size: 1px;
+	block-size: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+// Focus ring in the focus role of the contract, as the theme draws it on links and buttons (WCAG 2.4.7, 2.4.13).
+.wp-block-leitvia-feature-group__filter input:focus-visible {
+	outline: 0.125rem solid var(--wp--preset--color--focus, currentcolor);
+	outline-offset: 0.125rem;
+}

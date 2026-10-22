@@ -1,0 +1,7 @@
+{
+	"usage": {
+		"useWhen": "A grid of four to eight teasers or features of different weight on a landing page.",
+		"avoidWhen": "Equal items or content that must be read in order; use columns, a list or the timeline block.",
+		"a11y": "The tile order in the editor is the reading order on every screen; put the most important tile first."
+	}
+}

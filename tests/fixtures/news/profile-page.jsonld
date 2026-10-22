@@ -1,0 +1,10 @@
+{
+	"@context": "https://schema.org",
+	"@type": "ProfilePage",
+	"mainEntity": {
+		"@type": "Person",
+		"name": "Mara Lindqvist",
+		"url": "http://example.org/author/mara/",
+		"description": "Mara writes about design systems & accessible publishing."
+	}
+}

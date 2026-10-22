@@ -1,0 +1,60 @@
+// Still and wrapping by default (no JavaScript, reduced motion). With scripting and without reduced motion the band
+// is one line from the first paint and the button keeps its place while hidden, so starting the motion moves nothing
+// but the transform (CLS 0). Hover and focus inside the band hold the motion; the button pauses it for good.
+.wp-block-leitvia-marquee__track > ul {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--wp--preset--spacing--m, 1.5rem) var(--wp--preset--spacing--l, 2.5rem);
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.wp-block-leitvia-marquee__toggle {
+	margin-block-end: var(--wp--preset--spacing--s, 1rem);
+}
+
+@media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
+	.wp-block-leitvia-marquee__toggle[hidden] {
+		display: inline-block;
+		visibility: hidden;
+	}
+
+	.wp-block-leitvia-marquee__viewport {
+		display: flex;
+		overflow: hidden;
+	}
+
+	.wp-block-leitvia-marquee__track {
+		display: flex;
+		flex: none;
+		padding-inline-end: var(--wp--preset--spacing--l, 2.5rem);
+
+		> ul {
+			flex-wrap: nowrap;
+			white-space: nowrap;
+		}
+	}
+
+	.wp-block-leitvia-marquee.is-running .wp-block-leitvia-marquee__track {
+		animation: leitvia-marquee var(--leitvia-marquee-duration, 40s) linear infinite;
+	}
+
+	.wp-block-leitvia-marquee.is-paused .wp-block-leitvia-marquee__track,
+	.wp-block-leitvia-marquee__viewport:hover .wp-block-leitvia-marquee__track,
+	.wp-block-leitvia-marquee__viewport:focus-within .wp-block-leitvia-marquee__track {
+		animation-play-state: paused;
+	}
+}
+
+@keyframes leitvia-marquee {
+	to {
+		transform: translateX(-100%);
+	}
+}
+
+// In right-to-left text the copy sits on the left, so the band runs the other way.
+:dir(rtl) .wp-block-leitvia-marquee.is-running .wp-block-leitvia-marquee__track {
+	animation-direction: reverse;
+}

@@ -1,0 +1,108 @@
+// A compact band over the full width: one line of text in the ui font, the dismiss button at its end. Text and button
+// line up with the wide content width of the header below, never closer to the edge than the site padding. Without
+// colors set the band is ink on surface-alt, a pair the contract checks in every palette; color supports override it.
+.wp-block-leitvia-announcement-bar {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 2rem;
+	gap: var(--wp--preset--spacing--s, 1rem);
+	align-items: center;
+	box-sizing: border-box;
+	min-block-size: 2.5rem;
+	margin-block: 0;
+	padding-block: var(--wp--preset--spacing--xxs, 0.25rem);
+	padding-inline: max(var(--wp--style--root--padding-left, 1rem), calc((100% - var(--wp--style--global--wide-size, 80rem)) / 2));
+	background-color: var(--wp--preset--color--surface-alt, Canvas);
+	color: var(--wp--preset--color--ink, CanvasText);
+	font-family: var(--wp--preset--font-family--ui, inherit);
+	font-size: var(--wp--preset--font-size--meta, 0.8125rem);
+	line-height: 1.45;
+	letter-spacing: 0.01em;
+
+	// From 600 px the text is centered on the band; an empty first column balances the button.
+	@media (min-width: 600px) {
+		grid-template-columns: 2rem minmax(0, 1fr) 2rem;
+		text-align: center;
+
+		> .wp-block-leitvia-announcement-bar__text {
+			grid-column: 2;
+		}
+	}
+
+	// Style "Inverse": the pair turned around, surface on ink. Contrast is symmetric, so it passes wherever ink on
+	// surface passes, in light and dark palettes alike. Link and focus follow the theme's inverse bands.
+	&.is-style-inverse {
+		background-color: var(--wp--preset--color--ink, CanvasText);
+		color: var(--wp--preset--color--surface, Canvas);
+	}
+
+	// Forced colors drop the background; a line keeps the band apart from the header.
+	@media (forced-colors: active) {
+		border-block-end: 1px solid CanvasText;
+	}
+}
+
+html[data-leitvia-announcement] .wp-block-leitvia-announcement-bar {
+	display: none;
+}
+
+.wp-block-leitvia-announcement-bar__text {
+	margin: 0;
+	text-wrap: balance;
+
+	// Links keep the text color and stay underlined, so they never depend on color (WCAG 1.4.1). :where keeps a link
+	// color set in the block's color settings in charge.
+	:where(a) {
+		color: inherit;
+		font-weight: 500;
+		text-decoration-line: underline;
+		text-decoration-thickness: 1px;
+		text-underline-offset: 0.2em;
+	}
+
+	a:hover {
+		text-decoration-thickness: 2px;
+	}
+}
+
+// A 32 px target (WCAG 2.5.8 asks for 24) with a drawn cross. It keeps its place while hidden (no JavaScript yet), so
+// showing it shifts nothing. The transparent border turns visible in forced colors.
+.wp-block-leitvia-announcement-bar__dismiss {
+	display: inline-grid;
+	place-items: center;
+	inline-size: 2rem;
+	block-size: 2rem;
+	padding: 0;
+	border: 1px solid transparent;
+	border-radius: var(--wp--preset--border-radius--s, 0);
+	background: transparent;
+	color: inherit;
+	cursor: pointer;
+
+	svg {
+		inline-size: 0.75rem;
+		block-size: 0.75rem;
+		fill: none;
+		stroke: currentcolor;
+		stroke-width: 1.5;
+	}
+
+	&:hover {
+		border-color: currentcolor;
+	}
+
+	&[hidden] {
+		display: inline-grid;
+		visibility: hidden;
+	}
+}
+
+.wp-block-leitvia-announcement-bar a:focus-visible,
+.wp-block-leitvia-announcement-bar__dismiss:focus-visible {
+	outline: 0.125rem solid var(--wp--preset--color--focus, currentcolor);
+	outline-offset: 0.125rem;
+}
+
+// On ink the focus color needs the surface ring between outline and band (contract pair focus on ink, ring surface).
+.wp-block-leitvia-announcement-bar.is-style-inverse :is(a, .wp-block-leitvia-announcement-bar__dismiss):focus-visible {
+	box-shadow: 0 0 0 0.125rem var(--wp--preset--color--surface, Canvas);
+}

@@ -1,0 +1,7 @@
+{
+	"usage": {
+		"useWhen": "An image whose parts need short explanations, such as a product photo or a floor plan.",
+		"avoidWhen": "Images that need no explanation or long texts per point; use an image with a caption or a list.",
+		"a11y": "Each point has a name that screen readers announce; on narrow screens the points follow the image as a list."
+	}
+}

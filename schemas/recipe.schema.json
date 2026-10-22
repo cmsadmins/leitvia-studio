@@ -1,0 +1,266 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"title": "Leitvia Studio site recipe",
+	"description": "A bundle of style variation, optional token set, content model, template parts, pages from page frames and patterns, navigation, reading settings and data-saving options, applied as one change package by the ability leitvia/apply-recipe. Paths are relative to the recipe file. Pattern slugs, page frames and plugins are checked when the recipe is applied.",
+	"type": "object",
+	"additionalProperties": false,
+	"required": [
+		"name",
+		"title",
+		"description",
+		"pages"
+	],
+	"properties": {
+		"name": {
+			"type": "string",
+			"pattern": "^[a-z0-9-]+$"
+		},
+		"title": {
+			"type": "string",
+			"minLength": 1
+		},
+		"description": {
+			"type": "string",
+			"minLength": 1
+		},
+		"requires": {
+			"type": "array",
+			"description": "Slugs (folder names) of plugins that must be active.",
+			"items": {
+				"type": "string",
+				"pattern": "^[a-z0-9-]+$"
+			},
+			"uniqueItems": true
+		},
+		"variation": {
+			"type": "string",
+			"description": "Slug of a style variation from the contract.",
+			"pattern": "^[a-z0-9-]+$"
+		},
+		"tokenSet": {
+			"type": "string",
+			"description": "Path to a DTCG token document."
+		},
+		"contentModel": {
+			"type": "string",
+			"description": "Path to a content model declaration."
+		},
+		"templateParts": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"header": {
+					"type": "string",
+					"pattern": "^[a-z0-9-]+/[a-z0-9-]+$"
+				},
+				"footer": {
+					"type": "string",
+					"pattern": "^[a-z0-9-]+/[a-z0-9-]+$"
+				}
+			}
+		},
+		"pages": {
+			"type": "array",
+			"minItems": 1,
+			"items": {
+				"type": "object",
+				"additionalProperties": false,
+				"required": [
+					"slug",
+					"title",
+					"frame",
+					"sections"
+				],
+				"properties": {
+					"slug": {
+						"type": "string",
+						"pattern": "^[a-z0-9-]+$"
+					},
+					"title": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 200
+					},
+					"frame": {
+						"type": "string",
+						"description": "Type of a page frame from the contract."
+					},
+					"template": {
+						"type": "string",
+						"description": "Page template instead of the one of the frame, for example page-docs.",
+						"pattern": "^[a-z0-9-]+$"
+					},
+					"parent": {
+						"type": "string",
+						"description": "Slug of an earlier page of the recipe.",
+						"pattern": "^[a-z0-9-]+$"
+					},
+					"kind": {
+						"type": "string",
+						"enum": [
+							"imprint",
+							"privacy",
+							"terms",
+							"withdrawal",
+							"accessibility",
+							"editorial",
+							"contact",
+							"authors"
+						]
+					},
+					"sections": {
+						"type": "array",
+						"minItems": 1,
+						"items": {
+							"anyOf": [
+								{
+									"type": "string",
+									"pattern": "^[a-z0-9-]+/[a-z0-9-]+$"
+								},
+								{
+									"type": "object",
+									"additionalProperties": false,
+									"required": [
+										"pattern",
+										"edits"
+									],
+									"properties": {
+										"pattern": {
+											"type": "string",
+											"pattern": "^[a-z0-9-]+/[a-z0-9-]+$"
+										},
+										"edits": {
+											"type": "array",
+											"description": "Edits at block IDs of the pattern outline, as in leitvia/compose-page: text, link_text and url. Links starting with / point into the site, tel: and mailto: links stay as they are.",
+											"items": {
+												"type": "object",
+												"additionalProperties": false,
+												"required": [
+													"block"
+												],
+												"properties": {
+													"block": {
+														"type": "string"
+													},
+													"text": {
+														"type": "string"
+													},
+													"link_text": {
+														"type": "string",
+														"description": "The part of text that stays linked, for a text with one link such as a phone number."
+													},
+													"url": {
+														"type": "string"
+													}
+												}
+											}
+										}
+									}
+								}
+							]
+						}
+					}
+				}
+			}
+		},
+		"navigation": {
+			"type": "array",
+			"description": "Slugs of recipe pages in menu order; a slug that is no recipe page links to the published page of the site with that path, such as the WooCommerce shop page.",
+			"items": {
+				"type": "string",
+				"pattern": "^[a-z0-9-]+$"
+			}
+		},
+		"reading": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"show_on_front": {
+					"type": "string",
+					"enum": [
+						"posts",
+						"page"
+					]
+				},
+				"page_on_front": {
+					"type": "string",
+					"pattern": "^[a-z0-9-]+$"
+				},
+				"page_for_posts": {
+					"type": "string",
+					"pattern": "^[a-z0-9-]+$"
+				}
+			}
+		},
+		"connect": {
+			"type": "object",
+			"description": "Recipe pages that settings point to, by page slug: the privacy policy page of WordPress and the terms page of WooCommerce.",
+			"additionalProperties": false,
+			"properties": {
+				"wp_page_for_privacy_policy": {
+					"type": "string",
+					"pattern": "^[a-z0-9-]+$"
+				},
+				"woocommerce_terms_page_id": {
+					"type": "string",
+					"pattern": "^[a-z0-9-]+$"
+				}
+			}
+		},
+		"options": {
+			"type": "object",
+			"description": "Options that make the site collect or send less data; each one can only be turned off.",
+			"additionalProperties": false,
+			"properties": {
+				"default_pingback_flag": {
+					"type": "string",
+					"enum": [
+						"0"
+					]
+				},
+				"default_ping_status": {
+					"type": "string",
+					"enum": [
+						"closed"
+					]
+				},
+				"default_comment_status": {
+					"type": "string",
+					"enum": [
+						"closed"
+					]
+				},
+				"show_avatars": {
+					"type": "string",
+					"enum": [
+						"0"
+					]
+				},
+				"woocommerce_feature_order_attribution_enabled": {
+					"type": "string",
+					"enum": [
+						"no"
+					]
+				},
+				"woocommerce_allow_tracking": {
+					"type": "string",
+					"enum": [
+						"no"
+					]
+				},
+				"woocommerce_show_marketplace_suggestions": {
+					"type": "string",
+					"enum": [
+						"no"
+					]
+				},
+				"woocommerce_feature_remote_logging_enabled": {
+					"type": "string",
+					"enum": [
+						"no"
+					]
+				}
+			}
+		}
+	}
+}

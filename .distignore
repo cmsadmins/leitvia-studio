@@ -1,0 +1,14 @@
+.git/
+.github/
+.gitkeep
+tests/
+phpunit.xml.dist
+phpcs.xml.dist
+phpstan.neon.dist
+composer.json
+composer.lock
+.distignore
+.pcpignore
+node_modules/
+vendor/
+.wordpress-org/

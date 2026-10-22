@@ -1,0 +1,34 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "leitvia/consent-settings",
+	"version": "0.1.0",
+	"title": "Consent Settings",
+	"category": "leitvia",
+	"icon": "privacy",
+	"description": "Lists the providers a visitor always allows, such as YouTube, and lets them revoke each one. Place it on the privacy policy page.",
+	"keywords": [ "privacy", "cookies", "embed", "gdpr" ],
+	"textdomain": "leitvia-studio",
+	"attributes": {
+		"text": {
+			"type": "rich-text",
+			"source": "rich-text",
+			"selector": ".wp-block-leitvia-consent-settings__text"
+		}
+	},
+	"supports": {
+		"anchor": true,
+		"html": false,
+		"multiple": false,
+		"spacing": {
+			"margin": true,
+			"padding": true
+		}
+	},
+	"example": {
+		"attributes": { "text": "Providers you always allow:" }
+	},
+	"editorScript": "file:./index.js",
+	"style": "file:./style-index.css",
+	"viewScriptModule": "@leitvia/consent"
+}

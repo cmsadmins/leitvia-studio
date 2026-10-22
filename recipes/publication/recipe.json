@@ -1,0 +1,104 @@
+{
+	"name": "publication",
+	"title": "Publication",
+	"description": "A news site or magazine with the transparency pages that Google News looks for: editorial standards, authors, contact and imprint. The latest articles live on a news page.",
+	"variation": "warm-editorial-dark",
+	"templateParts": {
+		"header": "leitvia/header-default",
+		"footer": "leitvia/footer-minimal"
+	},
+	"pages": [
+		{
+			"slug": "home",
+			"title": "Home",
+			"frame": "home",
+			"sections": [ "leitvia/hero-editorial", "leitvia/teaser-featured-post", "leitvia/teaser-posts-list", "leitvia/content-quote", "leitvia/teaser-posts-badge" ]
+		},
+		{
+			"slug": "news",
+			"title": "News",
+			"frame": "contact",
+			"sections": [ "leitvia/teaser-posts-list" ]
+		},
+		{
+			"slug": "about",
+			"title": "About",
+			"frame": "about",
+			"sections": [ "leitvia/hero-editorial", "leitvia/content-two-columns", "leitvia/content-break-image", "leitvia/proof-testimonials-grid", "leitvia/cta-contact" ]
+		},
+		{
+			"slug": "editorial-standards",
+			"title": "Editorial standards",
+			"frame": "contact",
+			"kind": "editorial",
+			"sections": [
+				{
+					"pattern": "leitvia/content-two-columns",
+					"edits": [
+						{ "block": "p:0.0", "text": "How we report, check and correct" },
+						{ "block": "p:0.2.0.0", "text": "We publish what we can confirm from our own reporting or from at least two independent sources." },
+						{ "block": "p:0.2.0.1", "text": "Opinion pieces are marked as opinion. Sponsored content is labelled and kept apart from reporting." },
+						{ "block": "p:0.2.1.0", "text": "Every article shows when it was published and when it was last updated." },
+						{ "block": "p:0.2.1.1", "text": "When we get something wrong, we correct it in the article and say what changed and when." }
+					]
+				},
+				"leitvia/content-faq"
+			]
+		},
+		{
+			"slug": "authors",
+			"title": "Authors",
+			"frame": "contact",
+			"kind": "authors",
+			"sections": [
+				{
+					"pattern": "leitvia/content-two-columns",
+					"edits": [
+						{ "block": "p:0.0", "text": "The people who write for us" },
+						{ "block": "p:0.2.0.0", "text": "Every article names its author in the byline, and the name links to the author's page." },
+						{ "block": "p:0.2.0.1", "text": "Each author page shows a short biography and every article by that person, newest first." },
+						{ "block": "p:0.2.1.0", "text": "Authors write about subjects they know from their own work or research and name the sources they draw on." },
+						{ "block": "p:0.2.1.1", "text": "To reach an author, use the contact page and we will forward your message." }
+					]
+				},
+				"leitvia/teaser-posts-list"
+			]
+		},
+		{
+			"slug": "contact",
+			"title": "Contact",
+			"frame": "contact",
+			"kind": "contact",
+			"sections": [ "leitvia/cta-contact", "leitvia/content-faq" ]
+		},
+		{
+			"slug": "imprint",
+			"title": "Imprint",
+			"frame": "contact",
+			"kind": "imprint",
+			"sections": [
+				{
+					"pattern": "leitvia/content-two-columns",
+					"edits": [
+						{ "block": "p:0.0", "text": "Publisher and editor in charge" },
+						{ "block": "p:0.2.0.0", "text": "Name of the publisher, legal form, street, postcode and city." },
+						{ "block": "p:0.2.0.1", "text": "Register court and register number, VAT ID where it applies." },
+						{ "block": "p:0.2.1.0", "text": "Editor responsible for the content, with name and address." },
+						{ "block": "p:0.2.1.1", "text": "How to reach the newsroom follows below." }
+					]
+				},
+				"leitvia/cta-contact"
+			]
+		}
+	],
+	"navigation": [ "news", "about", "editorial-standards", "authors", "contact" ],
+	"reading": {
+		"show_on_front": "page",
+		"page_on_front": "home",
+		"page_for_posts": "news"
+	},
+	"options": {
+		"default_pingback_flag": "0",
+		"default_ping_status": "closed"
+	}
+}

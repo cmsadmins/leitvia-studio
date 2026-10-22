@@ -1,0 +1,7 @@
+{
+	"usage": {
+		"useWhen": "Dated milestones in order, such as company history or a project schedule.",
+		"avoidWhen": "Undated steps or processes; use an ordered list or the wizard block.",
+		"a11y": "The timeline is an ordered list and each date is a time element with a machine-readable datetime."
+	}
+}

@@ -1,0 +1,7 @@
+{
+	"usage": {
+		"useWhen": "A short form in steps that leads visitors to matching results, for example a product finder that sends its answers to a page with a query filter.",
+		"avoidWhen": "Long forms that must store data; use a form plugin.",
+		"a11y": "Each step is a fieldset with a legend. Without JavaScript all steps show at once and the form still works."
+	}
+}

@@ -1,0 +1,7 @@
+{
+	"usage": {
+		"useWhen": "One point on a spotlight image with a name and a short text.",
+		"avoidWhen": "Outside a spotlight; it only works as its child.",
+		"a11y": "The name must describe the point without the image, for example Charging port instead of Point 1."
+	}
+}

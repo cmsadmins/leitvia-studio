@@ -1,0 +1,79 @@
+{
+	"name": "company",
+	"title": "Company",
+	"description": "A company or agency site: a home page that routes to services, about and contact, plus an imprint.",
+	"variation": "corporate-light",
+	"templateParts": {
+		"header": "leitvia/header-default",
+		"footer": "leitvia/footer-minimal"
+	},
+	"pages": [
+		{
+			"slug": "home",
+			"title": "Home",
+			"frame": "home",
+			"sections": [
+				{
+					"pattern": "leitvia/hero-split-image",
+					"edits": [
+						{ "block": "p:0.0.0.3.0", "text": "See our services", "url": "/services/" },
+						{ "block": "p:0.0.0.3.1", "url": "/contact/" }
+					]
+				},
+				"leitvia/proof-logos",
+				"leitvia/content-feature-grid",
+				"leitvia/content-quote",
+				"leitvia/content-stats",
+				"leitvia/cta-contact"
+			]
+		},
+		{
+			"slug": "services",
+			"title": "Services",
+			"frame": "service",
+			"sections": [ "leitvia/hero-editorial", "leitvia/proof-trust-strip", "leitvia/content-steps", "leitvia/content-compare-two", "leitvia/content-quote", "leitvia/content-faq", "leitvia/cta-contact" ]
+		},
+		{
+			"slug": "about",
+			"title": "About",
+			"frame": "about",
+			"sections": [ "leitvia/hero-editorial", "leitvia/content-two-columns", "leitvia/content-break-image", "leitvia/proof-testimonials-grid", "leitvia/cta-contact" ]
+		},
+		{
+			"slug": "contact",
+			"title": "Contact",
+			"frame": "contact",
+			"kind": "contact",
+			"sections": [ "leitvia/cta-contact", "leitvia/content-faq" ]
+		},
+		{
+			"slug": "imprint",
+			"title": "Imprint",
+			"frame": "contact",
+			"kind": "imprint",
+			"sections": [
+				{
+					"pattern": "leitvia/content-two-columns",
+					"edits": [
+						{ "block": "p:0.0", "text": "Who is responsible for this site" },
+						{ "block": "p:0.2.0.0", "text": "Company name, legal form, street, postcode and city." },
+						{ "block": "p:0.2.0.1", "text": "Register court and register number, VAT ID where it applies." },
+						{ "block": "p:0.2.1.0", "text": "Managing directors or other people authorised to represent the company." },
+						{ "block": "p:0.2.1.1", "text": "How to reach us follows below." }
+					]
+				},
+				"leitvia/cta-contact"
+			]
+		}
+	],
+	"navigation": [ "services", "about", "contact" ],
+	"reading": {
+		"show_on_front": "page",
+		"page_on_front": "home"
+	},
+	"options": {
+		"default_pingback_flag": "0",
+		"default_ping_status": "closed",
+		"default_comment_status": "closed"
+	}
+}

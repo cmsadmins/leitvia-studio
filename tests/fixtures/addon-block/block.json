@@ -1,0 +1,15 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "catalog-addon/demo",
+	"title": "Catalog demo",
+	"category": "design",
+	"description": "A block of a test add-on.",
+	"attributes": {
+		"mode": {
+			"type": "string",
+			"enum": [ "a", "b" ],
+			"default": "a"
+		}
+	}
+}

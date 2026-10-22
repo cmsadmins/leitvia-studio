@@ -1,0 +1,81 @@
+{
+	"$schema": "http://json-schema.org/draft-04/schema#",
+	"title": "leitvia-studio-block-catalog",
+	"description": "Blocks of Leitvia Studio, its add-ons and the core blocks Studio extends, as GET /leitvia-studio/v1/blocks returns them. Built from the registered block types; usage comes from catalog.json next to each block.json.",
+	"type": "array",
+	"items": {
+		"type": "object",
+		"additionalProperties": false,
+		"required": [ "name", "title", "description", "category", "parent", "ancestor", "supports", "attributes", "innerBlocks", "usage", "owner" ],
+		"properties": {
+			"name": {
+				"description": "Block name.",
+				"type": "string",
+				"pattern": "^[a-z0-9-]+/[a-z0-9-]+$"
+			},
+			"title": {
+				"description": "Translated block title.",
+				"type": "string",
+				"minLength": 1
+			},
+			"description": {
+				"description": "Translated description of what the block does.",
+				"type": "string"
+			},
+			"category": {
+				"description": "Inserter category.",
+				"type": [ "string", "null" ]
+			},
+			"parent": {
+				"description": "Blocks this block must be a direct child of, null for anywhere.",
+				"type": [ "array", "null" ],
+				"items": { "type": "string" }
+			},
+			"ancestor": {
+				"description": "Blocks this block must be inside at any depth, null for anywhere.",
+				"type": [ "array", "null" ],
+				"items": { "type": "string" }
+			},
+			"supports": {
+				"description": "Supports of block.json an agent may use: align, anchor, color, spacing, typography, dimensions, border, shadow, layout, html, multiple, reusable, inserter, interactivity. Their attributes (className, style, backgroundColor and so on) are not listed under attributes.",
+				"type": "object"
+			},
+			"attributes": {
+				"description": "JSON schema of the block attributes from block.json. A property with source is stored in the block markup, not in the block comment; rich-text is a string of HTML.",
+				"type": "object",
+				"additionalProperties": false,
+				"required": [ "type", "properties" ],
+				"properties": {
+					"type": { "type": "string", "enum": [ "object" ] },
+					"properties": { "type": "object" }
+				}
+			},
+			"innerBlocks": {
+				"description": "Blocks allowed directly inside: allowedBlocks of block.json, otherwise the catalog blocks that name this block as parent. null when block.json sets no limit.",
+				"type": [ "array", "null" ],
+				"items": { "type": "string" }
+			},
+			"usage": {
+				"description": "When to use the block. Required for Studio blocks, optional for add-on blocks.",
+				"type": [ "object", "null" ],
+				"additionalProperties": false,
+				"required": [ "useWhen", "avoidWhen", "a11y" ],
+				"properties": {
+					"useWhen": { "type": "string", "minLength": 1 },
+					"avoidWhen": { "type": "string", "minLength": 1 },
+					"a11y": { "type": "string", "minLength": 1 }
+				}
+			},
+			"owner": {
+				"description": "Slug of the add-on that registered the block in the Studio blocks registry, core for core blocks.",
+				"type": "string",
+				"pattern": "^[a-z0-9-]+$"
+			},
+			"extension": {
+				"description": "Core blocks only: what Studio changes about the block.",
+				"type": "string",
+				"minLength": 1
+			}
+		}
+	}
+}

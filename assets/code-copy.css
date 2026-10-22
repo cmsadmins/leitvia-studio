@@ -1,0 +1,56 @@
+/*
+ * Code copy (class-code-copy.php): the button and the message sit in the top end corner of the code block. With
+ * scripting the code block reserves a band of that height above its first line, so no line of code runs under the
+ * button. The code block keeps its own margins on the wrapper.
+ */
+.leitvia-code-copy {
+	position: relative;
+}
+.leitvia-code-copy > pre {
+	margin: 0;
+}
+/*
+ * Specific enough to win over the padding of every block style, the terminal style included. With scripting the band is
+ * there from the first paint: set only once the script module shows the button, it shifted the layout when the module
+ * ran late (CLS). Browsers without the scripting media feature reserve it when the button shows.
+ */
+@media (scripting: enabled) {
+	.leitvia-code-copy:has(> .leitvia-code-copy__bar > .leitvia-code-copy__button) > pre {
+		padding-block-start: calc(2.75rem + 2 * var(--wp--preset--spacing--xs, 0.5rem));
+	}
+}
+.leitvia-code-copy:has(> .leitvia-code-copy__bar > .leitvia-code-copy__button:not([hidden])) > pre {
+	padding-block-start: calc(2.75rem + 2 * var(--wp--preset--spacing--xs, 0.5rem));
+}
+.leitvia-code-copy__bar {
+	position: absolute;
+	inset-block-start: var(--wp--preset--spacing--xs, 0.5rem);
+	inset-inline-end: var(--wp--preset--spacing--xs, 0.5rem);
+	display: flex;
+	gap: var(--wp--preset--spacing--xs, 0.5rem);
+	align-items: center;
+}
+.leitvia-code-copy__status:not(:empty),
+.leitvia-code-copy__button {
+	display: inline-flex;
+	align-items: center;
+	min-block-size: 2.75rem;
+	padding: 0 var(--wp--preset--spacing--s, 1rem);
+	border: 1px solid var(--wp--preset--color--ink, currentcolor);
+	background: var(--wp--preset--color--surface, Canvas);
+	color: var(--wp--preset--color--ink, CanvasText);
+	font: inherit;
+	font-size: var(--wp--preset--font-size--meta, 0.875rem);
+}
+.leitvia-code-copy__button {
+	cursor: pointer;
+}
+.leitvia-code-copy__button[hidden] {
+	display: none;
+}
+.leitvia-code-copy__button:focus-visible {
+	outline: 0.125rem solid var(--wp--preset--color--focus, currentcolor);
+	outline-offset: 0.125rem;
+	/* Inner ring, so the indicator also shows on dark code blocks such as the terminal style. */
+	box-shadow: 0 0 0 0.125rem var(--wp--preset--color--surface, Canvas);
+}

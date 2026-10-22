@@ -1,0 +1,7 @@
+{
+	"contractVersion": "2.0.0",
+	"theme": "fixture",
+	"roles": { "color": [ { "slug": "surface" }, { "slug": "ink" } ] },
+	"pairs": [ { "fg": "ink", "bg": "surface", "min": 4.5 } ],
+	"patterns": [ { "slug": "fixture/hero", "title": "Hero" } ]
+}

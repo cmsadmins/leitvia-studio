@@ -1,0 +1,7 @@
+{
+	"usage": {
+		"useWhen": "Comparing two to five options across several criteria, such as plans or products, with an optional source for the figures.",
+		"avoidWhen": "Simple data without row headers or more than six columns; use the table block.",
+		"a11y": "Always fill the caption and the column headers; the first column becomes the row header for screen readers."
+	}
+}

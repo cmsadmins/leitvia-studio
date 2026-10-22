@@ -1,0 +1,7 @@
+{
+	"usage": {
+		"useWhen": "A main navigation item with many sub pages or teasers that need a large panel.",
+		"avoidWhen": "Menus with a few sub pages; use a normal submenu of the navigation block.",
+		"a11y": "The item is a link with a button that opens the panel; Escape closes it. Without JavaScript it stays a plain link."
+	}
+}

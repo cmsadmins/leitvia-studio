@@ -1,0 +1,39 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "leitvia/table-of-contents",
+	"version": "0.1.0",
+	"title": "Table of Contents",
+	"category": "leitvia",
+	"icon": "list-view",
+	"description": "Lists the headings of this page as links, built when the page renders. Marks the section being read.",
+	"keywords": [ "toc", "headings", "outline", "jump links" ],
+	"textdomain": "leitvia-studio",
+	"attributes": {
+		"levels": {
+			"type": "array",
+			"items": { "type": "integer" },
+			"default": [ 2, 3 ]
+		}
+	},
+	"usesContext": [ "postId" ],
+	"supports": {
+		"anchor": true,
+		"html": false,
+		"multiple": false,
+		"color": {
+			"background": true,
+			"text": true,
+			"link": true
+		},
+		"spacing": {
+			"margin": true,
+			"padding": true
+		}
+	},
+	"example": {},
+	"editorScript": "file:./index.js",
+	"style": "file:./style-index.css",
+	"viewScriptModule": "file:./view.js",
+	"render": "file:./render.php"
+}

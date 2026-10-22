@@ -1,0 +1,32 @@
+// Nested lists of links. The current section is marked by a thicker underline, which keeps the line width, so the
+// marker never reflows the list.
+.wp-block-leitvia-table-of-contents {
+	ol {
+		margin: 0;
+		padding-inline-start: var(--wp--preset--spacing--s, 1rem);
+		list-style: none;
+	}
+
+	> ol {
+		padding-inline-start: 0;
+	}
+
+	li {
+		margin-block: var(--wp--preset--spacing--xs, 0.5rem);
+	}
+
+	a[aria-current="location"] {
+		text-decoration-line: underline;
+		text-decoration-thickness: 0.2em;
+	}
+}
+
+.wp-block-leitvia-table-of-contents__title {
+	margin-block: 0 var(--wp--preset--spacing--s, 1rem);
+	font-size: var(--wp--preset--font-size--lead, inherit);
+}
+
+// Jump targets stay clear of the top edge and of a sticky header (WCAG 2.4.11). Loaded only with the block.
+.wp-block-heading[id] {
+	scroll-margin-block-start: var(--wp--preset--spacing--xl, 4rem);
+}

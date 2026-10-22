@@ -1,0 +1,1 @@
+{ "version": 1, "postTypes": { "event": { "label": "Events", "singularLabel": "Event", "repeaters": { "event_agenda": { "postType": "event_session", "label": "Agenda", "singularLabel": "Session", "showInAbilities": true } } } } }

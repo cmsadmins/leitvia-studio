@@ -1,0 +1,27 @@
+{
+	"name": "lab-patterns",
+	"template": "page-landing",
+	"labPatterns": [
+		{
+			"slug": "block:7",
+			"area": "content",
+			"composition": { "role": "context", "tone": "surface", "layout": "grid", "density": "dense" }
+		},
+		{ "slug": "block:8" }
+	],
+	"sections": [
+		"leitvia/hero-editorial",
+		"block:7",
+		"leitvia/content-quote",
+		"block:8",
+		"block:9",
+		"leitvia/cta-contact"
+	],
+	"issues": [
+		[
+			"unknownPattern",
+			4
+		]
+	],
+	"score": 75
+}

@@ -1,0 +1,51 @@
+// Summary above the form and messages at the fields, in the danger role of the contract. Loaded only with the block.
+.wp-block-leitvia-form-errors__summary {
+	padding: var(--wp--preset--spacing--s, 1rem);
+	border: 0.125rem solid var(--wp--preset--color--danger, currentcolor);
+
+	&:focus {
+		outline: 0.125rem solid var(--wp--preset--color--focus, currentcolor);
+		outline-offset: 0.125rem;
+	}
+}
+
+.wp-block-leitvia-form-errors__title {
+	margin-block: 0 var(--wp--preset--spacing--xs, 0.5rem);
+	font-size: var(--wp--preset--font-size--heading-s, inherit);
+}
+
+.wp-block-leitvia-form-errors__list {
+	margin: 0;
+	padding-inline-start: var(--wp--preset--spacing--s, 1rem);
+
+	a {
+		color: var(--wp--preset--color--danger, inherit);
+		font-weight: 700;
+	}
+}
+
+.wp-block-leitvia-form-errors__message {
+	display: block;
+	color: var(--wp--preset--color--danger, inherit);
+	font-weight: 700;
+
+	// Corrected: hidden, but keeps its space until the next submit.
+	&.is-resolved {
+		visibility: hidden;
+	}
+}
+
+.wp-block-leitvia-form-errors [aria-invalid="true"] {
+	border-color: var(--wp--preset--color--danger, currentcolor);
+}
+
+// Jump targets stay clear of the top edge and of a sticky header (WCAG 2.4.11).
+.wp-block-leitvia-form-errors :is(.wp-block-leitvia-form-errors__summary, label, legend, input, select, textarea) {
+	scroll-margin-block-start: var(--wp--preset--spacing--xl, 4rem);
+}
+
+// Fields of any form in the block get the focus ring of the contract, also those of plugins that style none (WCAG 2.4.7).
+.wp-block-leitvia-form-errors :is(input, select, textarea, button):focus-visible {
+	outline: 0.125rem solid var(--wp--preset--color--focus, currentcolor);
+	outline-offset: 0.125rem;
+}

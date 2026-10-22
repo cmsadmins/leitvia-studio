@@ -1,0 +1,56 @@
+// Below 782 px the points follow the image as a numbered list in the flow. From 782 px each point sits on the image
+// at its position (--x, --y in percent of the image), the text opens below the marker.
+.wp-block-leitvia-spotlight {
+	counter-reset: leitvia-spotlight;
+
+	> .wp-block-image {
+		margin-block: 0;
+
+		img {
+			display: block;
+			inline-size: 100%;
+			block-size: auto;
+		}
+	}
+}
+
+@media (min-width: 782px) {
+	.wp-block-leitvia-spotlight {
+		position: relative;
+
+		> .wp-block-leitvia-spotlight-hotspot {
+			position: absolute;
+			inset-block-start: var(--y, 50%);
+			inset-inline-start: var(--x, 50%);
+			z-index: 1;
+			margin: 0;
+			translate: -50% -50%;
+
+			> summary .wp-block-leitvia-spotlight-hotspot__label {
+				position: absolute;
+				inline-size: 1px;
+				block-size: 1px;
+				overflow: hidden;
+				clip-path: inset(50%);
+				white-space: nowrap;
+			}
+
+			> .wp-block-leitvia-spotlight-hotspot__content {
+				position: absolute;
+				inset-block-start: calc(100% + 0.5rem);
+				inset-inline-start: 50%;
+				translate: -50% 0;
+				inline-size: min(20rem, 60vw);
+				padding: var(--wp--preset--spacing--s, 1rem);
+				background: var(--wp--preset--color--surface, Canvas);
+				color: var(--wp--preset--color--ink, CanvasText);
+				border: 1px solid var(--wp--preset--color--stroke, currentcolor);
+				box-shadow: var(--wp--preset--shadow--raised, none);
+			}
+		}
+	}
+}
+
+:dir(rtl) .wp-block-leitvia-spotlight > .wp-block-leitvia-spotlight-hotspot {
+	translate: 50% -50%;
+}

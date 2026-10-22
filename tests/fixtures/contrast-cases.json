@@ -1,0 +1,1072 @@
+{
+	"pairs": [
+		{
+			"fg": "ink",
+			"bg": "surface",
+			"min": 4.5
+		},
+		{
+			"fg": "ink",
+			"bg": "surface-alt",
+			"min": 4.5
+		},
+		{
+			"fg": "ink-muted",
+			"bg": "surface",
+			"min": 4.5
+		},
+		{
+			"fg": "ink-muted",
+			"bg": "surface-alt",
+			"min": 4.5
+		},
+		{
+			"fg": "accent",
+			"bg": "surface",
+			"min": 4.5
+		},
+		{
+			"fg": "accent",
+			"bg": "surface-alt",
+			"min": 4.5
+		},
+		{
+			"fg": "on-accent",
+			"bg": "accent",
+			"min": 4.5
+		},
+		{
+			"fg": "focus",
+			"bg": "surface",
+			"min": 3
+		},
+		{
+			"fg": "focus",
+			"bg": "surface-alt",
+			"min": 3
+		},
+		{
+			"fg": "focus",
+			"bg": "accent",
+			"min": 3,
+			"ring": "surface"
+		},
+		{
+			"fg": "focus",
+			"bg": "ink",
+			"min": 3,
+			"ring": "surface"
+		},
+		{
+			"fg": "stroke",
+			"bg": "ink",
+			"min": 4.5
+		},
+		{
+			"fg": "stroke",
+			"bg": "surface",
+			"min": 1.3
+		},
+		{
+			"fg": "success",
+			"bg": "surface",
+			"min": 4.5
+		},
+		{
+			"fg": "warning",
+			"bg": "surface",
+			"min": 4.5
+		},
+		{
+			"fg": "danger",
+			"bg": "surface",
+			"min": 4.5
+		}
+	],
+	"cases": [
+		{
+			"name": "default",
+			"palette": [
+				{
+					"slug": "surface",
+					"color": "#f7f4ee"
+				},
+				{
+					"slug": "surface-alt",
+					"color": "#efe9de"
+				},
+				{
+					"slug": "ink",
+					"color": "#1c1a17"
+				},
+				{
+					"slug": "ink-muted",
+					"color": "#57514a"
+				},
+				{
+					"slug": "accent",
+					"color": "#2f5d50"
+				},
+				{
+					"slug": "on-accent",
+					"color": "#ffffff"
+				},
+				{
+					"slug": "stroke",
+					"color": "#cfc6b6"
+				},
+				{
+					"slug": "focus",
+					"color": "#1d4ed8"
+				},
+				{
+					"slug": "success",
+					"color": "#2e6b3a"
+				},
+				{
+					"slug": "warning",
+					"color": "#7a4f00"
+				},
+				{
+					"slug": "danger",
+					"color": "#a3242b"
+				}
+			],
+			"failures": []
+		},
+		{
+			"name": "styles/colors/clay.json",
+			"palette": [
+				{
+					"slug": "surface",
+					"color": "#faf6f1"
+				},
+				{
+					"slug": "surface-alt",
+					"color": "#f1e8df"
+				},
+				{
+					"slug": "ink",
+					"color": "#221a16"
+				},
+				{
+					"slug": "ink-muted",
+					"color": "#5e5149"
+				},
+				{
+					"slug": "accent",
+					"color": "#a3432b"
+				},
+				{
+					"slug": "on-accent",
+					"color": "#ffffff"
+				},
+				{
+					"slug": "stroke",
+					"color": "#dbcbbd"
+				},
+				{
+					"slug": "focus",
+					"color": "#1d4ed8"
+				},
+				{
+					"slug": "success",
+					"color": "#2e6b3a"
+				},
+				{
+					"slug": "warning",
+					"color": "#7a4f00"
+				},
+				{
+					"slug": "danger",
+					"color": "#a3242b"
+				}
+			],
+			"failures": []
+		},
+		{
+			"name": "styles/colors/night.json",
+			"palette": [
+				{
+					"slug": "surface",
+					"color": "#0d1420"
+				},
+				{
+					"slug": "surface-alt",
+					"color": "#152033"
+				},
+				{
+					"slug": "ink",
+					"color": "#e8eef7"
+				},
+				{
+					"slug": "ink-muted",
+					"color": "#9aa8bd"
+				},
+				{
+					"slug": "accent",
+					"color": "#7fb2ff"
+				},
+				{
+					"slug": "on-accent",
+					"color": "#0b1a33"
+				},
+				{
+					"slug": "stroke",
+					"color": "#263247"
+				},
+				{
+					"slug": "focus",
+					"color": "#ffd166"
+				},
+				{
+					"slug": "success",
+					"color": "#7dcb8e"
+				},
+				{
+					"slug": "warning",
+					"color": "#f0b44c"
+				},
+				{
+					"slug": "danger",
+					"color": "#ff9b94"
+				}
+			],
+			"failures": []
+		},
+		{
+			"name": "styles/colors/sage.json",
+			"palette": [
+				{
+					"slug": "surface",
+					"color": "#f5f3ec"
+				},
+				{
+					"slug": "surface-alt",
+					"color": "#e9e6db"
+				},
+				{
+					"slug": "ink",
+					"color": "#1c1f1a"
+				},
+				{
+					"slug": "ink-muted",
+					"color": "#535a4f"
+				},
+				{
+					"slug": "accent",
+					"color": "#4a6b50"
+				},
+				{
+					"slug": "on-accent",
+					"color": "#ffffff"
+				},
+				{
+					"slug": "stroke",
+					"color": "#cbc8b9"
+				},
+				{
+					"slug": "focus",
+					"color": "#1d4ed8"
+				},
+				{
+					"slug": "success",
+					"color": "#2e6b3a"
+				},
+				{
+					"slug": "warning",
+					"color": "#7a4f00"
+				},
+				{
+					"slug": "danger",
+					"color": "#a3242b"
+				}
+			],
+			"failures": []
+		},
+		{
+			"name": "styles/corporate-dark.json",
+			"palette": [
+				{
+					"slug": "surface",
+					"color": "#0f1f3a"
+				},
+				{
+					"slug": "surface-alt",
+					"color": "#172b4d"
+				},
+				{
+					"slug": "ink",
+					"color": "#f3f6fb"
+				},
+				{
+					"slug": "ink-muted",
+					"color": "#a9b6cc"
+				},
+				{
+					"slug": "accent",
+					"color": "#8fb0ff"
+				},
+				{
+					"slug": "on-accent",
+					"color": "#0f1f3a"
+				},
+				{
+					"slug": "stroke",
+					"color": "#2c4268"
+				},
+				{
+					"slug": "focus",
+					"color": "#ffd166"
+				},
+				{
+					"slug": "success",
+					"color": "#7dcb8e"
+				},
+				{
+					"slug": "warning",
+					"color": "#f0b44c"
+				},
+				{
+					"slug": "danger",
+					"color": "#ff9b94"
+				}
+			],
+			"failures": []
+		},
+		{
+			"name": "styles/corporate-light.json",
+			"palette": [
+				{
+					"slug": "surface",
+					"color": "#ffffff"
+				},
+				{
+					"slug": "surface-alt",
+					"color": "#eef2f8"
+				},
+				{
+					"slug": "ink",
+					"color": "#0f1f3a"
+				},
+				{
+					"slug": "ink-muted",
+					"color": "#4a5872"
+				},
+				{
+					"slug": "accent",
+					"color": "#2152c7"
+				},
+				{
+					"slug": "on-accent",
+					"color": "#ffffff"
+				},
+				{
+					"slug": "stroke",
+					"color": "#ccd5e3"
+				},
+				{
+					"slug": "focus",
+					"color": "#b45309"
+				},
+				{
+					"slug": "success",
+					"color": "#1f6b35"
+				},
+				{
+					"slug": "warning",
+					"color": "#7a4f00"
+				},
+				{
+					"slug": "danger",
+					"color": "#b3261e"
+				}
+			],
+			"failures": []
+		},
+		{
+			"name": "styles/swiss-editorial-dark.json",
+			"palette": [
+				{
+					"slug": "surface",
+					"color": "#0e0e0e"
+				},
+				{
+					"slug": "surface-alt",
+					"color": "#1a1a1a"
+				},
+				{
+					"slug": "ink",
+					"color": "#f5f5f5"
+				},
+				{
+					"slug": "ink-muted",
+					"color": "#a6a6a6"
+				},
+				{
+					"slug": "accent",
+					"color": "#ff6a50"
+				},
+				{
+					"slug": "on-accent",
+					"color": "#111111"
+				},
+				{
+					"slug": "stroke",
+					"color": "#333333"
+				},
+				{
+					"slug": "focus",
+					"color": "#ffd166"
+				},
+				{
+					"slug": "success",
+					"color": "#6fcf88"
+				},
+				{
+					"slug": "warning",
+					"color": "#f0b44c"
+				},
+				{
+					"slug": "danger",
+					"color": "#ff8a80"
+				}
+			],
+			"failures": []
+		},
+		{
+			"name": "styles/swiss-editorial-light.json",
+			"palette": [
+				{
+					"slug": "surface",
+					"color": "#ffffff"
+				},
+				{
+					"slug": "surface-alt",
+					"color": "#f2f1ee"
+				},
+				{
+					"slug": "ink",
+					"color": "#111111"
+				},
+				{
+					"slug": "ink-muted",
+					"color": "#555555"
+				},
+				{
+					"slug": "accent",
+					"color": "#c2331c"
+				},
+				{
+					"slug": "on-accent",
+					"color": "#ffffff"
+				},
+				{
+					"slug": "stroke",
+					"color": "#d4d4d4"
+				},
+				{
+					"slug": "focus",
+					"color": "#1d4ed8"
+				},
+				{
+					"slug": "success",
+					"color": "#1f6b35"
+				},
+				{
+					"slug": "warning",
+					"color": "#7a4f00"
+				},
+				{
+					"slug": "danger",
+					"color": "#b3261e"
+				}
+			],
+			"failures": []
+		},
+		{
+			"name": "styles/warm-editorial-dark.json",
+			"palette": [
+				{
+					"slug": "surface",
+					"color": "#171512"
+				},
+				{
+					"slug": "surface-alt",
+					"color": "#221f1a"
+				},
+				{
+					"slug": "ink",
+					"color": "#f2ede4"
+				},
+				{
+					"slug": "ink-muted",
+					"color": "#b8b0a2"
+				},
+				{
+					"slug": "accent",
+					"color": "#8cc5b3"
+				},
+				{
+					"slug": "on-accent",
+					"color": "#10241e"
+				},
+				{
+					"slug": "stroke",
+					"color": "#3a352d"
+				},
+				{
+					"slug": "focus",
+					"color": "#f2c46d"
+				},
+				{
+					"slug": "success",
+					"color": "#7dcb8e"
+				},
+				{
+					"slug": "warning",
+					"color": "#e8b04a"
+				},
+				{
+					"slug": "danger",
+					"color": "#f08a8f"
+				}
+			],
+			"failures": []
+		},
+		{
+			"name": "accent too light",
+			"palette": [
+				{
+					"slug": "surface",
+					"color": "#f7f4ee"
+				},
+				{
+					"slug": "surface-alt",
+					"color": "#efe9de"
+				},
+				{
+					"slug": "ink",
+					"color": "#1c1a17"
+				},
+				{
+					"slug": "ink-muted",
+					"color": "#57514a"
+				},
+				{
+					"slug": "accent",
+					"color": "#9ab8ae"
+				},
+				{
+					"slug": "on-accent",
+					"color": "#ffffff"
+				},
+				{
+					"slug": "stroke",
+					"color": "#cfc6b6"
+				},
+				{
+					"slug": "focus",
+					"color": "#1d4ed8"
+				},
+				{
+					"slug": "success",
+					"color": "#2e6b3a"
+				},
+				{
+					"slug": "warning",
+					"color": "#7a4f00"
+				},
+				{
+					"slug": "danger",
+					"color": "#a3242b"
+				}
+			],
+			"failures": [
+				{
+					"fg": "accent",
+					"bg": "surface",
+					"ratio": 1.9438
+				},
+				{
+					"fg": "accent",
+					"bg": "surface-alt",
+					"ratio": 1.7661
+				},
+				{
+					"fg": "on-accent",
+					"bg": "accent",
+					"ratio": 2.1338
+				}
+			]
+		},
+		{
+			"name": "focus equals surface",
+			"palette": [
+				{
+					"slug": "surface",
+					"color": "#f7f4ee"
+				},
+				{
+					"slug": "surface-alt",
+					"color": "#efe9de"
+				},
+				{
+					"slug": "ink",
+					"color": "#1c1a17"
+				},
+				{
+					"slug": "ink-muted",
+					"color": "#57514a"
+				},
+				{
+					"slug": "accent",
+					"color": "#2f5d50"
+				},
+				{
+					"slug": "on-accent",
+					"color": "#ffffff"
+				},
+				{
+					"slug": "stroke",
+					"color": "#cfc6b6"
+				},
+				{
+					"slug": "focus",
+					"color": "#f7f4ee"
+				},
+				{
+					"slug": "success",
+					"color": "#2e6b3a"
+				},
+				{
+					"slug": "warning",
+					"color": "#7a4f00"
+				},
+				{
+					"slug": "danger",
+					"color": "#a3242b"
+				}
+			],
+			"failures": [
+				{
+					"fg": "focus",
+					"bg": "surface",
+					"ratio": 1
+				},
+				{
+					"fg": "focus",
+					"bg": "surface-alt",
+					"ratio": 1.1006
+				},
+				{
+					"fg": "focus",
+					"bg": "accent",
+					"ratio": 6.8261
+				},
+				{
+					"fg": "focus",
+					"bg": "ink",
+					"ratio": 15.8161
+				}
+			]
+		},
+		{
+			"name": "short hex",
+			"palette": [
+				{
+					"slug": "surface",
+					"color": "#f7f4ee"
+				},
+				{
+					"slug": "surface-alt",
+					"color": "#efe9de"
+				},
+				{
+					"slug": "ink",
+					"color": "#000"
+				},
+				{
+					"slug": "ink-muted",
+					"color": "#57514a"
+				},
+				{
+					"slug": "accent",
+					"color": "#2f5d50"
+				},
+				{
+					"slug": "on-accent",
+					"color": "#ffffff"
+				},
+				{
+					"slug": "stroke",
+					"color": "#cfc6b6"
+				},
+				{
+					"slug": "focus",
+					"color": "#1d4ed8"
+				},
+				{
+					"slug": "success",
+					"color": "#2e6b3a"
+				},
+				{
+					"slug": "warning",
+					"color": "#7a4f00"
+				},
+				{
+					"slug": "danger",
+					"color": "#a3242b"
+				}
+			],
+			"failures": []
+		},
+		{
+			"name": "missing role",
+			"palette": [
+				{
+					"slug": "surface",
+					"color": "#f7f4ee"
+				},
+				{
+					"slug": "surface-alt",
+					"color": "#efe9de"
+				},
+				{
+					"slug": "ink",
+					"color": "#1c1a17"
+				},
+				{
+					"slug": "ink-muted",
+					"color": "#57514a"
+				},
+				{
+					"slug": "accent",
+					"color": "#2f5d50"
+				},
+				{
+					"slug": "on-accent",
+					"color": "#ffffff"
+				},
+				{
+					"slug": "stroke",
+					"color": "#cfc6b6"
+				},
+				{
+					"slug": "success",
+					"color": "#2e6b3a"
+				},
+				{
+					"slug": "warning",
+					"color": "#7a4f00"
+				},
+				{
+					"slug": "danger",
+					"color": "#a3242b"
+				}
+			],
+			"failures": [
+				{
+					"fg": "focus",
+					"bg": "surface",
+					"ratio": 0
+				},
+				{
+					"fg": "focus",
+					"bg": "surface-alt",
+					"ratio": 0
+				},
+				{
+					"fg": "focus",
+					"bg": "accent",
+					"ratio": 6.8261
+				},
+				{
+					"fg": "focus",
+					"bg": "ink",
+					"ratio": 15.8161
+				}
+			]
+		},
+		{
+			"name": "rgb and hsl",
+			"palette": [
+				{
+					"slug": "surface",
+					"color": "hsl(40deg 36.84% 95.1%)"
+				},
+				{
+					"slug": "surface-alt",
+					"color": "#efe9de"
+				},
+				{
+					"slug": "ink",
+					"color": "rgba(28 26 23 / 100%)"
+				},
+				{
+					"slug": "ink-muted",
+					"color": "#57514a"
+				},
+				{
+					"slug": "accent",
+					"color": "rgb(47, 93, 80)"
+				},
+				{
+					"slug": "on-accent",
+					"color": "hsla(0, 0%, 100%, 1)"
+				},
+				{
+					"slug": "stroke",
+					"color": "#cfc6b6"
+				},
+				{
+					"slug": "focus",
+					"color": "#1d4ed8"
+				},
+				{
+					"slug": "success",
+					"color": "#2e6b3a"
+				},
+				{
+					"slug": "warning",
+					"color": "#7a4f00"
+				},
+				{
+					"slug": "danger",
+					"color": "#a3242b"
+				}
+			],
+			"failures": []
+		},
+		{
+			"name": "preset references",
+			"palette": [
+				{
+					"slug": "surface",
+					"color": "#f7f4ee"
+				},
+				{
+					"slug": "surface-alt",
+					"color": "#efe9de"
+				},
+				{
+					"slug": "ink",
+					"color": "#1c1a17"
+				},
+				{
+					"slug": "ink-muted",
+					"color": "#57514a"
+				},
+				{
+					"slug": "accent",
+					"color": "#2f5d50"
+				},
+				{
+					"slug": "on-accent",
+					"color": "var(--wp--preset--color--surface)"
+				},
+				{
+					"slug": "stroke",
+					"color": "#cfc6b6"
+				},
+				{
+					"slug": "focus",
+					"color": "#1d4ed8"
+				},
+				{
+					"slug": "success",
+					"color": "#2e6b3a"
+				},
+				{
+					"slug": "warning",
+					"color": "#7a4f00"
+				},
+				{
+					"slug": "danger",
+					"color": "#a3242b"
+				}
+			],
+			"failures": []
+		},
+		{
+			"name": "not checkable",
+			"palette": [
+				{
+					"slug": "surface",
+					"color": "#f7f4ee"
+				},
+				{
+					"slug": "surface-alt",
+					"color": "#efe9de"
+				},
+				{
+					"slug": "ink",
+					"color": "currentColor"
+				},
+				{
+					"slug": "ink-muted",
+					"color": "#57514a"
+				},
+				{
+					"slug": "accent",
+					"color": "var(--brand)"
+				},
+				{
+					"slug": "on-accent",
+					"color": "#ffffff"
+				},
+				{
+					"slug": "stroke",
+					"color": "#cfc6b6"
+				},
+				{
+					"slug": "focus",
+					"color": "rgba(0, 0, 0, 0.5)"
+				},
+				{
+					"slug": "success",
+					"color": "#2e6b3a"
+				},
+				{
+					"slug": "warning",
+					"color": "#7a4f00"
+				},
+				{
+					"slug": "danger",
+					"color": "#a3242b"
+				}
+			],
+			"failures": [
+				{
+					"fg": "ink",
+					"bg": "surface",
+					"ratio": null
+				},
+				{
+					"fg": "ink",
+					"bg": "surface-alt",
+					"ratio": null
+				},
+				{
+					"fg": "accent",
+					"bg": "surface",
+					"ratio": null
+				},
+				{
+					"fg": "accent",
+					"bg": "surface-alt",
+					"ratio": null
+				},
+				{
+					"fg": "on-accent",
+					"bg": "accent",
+					"ratio": null
+				},
+				{
+					"fg": "focus",
+					"bg": "surface",
+					"ratio": null
+				},
+				{
+					"fg": "focus",
+					"bg": "surface-alt",
+					"ratio": null
+				},
+				{
+					"fg": "focus",
+					"bg": "accent",
+					"ratio": null
+				},
+				{
+					"fg": "focus",
+					"bg": "ink",
+					"ratio": null
+				},
+				{
+					"fg": "stroke",
+					"bg": "ink",
+					"ratio": null
+				}
+			]
+		},
+		{
+			"name": "exactly at the limits",
+			"palette": [
+				{
+					"slug": "text",
+					"color": "rgb(117.45940287407777 117.45940287407777 117.45940287407777)"
+				},
+				{
+					"slug": "paper",
+					"color": "rgb(253 253 253)"
+				},
+				{
+					"slug": "line",
+					"color": "rgb(146.85682916412293 146.85682916412293 146.85682916412293)"
+				},
+				{
+					"slug": "paper-alt",
+					"color": "rgb(252 252 252)"
+				}
+			],
+			"pairs": [
+				{
+					"fg": "text",
+					"bg": "paper",
+					"min": 4.5
+				},
+				{
+					"fg": "line",
+					"bg": "paper-alt",
+					"min": 3
+				}
+			],
+			"failures": []
+		},
+		{
+			"name": "just below the limits",
+			"palette": [
+				{
+					"slug": "text",
+					"color": "rgb(117.5 117.5 117.5)"
+				},
+				{
+					"slug": "paper",
+					"color": "rgb(253 253 253)"
+				},
+				{
+					"slug": "line",
+					"color": "rgb(146.9 146.9 146.9)"
+				},
+				{
+					"slug": "paper-alt",
+					"color": "rgb(252 252 252)"
+				}
+			],
+			"pairs": [
+				{
+					"fg": "text",
+					"bg": "paper",
+					"min": 4.5
+				},
+				{
+					"fg": "line",
+					"bg": "paper-alt",
+					"min": 3
+				}
+			],
+			"failures": [
+				{
+					"fg": "text",
+					"bg": "paper",
+					"ratio": 4.4974
+				},
+				{
+					"fg": "line",
+					"bg": "paper-alt",
+					"ratio": 2.9984
+				}
+			]
+		}
+	]
+}

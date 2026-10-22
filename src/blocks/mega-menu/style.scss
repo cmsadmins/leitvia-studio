@@ -1,0 +1,138 @@
+// Desktop: the panel overlays the page below the navigation (absolute, nothing moves when it opens). The item gives
+// up core's position: relative, so the panel lines up with the navigation instead of the item. The ::before strip
+// fills the gap between item and panel, the hover bridge of view.js covers the rest of the way.
+.wp-block-navigation .wp-block-leitvia-mega-menu {
+	position: static;
+	gap: var(--wp--preset--spacing--xxs, 0.25rem);
+}
+
+.wp-block-leitvia-mega-menu__toggle {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-inline-size: 1.5rem;
+	min-block-size: 1.5rem;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: inherit;
+	cursor: pointer;
+
+	// Keeps its space until view.js shows it, so showing it shifts nothing.
+	&[hidden] {
+		display: inline-flex;
+		visibility: hidden;
+	}
+
+	svg {
+		inline-size: 0.75rem;
+		block-size: 0.75rem;
+		fill: none;
+		stroke: currentcolor;
+	}
+
+	&[aria-expanded="true"] svg {
+		transform: rotate(180deg);
+	}
+
+	&:focus-visible {
+		outline: 2px solid var(--wp--preset--color--focus, currentcolor);
+		outline-offset: 2px;
+	}
+}
+
+.wp-block-leitvia-mega-menu__panel {
+	position: absolute;
+	z-index: 2;
+	inset-block-start: 100%;
+	inset-inline-start: 0;
+	inline-size: min(56rem, calc(100vw - 2 * var(--wp--preset--spacing--s, 1rem)));
+	margin-block-start: var(--wp--preset--spacing--xs, 0.5rem);
+	padding: var(--wp--preset--spacing--m, 1.5rem);
+	border: 1px solid var(--wp--preset--color--stroke, currentcolor);
+	border-radius: var(--wp--preset--border-radius--m, 0);
+	background-color: var(--wp--preset--color--surface, #fff);
+	box-shadow: var(--wp--preset--shadow--raised, none);
+	color: var(--wp--preset--color--ink, inherit);
+	font-family: var(--wp--preset--font-family--body, inherit);
+	font-size: var(--wp--preset--font-size--body, 1rem);
+	text-align: start;
+
+	&::before {
+		content: "";
+		position: absolute;
+		inset-block-end: 100%;
+		inset-inline: 0;
+		block-size: calc(var(--wp--preset--spacing--xs, 0.5rem) + 1px);
+	}
+
+	&[hidden] {
+		display: none;
+	}
+
+	.items-justified-right & {
+		inset-inline: auto 0;
+	}
+}
+
+// Overlay: the panel is a collapsible section in the flow of the menu. The selectors outweigh core's overlay rules
+// (four classes), which stack every item in a column.
+$overlay: ".wp-block-navigation__responsive-container.is-menu-open .wp-block-navigation__responsive-container-content";
+
+#{$overlay} .wp-block-navigation-item.wp-block-leitvia-mega-menu {
+	flex-flow: row wrap;
+	justify-content: center;
+}
+
+.is-menu-open .wp-block-leitvia-mega-menu__panel {
+	position: static;
+	flex-basis: 100%;
+	inline-size: auto;
+	margin: 0;
+	padding: var(--wp--preset--spacing--xs, 0.5rem) 0 0;
+	border: 0;
+	background: transparent;
+	box-shadow: none;
+	color: inherit;
+	text-align: inherit;
+
+	&::before {
+		content: none;
+	}
+}
+
+// Core submenus in the overlay of a navigation the server marked collapsible (view.js adds the class): collapsed groups
+// hide their links, every group label shows the chevron, so it reads as a toggle and not as a link.
+.has-leitvia-collapsible#{$overlay} {
+	.wp-block-navigation-item.has-child {
+		flex-flow: row wrap;
+		justify-content: center;
+		column-gap: var(--wp--preset--spacing--xxs, 0.25rem);
+	}
+
+	.has-child > .wp-block-navigation__submenu-container.wp-block-navigation__submenu-container {
+		flex-basis: 100%;
+	}
+
+	.wp-block-navigation-submenu__toggle[aria-expanded="false"] ~ .wp-block-navigation__submenu-container {
+		display: none;
+	}
+
+	// Core stretches toggles of nested submenus; in the overlay label and chevron stay together.
+	.wp-block-navigation-submenu__toggle {
+		flex: none;
+		inline-size: auto;
+		font-weight: 600;
+	}
+
+	.wp-block-navigation-item__content.wp-block-navigation-submenu__toggle + .wp-block-navigation__submenu-icon,
+	.has-child > .wp-block-navigation__submenu-icon.wp-block-navigation-submenu__toggle {
+		display: inline-flex;
+		margin: 0;
+	}
+
+	.wp-block-navigation-submenu__toggle[aria-expanded="true"] + .wp-block-navigation__submenu-icon > svg,
+	.wp-block-navigation-submenu__toggle[aria-expanded="true"] > svg {
+		transform: rotate(180deg);
+	}
+}

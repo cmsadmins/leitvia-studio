@@ -1,0 +1,60 @@
+{
+	"$schema": "https://playground.wordpress.net/blueprint-schema.json",
+	"meta": {
+		"title": "Leitvia Studio live preview",
+		"description": "The theme Leitvia and Leitvia Studio with the recipe company applied, its pages published and its change package taken over by the admin.",
+		"author": "contexlabs"
+	},
+	"landingPage": "/wp-admin/admin.php?page=leitvia-studio",
+	"login": true,
+	"preferredVersions": {
+		"php": "8.4",
+		"wp": "latest"
+	},
+	"steps": [
+		{
+			"step": "installTheme",
+			"themeData": {
+				"resource": "wordpress.org/themes",
+				"slug": "leitvia"
+			},
+			"options": {
+				"activate": true
+			}
+		},
+		{
+			"step": "installPlugin",
+			"pluginData": {
+				"resource": "wordpress.org/plugins",
+				"slug": "leitvia-studio"
+			},
+			"options": {
+				"activate": true
+			}
+		},
+		{
+			"step": "wp-cli",
+			"command": "wp option update leitvia_studio_gateway '{\"profile\":\"full\"}' --format=json"
+		},
+		{
+			"step": "wp-cli",
+			"command": "wp leitvia recipe apply leitvia/company --user=admin"
+		},
+		{
+			"step": "wp-cli",
+			"command": "wp eval 'foreach ( WP_CLI::runcommand( \"leitvia package list --state=open --format=json\", array( \"launch\" => false, \"return\" => true, \"parse\" => \"json\" ) ) as $package ) { WP_CLI::runcommand( \"leitvia package apply \" . (int) $package[\"id\"], array( \"launch\" => false ) ); }' --user=admin"
+		},
+		{
+			"step": "wp-cli",
+			"command": "wp leitvia recipe apply leitvia/company --user=admin"
+		},
+		{
+			"step": "wp-cli",
+			"command": "wp eval 'foreach ( WP_CLI::runcommand( \"leitvia package list --state=open --format=json\", array( \"launch\" => false, \"return\" => true, \"parse\" => \"json\" ) ) as $package ) { WP_CLI::runcommand( \"leitvia package apply \" . (int) $package[\"id\"], array( \"launch\" => false ) ); }' --user=admin"
+		},
+		{
+			"step": "wp-cli",
+			"command": "wp option delete leitvia_studio_gateway"
+		}
+	]
+}

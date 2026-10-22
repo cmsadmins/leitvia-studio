@@ -1,0 +1,23 @@
+{
+	"name": "break-within",
+	"template": "page-landing",
+	"sections": [
+		"leitvia/hero-split-image",
+		"leitvia/content-feature-grid",
+		"leitvia/content-faq",
+		"leitvia/teaser-services",
+		"leitvia/content-steps",
+		"leitvia/cta-contact"
+	],
+	"issues": [
+		[
+			"breakWithin",
+			3
+		],
+		[
+			"maxDensityRun",
+			5
+		]
+	],
+	"score": 85
+}

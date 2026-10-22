@@ -1,0 +1,47 @@
+// Line in stroke, dot in accent. Both are decoration: the date and heading carry the information.
+.wp-block-leitvia-timeline-item {
+	position: relative;
+	padding-inline-start: var(--wp--preset--spacing--l, 2rem);
+	padding-block-end: var(--wp--preset--spacing--m, 1.5rem);
+
+	&::before,
+	&::after {
+		content: "";
+		position: absolute;
+	}
+
+	&::before {
+		inset-block: 0;
+		inset-inline-start: calc(0.5rem - 1px);
+		inline-size: 2px;
+		background: var(--wp--preset--color--stroke, currentcolor);
+	}
+
+	&:last-child::before {
+		inset-block-end: auto;
+		block-size: 1.5em;
+	}
+
+	&::after {
+		inset-block-start: 0.25em;
+		inset-inline-start: 0;
+		inline-size: 1rem;
+		block-size: 1rem;
+		border-radius: 50%;
+		background: var(--wp--preset--color--accent, currentcolor);
+	}
+}
+
+.wp-block-leitvia-timeline-item__date {
+	display: block;
+	font-variant-numeric: tabular-nums;
+	font-weight: 600;
+}
+
+.wp-block-leitvia-timeline-item__heading {
+	margin-block: 0.25em 0.5em;
+}
+
+.wp-block-leitvia-timeline-item__content > :first-child {
+	margin-block-start: 0;
+}

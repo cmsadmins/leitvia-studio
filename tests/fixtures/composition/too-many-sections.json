@@ -1,0 +1,27 @@
+{
+	"name": "too-many-sections",
+	"template": "page-landing",
+	"sections": [
+		"leitvia/hero-centered",
+		"leitvia/proof-trust-strip",
+		"leitvia/content-text-media",
+		"leitvia/content-steps",
+		"leitvia/content-quote",
+		"leitvia/content-feature-grid",
+		"leitvia/content-faq",
+		"leitvia/content-break-image",
+		"leitvia/teaser-posts-grid",
+		"leitvia/teaser-services",
+		"leitvia/content-statement",
+		"leitvia/content-two-columns",
+		"leitvia/cta-contact",
+		"leitvia/cta-newsletter"
+	],
+	"issues": [
+		[
+			"maxSections",
+			12
+		]
+	],
+	"score": 90
+}

@@ -1,0 +1,54 @@
+// Layout of the content model panel only: colours, borders and type come from the editor and @wordpress/components.
+@use "~@wordpress/dataviews/build-style/style";
+
+.leitvia-studio-model-panel {
+	.components-notice {
+		margin: 0 0 16px;
+	}
+}
+
+.leitvia-studio-image-field__label,
+.leitvia-studio-relation__label {
+	margin: 0 0 8px;
+	font-weight: 500;
+}
+
+.leitvia-studio-image-field__preview {
+	display: block;
+	max-width: 100%;
+	height: auto;
+	margin-bottom: 8px;
+}
+
+.leitvia-studio-repeater {
+	margin-top: 24px;
+
+	.dataviews-wrapper {
+		margin: 8px 0 16px;
+	}
+}
+
+.leitvia-studio-repeater__title {
+	margin: 0 0 8px;
+	font-size: 13px;
+}
+
+.leitvia-studio-relation__list {
+	margin: 0 0 8px;
+	list-style: none;
+
+	li {
+		display: flex;
+		gap: 8px;
+		align-items: center;
+		justify-content: space-between;
+		margin: 0 0 4px;
+	}
+}
+
+.leitvia-highlight-popover {
+	display: grid;
+	gap: 12px;
+	width: 260px;
+	padding: 16px;
+}

@@ -1,0 +1,7 @@
+{
+	"usage": {
+		"useWhen": "A strip of client logos or short statements as social proof.",
+		"avoidWhen": "Important information visitors must read; moving content is easy to miss.",
+		"a11y": "The strip moves only with JavaScript and without reduced motion and has a Pause button. Logos need alt text with the company name."
+	}
+}

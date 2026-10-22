@@ -1,0 +1,26 @@
+.wp-block-leitvia-feature-item {
+	display: flex;
+	flex-direction: column;
+	gap: var(--wp--preset--spacing--xxs, 0.25rem);
+	padding-block: var(--wp--preset--spacing--s, 1rem);
+	border-block-start: 1px solid var(--wp--preset--color--stroke, currentcolor);
+
+	> * {
+		margin: 0;
+	}
+}
+
+.wp-block-leitvia-feature-item__title {
+	font-size: var(--wp--preset--font-size--body, 1.125rem);
+}
+
+.wp-block-leitvia-feature-item__badge {
+	align-self: flex-start;
+	padding-inline: var(--wp--preset--spacing--xs, 0.5rem);
+	border: 1px solid currentcolor;
+	font-family: var(--wp--preset--font-family--ui, inherit);
+	font-size: 0.75rem;
+	font-weight: 500;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}

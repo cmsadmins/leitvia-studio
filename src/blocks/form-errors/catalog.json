@@ -1,0 +1,7 @@
+{
+	"usage": {
+		"useWhen": "Around a form from a form plugin, so visitors see all errors at the top with links to the fields.",
+		"avoidWhen": "Around content without form fields or forms that already show an error summary.",
+		"a11y": "On a failed submit the summary takes the focus and links to each field; each field gets aria-invalid and a message next to it."
+	}
+}

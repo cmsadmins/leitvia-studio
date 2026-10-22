@@ -1,0 +1,422 @@
+{
+	"$schema": "http://json-schema.org/draft-04/schema#",
+	"title": "Leitvia Studio content model",
+	"description": "Post types, taxonomies, fields, relations, repeaters and site settings, registered through WordPress core APIs. Cross references (relation targets, duplicate and reserved keys) are checked on the server.",
+	"type": "object",
+	"additionalProperties": false,
+	"required": [
+		"version"
+	],
+	"properties": {
+		"version": {
+			"type": "integer",
+			"enum": [
+				1
+			]
+		},
+		"postTypes": {
+			"type": "object",
+			"additionalProperties": false,
+			"patternProperties": {
+				"^(?!wp_)[a-z][a-z0-9_]{1,19}$": {
+					"type": "object",
+					"additionalProperties": false,
+					"required": [
+						"label",
+						"singularLabel"
+					],
+					"properties": {
+						"label": {
+							"type": "string",
+							"minLength": 1,
+							"maxLength": 100,
+							"pattern": "^[^<>]*$"
+						},
+						"singularLabel": {
+							"type": "string",
+							"minLength": 1,
+							"maxLength": 100,
+							"pattern": "^[^<>]*$"
+						},
+						"description": {
+							"type": "string",
+							"maxLength": 500,
+							"pattern": "^[^<>]*$"
+						},
+						"public": {
+							"type": "boolean"
+						},
+						"hasArchive": {
+							"type": "boolean"
+						},
+						"hierarchical": {
+							"type": "boolean"
+						},
+						"slug": {
+							"type": "string",
+							"pattern": "^[a-z0-9][a-z0-9-]{0,59}$"
+						},
+						"supports": {
+							"type": "array",
+							"items": {
+								"type": "string",
+								"enum": [
+									"title",
+									"editor",
+									"author",
+									"thumbnail",
+									"excerpt",
+									"comments",
+									"revisions",
+									"page-attributes"
+								]
+							}
+						},
+						"icon": {
+							"type": "string",
+							"pattern": "^dashicons-[a-z0-9-]+$"
+						},
+						"showInAbilities": {
+							"type": "boolean"
+						},
+						"fields": {
+							"type": "object",
+							"additionalProperties": false,
+							"patternProperties": {
+								"^(?!wp_)[a-z][a-z0-9_]{2,63}$": {
+									"type": "object",
+									"additionalProperties": false,
+									"required": [
+										"type",
+										"label"
+									],
+									"properties": {
+										"type": {
+											"type": "string",
+											"enum": [
+												"text",
+												"textarea",
+												"email",
+												"url",
+												"integer",
+												"number",
+												"boolean",
+												"select",
+												"date",
+												"datetime",
+												"time",
+												"image"
+											]
+										},
+										"label": {
+											"type": "string",
+											"minLength": 1,
+											"maxLength": 100,
+											"pattern": "^[^<>]*$"
+										},
+										"description": {
+											"type": "string",
+											"maxLength": 500,
+											"pattern": "^[^<>]*$"
+										},
+										"required": {
+											"type": "boolean"
+										},
+										"maxLength": {
+											"type": "integer",
+											"minimum": 1
+										},
+										"min": {
+											"type": "number"
+										},
+										"max": {
+											"type": "number"
+										},
+										"options": {
+											"type": "object",
+											"additionalProperties": false,
+											"patternProperties": {
+												"^[a-z0-9_-]{1,64}$": {
+													"type": "string",
+													"minLength": 1,
+													"maxLength": 100,
+													"pattern": "^[^<>]*$"
+												}
+											}
+										}
+									}
+								}
+							}
+						},
+						"repeaters": {
+							"type": "object",
+							"additionalProperties": false,
+							"patternProperties": {
+								"^(?!wp_)[a-z][a-z0-9_]{2,63}$": {
+									"type": "object",
+									"additionalProperties": false,
+									"required": [
+										"postType",
+										"label",
+										"singularLabel"
+									],
+									"properties": {
+										"postType": {
+											"type": "string",
+											"pattern": "^(?!wp_)[a-z][a-z0-9_]{1,19}$"
+										},
+										"label": {
+											"type": "string",
+											"minLength": 1,
+											"maxLength": 100,
+											"pattern": "^[^<>]*$"
+										},
+										"singularLabel": {
+											"type": "string",
+											"minLength": 1,
+											"maxLength": 100,
+											"pattern": "^[^<>]*$"
+										},
+										"fields": {
+											"type": "object",
+											"additionalProperties": false,
+											"patternProperties": {
+												"^(?!wp_)[a-z][a-z0-9_]{2,63}$": {
+													"type": "object",
+													"additionalProperties": false,
+													"required": [
+														"type",
+														"label"
+													],
+													"properties": {
+														"type": {
+															"type": "string",
+															"enum": [
+																"text",
+																"textarea",
+																"email",
+																"url",
+																"integer",
+																"number",
+																"boolean",
+																"select",
+																"date",
+																"datetime",
+																"time",
+																"image"
+															]
+														},
+														"label": {
+															"type": "string",
+															"minLength": 1,
+															"maxLength": 100,
+															"pattern": "^[^<>]*$"
+														},
+														"description": {
+															"type": "string",
+															"maxLength": 500,
+															"pattern": "^[^<>]*$"
+														},
+														"required": {
+															"type": "boolean"
+														},
+														"maxLength": {
+															"type": "integer",
+															"minimum": 1
+														},
+														"min": {
+															"type": "number"
+														},
+														"max": {
+															"type": "number"
+														},
+														"options": {
+															"type": "object",
+															"additionalProperties": false,
+															"patternProperties": {
+																"^[a-z0-9_-]{1,64}$": {
+																	"type": "string",
+																	"minLength": 1,
+																	"maxLength": 100,
+																	"pattern": "^[^<>]*$"
+																}
+															}
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"taxonomies": {
+			"type": "object",
+			"additionalProperties": false,
+			"patternProperties": {
+				"^(?!wp_)[a-z][a-z0-9_]{1,31}$": {
+					"type": "object",
+					"additionalProperties": false,
+					"required": [
+						"label",
+						"singularLabel",
+						"postTypes"
+					],
+					"properties": {
+						"label": {
+							"type": "string",
+							"minLength": 1,
+							"maxLength": 100,
+							"pattern": "^[^<>]*$"
+						},
+						"singularLabel": {
+							"type": "string",
+							"minLength": 1,
+							"maxLength": 100,
+							"pattern": "^[^<>]*$"
+						},
+						"description": {
+							"type": "string",
+							"maxLength": 500,
+							"pattern": "^[^<>]*$"
+						},
+						"public": {
+							"type": "boolean"
+						},
+						"hierarchical": {
+							"type": "boolean"
+						},
+						"slug": {
+							"type": "string",
+							"pattern": "^[a-z0-9][a-z0-9-]{0,59}$"
+						},
+						"postTypes": {
+							"type": "array",
+							"items": {
+								"type": "string",
+								"pattern": "^[a-z][a-z0-9_]{1,19}$"
+							}
+						},
+						"showInAbilities": {
+							"type": "boolean"
+						}
+					}
+				}
+			}
+		},
+		"relations": {
+			"type": "object",
+			"additionalProperties": false,
+			"patternProperties": {
+				"^(?!wp_)[a-z][a-z0-9_]{2,63}$": {
+					"type": "object",
+					"additionalProperties": false,
+					"required": [
+						"label",
+						"from",
+						"to"
+					],
+					"properties": {
+						"label": {
+							"type": "string",
+							"minLength": 1,
+							"maxLength": 100,
+							"pattern": "^[^<>]*$"
+						},
+						"from": {
+							"type": "string",
+							"pattern": "^[a-z][a-z0-9_]{1,19}$"
+						},
+						"to": {
+							"type": "string",
+							"pattern": "^[a-z][a-z0-9_]{1,19}$"
+						},
+						"multiple": {
+							"type": "boolean"
+						}
+					}
+				}
+			}
+		},
+		"settings": {
+			"type": "object",
+			"additionalProperties": false,
+			"patternProperties": {
+				"^(?!wp_)[a-z][a-z0-9_]{2,63}$": {
+					"type": "object",
+					"additionalProperties": false,
+					"required": [
+						"type",
+						"label"
+					],
+					"properties": {
+						"type": {
+							"type": "string",
+							"enum": [
+								"text",
+								"textarea",
+								"email",
+								"url",
+								"integer",
+								"number",
+								"boolean",
+								"select",
+								"date",
+								"datetime",
+								"time",
+								"image"
+							]
+						},
+						"label": {
+							"type": "string",
+							"minLength": 1,
+							"maxLength": 100,
+							"pattern": "^[^<>]*$"
+						},
+						"description": {
+							"type": "string",
+							"maxLength": 500,
+							"pattern": "^[^<>]*$"
+						},
+						"required": {
+							"type": "boolean"
+						},
+						"maxLength": {
+							"type": "integer",
+							"minimum": 1
+						},
+						"min": {
+							"type": "number"
+						},
+						"max": {
+							"type": "number"
+						},
+						"options": {
+							"type": "object",
+							"additionalProperties": false,
+							"patternProperties": {
+								"^[a-z0-9_-]{1,64}$": {
+									"type": "string",
+									"minLength": 1,
+									"maxLength": 100,
+									"pattern": "^[^<>]*$"
+								}
+							}
+						},
+						"showInAbilities": {
+							"type": "boolean"
+						},
+						"bindable": {
+							"type": "boolean",
+							"description": "Whether blocks may show the value through the leitvia/setting binding, also to visitors. Off unless set."
+						}
+					}
+				}
+			}
+		}
+	}
+}

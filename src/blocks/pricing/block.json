@@ -1,0 +1,59 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "leitvia/pricing",
+	"version": "0.1.0",
+	"title": "Pricing",
+	"category": "leitvia",
+	"icon": "money-alt",
+	"description": "Plans with monthly and yearly prices, a period switch that works without JavaScript and notes on tax and guarantee.",
+	"keywords": [ "plans", "prices", "tariffs" ],
+	"textdomain": "leitvia-studio",
+	"allowedBlocks": [ "leitvia/pricing-plan", "core/details" ],
+	"attributes": {
+		"groupId": {
+			"type": "string",
+			"default": ""
+		},
+		"legend": {
+			"type": "rich-text",
+			"source": "rich-text",
+			"selector": "legend"
+		},
+		"monthlyLabel": {
+			"type": "rich-text",
+			"source": "rich-text",
+			"selector": ".wp-block-leitvia-pricing__monthly"
+		},
+		"yearlyLabel": {
+			"type": "rich-text",
+			"source": "rich-text",
+			"selector": ".wp-block-leitvia-pricing__yearly"
+		},
+		"taxNote": {
+			"type": "rich-text",
+			"source": "rich-text",
+			"selector": ".wp-block-leitvia-pricing__tax"
+		},
+		"guarantee": {
+			"type": "rich-text",
+			"source": "rich-text",
+			"selector": ".wp-block-leitvia-pricing__guarantee"
+		}
+	},
+	"supports": {
+		"anchor": true,
+		"align": [ "wide" ],
+		"html": false,
+		"spacing": {
+			"margin": true,
+			"padding": true
+		}
+	},
+	"example": {
+		"attributes": { "legend": "Billing period", "monthlyLabel": "Monthly", "yearlyLabel": "Yearly" },
+		"innerBlocks": [ { "name": "leitvia/pricing-plan", "attributes": { "name": "Basic", "monthly": 9, "yearly": 90 } }, { "name": "leitvia/pricing-plan", "attributes": { "name": "Pro", "monthly": 19, "yearly": 190, "recommended": true, "badge": "Recommended" } } ]
+	},
+	"editorScript": "file:./index.js",
+	"style": "file:./style-index.css"
+}

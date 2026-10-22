@@ -1,0 +1,16 @@
+{
+	"name": "hero-on-titled-template",
+	"template": "page",
+	"sections": [
+		"leitvia/hero-split-image",
+		"leitvia/content-quote",
+		"leitvia/cta-contact"
+	],
+	"issues": [
+		[
+			"heroTemplate",
+			0
+		]
+	],
+	"score": 80
+}

@@ -1,0 +1,13 @@
+{
+	"name": "studio-patterns",
+	"template": "page-landing",
+	"sections": [
+		"leitvia/hero-editorial",
+		"leitvia-studio/content-bento-features",
+		"leitvia/content-quote",
+		"leitvia-studio/offer-pricing-plans",
+		"leitvia/cta-contact"
+	],
+	"issues": [],
+	"score": 100
+}

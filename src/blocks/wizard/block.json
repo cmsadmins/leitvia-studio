@@ -1,0 +1,49 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "leitvia/wizard",
+	"version": "0.1.0",
+	"title": "Wizard",
+	"category": "leitvia",
+	"icon": "editor-ol",
+	"description": "A form in steps that sends its answers as URL parameters, for example to a page with a query filter. Without JavaScript all steps show at once.",
+	"keywords": [ "steps", "form", "assistant" ],
+	"textdomain": "leitvia-studio",
+	"allowedBlocks": [ "leitvia/wizard-step" ],
+	"attributes": {
+		"action": {
+			"type": "string",
+			"source": "attribute",
+			"selector": "form",
+			"attribute": "action",
+			"default": ""
+		},
+		"submit": {
+			"type": "rich-text",
+			"source": "rich-text",
+			"selector": ".wp-block-leitvia-wizard__submit button",
+			"default": "Show results"
+		}
+	},
+	"supports": {
+		"anchor": true,
+		"align": [ "wide" ],
+		"html": false,
+		"spacing": {
+			"margin": true,
+			"padding": true
+		},
+		"color": {
+			"background": true,
+			"text": true,
+			"link": false
+		}
+	},
+	"example": {
+		"attributes": { "submit": "Show results" },
+		"innerBlocks": [ { "name": "leitvia/wizard-step", "attributes": { "legend": "What do you need?", "name": "need", "options": [ { "label": "Website", "value": "website" }, { "label": "Shop", "value": "shop" } ] } } ]
+	},
+	"editorScript": "file:./index.js",
+	"style": "file:./style-index.css",
+	"viewScriptModule": "file:./view.js"
+}

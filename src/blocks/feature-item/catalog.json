@@ -1,0 +1,7 @@
+{
+	"usage": {
+		"useWhen": "One feature inside a feature group, with the plan that includes it.",
+		"avoidWhen": "Outside a feature group; it only works as its child.",
+		"a11y": "Keep the title short and the text one or two sentences; the plan badge is text, not color alone."
+	}
+}

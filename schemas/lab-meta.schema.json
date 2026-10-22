@@ -1,0 +1,124 @@
+{
+	"$schema": "http://json-schema.org/draft-04/schema#",
+	"title": "leitvia-studio-lab-meta",
+	"description": "Lab metadata of a wp_block pattern. Each property is one post meta key; the REST API validates against these schemas.",
+	"type": "object",
+	"properties": {
+		"_leitvia_lab_status": {
+			"description": "Own lab status of the pattern.",
+			"type": "string",
+			"enum": [ "draft", "review", "approved", "deprecated" ],
+			"default": "draft"
+		},
+		"_leitvia_lab_version": {
+			"description": "Semantic version of the pattern.",
+			"type": "string",
+			"pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?$",
+			"default": "0.1.0"
+		},
+		"_leitvia_lab_replaced_by": {
+			"description": "Replacement of a deprecated pattern: block:<ID> or pattern:<slug>. Required for the status deprecated.",
+			"type": "string",
+			"pattern": "^(?:|block:[1-9]\\d*|pattern:[a-z0-9-]+/[a-z0-9-]+)$",
+			"default": ""
+		},
+		"_leitvia_lab_changelog": {
+			"description": "Changelog, newest entry first.",
+			"type": "array",
+			"default": [],
+			"maxItems": 200,
+			"items": {
+				"type": "object",
+				"additionalProperties": false,
+				"required": [ "version", "date", "breaking", "note" ],
+				"properties": {
+					"version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?$" },
+					"date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+					"breaking": { "type": "boolean" },
+					"note": { "type": "string", "maxLength": 1000 }
+				}
+			}
+		},
+		"_leitvia_lab_checks": {
+			"description": "Results of the pattern checks.",
+			"type": "object",
+			"default": {},
+			"additionalProperties": false,
+			"properties": {
+				"tokens": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"count": { "type": "integer", "minimum": 0 },
+						"findings": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"additionalProperties": false,
+								"properties": {
+									"rule": { "type": "string" },
+									"match": { "type": "string" }
+								}
+							}
+						}
+					}
+				},
+				"axe": {
+					"description": "axe violations per \"<style>|<viewport>|<state>\", style default for the theme default and state original for the pattern itself.",
+					"type": "object",
+					"maxProperties": 200,
+					"additionalProperties": {
+						"type": "array",
+						"maxItems": 100,
+						"items": {
+							"type": "object",
+							"additionalProperties": false,
+							"required": [ "id", "impact", "help", "nodes" ],
+							"properties": {
+								"id": { "type": "string", "maxLength": 100 },
+								"impact": { "type": [ "string", "null" ], "enum": [ "minor", "moderate", "serious", "critical", null ] },
+								"help": { "type": "string", "maxLength": 500 },
+								"nodes": { "type": "array", "maxItems": 20, "items": { "type": "string", "maxLength": 500 } }
+							}
+						}
+					}
+				},
+				"axe_checked_at": { "type": "string" },
+				"checked_at": { "type": "string" }
+			}
+		},
+		"_leitvia_lab_variant_of": {
+			"description": "ID of the original pattern; 0 for originals.",
+			"type": "integer",
+			"minimum": 0,
+			"default": 0
+		},
+		"_leitvia_lab_state": {
+			"description": "State of a variant; empty for originals and content variants.",
+			"type": "string",
+			"enum": [ "", "error", "empty", "long", "disabled" ],
+			"default": ""
+		},
+		"_leitvia_lab_source_pattern": {
+			"description": "Slug of the theme pattern a state was made from; empty otherwise. Such states have no original wp_block.",
+			"type": "string",
+			"pattern": "^(?:|[a-z0-9_.-]+/[a-z0-9_.-]+)$",
+			"default": ""
+		},
+		"_leitvia_lab_annotations": {
+			"description": "Notes on named blocks of the pattern.",
+			"type": "array",
+			"default": [],
+			"maxItems": 200,
+			"items": {
+				"type": "object",
+				"additionalProperties": false,
+				"required": [ "target", "text" ],
+				"properties": {
+					"target": { "type": "string", "minLength": 1 },
+					"text": { "type": "string", "maxLength": 2000 }
+				}
+			}
+		}
+	}
+}

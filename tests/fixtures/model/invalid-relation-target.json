@@ -1,0 +1,1 @@
+{ "version": 1, "postTypes": { "event": { "label": "Events", "singularLabel": "Event" } }, "relations": { "event_venue": { "label": "Venue", "from": "event", "to": "venue" } } }

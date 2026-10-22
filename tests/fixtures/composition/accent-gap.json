@@ -1,0 +1,17 @@
+{
+	"name": "accent-gap",
+	"template": "page-landing",
+	"sections": [
+		"leitvia/hero-centered",
+		"leitvia/content-statement",
+		"leitvia/content-text-media",
+		"leitvia/cta-banner"
+	],
+	"issues": [
+		[
+			"accentMinGap",
+			3
+		]
+	],
+	"score": 90
+}

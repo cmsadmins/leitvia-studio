@@ -1,0 +1,47 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "leitvia/timeline-item",
+	"version": "0.1.0",
+	"title": "Timeline entry",
+	"category": "leitvia",
+	"icon": "marker",
+	"description": "One dated entry of a timeline with a heading and text.",
+	"keywords": [ "milestone", "date", "event" ],
+	"textdomain": "leitvia-studio",
+	"parent": [ "leitvia/timeline" ],
+	"attributes": {
+		"date": {
+			"type": "string",
+			"source": "attribute",
+			"selector": "time",
+			"attribute": "datetime",
+			"default": ""
+		},
+		"dateLabel": {
+			"type": "rich-text",
+			"source": "rich-text",
+			"selector": "time"
+		},
+		"heading": {
+			"type": "rich-text",
+			"source": "rich-text",
+			"selector": ".wp-block-leitvia-timeline-item__heading"
+		},
+		"level": {
+			"type": "number",
+			"default": 3
+		}
+	},
+	"supports": {
+		"anchor": true,
+		"html": false,
+		"reusable": false
+	},
+	"example": {
+		"attributes": { "date": "2019", "dateLabel": "2019", "heading": "Founded" },
+		"innerBlocks": [ { "name": "core/paragraph", "attributes": { "content": "Two designers start the studio." } } ]
+	},
+	"editorScript": "file:./index.js",
+	"style": "file:./style-index.css"
+}

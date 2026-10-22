@@ -1,0 +1,7 @@
+{
+	"usage": {
+		"useWhen": "In the header of public sector or accessibility focused sites that offer an easy language version, an accessibility statement or sign language.",
+		"avoidWhen": "Sites without any of these offers; an empty bar only adds noise.",
+		"a11y": "Keep the link texts as they are or equally clear. Text size, contrast and read aloud appear only with JavaScript and are announced as buttons."
+	}
+}

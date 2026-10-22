@@ -1,0 +1,15 @@
+// Icon and text as one target of at least 24 x 24 px (WCAG 2.5.8).
+.wp-block-leitvia-language-switch {
+	display: inline-flex;
+	gap: var(--wp--preset--spacing--xs, 0.5rem);
+	align-items: center;
+	min-block-size: 24px;
+}
+
+.wp-block-leitvia-language-switch__icon {
+	flex: none;
+	inline-size: 1.25em;
+	block-size: 1.25em;
+	min-inline-size: 20px;
+	min-block-size: 20px;
+}

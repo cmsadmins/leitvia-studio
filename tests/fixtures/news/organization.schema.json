@@ -1,0 +1,26 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"$id": "https://leitvia.com/schemas/news/organization.schema.json",
+	"title": "Publisher of an article",
+	"description": "An Organization node as search engines read it for article publishers: a name, and if a logo is given it must be an image of at least 112 by 112 pixels.",
+	"type": "object",
+	"required": [ "@type", "name" ],
+	"properties": {
+		"@type": { "const": "Organization" },
+		"name": { "type": "string", "minLength": 1 },
+		"url": { "$ref": "#/definitions/url" },
+		"logo": {
+			"type": "object",
+			"required": [ "@type", "url", "width", "height" ],
+			"properties": {
+				"@type": { "const": "ImageObject" },
+				"url": { "$ref": "#/definitions/url" },
+				"width": { "type": "integer", "minimum": 112 },
+				"height": { "type": "integer", "minimum": 112 }
+			}
+		}
+	},
+	"definitions": {
+		"url": { "type": "string", "pattern": "^https?://\\S+$" }
+	}
+}

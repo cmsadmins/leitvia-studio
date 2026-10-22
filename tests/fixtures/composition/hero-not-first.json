@@ -1,0 +1,15 @@
+{
+	"name": "hero-not-first",
+	"sections": [
+		"leitvia/content-text-media",
+		"leitvia/hero-centered",
+		"leitvia/cta-banner"
+	],
+	"issues": [
+		[
+			"heroFirstOnly",
+			1
+		]
+	],
+	"score": 80
+}

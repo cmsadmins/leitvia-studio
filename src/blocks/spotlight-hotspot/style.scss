@@ -1,0 +1,57 @@
+// The marker shows the number of the point (CSS counter, hidden from assistive technology); the name is the
+// accessible name of the summary and visible below 782 px (spotlight/style.scss hides it visually above).
+.wp-block-leitvia-spotlight-hotspot {
+	margin-block: var(--wp--preset--spacing--s, 1rem) 0;
+}
+
+.wp-block-leitvia-spotlight-hotspot__summary {
+	display: flex;
+	align-items: center;
+	gap: 0.5em;
+	cursor: pointer;
+	counter-increment: leitvia-spotlight;
+
+	&::before {
+		content: counter(leitvia-spotlight) / "";
+		display: inline-grid;
+		flex: none;
+		place-items: center;
+		inline-size: 2rem;
+		block-size: 2rem;
+		border: 2px solid var(--wp--preset--color--surface, Canvas);
+		border-radius: 50%;
+		background: var(--wp--preset--color--accent, CanvasText);
+		color: var(--wp--preset--color--on-accent, Canvas);
+		font-weight: 700;
+		font-variant-numeric: tabular-nums;
+		line-height: 1;
+	}
+
+	&::-webkit-details-marker {
+		display: none;
+	}
+}
+
+.wp-block-leitvia-spotlight-hotspot[open] > .wp-block-leitvia-spotlight-hotspot__summary::before,
+.wp-block-leitvia-spotlight-hotspot.is-open > .wp-block-leitvia-spotlight-hotspot__summary::before {
+	background: var(--wp--preset--color--ink, CanvasText);
+	color: var(--wp--preset--color--surface, Canvas);
+}
+
+.wp-block-leitvia-spotlight-hotspot__content {
+	padding-block-start: 0.5rem;
+
+	> :first-child {
+		margin-block-start: 0;
+	}
+
+	> :last-child {
+		margin-block-end: 0;
+	}
+}
+
+// Focus ring in the focus role of the contract, as the theme draws it on links and buttons (WCAG 2.4.7, 2.4.13).
+.wp-block-leitvia-spotlight-hotspot__summary:focus-visible {
+	outline: 0.125rem solid var(--wp--preset--color--focus, currentcolor);
+	outline-offset: 0.125rem;
+}

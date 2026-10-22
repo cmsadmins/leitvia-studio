@@ -1,0 +1,7 @@
+{
+	"usage": {
+		"useWhen": "In the header or footer of sites with pages in easy language, to link each page to its counterpart.",
+		"avoidWhen": "Switching between foreign languages; use the language plugin of the site.",
+		"a11y": "The link names the target version in its own language. It renders nothing without a published counterpart."
+	}
+}

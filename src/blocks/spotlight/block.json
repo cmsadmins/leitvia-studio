@@ -1,0 +1,28 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "leitvia/spotlight",
+	"version": "0.1.0",
+	"title": "Spotlight",
+	"category": "leitvia",
+	"icon": "location",
+	"description": "An image with numbered points that open a short text each. On narrow screens the points follow the image as a list.",
+	"keywords": [ "hotspot", "image map", "callout" ],
+	"textdomain": "leitvia-studio",
+	"allowedBlocks": [ "core/image", "leitvia/spotlight-hotspot" ],
+	"supports": {
+		"anchor": true,
+		"align": [ "wide", "full" ],
+		"html": false,
+		"interactivity": true,
+		"spacing": {
+			"margin": true
+		}
+	},
+	"example": {
+		"innerBlocks": [ { "name": "leitvia/spotlight-hotspot", "attributes": { "x": 30, "y": 40, "label": "Charging port" } } ]
+	},
+	"editorScript": "file:./index.js",
+	"style": "file:./style-index.css",
+	"viewScriptModule": "file:./view.js"
+}

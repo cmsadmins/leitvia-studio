@@ -1,0 +1,63 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "leitvia/pricing-plan",
+	"version": "0.1.0",
+	"title": "Pricing plan",
+	"category": "leitvia",
+	"icon": "tag",
+	"description": "One plan with its monthly and yearly price, the saving of the yearly price and its features.",
+	"keywords": [ "plan", "price", "tier" ],
+	"textdomain": "leitvia-studio",
+	"parent": [ "leitvia/pricing" ],
+	"attributes": {
+		"name": {
+			"type": "rich-text",
+			"source": "rich-text",
+			"selector": ".wp-block-leitvia-pricing-plan__name"
+		},
+		"monthly": {
+			"type": "number",
+			"default": 0
+		},
+		"yearly": {
+			"type": "number",
+			"default": 0
+		},
+		"currency": {
+			"type": "string",
+			"default": "EUR"
+		},
+		"monthlyText": {
+			"type": "string",
+			"source": "text",
+			"selector": ".wp-block-leitvia-pricing-plan__price--monthly",
+			"default": ""
+		},
+		"yearlyText": {
+			"type": "string",
+			"source": "text",
+			"selector": ".wp-block-leitvia-pricing-plan__price--yearly",
+			"default": ""
+		},
+		"recommended": {
+			"type": "boolean",
+			"default": false
+		},
+		"badge": {
+			"type": "rich-text",
+			"source": "rich-text",
+			"selector": ".wp-block-leitvia-pricing-plan__badge"
+		}
+	},
+	"supports": {
+		"anchor": true,
+		"html": false,
+		"reusable": false
+	},
+	"example": {
+		"attributes": { "name": "Basic", "monthly": 9, "yearly": 90 }
+	},
+	"editorScript": "file:./index.js",
+	"style": "file:./style-index.css"
+}

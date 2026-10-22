@@ -1,0 +1,88 @@
+/*
+ * Format "Highlight" (src/formats/highlight/): <mark class="leitvia-highlight is-<style> is-<color>">. Loaded only
+ * where content uses the format (Blocks::highlight_style()) and in the editor.
+ * The end state is the default. Only with support for scroll timelines and without reduced motion the mark draws in
+ * while it scrolls into view. The marker fill is the role color at 25 % over the background; the contrast of the text
+ * on it is checked for every palette (tests/unit/highlight-contrast.test.mjs, which reads the percentage from here).
+ */
+.leitvia-highlight {
+	--leitvia-highlight: var(--wp--preset--color--accent, currentcolor);
+	position: relative;
+	color: inherit;
+	background-color: transparent;
+	background-repeat: no-repeat;
+	background-position: 0 100%;
+	-webkit-box-decoration-break: clone;
+	box-decoration-break: clone;
+}
+
+.leitvia-highlight.is-warning {
+	--leitvia-highlight: var(--wp--preset--color--warning, currentcolor);
+}
+
+.leitvia-highlight.is-success {
+	--leitvia-highlight: var(--wp--preset--color--success, currentcolor);
+}
+
+.leitvia-highlight.is-marker {
+	padding-inline: 0.1em;
+	background-image: linear-gradient(color-mix(in srgb, var(--leitvia-highlight) 25%, transparent) 0 0);
+	background-size: 100% 100%;
+}
+
+.leitvia-highlight.is-underline {
+	--leitvia-highlight-height: 0.12em;
+	background-image: linear-gradient(var(--leitvia-highlight) 0 0);
+	background-size: 100% var(--leitvia-highlight-height);
+}
+
+/* An ellipse around the words, drawn with a border; it does not take space, so the line does not move. */
+.leitvia-highlight.is-circle::after {
+	content: "";
+	position: absolute;
+	inset: -0.2em -0.35em;
+	border: 0.1em solid var(--leitvia-highlight);
+	border-radius: 50%;
+	pointer-events: none;
+}
+
+.leitvia-highlight.is-circle {
+	background: none;
+}
+
+:dir(rtl) .leitvia-highlight {
+	background-position: 100% 100%;
+}
+
+@supports (animation-timeline: view()) {
+	@media (prefers-reduced-motion: no-preference) {
+		.leitvia-highlight.is-marker,
+		.leitvia-highlight.is-underline {
+			animation: leitvia-highlight-draw linear both;
+			animation-timeline: view();
+			animation-range: entry 100% cover 40%;
+		}
+
+		.leitvia-highlight.is-circle::after {
+			animation: leitvia-highlight-circle linear both;
+			animation-timeline: view();
+			animation-range: entry 100% cover 40%;
+		}
+	}
+}
+
+@keyframes leitvia-highlight-draw {
+	from {
+		background-size: 0 var(--leitvia-highlight-height, 100%);
+	}
+}
+
+@keyframes leitvia-highlight-circle {
+	from {
+		clip-path: inset(0 100% 0 0);
+	}
+
+	to {
+		clip-path: inset(0);
+	}
+}

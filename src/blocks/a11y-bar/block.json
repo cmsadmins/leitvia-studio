@@ -1,0 +1,65 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "leitvia/a11y-bar",
+	"version": "0.1.0",
+	"title": "Accessibility bar",
+	"category": "leitvia",
+	"icon": "universal-access",
+	"description": "Links to the easy language version, the accessibility statement and sign language for the header. With JavaScript it adds text size, high contrast and read aloud with a voice on the device.",
+	"keywords": [ "accessibility", "easy language", "BITV", "contrast", "text size" ],
+	"textdomain": "leitvia-studio",
+	"attributes": {
+		"label": {
+			"type": "string",
+			"source": "attribute",
+			"selector": "nav",
+			"attribute": "aria-label"
+		},
+		"statementUrl": {
+			"type": "string",
+			"source": "attribute",
+			"selector": ".wp-block-leitvia-a11y-bar__statement",
+			"attribute": "href"
+		},
+		"statementText": {
+			"type": "string",
+			"source": "html",
+			"selector": ".wp-block-leitvia-a11y-bar__statement"
+		},
+		"signLanguageUrl": {
+			"type": "string",
+			"source": "attribute",
+			"selector": ".wp-block-leitvia-a11y-bar__sign-language",
+			"attribute": "href"
+		},
+		"signLanguageText": {
+			"type": "string",
+			"source": "html",
+			"selector": ".wp-block-leitvia-a11y-bar__sign-language"
+		}
+	},
+	"supports": {
+		"anchor": true,
+		"align": [ "full", "wide" ],
+		"html": false,
+		"multiple": false,
+		"color": {
+			"background": true,
+			"text": true,
+			"link": true
+		},
+		"typography": {
+			"fontSize": true
+		},
+		"spacing": {
+			"padding": true
+		}
+	},
+	"example": {
+		"attributes": { "label": "Accessibility", "statementUrl": "#", "statementText": "Accessibility statement", "signLanguageUrl": "#", "signLanguageText": "Sign language" }
+	},
+	"editorScript": "file:./index.js",
+	"style": "file:./style-index.css",
+	"viewScriptModule": "file:./view.js"
+}

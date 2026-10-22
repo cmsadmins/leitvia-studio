@@ -1,0 +1,54 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "leitvia/feature-group",
+	"version": "0.1.0",
+	"title": "Feature group",
+	"category": "leitvia",
+	"icon": "list-view",
+	"description": "A list of features with their count in the heading and an optional filter by plan that works without JavaScript.",
+	"keywords": [ "features", "plans", "filter" ],
+	"textdomain": "leitvia-studio",
+	"allowedBlocks": [ "leitvia/feature-item" ],
+	"attributes": {
+		"heading": {
+			"type": "rich-text",
+			"source": "rich-text",
+			"selector": ".wp-block-leitvia-feature-group__title"
+		},
+		"countLabel": {
+			"type": "string",
+			"source": "text",
+			"selector": ".wp-block-leitvia-feature-group__count",
+			"default": ""
+		},
+		"filter": {
+			"type": "boolean",
+			"default": false
+		},
+		"plans": {
+			"type": "array",
+			"items": { "type": "string" },
+			"default": []
+		},
+		"labels": {
+			"type": "object"
+		}
+	},
+	"supports": {
+		"anchor": true,
+		"align": [ "wide" ],
+		"html": false,
+		"spacing": {
+			"margin": true,
+			"padding": true
+		}
+	},
+	"example": {
+		"attributes": { "heading": "Features" },
+		"innerBlocks": [ { "name": "leitvia/feature-item", "attributes": { "title": "Unlimited pages", "text": "Add as many pages as you need." } }, { "name": "leitvia/feature-item", "attributes": { "title": "Backups", "text": "Daily backups for thirty days." } } ]
+	},
+	"editorScript": "file:./index.js",
+	"style": "file:./style-index.css",
+	"viewScriptModule": "file:./view.js"
+}
