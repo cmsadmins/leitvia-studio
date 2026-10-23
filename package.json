@@ -1,6 +1,6 @@
 {
 	"name": "leitvia-studio",
-	"version": "1.0.0",
+	"version": "1.1.0",
 	"private": true,
 	"license": "GPL-2.0-or-later",
 	"author": "Patrick Schlesinger <ps@cms-admins.de> (https://cms-admins.de)",
@@ -12,6 +12,7 @@
 		"test:php": "cd ../.. && wp-env run tests-cli --env-cwd=wp-content/plugins/leitvia-studio bash -c \"composer install -q && vendor/bin/phpunit --exclude-group ms-required,woocommerce\"",
 		"test:php:commerce": "cd ../.. && wp-env run tests-cli --env-cwd=wp-content/plugins/leitvia-studio bash -c \"composer install -q && LEITVIA_TESTS_WOOCOMMERCE=1 vendor/bin/phpunit --group woocommerce\"",
 		"test:php:multisite": "cd ../.. && wp-env run tests-cli --env-cwd=wp-content/plugins/leitvia-studio bash -c \"composer install -q && WP_MULTISITE=1 vendor/bin/phpunit --exclude-group woocommerce\"",
+		"test:php:multisite:group": "cd ../.. && wp-env run tests-cli --env-cwd=wp-content/plugins/leitvia-studio bash -c \"composer install -q && WP_MULTISITE=1 vendor/bin/phpunit --group ms-required,multisite --exclude-group woocommerce\"",
 		"test:php:subdomain": "cd ../.. && wp-env run tests-cli --env-cwd=wp-content/plugins/leitvia-studio bash -c \"composer install -q && WP_MULTISITE=1 LEITVIA_TESTS_SUBDOMAIN=1 vendor/bin/phpunit --exclude-group woocommerce\""
 	},
 	"devDependencies": {

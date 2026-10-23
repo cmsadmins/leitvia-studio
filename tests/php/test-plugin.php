@@ -14,7 +14,8 @@ class Test_Plugin extends WP_UnitTestCase {
 	 * The public constants and the plugin class exist.
 	 */
 	public function test_constants_and_boot(): void {
-		$this->assertSame( '1.0.0', LEITVIA_STUDIO_VERSION );
+		// The constant follows the plugin header, so a release only changes the header and the constant together.
+		$this->assertSame( get_file_data( LEITVIA_STUDIO_FILE, array( 'v' => 'Version' ) )['v'], LEITVIA_STUDIO_VERSION );
 		$this->assertSame( 1, LEITVIA_STUDIO_API );
 		$this->assertTrue( class_exists( \LeitviaStudio\Plugin::class ) );
 	}

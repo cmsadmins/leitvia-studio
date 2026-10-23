@@ -4,7 +4,7 @@ Tags: ai, mcp, block theme, accessibility, design tokens
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.0.0
+Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -180,6 +180,15 @@ The `src/` folder contains the source code of the files in `build/`. Run `npm in
 3. Agents: agent users with their application passwords, the MCP Adapter state and the autonomy per area.
 
 == Changelog ==
+
+= 1.1.0 =
+* New abilities: create-content creates posts, pages and entries of content model types with blocks or patterns, terms, fields and a featured image; list-content and list-media list what an agent may read; get-site-health reports versions and available updates without a request to other servers.
+* update-content also changes the date, terms, fields and the featured image; get-package names the post each applied operation created.
+* Text that an agent wrote with AI carries a short note above the content (EU AI Act, Article 50), which a person can remove.
+* Recipes keep a header or footer that was changed after the recipe wrote it.
+* Filter `leitvia_studio_bundled_fonts`: a plugin can ship fonts for token sets, served from the site.
+* Images added by an agent or a kit get the smaller sizes for srcset.
+* A changed price or fee field of an entry goes to a person for review.
 
 = 1.0.0 =
 * First public release.

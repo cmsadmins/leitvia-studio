@@ -10,6 +10,8 @@ use LeitviaStudio\Gateway\Store;
 
 /**
  * Tables per site, audit entries, snapshots, pruning by age and size, exporter and eraser, settings.
+ *
+ * @group multisite
  */
 class Test_Gateway_Store extends WP_UnitTestCase {
 

@@ -9,6 +9,8 @@ use LeitviaStudio\Avatars\Avatars;
 
 /**
  * Every avatar comes from the media library or the local placeholder; Gravatar only after the site owner opts in.
+ *
+ * @group multisite
  */
 class Test_Avatars extends WP_UnitTestCase {
 

@@ -15,6 +15,8 @@ use LeitviaStudio\Tokens\Token_Sets;
  *
  * @runTestsInSeparateProcesses
  * @preserveGlobalState disabled
+ *
+ * @group multisite
  */
 class Test_Uninstall extends WP_UnitTestCase {
 

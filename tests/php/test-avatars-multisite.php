@@ -9,6 +9,7 @@
  * The picture belongs to one site; network wide deactivation and activation reach every site.
  *
  * @group ms-required
+ * @group multisite
  */
 class Test_Avatars_Multisite extends WP_UnitTestCase {
 

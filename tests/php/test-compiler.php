@@ -11,6 +11,8 @@ use LeitviaStudio\Tokens\Token_Sets;
 
 /**
  * Writing into user global styles, drift, checks and the REST route.
+ *
+ * @group multisite
  */
 class Test_Compiler extends WP_UnitTestCase {
 
@@ -244,6 +246,17 @@ class Test_Compiler extends WP_UnitTestCase {
 		update_post_meta( $id, Token_Sets::META, wp_slash( wp_json_encode( $doc ) ) );
 		$this->assertSame( 'font_not_bundled', Compiler::check( $doc )[0]['code'] );
 		$this->assertTrue( Compiler::activate( $id ) );
+
+		// An add-on that ships the font adds its faces; the token set then gets them instead of the warning.
+		$face = array(
+			'fontFamily' => 'Comic Neue',
+			'src'        => array( content_url( 'plugins/my-addon/comic-neue.woff2' ) ),
+		);
+		add_filter( 'leitvia_studio_bundled_fonts', static fn( array $fonts ): array => $fonts + array( 'comic neue' => array( $face ) ) );
+		$this->assertSame( array(), Compiler::check( $doc ) );
+		$mono = array_column( \LeitviaStudio\Tokens\Dtcg::to_settings( $doc, leitvia_studio_contract() )['typography']['fontFamilies']['theme'], null, 'slug' )['mono'];
+		$this->assertSame( array( $face ), $mono['fontFace'] );
+		remove_all_filters( 'leitvia_studio_bundled_fonts' );
 
 		add_action(
 			'leitvia_studio_init',

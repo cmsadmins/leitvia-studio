@@ -31,7 +31,7 @@ final class Diff {
 	/**
 	 * Post fields compared as text besides the content.
 	 */
-	private const FIELDS = array( 'post_title', 'post_excerpt', 'post_status', 'post_name', 'post_parent', 'menu_order', 'meta_input', 'product', 'term', 'value' );
+	private const FIELDS = array( 'post_title', 'post_excerpt', 'post_status', 'post_name', 'post_parent', 'menu_order', 'post_date', 'terms', 'meta_input', 'product', 'term', 'value' );
 
 	/**
 	 * Diff of a stored operation against the current state of its target.

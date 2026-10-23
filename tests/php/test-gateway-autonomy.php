@@ -130,7 +130,7 @@ class Test_Gateway_Autonomy extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Prices: any change to pricing blocks and to price columns of comparison tables, not other changes.
+	 * Prices: any change to pricing blocks, to price columns of comparison tables and to price fields, not other changes.
 	 */
 	public function test_prices(): void {
 		$pricing = '<!-- wp:paragraph --><p>Intro</p><!-- /wp:paragraph --><!-- wp:leitvia/pricing --><div class="wp-block-leitvia-pricing"><!-- wp:leitvia/pricing-plan {"name":"Basic","monthly":"9"} /--></div><!-- /wp:leitvia/pricing -->';
@@ -154,6 +154,30 @@ class Test_Gateway_Autonomy extends WP_UnitTestCase {
 		$before = array( 'post_content' => $table( 'Search', '9 €' ) );
 		$this->assertSame( array(), self::kinds( 0, $before, array( 'post_content' => $table( 'Search and tags', '9 €' ) ) ), 'other column' );
 		$this->assertSame( array( 'prices' ), self::kinds( 0, $before, array( 'post_content' => $table( 'Search', '12 €' ) ) ) );
+
+		// Price and fee fields of entries: a changed value is a price, an unchanged one or another field is not.
+		$dish = array(
+			'meta_input' => array(
+				'price'   => '8.5',
+				'summary' => 'Soup',
+			),
+		);
+		$this->assertSame( array( 'prices' ), self::kinds( 0, $dish, array( 'meta_input' => array( 'price' => 9 ) ) ) );
+		$this->assertSame( array( 'prices' ), self::kinds( 0, array( 'meta_input' => array( 'menu_price' => '48' ) ), array( 'meta_input' => array( 'menu_price' => 52 ) ) ) );
+		$this->assertSame(
+			array(),
+			self::kinds(
+				0,
+				$dish,
+				array(
+					'meta_input' => array(
+						'price'   => 8.5,
+						'summary' => 'Pumpkin soup',
+					),
+				)
+			)
+		);
+		$this->assertSame( array(), self::kinds( 0, array(), array( 'meta_input' => array( 'price' => 9 ) ) ), 'a new entry brings its price' );
 	}
 
 	/**

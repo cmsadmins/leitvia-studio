@@ -10,6 +10,8 @@ use LeitviaStudio\Model\Registrar;
 
 /**
  * Post types, taxonomies, meta, relations, repeaters, settings, abilities flag, rewrite flush, deactivation.
+ *
+ * @group multisite
  */
 class Test_Registrar extends WP_UnitTestCase {
 

@@ -11,6 +11,8 @@ use LeitviaStudio\Tokens\Token_Sets;
 
 /**
  * Invalid sets cannot be saved over REST or activated; the Site Editor guard rejects failing palettes.
+ *
+ * @group multisite
  */
 class Test_Token_Lock extends WP_UnitTestCase {
 

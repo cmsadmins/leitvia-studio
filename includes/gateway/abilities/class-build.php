@@ -65,27 +65,7 @@ final class Build {
 						'type'        => 'string',
 						'description' => __( 'Type of a page frame from pageFrames in the contract, for example home or service.', 'leitvia-studio' ),
 					),
-					'sections' => array(
-						'type'     => 'array',
-						'minItems' => 1,
-						'maxItems' => 30,
-						'items'    => array(
-							'type'                 => 'object',
-							'properties'           => array(
-								'pattern' => array(
-									'type'        => 'string',
-									'description' => __( 'Pattern slug such as leitvia/hero-split-image, or block:<ID> for a Lab pattern.', 'leitvia-studio' ),
-								),
-								'edits'   => array(
-									'type'     => 'array',
-									'maxItems' => 50,
-									'items'    => self::edit_schema( false ),
-								),
-							),
-							'required'             => array( 'pattern' ),
-							'additionalProperties' => false,
-						),
-					),
+					'sections' => self::sections_schema(),
 					'kind'     => array(
 						'type' => 'string',
 						'enum' => self::PAGE_KINDS,
@@ -215,6 +195,35 @@ final class Build {
 	}
 
 	/**
+	 * Schema of the sections of compose-page and create-content.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function sections_schema(): array {
+		return array(
+			'type'     => 'array',
+			'minItems' => 1,
+			'maxItems' => 30,
+			'items'    => array(
+				'type'                 => 'object',
+				'properties'           => array(
+					'pattern' => array(
+						'type'        => 'string',
+						'description' => __( 'Pattern slug such as leitvia/hero-split-image, or block:<ID> for a Lab pattern.', 'leitvia-studio' ),
+					),
+					'edits'   => array(
+						'type'     => 'array',
+						'maxItems' => 50,
+						'items'    => self::edit_schema( false ),
+					),
+				),
+				'required'             => array( 'pattern' ),
+				'additionalProperties' => false,
+			),
+		);
+	}
+
+	/**
 	 * Schema of one block edit.
 	 *
 	 * @param bool $attributes Whether catalog attributes may change too (update-block only).
@@ -291,18 +300,9 @@ final class Build {
 		if ( ! $frame ) {
 			return Block_Edit::invalid( 'frame', __( 'The contract has no page frame of this type.', 'leitvia-studio' ), array(), 'leitvia/get-contract' );
 		}
-		$sections = array();
-		foreach ( (array) ( $input['sections'] ?? array() ) as $section ) {
-			$pattern = self::pattern( (string) ( $section['pattern'] ?? '' ) );
-			if ( is_wp_error( $pattern ) ) {
-				return $pattern;
-			}
-			// An agent's own Lab pattern reaches a page only after a person approved it.
-			$status = $pattern['id'] ? Status::effective( 'block:' . $pattern['id'] ) : 'approved';
-			if ( 'approved' !== $status ) {
-				return Rejection::make( 'leitvia_pattern_not_approved', __( 'The Lab pattern is not approved yet. Use an approved pattern, or ask a person to approve this one in the Lab.', 'leitvia-studio' ), 422, 'lab_status', array( 'pattern' => $pattern['ref'] ), 'leitvia/list-patterns', 'once', array( 'status' => $status ) );
-			}
-			$sections[] = $pattern + array( 'edits' => (array) ( $section['edits'] ?? array() ) );
+		$sections = self::sections( (array) ( $input['sections'] ?? array() ) );
+		if ( is_wp_error( $sections ) ) {
+			return $sections;
 		}
 		$type     = 'single' === ( $frame['template'] ?? '' ) ? 'post' : 'page';
 		$template = (string) ( $input['template'] ?? $frame['template'] ?? 'page' );
@@ -329,23 +329,60 @@ final class Build {
 			),
 			'kinds'  => in_array( $kind, Autonomy::LEGAL_PAGES, true ) ? array( 'legal' ) : array(),
 			'change' => static function ( array $state ) use ( $sections, $input, $meta, $parent ) {
-				$parts = array();
-				foreach ( $sections as $section ) {
-					$content = self::edit( $section['content'], $section['edits'], array( 'pattern' => $section['ref'] ) );
-					if ( is_wp_error( $content ) ) {
-						return $content;
-					}
-					$parts[] = self::name_sections( $content, $section['name'] );
+				$content = self::compose( $sections );
+				if ( is_wp_error( $content ) ) {
+					return $content;
 				}
 				return array(
 					'post_title'   => (string) $input['title'],
-					'post_content' => implode( "\n\n", $parts ),
+					'post_content' => $content,
 					'post_name'    => (string) ( $input['slug'] ?? '' ),
 					'post_parent'  => $parent,
 					'meta_input'   => $meta,
 				) + $state;
 			},
 		);
+	}
+
+	/**
+	 * Patterns of the sections with their edits, or the rejection of the first unknown, deprecated or unapproved one.
+	 *
+	 * @param array<mixed> $sections Sections with pattern and edits.
+	 * @return list<array<string, mixed>>|\WP_Error
+	 */
+	public static function sections( array $sections ) {
+		$found = array();
+		foreach ( $sections as $section ) {
+			$pattern = self::pattern( (string) ( $section['pattern'] ?? '' ) );
+			if ( is_wp_error( $pattern ) ) {
+				return $pattern;
+			}
+			// An agent's own Lab pattern reaches a page only after a person approved it.
+			$status = $pattern['id'] ? Status::effective( 'block:' . $pattern['id'] ) : 'approved';
+			if ( 'approved' !== $status ) {
+				return Rejection::make( 'leitvia_pattern_not_approved', __( 'The Lab pattern is not approved yet. Use an approved pattern, or ask a person to approve this one in the Lab.', 'leitvia-studio' ), 422, 'lab_status', array( 'pattern' => $pattern['ref'] ), 'leitvia/list-patterns', 'once', array( 'status' => $status ) );
+			}
+			$found[] = $pattern + array( 'edits' => (array) ( $section['edits'] ?? array() ) );
+		}
+		return $found;
+	}
+
+	/**
+	 * Markup of sections from sections(): each pattern with its edits and metadata.patternName.
+	 *
+	 * @param list<array<string, mixed>> $sections Sections.
+	 * @return string|\WP_Error
+	 */
+	public static function compose( array $sections ) {
+		$parts = array();
+		foreach ( $sections as $section ) {
+			$content = self::edit( (string) $section['content'], (array) $section['edits'], array( 'pattern' => $section['ref'] ) );
+			if ( is_wp_error( $content ) ) {
+				return $content;
+			}
+			$parts[] = self::name_sections( $content, (string) $section['name'] );
+		}
+		return implode( "\n\n", $parts );
 	}
 
 	/**

@@ -122,6 +122,14 @@ final class Autonomy {
 		if ( self::prices( (string) ( $before['post_content'] ?? '' ) ) !== self::prices( (string) ( $after['post_content'] ?? '' ) ) ) {
 			$kinds[] = 'prices';
 		}
+		// A changed price or fee field of an entry, such as the price of a dish; a new entry brings its price with it.
+		$text = static fn( $value ): string => is_scalar( $value ) ? (string) $value : (string) wp_json_encode( $value );
+		foreach ( $before ? (array) ( $after['meta_input'] ?? array() ) : array() as $key => $value ) {
+			if ( preg_match( '/(?:^|_)(?:price|fee)s?(?:_|$)/', (string) $key ) && $text( $value ) !== $text( $before['meta_input'][ $key ] ?? '' ) ) {
+				$kinds[] = 'prices';
+				break;
+			}
+		}
 		/**
 		 * Filters the content kinds of an operation, for example product prices of a commerce add-on. Known kinds are
 		 * prices, legal, slugs and organization; each caps the level at "suggest" unless unlocked in the settings.

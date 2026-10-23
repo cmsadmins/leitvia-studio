@@ -16,6 +16,8 @@ use LeitviaStudio\Gateway\Store;
 /**
  * The eight cases of the pipeline: identity, scope, base hash, content safety, autonomy, checks, snapshot and audit,
  * and a failed write. Plus the write helper.
+ *
+ * @group multisite
  */
 class Test_Gateway_Pipeline extends WP_UnitTestCase {
 
@@ -403,7 +405,7 @@ class Test_Gateway_Pipeline extends WP_UnitTestCase {
 	 */
 	public function test_snapshot_audit_and_action(): void {
 		$page   = $this->page();
-		$before = array_intersect_key( get_post( $page, ARRAY_A ), array_flip( Pipeline::POST_FIELDS ) );
+		$before = Pipeline::state( $page );
 		$op     = self::op( array( 'post' => $page ), self::set( array( 'post_title' => 'Corrected' ) ), 'corrections' );
 		$seen   = array();
 		add_action(

@@ -13,6 +13,8 @@ use LeitviaStudio\Tokens\Token_Sets;
 
 /**
  * Registration, annotations, output against the output schema, permission and the content of each ability.
+ *
+ * @group multisite
  */
 class Test_Gateway_Read_Design extends WP_UnitTestCase {
 

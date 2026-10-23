@@ -704,7 +704,14 @@ final class Dtcg {
 				}
 			}
 		}
-		return $fonts;
+		/**
+		 * Filters the font faces a token set can use, by lowercased first family name. An add-on that ships its own
+		 * fonts adds them here with absolute URLs of this site, so a token set that names the family gets the font
+		 * faces instead of the system fallback. Faces of the theme win: add-ons only add families the theme lacks.
+		 *
+		 * @param array<string, array<mixed>> $fonts Font faces by lowercased family name.
+		 */
+		return $fonts + (array) apply_filters( 'leitvia_studio_bundled_fonts', $fonts );
 	}
 
 	/**

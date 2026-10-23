@@ -13,6 +13,8 @@ use LeitviaStudio\Gateway\Recipes;
 
 /**
  * Base recipes, the registry recipes, list-recipes and apply-recipe through the build abilities and the pipeline.
+ *
+ * @group multisite
  */
 class Test_Gateway_Recipes extends WP_UnitTestCase {
 

@@ -23,6 +23,16 @@ if ( getenv( 'LEITVIA_TESTS_SUBDOMAIN' ) ) {
 	define( 'SUBDOMAIN_INSTALL', true ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- Core constant.
 }
 require $leitvia_studio_tests_dir . '/includes/bootstrap.php';
+// Files of earlier runs: tests that upload or import images without remove_added_uploads() leave them in the tests
+// site, about 50 per run, and every remove_added_uploads() lists the whole folder over the slow bind mount of wp-env
+// (3,400 files made each avatar test take 2 s). The tests site holds nothing else, so every run starts without them.
+require_once ABSPATH . 'wp-admin/includes/file.php';
+if ( WP_Filesystem() ) {
+	$leitvia_studio_uploads_dir = wp_upload_dir()['basedir'];
+	foreach ( array_merge( (array) glob( $leitvia_studio_uploads_dir . '/[0-9][0-9][0-9][0-9]', GLOB_ONLYDIR ), (array) glob( $leitvia_studio_uploads_dir . '/sites', GLOB_ONLYDIR ) ) as $leitvia_studio_uploads ) {
+		$GLOBALS['wp_filesystem']->delete( $leitvia_studio_uploads, true );
+	}
+}
 if ( getenv( 'LEITVIA_TESTS_WOOCOMMERCE' ) ) {
 	WC_Install::install();
 	$GLOBALS['wp_roles'] = null; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Reload the roles WooCommerce just added.

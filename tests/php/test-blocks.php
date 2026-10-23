@@ -7,6 +7,8 @@
 
 /**
  * Every folder in build/blocks/ reaches core through the blocks registry, assets load only with the block.
+ *
+ * @group multisite
  */
 class Test_Blocks extends WP_UnitTestCase {
 

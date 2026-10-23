@@ -9,6 +9,8 @@ use LeitviaStudio\Lab\Pattern_Meta;
 
 /**
  * Round trip of content and lab metadata, core files, limits and rights.
+ *
+ * @group multisite
  */
 class Test_Pattern_IO extends WP_UnitTestCase {
 

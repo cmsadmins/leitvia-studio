@@ -10,6 +10,8 @@ use LeitviaStudio\Tokens\Token_Sets;
 
 /**
  * Time windows, front-end only runtime application, REST validation, deactivation and the change action.
+ *
+ * @group multisite
  */
 class Test_Overlays extends WP_UnitTestCase {
 

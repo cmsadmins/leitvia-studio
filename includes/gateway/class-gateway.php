@@ -100,6 +100,8 @@ final class Gateway {
 		add_action( 'leitvia_studio_init', array( Abilities\Recipes::class, 'register' ) );
 		add_action( 'leitvia_studio_init', array( Abilities\Packages::class, 'register' ) );
 		add_action( 'leitvia_studio_init', array( Abilities\Maintain::class, 'register' ) );
+		add_action( 'leitvia_studio_init', array( Abilities\Content::class, 'register' ) );
+		add_filter( 'the_content', array( Abilities\Content::class, 'note' ), 20 );
 		add_action( 'leitvia_studio_init', array( Composition::class, 'register' ) );
 		add_action( 'leitvia_studio_init', array( Abilities\Read_Composition::class, 'register' ) );
 		add_action( 'leitvia_studio_init', array( Abilities\Read_Plan::class, 'register' ) );

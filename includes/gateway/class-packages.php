@@ -314,7 +314,7 @@ final class Packages {
 
 	/**
 	 * A package with its operations: summary() plus per operation id, ability, area, target, level, kinds, findings,
-	 * status, conflict, modified_by (who saved the target post last) and, for open ones, the block diff against the
+	 * status, applied (post and hash), conflict, modified_by (who saved the target post last) and, for open ones, the block diff against the
 	 * current state (or diff_error).
 	 *
 	 * @param int $id Package ID.
@@ -327,7 +327,11 @@ final class Packages {
 		$operations = array();
 		$states     = array_column( self::operations( $id ), 'state', 'id' );
 		foreach ( self::operations( $id ) as $entry ) {
-			$item           = array_intersect_key( $entry, array_flip( array( 'id', 'ability', 'area', 'target', 'level', 'kinds', 'findings', 'conflict', 'error' ) ) );
+			$item = array_intersect_key( $entry, array_flip( array( 'id', 'ability', 'area', 'target', 'level', 'kinds', 'findings', 'conflict', 'error' ) ) );
+			// The post an applied operation wrote: the ID a new post got, and the hash it left.
+			if ( isset( $entry['applied'] ) ) {
+				$item['applied'] = array_intersect_key( (array) $entry['applied'], array_flip( array( 'post', 'hash' ) ) );
+			}
 			$item['status'] = self::status( $entry );
 			// Who saved the target last, so a conflict can name the person who changed it.
 			$post                = (int) ( $entry['applied']['post'] ?? $entry['target']['post'] ?? 0 );
@@ -388,9 +392,17 @@ final class Packages {
 			if ( $page ) {
 				$new['value'] = (string) $page;
 			}
-			$result = '' !== $slug && ! $page
-				? Rejection::make( 'leitvia_page_missing', __( 'The page this setting points to is not applied yet. Apply the page first.', 'leitvia-studio' ), 409, 'page_missing', array( 'option' => (string) ( $entry['target']['option'] ?? '' ) ), '', 'never', array( 'page' => $slug ) )
-				: Pipeline::run( new Operation( (string) $entry['ability'], (string) $entry['area'], (array) $entry['target'], $base, static fn(): array => $new, (array) $entry['kinds'] ), $id );
+			// Content whose featured image waits in this package (target media) gets the ID the image got.
+			$file  = (string) ( $entry['target']['media'] ?? '' );
+			$image = '' !== $file ? self::created_media( $operations, $file ) : 0;
+			if ( $image ) {
+				$new['meta_input']['_thumbnail_id'] = $image;
+			}
+			$result = match ( true ) {
+				'' !== $slug && ! $page  => Rejection::make( 'leitvia_page_missing', __( 'The page this setting points to is not applied yet. Apply the page first.', 'leitvia-studio' ), 409, 'page_missing', array( 'option' => (string) ( $entry['target']['option'] ?? '' ) ), '', 'never', array( 'page' => $slug ) ),
+				'' !== $file && ! $image => Rejection::make( 'leitvia_media_missing', __( 'The image this content uses is not applied yet. Apply the image first.', 'leitvia-studio' ), 409, 'media_missing', array( 'post' => 0 ), '', 'never', array( 'file' => $file ) ),
+				default                  => Pipeline::run( new Operation( (string) $entry['ability'], (string) $entry['area'], (array) $entry['target'], $base, static fn(): array => $new, (array) $entry['kinds'] ), $id ),
+			};
 			if ( is_wp_error( $result ) ) {
 				$data = (array) $result->get_error_data();
 				if ( 'leitvia_stale_hash' === $result->get_error_code() ) {
@@ -446,6 +458,21 @@ final class Packages {
 	private static function created_page( array $operations, string $slug ): int {
 		foreach ( $operations as $entry ) {
 			if ( empty( $entry['target']['post'] ) && 'page' === ( $entry['state']['post_type'] ?? '' ) && ( $entry['state']['post_name'] ?? '' ) === $slug ) {
+				return (int) ( $entry['applied']['post'] ?? 0 );
+			}
+		}
+		return 0;
+	}
+
+	/**
+	 * ID of the image an applied add-media operation of the package created from a file of this name, 0 for none.
+	 *
+	 * @param list<array<string, mixed>> $operations Operations of the package.
+	 * @param string                     $file       File name as the operation stashed it.
+	 */
+	private static function created_media( array $operations, string $file ): int {
+		foreach ( $operations as $entry ) {
+			if ( 'leitvia/add-media' === ( $entry['ability'] ?? '' ) && wp_basename( (string) ( $entry['state']['file'] ?? '' ) ) === $file ) {
 				return (int) ( $entry['applied']['post'] ?? 0 );
 			}
 		}

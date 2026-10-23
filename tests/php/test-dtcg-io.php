@@ -10,6 +10,8 @@ use LeitviaStudio\Tokens\Token_Sets;
 
 /**
  * Round trips of documents and CSS variables, rejected imports, permissions and the download.
+ *
+ * @group multisite
  */
 class Test_Dtcg_Io extends WP_UnitTestCase {
 

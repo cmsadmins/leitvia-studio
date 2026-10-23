@@ -12,6 +12,8 @@ use LeitviaStudio\Gateway\Hashes;
 /**
  * Block edits from fixtures, compose-page, update-block, create-pattern, vary-pattern and add-media through the
  * pipeline.
+ *
+ * @group multisite
  */
 class Test_Gateway_Build extends WP_UnitTestCase {
 
@@ -468,6 +470,8 @@ class Test_Gateway_Build extends WP_UnitTestCase {
 		);
 		$this->assertIsArray( $own, is_wp_error( $own ) ? wp_json_encode( $own->get_error_data() ) : '' );
 		$this->assertSame( 'image/webp', get_post_mime_type( $own['target']['post'] ) );
+		$this->assertNotEmpty( wp_get_attachment_metadata( $own['target']['post'] )['sizes'], 'core sizes for srcset' );
+		$this->assertStringContainsString( 'srcset=', (string) wp_get_attachment_image( $own['target']['post'], 'full' ) );
 
 		$this->assert_rejected(
 			'leitvia_check_failed',

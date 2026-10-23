@@ -57,7 +57,7 @@ final class Packages {
 		Abilities::read(
 			'leitvia/get-package',
 			__( 'Get change package', 'leitvia-studio' ),
-			__( 'Returns a change package with its operations: status, conflicts and, for open operations, a block diff against the current state (per block added, removed, moved or changed with text before and after and the changed attributes).', 'leitvia-studio' ),
+			__( 'Returns a change package with its operations: status, the post each applied operation wrote, conflicts and, for open operations, a block diff against the current state (per block added, removed, moved or changed with text before and after and the changed attributes). applied.post is the ID a new post got, applied.hash its hash after the write.', 'leitvia-studio' ),
 			self::input( $id ),
 			$object,
 			static fn( $input ) => self::own( (int) ( $input['id'] ?? 0 ) ) ?? Store::detail( (int) $input['id'] )

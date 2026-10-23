@@ -16,6 +16,8 @@ use LeitviaStudio\Gateway\Store;
 /**
  * Routes /leitvia-studio/v1/gateway/access and /gateway/settings for people with manage_options, the REST nonce, the
  * confirmation of the profile "full", and the rule that the autonomy level binds agents only when applying packages.
+ *
+ * @group multisite
  */
 class Test_Gateway_Access extends WP_UnitTestCase {
 

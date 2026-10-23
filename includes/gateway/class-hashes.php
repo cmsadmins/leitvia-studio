@@ -17,7 +17,8 @@ final class Hashes {
 
 	/**
 	 * Hash of a post over title, content, excerpt, status, slug, parent, order, featured image, the meta keys of
-	 * Pipeline::META (the alt text of an attachment) and the props of a product; '' when the post does not exist.
+	 * Pipeline::META (the alt text of an attachment), the props of a product and, for content types, date, terms and
+	 * fields (Abilities\Content::state()); '' when the post does not exist.
 	 *
 	 * @param int $post_id Post ID.
 	 */
@@ -41,6 +42,10 @@ final class Hashes {
 		}
 		if ( Abilities\Commerce::handles( $post->post_type ) ) {
 			$parts[] = Abilities\Commerce::props( $post->ID );
+		}
+		$content = Abilities\Content::state( $post->ID, $post->post_type );
+		if ( $content ) {
+			$parts[] = $content;
 		}
 		return self::of( $parts );
 	}

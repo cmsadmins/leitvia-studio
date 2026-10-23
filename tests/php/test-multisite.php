@@ -17,6 +17,7 @@ use LeitviaStudio\Rest\Gateway_Access_Controller;
  * a network deactivation. Runs in a subdirectory network and, with LEITVIA_TESTS_SUBDOMAIN, in a subdomain network.
  *
  * @group ms-required
+ * @group multisite
  */
 class Test_Multisite extends WP_UnitTestCase {
 

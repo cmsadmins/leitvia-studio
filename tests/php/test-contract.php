@@ -9,6 +9,8 @@ use LeitviaStudio\Contract\Contract;
 
 /**
  * Loading, validation, child theme order and the REST route.
+ *
+ * @group multisite
  */
 class Test_Contract extends WP_UnitTestCase {
 

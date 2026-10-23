@@ -8,6 +8,7 @@
 namespace LeitviaStudio\Gateway;
 
 use LeitviaStudio\Gateway\Abilities\Commerce;
+use LeitviaStudio\Gateway\Abilities\Content;
 use LeitviaStudio\Model\Model;
 use LeitviaStudio\Tokens\Compiler;
 
@@ -27,10 +28,10 @@ final class Pipeline {
 
 	/**
 	 * Further fields an operation may set on a new post only: the MIME type and file of an attachment, meta (for
-	 * example the template or lab metadata) and terms (the theme and area of a template part). A failed create deletes
-	 * the post, so nothing of them needs restoring.
+	 * example the template or lab metadata), terms (the theme and area of a template part in tax_input, terms of a
+	 * content type in terms) and the date. A failed create deletes the post, so nothing of them needs restoring.
 	 */
-	public const CREATE_FIELDS = array( 'post_mime_type', 'file', 'meta_input', 'tax_input' );
+	public const CREATE_FIELDS = array( 'post_mime_type', 'file', 'meta_input', 'tax_input', 'terms', 'post_date' );
 
 	/**
 	 * Meta keys per post type that belong to the state of an existing post, under meta_input: hashed, snapshotted,
@@ -249,7 +250,8 @@ final class Pipeline {
 		// 7. Execution.
 		// A package key from the caller always means a package: an agent may hold itself to more than the autonomy asks.
 		// A setting that points to a page waiting in the package (target page, see Recipes) can only wait as well.
-		$strict = '' !== $op->package && ( ! Recipes::collects( $op->package ) || isset( $op->target['page'] ) );
+		// So can content whose featured image waits in the package (target media, see Abilities\Content).
+		$strict = '' !== $op->package && ( ! Recipes::collects( $op->package ) || isset( $op->target['page'] ) || isset( $op->target['media'] ) );
 		$mode   = match ( true ) {
 			$package > 0            => 'live',
 			$follows > 0 || $strict => 'package',
@@ -398,7 +400,7 @@ final class Pipeline {
 		if ( Commerce::handles( (string) $post['post_type'] ) ) {
 			$state['product'] = Commerce::props( $post_id );
 		}
-		return $state;
+		return $state + Content::state( $post_id, (string) $post['post_type'] );
 	}
 
 	/**
@@ -454,8 +456,8 @@ final class Pipeline {
 			// Only the meta keys of META; an existing post takes no other meta through the pipeline.
 			$after['meta_input'] = array_intersect_key( (array) $after['meta_input'], $start['meta_input'] );
 		}
-		foreach ( array( 'product', 'term' ) as $key ) {
-			// Only the props and term fields the state knows.
+		foreach ( array( 'product', 'term', 'terms' ) as $key ) {
+			// Only the props, term fields and taxonomies the state knows.
 			if ( isset( $start[ $key ] ) ) {
 				$after[ $key ] = array_intersect_key( (array) $after[ $key ], $start[ $key ] ) + $start[ $key ];
 			}
@@ -724,9 +726,9 @@ final class Pipeline {
 				$id        = is_wp_error( $activated ) ? 0 : (int) ( \WP_Theme_JSON_Resolver::get_user_data_from_wp_global_styles( wp_get_theme() )['ID'] ?? 0 );
 				$failed    = ! $id;
 			} else {
-				$written = $op->creates() ? wp_insert_post( wp_slash( $after ), true ) : self::update( $id, $after );
+				$written = $op->creates() ? wp_insert_post( wp_slash( Content::prepare( 0, $after ) ), true ) : self::update( $id, $after );
 				$id      = is_wp_error( $written ) ? 0 : (int) $written;
-				$failed  = ! $id;
+				$failed  = ! $id || ( $op->creates() && ! Content::set_terms( $id, $after ) );
 			}
 		} catch ( \Throwable $e ) {
 			$failed = true;
@@ -739,6 +741,11 @@ final class Pipeline {
 			}
 		} elseif ( '' !== $private ) {
 			Packages::discard_file( array( 'file' => $private ) );
+			// The smaller sizes core makes on upload, so the image gets a srcset and phones load a small file.
+			if ( $id && wp_attachment_is_image( $id ) ) {
+				require_once ABSPATH . 'wp-admin/includes/image.php';
+				wp_update_attachment_metadata( $id, wp_generate_attachment_metadata( $id, (string) $after['file'] ) );
+			}
 		}
 		if ( false !== $kses ) {
 			add_filter( 'content_save_pre', 'wp_filter_post_kses', $kses );
@@ -767,8 +774,9 @@ final class Pipeline {
 		if ( isset( $fields['product'] ) && Commerce::handles( (string) get_post_type( $id ) ) ) {
 			return Commerce::save( $id, $fields );
 		}
-		$row = array_diff_key( (array) get_post( $id, ARRAY_A ), array_flip( array( 'page_template', 'ancestors', 'post_category', 'tags_input' ) ) );
-		return wp_insert_post( wp_slash( array( 'ID' => $id ) + $fields + $row ), true );
+		$row     = array_diff_key( (array) get_post( $id, ARRAY_A ), array_flip( array( 'page_template', 'ancestors', 'post_category', 'tags_input' ) ) );
+		$written = wp_insert_post( wp_slash( array( 'ID' => $id ) + Content::prepare( $id, $fields ) + $row ), true );
+		return is_wp_error( $written ) || Content::set_terms( $id, $fields ) ? $written : self::failed( array( 'post' => $id ) );
 	}
 
 	/**

@@ -10,6 +10,8 @@ use LeitviaStudio\Tokens\Token_Sets;
 
 /**
  * Access, rendering, style variations and token sets of Preview::respond().
+ *
+ * @group multisite
  */
 class Test_Preview extends WP_UnitTestCase {
 

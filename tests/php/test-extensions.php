@@ -10,6 +10,8 @@ use LeitviaStudio\Extension\Studio;
 
 /**
  * Extension API tests.
+ *
+ * @group multisite
  */
 class Test_Extensions extends WP_UnitTestCase {
 

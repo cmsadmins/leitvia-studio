@@ -16,6 +16,6 @@ Until the plugin is listed on WordPress.org, download `leitvia-studio-<version>.
 
 This repository is a mirror of the package in the Leitvia monorepo, where it is built and tested. Report problems and accessibility barriers as issues here or through https://leitvia.com.
 
-## License
+## Copying
 
-GPL-2.0-or-later.
+GPL-2.0-or-later, like WordPress.

@@ -15,6 +15,8 @@ use LeitviaStudio\Gateway\Store;
 /**
  * KSES and block attribute attacks, the write path through the pipeline, slashes, scope, identity and capabilities,
  * rate limit, rollback, REST and XML-RPC limits for agents.
+ *
+ * @group multisite
  */
 class Test_Gateway_Security extends WP_UnitTestCase {
 
@@ -421,6 +423,11 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 			'leitvia/apply-recipe'         => static fn(): array => array( 'recipe' => 'leitvia/blog' ),
 			'leitvia/apply-package'        => fn(): array => array( 'id' => $this->queue( $this->page(), array( 'post_title' => 'Queued' ) ) ),
 			'leitvia/rollback'             => fn(): array => array( 'id' => $this->applied( $this->page(), array( 'post_title' => 'Applied' ) ) ),
+			'leitvia/create-content'       => static fn(): array => array(
+				'post_type' => 'post',
+				'title'     => 'Security post',
+				'content'   => '<!-- wp:paragraph --><p>News</p><!-- /wp:paragraph -->',
+			),
 			'leitvia/update-content'       => fn(): array => array(
 				'post'  => $this->page(),
 				'title' => 'New title',

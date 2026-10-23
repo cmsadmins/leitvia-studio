@@ -9,6 +9,8 @@ use LeitviaStudio\Tokens\Token_Sets;
 
 /**
  * Post type, meta, revisions and capabilities.
+ *
+ * @group multisite
  */
 class Test_Token_Sets extends WP_UnitTestCase {
 
