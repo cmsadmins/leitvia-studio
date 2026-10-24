@@ -4,7 +4,7 @@ Tags: ai, mcp, block theme, accessibility, design tokens
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.1.0
+Stable tag: 1.1.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -179,7 +179,24 @@ The `src/` folder contains the source code of the files in `build/`. Run `npm in
 2. A change package of an agent with the block diff per operation, a checkbox per operation and the buttons to apply or reject it.
 3. Agents: agent users with their application passwords, the MCP Adapter state and the autonomy per area.
 
+== Support ==
+
+Leitvia Studio is developed and maintained by CMS ADMINS, https://cms-admins.de. Ask questions in the support forum of the plugin on WordPress.org or write to support@cms-admins.de. Report security issues and accessibility barriers to the same address; we answer within five working days.
+
+== Legal ==
+
+Leitvia Studio is a product of CMS ADMINS, a brand of MSRV Hosting und Service GbR, Parkstraße 19, 80339 München, Germany, represented by Patrick Schlesinger and Peter Laschtowitz. Contact: support@cms-admins.de.
+
+Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or later. It is provided as is, without any warranty, to the extent permitted by applicable law; see sections 11 and 12 of the GPL. You are responsible for checking that your site meets the legal requirements that apply to it, such as accessibility, privacy and imprint duties; Leitvia Studio helps with these but does not replace that check.
+
+* Imprint: https://leitvia.com/legal-notice/ (German original: https://leitvia.com/de/impressum/)
+* Privacy policy: https://leitvia.com/privacy-policy/
+* Terms for the paid Leitvia Pro plans and the account on leitvia.com (they do not apply to this free software): https://leitvia.com/terms/
+
 == Changelog ==
+
+= 1.1.1 =
+* Reveal: content switches from invisible to fully visible in one step while it scrolls in, so text never shows below its contrast. The lift of "Rise" and "Stagger" stays gradual; the effect "Fade in" is now called "Appear" and shows its content without a fade.
 
 = 1.1.0 =
 * New abilities: create-content creates posts, pages and entries of content model types with blocks or patterns, terms, fields and a featured image; list-content and list-media list what an agent may read; get-site-health reports versions and available updates without a request to other servers.

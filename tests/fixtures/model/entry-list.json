@@ -1,0 +1,40 @@
+{
+	"version": 1,
+	"postTypes": {
+		"lvt_dish": {
+			"label": "Test dishes",
+			"singularLabel": "Test dish",
+			"public": false,
+			"supports": [ "title", "excerpt", "page-attributes" ],
+			"fields": {
+				"dish_summary": { "type": "text", "label": "Short description", "maxLength": 120 },
+				"dish_price": { "type": "number", "label": "Price", "min": 0 },
+				"dish_course": { "type": "select", "label": "Course", "options": { "starter": "Starters", "main": "Mains" } },
+				"dish_vegetarian": { "type": "boolean", "label": "Vegetarian" }
+			}
+		},
+		"lvt_event": {
+			"label": "Test events",
+			"singularLabel": "Test event",
+			"public": false,
+			"supports": [ "title", "excerpt" ],
+			"fields": {
+				"event_day": { "type": "date", "label": "Date" },
+				"event_place": { "type": "text", "label": "Venue", "maxLength": 120 },
+				"event_fee": { "type": "number", "label": "Fee", "min": 0 }
+			}
+		},
+		"lvt_notice": {
+			"label": "Test notices",
+			"singularLabel": "Test notice",
+			"public": false,
+			"supports": [ "title", "excerpt" ],
+			"fields": {
+				"notice_from": { "type": "date", "label": "Valid from" }
+			}
+		}
+	},
+	"taxonomies": {
+		"lvt_allergen": { "label": "Allergens", "singularLabel": "Allergen", "public": false, "hierarchical": false, "postTypes": [ "lvt_dish" ] }
+	}
+}

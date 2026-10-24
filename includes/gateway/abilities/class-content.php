@@ -139,6 +139,7 @@ final class Content {
 						'type' => 'string',
 						'enum' => self::STATUSES,
 					),
+					'comment_status' => self::comment_status_schema(),
 					'ai_generated'   => array(
 						'type'        => 'boolean',
 						'description' => __( 'Whether AI wrote the text; it then shows a note that says so.', 'leitvia-studio' ),
@@ -226,6 +227,19 @@ final class Content {
 			'type'        => 'string',
 			'pattern'     => '^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2})?)?$',
 			'description' => __( 'Date in the time zone of the site, YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS.', 'leitvia-studio' ),
+		);
+	}
+
+	/**
+	 * Schema of comment_status, shared by create-content and update-content.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function comment_status_schema(): array {
+		return array(
+			'type'        => 'string',
+			'enum'        => array( 'open', 'closed' ),
+			'description' => __( 'Whether visitors may comment; without it a new post takes the default of the site.', 'leitvia-studio' ),
 		);
 	}
 
@@ -528,7 +542,7 @@ final class Content {
 					'post_date'    => (string) $date,
 					'terms'        => array_fill_keys( self::taxonomies( $type ), array() ),
 					'meta_input'   => array_fill_keys( array_keys( self::fields( $type ) ), '' ) + ( post_type_supports( $type, 'thumbnail' ) ? array( '_thumbnail_id' => 0 ) : array() ),
-				) + $state;
+				) + array_intersect_key( $input, array( 'comment_status' => true ) ) + $state;
 				$state = self::change( $state, array_diff_key( $input, array( 'date' => true ) ), array( 'post' => 0 ) );
 				if ( is_wp_error( $state ) ) {
 					return $state;

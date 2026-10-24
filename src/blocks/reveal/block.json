@@ -6,7 +6,7 @@
 	"title": "Reveal",
 	"category": "leitvia",
 	"icon": "visibility",
-	"description": "Fades or lifts its content in while it scrolls into view. Without support for scroll-driven animation or with reduced motion the content simply shows.",
+	"description": "Shows or lifts its content in while it scrolls into view; text is never shown half faded. Without support for scroll-driven animation or with reduced motion the content simply shows.",
 	"keywords": [ "animation", "scroll", "fade" ],
 	"textdomain": "leitvia-studio",
 	"attributes": {
@@ -32,7 +32,7 @@
 		}
 	},
 	"example": {
-		"innerBlocks": [ { "name": "core/paragraph", "attributes": { "content": "This text fades in while it scrolls into view." } } ]
+		"innerBlocks": [ { "name": "core/paragraph", "attributes": { "content": "This text appears while it scrolls into view." } } ]
 	},
 	"editorScript": "file:./index.js",
 	"style": "file:./style-index.css"

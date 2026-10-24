@@ -1,6 +1,7 @@
 // Scroll-driven, CSS only, opacity and transform only. Without support for view timelines or with reduced motion no
 // rule below applies and the content is simply there. The effect ends at the latest when the element reaches the middle of the viewport;
-// stagger starts each child a little later, up to the sixth child.
+// stagger starts each child a little later, up to the sixth child. Opacity switches from 0 to 1 in one step, so text
+// is never visible below its contrast (WCAG 1.4.3); only the lift is gradual.
 @supports (animation-timeline: view()) {
 	@media (prefers-reduced-motion: no-preference) {
 		.wp-block-leitvia-reveal.is-effect-fade,
@@ -28,5 +29,11 @@
 	from {
 		opacity: 0;
 		transform: translateY(var(--leitvia-reveal-shift, 0));
+	}
+
+	// Only opacity has this keyframe, so the step applies to opacity alone.
+	40% {
+		opacity: 0;
+		animation-timing-function: step-start;
 	}
 }

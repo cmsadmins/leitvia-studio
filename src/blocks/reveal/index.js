@@ -10,7 +10,7 @@ import metadata from './block.json';
 import './style.scss';
 
 const effects = () => [
-	{ value: 'fade', label: __( 'Fade in', 'leitvia-studio' ) },
+	{ value: 'fade', label: __( 'Appear', 'leitvia-studio' ) },
 	{ value: 'rise', label: __( 'Rise', 'leitvia-studio' ) },
 	{ value: 'stagger', label: __( 'One after another', 'leitvia-studio' ) },
 ];

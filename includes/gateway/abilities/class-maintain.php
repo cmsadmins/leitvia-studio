@@ -43,7 +43,7 @@ final class Maintain {
 		Abilities::write(
 			'leitvia/update-content',
 			__( 'Update content', 'leitvia-studio' ),
-			__( 'Updates title, excerpt, slug, date, terms, fields, featured image and the texts and button links of several blocks of one post in one operation, blocks found by their ID from the outline. Terms, fields and featured image follow the rules of leitvia/create-content; terms replace those of their taxonomy. Instead of blocks, content replaces the whole content with block markup, for example to turn classic content into blocks; the new content may hold no classic block. Read the post with leitvia/get-page-outline first and send its hash as base_hash. A slug change is a URL change and lands at most as a suggestion; after one, leitvia/repair-links with auto points the links of other posts to the new address. For attributes or images of a block use leitvia/update-block.', 'leitvia-studio' ),
+			__( 'Updates title, excerpt, slug, date, terms, fields, featured image, comment status and the texts and button links of several blocks of one post in one operation, blocks found by their ID from the outline. Terms, fields and featured image follow the rules of leitvia/create-content; terms replace those of their taxonomy. Instead of blocks, content replaces the whole content with block markup, for example to turn classic content into blocks; the new content may hold no classic block. Read the post with leitvia/get-page-outline first and send its hash as base_hash. A slug change is a URL change and lands at most as a suggestion; after one, leitvia/repair-links with auto points the links of other posts to the new address. For attributes or images of a block use leitvia/update-block.', 'leitvia-studio' ),
 			'maintain',
 			$overwrite,
 			array(
@@ -98,6 +98,7 @@ final class Maintain {
 					'terms'          => Content::terms_schema(),
 					'fields'         => Content::fields_schema(),
 					'featured_image' => Content::image_schema( false ),
+					'comment_status' => Content::comment_status_schema(),
 				),
 				'required'             => array( 'post' ),
 				'additionalProperties' => false,
@@ -208,9 +209,10 @@ final class Maintain {
 		$replace = isset( $input['content'] ) ? (string) $input['content'] : null;
 		$fields  = array_filter(
 			array(
-				'post_title'   => $input['title'] ?? null,
-				'post_excerpt' => $input['excerpt'] ?? null,
-				'post_name'    => $input['slug'] ?? null,
+				'post_title'     => $input['title'] ?? null,
+				'post_excerpt'   => $input['excerpt'] ?? null,
+				'post_name'      => $input['slug'] ?? null,
+				'comment_status' => $input['comment_status'] ?? null,
 			),
 			'is_string'
 		);
@@ -219,7 +221,7 @@ final class Maintain {
 			return Block_Edit::invalid( 'change', __( 'Send either content or blocks, not both.', 'leitvia-studio' ), array( 'post' => $post ) );
 		}
 		if ( ! $fields && ! $edits && null === $replace && ! $extra ) {
-			return Block_Edit::invalid( 'change', __( 'Name what to change: title, excerpt, slug, date, terms, fields, featured image, blocks or content.', 'leitvia-studio' ), array( 'post' => $post ) );
+			return Block_Edit::invalid( 'change', __( 'Name what to change: title, excerpt, slug, date, terms, fields, featured image, comment status, blocks or content.', 'leitvia-studio' ), array( 'post' => $post ) );
 		}
 		return array(
 			'area'   => 'content',

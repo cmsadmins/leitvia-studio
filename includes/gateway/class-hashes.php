@@ -16,9 +16,9 @@ defined( 'ABSPATH' ) || exit;
 final class Hashes {
 
 	/**
-	 * Hash of a post over title, content, excerpt, status, slug, parent, order, featured image, the meta keys of
-	 * Pipeline::META (the alt text of an attachment), the props of a product and, for content types, date, terms and
-	 * fields (Abilities\Content::state()); '' when the post does not exist.
+	 * Hash of a post over title, content, excerpt, status, slug, parent, order, featured image, comment status, the meta
+	 * keys of Pipeline::META (the alt text of an attachment), the props of a product and, for content types, date, terms
+	 * and fields (Abilities\Content::state()); '' when the post does not exist.
 	 *
 	 * @param int $post_id Post ID.
 	 */
@@ -36,6 +36,7 @@ final class Hashes {
 			(int) $post->post_parent,
 			(int) $post->menu_order,
 			(int) get_post_thumbnail_id( $post ),
+			$post->comment_status,
 		);
 		foreach ( Pipeline::META[ $post->post_type ] ?? array() as $key ) {
 			$parts[] = (string) get_post_meta( $post->ID, $key, true );

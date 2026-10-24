@@ -415,6 +415,88 @@ class Test_Gateway_Content extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Text colors as rgba(), rgb(), hsl() and preset variables in a block style pass the pipeline unchanged; other
+	 * parentheses in a style stay refused, and the color filter is gone after the check.
+	 */
+	public function test_create_with_css_colors(): void {
+		$content = '';
+		$colors  = array( 'rgba(0, 0, 0, 0.87)', 'rgb(17 17 17)', 'hsl(0 0% 10%)', 'var(--wp--preset--color--contrast)' );
+		foreach ( $colors as $color ) {
+			$content .= '<!-- wp:paragraph {"style":{"color":{"text":"' . $color . '"}}} --><p class="has-text-color" style="color:' . $color . '">Muted text</p><!-- /wp:paragraph -->';
+		}
+		$result = self::call(
+			'leitvia/create-content',
+			array(
+				'post_type' => 'post',
+				'title'     => 'Colors',
+				'content'   => $content,
+				'status'    => 'publish',
+			)
+		);
+		$this->assertIsArray( $result, $result instanceof WP_Error ? $result->get_error_message() : '' );
+		// The pipeline adds a leitviaId to each block; the styles stay as written.
+		$saved = get_post( $result['target']['post'] )->post_content;
+		foreach ( $colors as $color ) {
+			$this->assertStringContainsString( 'style="color:' . $color . '"', $saved );
+		}
+		$this->assertFalse( has_filter( 'safecss_filter_attr_allow_css' ) );
+		$this->assert_rejected(
+			'leitvia_unsafe_content',
+			self::call(
+				'leitvia/create-content',
+				array(
+					'post_type' => 'post',
+					'title'     => 'Expression',
+					'content'   => '<!-- wp:paragraph --><p style="color:expression(alert(1))">Bad</p><!-- /wp:paragraph -->',
+				)
+			)
+		);
+	}
+
+	/**
+	 * The comment status: create-content sets it, update-content changes it and the hash with it, values other than
+	 * open and closed are refused.
+	 */
+	public function test_comment_status(): void {
+		$result = self::call(
+			'leitvia/create-content',
+			array(
+				'post_type'      => 'post',
+				'title'          => 'Quiet',
+				'content'        => self::TEXT,
+				'status'         => 'publish',
+				'comment_status' => 'closed',
+			)
+		);
+		$this->assertIsArray( $result, $result instanceof WP_Error ? $result->get_error_message() : '' );
+		$post = $result['target']['post'];
+		$this->assertSame( 'closed', get_post( $post )->comment_status );
+		$update = self::call(
+			'leitvia/update-content',
+			array(
+				'post'           => $post,
+				'base_hash'      => $result['hash'],
+				'comment_status' => 'open',
+			)
+		);
+		$this->assertIsArray( $update, $update instanceof WP_Error ? $update->get_error_message() : '' );
+		$this->assertSame( 'live', $update['mode'] );
+		$this->assertSame( 'open', get_post( $post )->comment_status );
+		$this->assertNotSame( $result['hash'], $update['hash'] );
+		$this->assertWPError(
+			self::call(
+				'leitvia/update-content',
+				array(
+					'post'           => $post,
+					'base_hash'      => $update['hash'],
+					'comment_status' => 'maybe',
+				)
+			)
+		);
+		$this->assertSame( 'open', get_post( $post )->comment_status );
+	}
+
+	/**
 	 * The ability list-content: content types only, filters, the waiting package, fields of entries; nothing private, password
 	 * protected or of another type.
 	 */

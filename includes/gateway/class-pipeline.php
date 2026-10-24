@@ -22,9 +22,9 @@ defined( 'ABSPATH' ) || exit;
 final class Pipeline {
 
 	/**
-	 * Post fields an operation reads and writes.
+	 * Post fields an operation reads and writes. comment_status takes open or closed only.
 	 */
-	public const POST_FIELDS = array( 'post_type', 'post_title', 'post_content', 'post_excerpt', 'post_status', 'post_name', 'post_parent', 'menu_order' );
+	public const POST_FIELDS = array( 'post_type', 'post_title', 'post_content', 'post_excerpt', 'post_status', 'post_name', 'post_parent', 'menu_order', 'comment_status' );
 
 	/**
 	 * Further fields an operation may set on a new post only: the MIME type and file of an attachment, meta (for
@@ -437,14 +437,15 @@ final class Pipeline {
 		$start = $before;
 		if ( $op->creates() ) {
 			$start = array(
-				'post_type'    => (string) $op->target['post_type'],
-				'post_title'   => '',
-				'post_content' => '',
-				'post_excerpt' => '',
-				'post_status'  => 'publish',
-				'post_name'    => '',
-				'post_parent'  => 0,
-				'menu_order'   => 0,
+				'post_type'      => (string) $op->target['post_type'],
+				'post_title'     => '',
+				'post_content'   => '',
+				'post_excerpt'   => '',
+				'post_status'    => 'publish',
+				'post_name'      => '',
+				'post_parent'    => 0,
+				'menu_order'     => 0,
+				'comment_status' => get_default_comment_status( (string) $op->target['post_type'] ),
 			);
 		}
 		$after = ( $op->change )( $start );
@@ -469,6 +470,10 @@ final class Pipeline {
 		$statuses           = Scope::statuses( (string) $after['post_type'] );
 		if ( ! in_array( $after['post_status'], $statuses, true ) ) {
 			return Rejection::make( 'leitvia_out_of_scope', __( 'Agents may not set this status. Use draft, pending or publish.', 'leitvia-studio' ), 403, 'status', self::target( $op ), '', 'once' );
+		}
+		$comments = $after['comment_status'] ?? null;
+		if ( ( $before['comment_status'] ?? null ) !== $comments && ! in_array( $comments, array( 'open', 'closed' ), true ) ) {
+			return Block_Edit::invalid( 'comment_status', __( 'Use open or closed for comment_status.', 'leitvia-studio' ), self::target( $op ) );
 		}
 		return $after;
 	}
@@ -588,7 +593,23 @@ final class Pipeline {
 	 */
 	private static function kses_safe( string $html ): bool {
 		$normal = static fn( string $markup ): string => (string) preg_replace( '#\s*/>#', '>', html_entity_decode( $markup, ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
-		return $normal( wp_kses_post( $html ) ) === $normal( $html );
+		add_filter( 'safecss_filter_attr_allow_css', array( self::class, 'allow_colors' ), 10, 2 );
+		$kept   = wp_kses_post( $html );
+		remove_filter( 'safecss_filter_attr_allow_css', array( self::class, 'allow_colors' ), 10 );
+		return $normal( $kept ) === $normal( $html );
+	}
+
+	/**
+	 * Lets a style declaration with rgb(), rgba(), hsl() or hsla() colors pass safecss_filter_attr(), which allows var()
+	 * and calc() but no other parentheses. Only numbers, units, separators and none count as color arguments; the rest
+	 * of the declaration meets the core check unchanged. Runs on safecss_filter_attr_allow_css during kses_safe() only.
+	 *
+	 * @param bool   $allow Whether core allows the declaration.
+	 * @param string $css   Declaration with url(), gradients, var() and calc() already removed.
+	 */
+	public static function allow_colors( $allow, $css ): bool {
+		$rest = preg_replace( '/\b(?:rgba?|hsla?)\(\s*(?:[0-9.+%-]+(?:deg|turn|rad|grad)?|none|[\s,\/])*\)/i', '', (string) $css );
+		return (bool) $allow || ( is_string( $rest ) && ! preg_match( '%[\\(&=}]|/\*%', $rest ) );
 	}
 
 	/**
@@ -762,7 +783,7 @@ final class Pipeline {
 	}
 
 	/**
-	 * Writes fields of an existing post over its current row, so author, dates, MIME type, comment status and the other
+	 * Writes fields of an existing post over its current row, so author, dates, MIME type, ping status and the other
 	 * fields a state does not hold stay. page_template stays out: wp_insert_post() would validate it against the page
 	 * templates again, which block templates of the theme may not pass.
 	 *
