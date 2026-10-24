@@ -45,14 +45,46 @@
 			"slug": "about",
 			"title": "About",
 			"frame": "about",
-			"sections": [ "leitvia/hero-editorial", "leitvia/content-two-columns", "leitvia/content-break-image", "leitvia/proof-testimonials-grid", "leitvia/cta-contact" ]
+			"sections": [
+				{
+					"pattern": "leitvia/hero-centered",
+					"edits": [
+						{ "block": "p:0.0", "text": "About" },
+						{ "block": "p:0.1", "text": "Placeholder: who makes what this shop sells" },
+						{ "block": "p:0.2", "text": "This page is a placeholder. Replace it with the story of your shop before it goes live." },
+						{ "block": "p:0.3.0", "text": "Browse the shop", "url": "/shop/" },
+						{ "block": "p:0.3.1", "text": "Contact us", "url": "/contact/" }
+					]
+				},
+				{
+					"pattern": "leitvia/content-two-columns",
+					"edits": [
+						{ "block": "p:0.0", "text": "Placeholder: replace this text with your story" },
+						{ "block": "p:0.2.0.0", "text": "Who runs the shop, since when and where the products are made." },
+						{ "block": "p:0.2.0.1", "text": "What the products are made of and how they are made." },
+						{ "block": "p:0.2.1.0", "text": "What customers can rely on, in facts you can back up." },
+						{ "block": "p:0.2.1.1", "text": "How customers reach you with questions before and after an order." }
+					]
+				}
+			]
 		},
 		{
 			"slug": "contact",
 			"title": "Contact",
 			"frame": "contact",
 			"kind": "contact",
-			"sections": [ "leitvia/cta-contact", "leitvia/content-faq" ]
+			"sections": [
+				{
+					"pattern": "leitvia/content-two-columns",
+					"edits": [
+						{ "block": "p:0.0", "text": "Placeholder: replace this text with your contact details" },
+						{ "block": "p:0.2.0.0", "text": "This page is a placeholder. Replace it before the shop goes live." },
+						{ "block": "p:0.2.0.1", "text": "E-mail address and phone number for questions about products and orders." },
+						{ "block": "p:0.2.1.0", "text": "Postal address, and opening hours if customers can visit." },
+						{ "block": "p:0.2.1.1", "text": "How soon you answer, and where to find shipping and returns." }
+					]
+				}
+			]
 		},
 		{
 			"slug": "imprint",
@@ -69,8 +101,7 @@
 						{ "block": "p:0.2.1.0", "text": "Register court and register number, VAT ID where it applies." },
 						{ "block": "p:0.2.1.1", "text": "Managing directors or other people authorised to represent the company." }
 					]
-				},
-				"leitvia/cta-contact"
+				}
 			]
 		},
 		{
@@ -88,8 +119,7 @@
 						{ "block": "p:0.2.1.0", "text": "Which data the shop processes for orders, payment and shipping, on which legal basis and for how long." },
 						{ "block": "p:0.2.1.1", "text": "Which service providers receive data, and the rights of the people concerned." }
 					]
-				},
-				"leitvia/cta-contact"
+				}
 			]
 		},
 		{
@@ -107,8 +137,7 @@
 						{ "block": "p:0.2.1.0", "text": "Prices, payment, delivery and retention of title." },
 						{ "block": "p:0.2.1.1", "text": "Warranty, liability and how disputes are resolved." }
 					]
-				},
-				"leitvia/cta-contact"
+				}
 			]
 		},
 		{
@@ -126,8 +155,7 @@
 						{ "block": "p:0.2.1.0", "text": "How customers declare the withdrawal, with the model withdrawal form." },
 						{ "block": "p:0.2.1.1", "text": "What happens to payments and goods after a withdrawal, and any exceptions." }
 					]
-				},
-				"leitvia/cta-contact"
+				}
 			]
 		},
 		{
@@ -144,12 +172,12 @@
 						{ "block": "p:0.2.1.0", "text": "The payment methods you accept and when payment is due." },
 						{ "block": "p:0.2.1.1", "text": "Any restrictions, such as items that cannot be shipped to some countries." }
 					]
-				},
-				"leitvia/cta-contact"
+				}
 			]
 		}
 	],
 	"navigation": [ "shop", "about", "contact" ],
+	"footerNavigation": [ "about", "contact", "shipping-and-payment", "terms", "withdrawal", "imprint", "privacy" ],
 	"reading": {
 		"show_on_front": "page",
 		"page_on_front": "home"

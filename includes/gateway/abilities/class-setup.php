@@ -162,7 +162,7 @@ final class Setup {
 		Abilities::write(
 			'leitvia/update-navigation',
 			__( 'Update navigation', 'leitvia-studio' ),
-			__( 'Replaces the links of a navigation menu, by default the one published last, which headers without a chosen menu show. Send items (with one level of sub items) or block markup of navigation links, submenus, page lists and mega menus. Links point to this site, use https, mailto: or tel:, and need a text that names their target. The base hash is the hash of the menu, empty when the site has none. No ability returns this hash: send base_hash empty and repeat the call once with current_hash from leitvia_stale_hash.', 'leitvia-studio' ),
+			__( 'Replaces the links of a navigation menu, by default the one published last, which headers without a chosen menu show. Send items (with one level of sub items) or block markup of navigation links, submenus, page lists and mega menus. Links point to this site, use https, mailto: or tel:, and need a text that names their target. The change publishes the menu, a draft one too, since core shows no draft menu. The base hash is the hash of the menu, empty when the site has none. No ability returns this hash: send base_hash empty and repeat the call once with current_hash from leitvia_stale_hash.', 'leitvia-studio' ),
 			'setup',
 			$replace,
 			array(
@@ -188,7 +188,7 @@ final class Setup {
 		Abilities::write(
 			'leitvia/update-template-part',
 			__( 'Update template part', 'leitvia-studio' ),
-			__( 'Replaces a template part of the contract, such as header, footer or sidebar, with a pattern made for its area or with changed block markup. Part names come from leitvia/get-contract, patterns from leitvia/list-patterns. The base hash is the hash of the template part. No ability returns this hash: send base_hash empty and repeat the call once with current_hash from leitvia_stale_hash.', 'leitvia-studio' ),
+			__( 'Replaces a template part of the contract, such as header, footer or sidebar, with a pattern made for its area or with changed block markup. Part names come from leitvia/get-contract, patterns from leitvia/list-patterns. The change publishes the part, a draft one too: core shows no draft part, so where the area level is draft it waits in a change package. The base hash is the hash of the template part. No ability returns this hash: send base_hash empty and repeat the call once with current_hash from leitvia_stale_hash.', 'leitvia-studio' ),
 			'setup',
 			$replace,
 			array(
@@ -402,7 +402,11 @@ final class Setup {
 					return self::check_failed( $target, $findings, 'leitvia/list-blocks' );
 				}
 				$new = $state['post_title'] ? array() : array( 'post_title' => __( 'Navigation', 'leitvia-studio' ) );
-				return array( 'post_content' => $content ) + $new + $state;
+				// Core renders only a published menu: a draft one (from an earlier run) is published with the change.
+				return array(
+					'post_content' => $content,
+					'post_status'  => 'publish',
+				) + $new + $state;
 			},
 		);
 	}
@@ -454,7 +458,11 @@ final class Setup {
 		return array(
 			'area'   => 'structure',
 			'target' => $target,
-			'change' => static fn( array $state ): array => array( 'post_content' => $content ) + $new + $state,
+			// Core renders only a published part: a draft one (from an earlier run) is published with the change.
+			'change' => static fn( array $state ): array => array(
+				'post_content' => $content,
+				'post_status'  => 'publish',
+			) + $new + $state,
 		);
 	}
 

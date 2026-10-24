@@ -24,6 +24,9 @@ class Test_Plugin extends WP_UnitTestCase {
 	 * The plugin enqueues nothing on the front end.
 	 */
 	public function test_no_front_end_assets(): void {
+		// Earlier tests render blocks that enqueue their own rules (the facts list); only wp_enqueue_scripts counts here.
+		wp_scripts()->queue = array();
+		wp_styles()->queue  = array();
 		do_action( 'wp_enqueue_scripts' );
 		foreach ( array_merge( wp_scripts()->queue, wp_styles()->queue ) as $handle ) {
 			$this->assertStringStartsNotWith( 'leitvia-studio', $handle );

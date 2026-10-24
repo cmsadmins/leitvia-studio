@@ -45,7 +45,16 @@ class Test_Bindings extends WP_UnitTestCase {
 	 * @param int                  $post_id Post of the block context.
 	 */
 	private function paragraph( string $source, array $args, int $post_id = 0 ): string {
-		$attrs = array( 'metadata' => array( 'bindings' => array( 'content' => compact( 'source', 'args' ) ) ) );
+		$attrs = array(
+			'metadata' => array(
+				'bindings' => array(
+					'content' => array(
+						'source' => $source,
+						'args'   => $args,
+					),
+				),
+			),
+		);
 		$html  = $this->render( '<!-- wp:paragraph ' . wp_json_encode( $attrs ) . ' --><p>Fallback</p><!-- /wp:paragraph -->', $post_id );
 		// Core adds the block class to the paragraph since 7.0.
 		return str_replace( '<p class="wp-block-paragraph">', '<p>', $html );
@@ -245,6 +254,46 @@ class Test_Bindings extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Prefix and suffix go around a value, escaped like it, and stay away from an empty value and from a URL.
+	 */
+	public function test_meta_prefix_and_suffix(): void {
+		$event = $this->event( array( 'event_price' => 45 ) );
+		$this->assertSame(
+			'<p>45 €</p>',
+			$this->paragraph(
+				'leitvia/meta',
+				array(
+					'key'    => 'event_price',
+					'suffix' => ' €',
+				),
+				$event
+			)
+		);
+		$this->assertSame(
+			'<p>&lt;b&gt;EUR 45</p>',
+			$this->paragraph(
+				'leitvia/meta',
+				array(
+					'key'    => 'event_price',
+					'prefix' => '<b>EUR ',
+				),
+				$event
+			)
+		);
+		$this->assertSame(
+			'<p></p>',
+			$this->paragraph(
+				'leitvia/meta',
+				array(
+					'key'    => 'event_venue',
+					'suffix' => ' €',
+				),
+				$event
+			)
+		);
+	}
+
+	/**
 	 * Line breaks of a textarea field become <br> in HTML attributes and stay plain text elsewhere.
 	 */
 	public function test_textarea_keeps_line_breaks(): void {
@@ -342,5 +391,44 @@ class Test_Bindings extends WP_UnitTestCase {
 			unregister_block_bindings_source( 'leitvia/relation' );
 			LeitviaStudio\Model\Bindings::register();
 		}
+	}
+
+	/**
+	 * The pattern Entries of a type with the post type of the model and paragraphs bound to its fields and relation lists the
+	 * entries with their values, as the skill leitvia-page shows it; posts of other types stay out.
+	 */
+	public function test_entry_list_pattern_lists_entries_with_fields(): void {
+		$speaker = self::factory()->post->create(
+			array(
+				'post_type'   => 'person',
+				'post_title'  => 'Ada Brandt',
+				'post_status' => 'publish',
+			)
+		);
+		$this->event(
+			array(
+				'event_venue'    => 'Hall 2',
+				'event_level'    => 'advanced',
+				'event_speakers' => array( $speaker ),
+			),
+			array( 'post_title' => 'Spring walk' )
+		);
+		self::factory()->post->create( array( 'post_title' => 'A blog post' ) );
+		$pattern = WP_Block_Patterns_Registry::get_instance()->get_registered( 'leitvia-studio/teaser-type-entries' );
+		$this->assertIsArray( $pattern );
+		$field   = static fn( string $source, string $args ): string => sprintf( '<!-- wp:paragraph {"metadata":{"bindings":{"content":{"source":"%s","args":%s}}}} --><p></p><!-- /wp:paragraph -->', $source, $args );
+		$excerpt = '<!-- wp:post-excerpt {"excerptLength":30,"textColor":"ink-muted"} /-->';
+		$this->assertStringContainsString( $excerpt, $pattern['content'] );
+		$markup = str_replace(
+			array( '"postType":"post"', $excerpt ),
+			array( '"postType":"event"', $field( 'leitvia/meta', '{"key":"event_venue"}' ) . $field( 'leitvia/meta', '{"key":"event_level"}' ) . $field( 'leitvia/relation', '{"relation":"event_speakers"}' ) ),
+			$pattern['content']
+		);
+		$html   = do_blocks( $markup );
+		$this->assertStringContainsString( 'Spring walk', $html );
+		$this->assertStringContainsString( '>Hall 2</p>', $html );
+		$this->assertStringContainsString( '>Advanced</p>', $html );
+		$this->assertStringContainsString( '>Ada Brandt</p>', $html );
+		$this->assertStringNotContainsString( 'A blog post', $html );
 	}
 }

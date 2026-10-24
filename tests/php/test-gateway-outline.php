@@ -104,6 +104,22 @@ class Test_Gateway_Outline extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A block with links lists their targets, its own only: the url of a navigation link and every href of its markup,
+	 * sample links to "#" included. Blocks without links have no key links.
+	 */
+	public function test_outline_links(): void {
+		$content = '<!-- wp:navigation --><!-- wp:navigation-link {"label":"Imprint","url":"#","kind":"custom"} /--><!-- wp:navigation-link {"label":"About","url":"https://example.org/about/","kind":"custom"} /--><!-- /wp:navigation -->'
+			. '<!-- wp:paragraph --><p>Write to <a href="mailto:hello@example.org">hello@example.org</a> or <a href="/contact/">use the form</a>.</p><!-- /wp:paragraph -->'
+			. '<!-- wp:paragraph --><p>No link.</p><!-- /wp:paragraph -->';
+		$outline = self::ability( 'leitvia/get-page-outline', array( 'post' => $this->page( $content, false ) ) );
+		$this->assertArrayNotHasKey( 'links', $outline['blocks'][0] );
+		$this->assertSame( array( '#' ), $outline['blocks'][0]['children'][0]['links'] );
+		$this->assertSame( array( 'https://example.org/about/' ), $outline['blocks'][0]['children'][1]['links'] );
+		$this->assertSame( array( 'mailto:hello@example.org', '/contact/' ), $outline['blocks'][1]['links'] );
+		$this->assertArrayNotHasKey( 'links', $outline['blocks'][2] );
+	}
+
+	/**
 	 * Older content without IDs gets path IDs, marked unstable; reading never writes them.
 	 */
 	public function test_path_ids_without_writing(): void {

@@ -25,6 +25,12 @@ final class Read_Plan {
 	public const MAX_POINTS = 20;
 
 	/**
+	 * Patterns that show data of their own the plan cannot know: releases, dates, an entry, entries of a type.
+	 * ponytail: a fixed list; a contract field naming what a pattern needs would replace it.
+	 */
+	private const OWN_DATA = array( 'leitvia/content-changelog', 'leitvia-studio/content-timeline', 'leitvia-studio/content-entry-facts', 'leitvia-studio/teaser-type-entries' );
+
+	/**
 	 * Registers the ability. Runs on leitvia_studio_init.
 	 */
 	public static function register(): void {
@@ -36,7 +42,7 @@ final class Read_Plan {
 		Gateway\Abilities::read(
 			self::NAME,
 			__( 'Plan page', 'leitvia-studio' ),
-			__( 'Proposes a page for a goal and content points: page frame, template, the patterns in page order with role, slot, text lengths and the points each section carries, and the composition score. Without AI the plan follows the page frames, examples and composition rules of the contract and is the same for the same input. With ai set to true the AI connector the site owner set up in WordPress refines it; the goal, the points and pattern names with their metadata are sent to that provider. Writes nothing; build the page with leitvia/compose-page.', 'leitvia-studio' ),
+			__( 'Proposes a page for a goal and content points: page frame, template, the patterns in page order with role, slot, text lengths and the points each section carries, and the composition score. Without AI the plan follows the page frames, examples and composition rules of the contract and is the same for the same input; it leaves out patterns that need images while the media library has none, post teasers below three published posts and proof or offer patterns, which carry facts of the person, and plans a shop home from the home page of the shop recipe. With ai set to true the AI connector the site owner set up in WordPress refines it; the goal, the points and pattern names with their metadata are sent to that provider. Writes nothing; build the page with leitvia/compose-page.', 'leitvia-studio' ),
 			array(
 				'type'                 => 'object',
 				'properties'           => array(
@@ -149,8 +155,9 @@ final class Read_Plan {
 	}
 
 	/**
-	 * Deterministic plan: the example of the frame when all its patterns are usable, else per slot and role the usable
-	 * pattern that scores best after the sections before it. The content slot repeats its roles until every point has
+	 * Deterministic plan from the patterns the site gives what they need (fits()): for the home frame of a shop the
+	 * home page of the shop recipe, else the example of the frame when all its patterns fit, else per slot and role the
+	 * fitting pattern that scores best after the sections before it. The content slot repeats its roles until every point has
 	 * a section, within maxSections.
 	 *
 	 * @param array<string, mixed> $frame  Page frame.
@@ -159,9 +166,12 @@ final class Read_Plan {
 	 */
 	private static function rules( array $frame, array $points ): array {
 		$contract = leitvia_studio_contract()->data();
-		$patterns = self::patterns();
-		$slugs    = array();
-		foreach ( (array) ( $contract['examples'] ?? array() ) as $example ) {
+		$images   = self::has_images();
+		$posts    = (int) wp_count_posts()->publish >= 3;
+		$shop     = self::shop_home();
+		$patterns = array_filter( self::patterns(), static fn( array $pattern ): bool => self::fits( $pattern, $images, $posts, (bool) $shop ) );
+		$slugs    = 'home' === $frame['type'] && $shop && ! array_diff( $shop, array_keys( $patterns ) ) ? $shop : array();
+		foreach ( $slugs ? array() : (array) ( $contract['examples'] ?? array() ) as $example ) {
 			if ( ( $example['frame'] ?? '' ) === $frame['type'] && ! array_diff( (array) $example['sections'], array_keys( $patterns ) ) ) {
 				$slugs = array_values( (array) $example['sections'] );
 				break;
@@ -182,6 +192,61 @@ final class Read_Plan {
 			}
 		}
 		return self::result( $frame, $slugs, $points, 'rules' );
+	}
+
+	/**
+	 * Whether the site gives a pattern what it needs, for the plan without AI: an image in the media library for a
+	 * pattern with images, three published posts for a post teaser, nothing of OWN_DATA. Patterns of the roles proof
+	 * and offer carry facts of the person (quotes, figures, logos, prices) and stay out, except the shop patterns on a
+	 * shop, which show its products and promises. Shop patterns fit only a shop.
+	 *
+	 * @param array<string, mixed> $pattern Contract entry of the pattern.
+	 * @param bool                 $images  Whether the media library holds an image.
+	 * @param bool                 $posts   Whether the site has three published posts.
+	 * @param bool                 $shop    Whether the site is a shop, see shop_home().
+	 */
+	private static function fits( array $pattern, bool $images, bool $posts, bool $shop ): bool {
+		$slug = (string) $pattern['slug'];
+		if ( in_array( $slug, self::OWN_DATA, true ) || ( ! empty( $pattern['images'] ) && ! $images ) ) {
+			return false;
+		}
+		if ( preg_match( '#^leitvia/teaser-(posts|featured-post|editorial-grid|front-page)#', $slug ) ) {
+			return $posts;
+		}
+		$commerce = in_array( 'woocommerce', (array) ( $pattern['requires'] ?? array() ), true );
+		if ( $commerce ) {
+			return $shop;
+		}
+		return ! in_array( $pattern['composition']['role'] ?? '', array( 'proof', 'offer' ), true );
+	}
+
+	/**
+	 * Whether the media library holds at least one image.
+	 */
+	private static function has_images(): bool {
+		$counts = (array) wp_count_attachments( 'image' );
+		unset( $counts['trash'] );
+		return array_sum( array_map( 'intval', $counts ) ) > 0;
+	}
+
+	/**
+	 * Sections of the home page of the recipe leitvia/shop while its plugins are active, else none: a shop home is
+	 * planned from the shop patterns.
+	 *
+	 * @return list<string>
+	 */
+	private static function shop_home(): array {
+		$entry  = leitvia_studio()->registry( 'recipes' )->get( 'leitvia/shop' );
+		$recipe = $entry ? Gateway\Recipes::load( (string) $entry['path'] ) : null;
+		if ( ! is_array( $recipe ) || '' !== Gateway\Recipes::missing( $recipe ) ) {
+			return array();
+		}
+		foreach ( (array) $recipe['pages'] as $page ) {
+			if ( 'home' === ( $page['slug'] ?? '' ) ) {
+				return array_values( array_map( static fn( $section ): string => (string) ( is_array( $section ) ? $section['pattern'] : $section ), (array) $page['sections'] ) );
+			}
+		}
+		return array();
 	}
 
 	/**

@@ -46,15 +46,20 @@ final class Bindings {
 	}
 
 	/**
-	 * Value of a declared field of the current post.
+	 * Value of a declared field of the current post. The arguments prefix and suffix put text around a value that is
+	 * not empty, such as a currency ("45 EUR"); a URL gets no affixes.
 	 *
-	 * @param array<string, mixed> $args      Source arguments: key.
+	 * @param array<string, mixed> $args      Source arguments: key, prefix, suffix.
 	 * @param \WP_Block            $block     Block instance.
 	 * @param string               $attribute Bound attribute.
 	 */
 	public static function meta_value( array $args, \WP_Block $block, string $attribute ): ?string {
-		$post = self::readable_post( (int) ( $block->context['postId'] ?? 0 ) );
-		return $post ? self::field_value( $post, (string) ( $args['key'] ?? '' ), $block, $attribute ) : null;
+		$post  = self::readable_post( (int) ( $block->context['postId'] ?? 0 ) );
+		$value = $post ? self::field_value( $post, (string) ( $args['key'] ?? '' ), $block, $attribute ) : null;
+		if ( null === $value || '' === $value || 'url' === $attribute ) {
+			return $value;
+		}
+		return self::text( (string) ( $args['prefix'] ?? '' ), $block, $attribute ) . $value . self::text( (string) ( $args['suffix'] ?? '' ), $block, $attribute );
 	}
 
 	/**

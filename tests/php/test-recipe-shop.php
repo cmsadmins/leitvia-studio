@@ -282,4 +282,38 @@ class Test_Recipe_Shop extends WP_UnitTestCase {
 			$this->assertSame( 'yes', get_option( $option ), 'settings wait for a person' );
 		}
 	}
+
+	/**
+	 * The benefits bar where its useWhen puts it, right below the h1 of a shop hero, passes the heading check.
+	 *
+	 * @group woocommerce
+	 */
+	public function test_usp_bar_right_below_the_hero(): void {
+		$this->sign_in( Gateway::ROLE );
+		$result = wp_get_ability( 'leitvia/compose-page' )->execute(
+			array(
+				'title'     => 'Shop home',
+				'frame'     => 'home',
+				'sections'  => array(
+					array(
+						'pattern' => 'leitvia/shop-product-hero',
+						'edits'   => array(
+							array(
+								'block' => 'p:0.0.0.3.0',
+								'url'   => '/shop/',
+							),
+							array(
+								'block' => 'p:0.0.0.3.1',
+								'url'   => '/about/',
+							),
+						),
+					),
+					array( 'pattern' => 'leitvia/shop-usp-bar' ),
+				),
+				'base_hash' => '',
+			)
+		);
+		$this->assertIsArray( $result, is_wp_error( $result ) ? wp_json_encode( $result->get_error_data() ) : '' );
+		$this->assertSame( array(), array_filter( $result['findings'], static fn( array $f ): bool => 'leitvia/headings' === $f['check'] ) );
+	}
 }

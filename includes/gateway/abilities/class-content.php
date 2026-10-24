@@ -189,7 +189,7 @@ final class Content {
 		Abilities::read(
 			'leitvia/list-media',
 			__( 'List media', 'leitvia-studio' ),
-			__( 'Lists the media library, newest first: ID, URL, file name, alt text, width, height and hash (the base_hash for leitvia/set-alt-text). Filter by search text, MIME type (image or image/png) and uploaded after a date.', 'leitvia-studio' ),
+			__( 'Lists the media library, newest first: ID, URL, file name, MIME type, file size in bytes, alt text, width, height and hash (the base_hash for leitvia/set-alt-text). Filter by search text, MIME type (image, image/png or application/pdf) and uploaded after a date.', 'leitvia-studio' ),
 			array(
 				'type'                 => 'object',
 				'properties'           => array(
@@ -790,6 +790,7 @@ final class Content {
 				'url'      => (string) wp_get_attachment_url( $post->ID ),
 				'filename' => wp_basename( (string) get_attached_file( $post->ID ) ),
 				'mime'     => $post->post_mime_type,
+				'filesize' => (int) ( $meta['filesize'] ?? wp_filesize( (string) get_attached_file( $post->ID ) ) ),
 				'alt'      => (string) get_post_meta( $post->ID, '_wp_attachment_image_alt', true ),
 				'width'    => (int) ( $meta['width'] ?? 0 ),
 				'height'   => (int) ( $meta['height'] ?? 0 ),

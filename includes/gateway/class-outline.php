@@ -147,12 +147,38 @@ final class Outline {
 				'hash'      => Hashes::of( $serialized ),
 				'children'  => self::tree( Block_Ids::blocks( (array) $block['innerBlocks'] ), $here . '.' ),
 			);
+			$links      = self::links( $block );
+			if ( $links ) {
+				$node['links'] = $links;
+			}
 			if ( 'core/template-part' === $block['blockName'] && ! empty( $attrs['slug'] ) ) {
 				$node['ref'] = ( $attrs['theme'] ?? get_stylesheet() ) . '//' . $attrs['slug'];
 			}
 			$nodes[] = $node;
 		}
 		return $nodes;
+	}
+
+	/**
+	 * Link targets of a block itself, in order: the url of a navigation link or submenu, and every href in its own
+	 * markup. Links of inner blocks belong to those blocks.
+	 *
+	 * @param array<string, mixed> $block Parsed block.
+	 * @return list<string>
+	 */
+	private static function links( array $block ): array {
+		$links = array();
+		if ( in_array( $block['blockName'], array( 'core/navigation-link', 'core/navigation-submenu' ), true ) && isset( $block['attrs']['url'] ) ) {
+			$links[] = (string) $block['attrs']['url'];
+		}
+		$tags = new \WP_HTML_Tag_Processor( (string) $block['innerHTML'] );
+		while ( $tags->next_tag( array( 'tag_name' => 'a' ) ) ) {
+			$href = $tags->get_attribute( 'href' );
+			if ( null !== $href ) {
+				$links[] = is_string( $href ) ? $href : '';
+			}
+		}
+		return $links;
 	}
 
 	/**

@@ -510,17 +510,21 @@ final class Registrar {
 	}
 
 	/**
-	 * Copies the variation name of a core/query block into its query, which reaches the post template as context.
-	 * Runs on render_block_data.
+	 * Hands the variation name of a core/query block (attribute namespace) to its post template as query.namespace,
+	 * where query_loop_block_query_vars sees it. Runs on render_block_context. A change in render_block_data does not
+	 * reach a nested query: core builds the context of inner blocks from the attributes it read before that filter.
 	 *
-	 * @param array<string, mixed> $block Parsed block.
+	 * @param array<string, mixed> $context Context of the block.
+	 * @param array<string, mixed> $parsed  Parsed block.
+	 * @param \WP_Block|null       $parent_block Parent block.
 	 * @return array<string, mixed>
 	 */
-	public static function mark_children_query( array $block ): array {
-		if ( 'core/query' === $block['blockName'] && self::CHILDREN === ( $block['attrs']['namespace'] ?? '' ) && is_array( $block['attrs']['query'] ?? null ) ) {
-			$block['attrs']['query']['namespace'] = self::CHILDREN;
+	public static function query_namespace( array $context, array $parsed, $parent_block = null ): array {
+		$namespace = $parent_block instanceof \WP_Block && 'core/query' === $parent_block->name ? (string) ( $parent_block->parsed_block['attrs']['namespace'] ?? '' ) : '';
+		if ( 'core/post-template' === $parsed['blockName'] && '' !== $namespace && is_array( $context['query'] ?? null ) ) {
+			$context['query']['namespace'] = $namespace;
 		}
-		return $block;
+		return $context;
 	}
 
 	/**

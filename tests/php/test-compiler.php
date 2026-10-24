@@ -286,6 +286,35 @@ class Test_Compiler extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A font Studio ships (assets/fonts/fonts.json) is bundled: no warning, and its faces point to this site.
+	 */
+	public function test_studio_font_libre_franklin_is_bundled(): void {
+		$id                                     = self::set_with_accent( '#123456' );
+		$doc                                    = json_decode( get_post_meta( $id, Token_Sets::META, true ), true );
+		$doc['fontFamily']['heading']['$value'] = array( 'Libre Franklin', 'Arial', 'sans-serif' );
+		$this->assertSame( array(), Compiler::check( $doc ) );
+		$heading = array_column( \LeitviaStudio\Tokens\Dtcg::to_settings( $doc, leitvia_studio_contract() )['typography']['fontFamilies']['theme'], null, 'slug' )['heading'];
+		$this->assertSame( 'Libre Franklin', $heading['fontFace'][0]['fontFamily'] );
+		$this->assertSame( '100 900', $heading['fontFace'][0]['fontWeight'] );
+		$this->assertStringStartsWith( plugins_url( 'assets/fonts/libre-franklin/', LEITVIA_STUDIO_FILE ), $heading['fontFace'][0]['src'][0] );
+		$this->assertFileExists( dirname( LEITVIA_STUDIO_FILE ) . '/assets/fonts/libre-franklin/libre-franklin-latin-wght-normal.woff2' );
+	}
+
+	/**
+	 * Young Serif ships with Studio for token sets, like Libre Franklin.
+	 */
+	public function test_studio_font_young_serif_is_bundled(): void {
+		$id                                     = self::set_with_accent( '#123456' );
+		$doc                                    = json_decode( get_post_meta( $id, Token_Sets::META, true ), true );
+		$doc['fontFamily']['heading']['$value'] = array( 'Young Serif', 'Georgia', 'serif' );
+		$this->assertSame( array(), Compiler::check( $doc ) );
+		$heading = array_column( \LeitviaStudio\Tokens\Dtcg::to_settings( $doc, leitvia_studio_contract() )['typography']['fontFamilies']['theme'], null, 'slug' )['heading'];
+		$this->assertSame( 'Young Serif', $heading['fontFace'][0]['fontFamily'] );
+		$this->assertStringStartsWith( plugins_url( 'assets/fonts/young-serif/', LEITVIA_STUDIO_FILE ), $heading['fontFace'][0]['src'][0] );
+		$this->assertFileExists( dirname( LEITVIA_STUDIO_FILE ) . '/assets/fonts/young-serif/young-serif-latin-400-normal.woff2' );
+	}
+
+	/**
 	 * The REST route activates for theme editors only.
 	 */
 	public function test_rest_activate(): void {

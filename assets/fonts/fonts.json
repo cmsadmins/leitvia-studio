@@ -1,0 +1,11 @@
+{
+	"$comment": "Fonts of Leitvia Studio that a token set can name, Latin subset, in the fontFace format of theme.json with src relative to this folder. Dtcg::bundled_fonts() adds them after the fonts of the theme, so a face of the theme always wins. SIL OFL 1.1; readme.txt names each font and where its terms are. From Fontsource 5.3.0: Libre Franklin, one variable file for the weights 100 to 900; Young Serif, its one regular cut declared for 400 to 900, so headings of any weight show it without faux bold. Open Sans in open-sans/ is for the admin screens only and not listed here.",
+	"families": {
+		"libre franklin": [
+			{ "fontFamily": "Libre Franklin", "fontStyle": "normal", "fontWeight": "100 900", "fontDisplay": "swap", "src": [ "libre-franklin/libre-franklin-latin-wght-normal.woff2" ], "unicodeRange": "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD" }
+		],
+		"young serif": [
+			{ "fontFamily": "Young Serif", "fontStyle": "normal", "fontWeight": "400 900", "fontDisplay": "swap", "src": [ "young-serif/young-serif-latin-400-normal.woff2" ], "unicodeRange": "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD" }
+		]
+	}
+}

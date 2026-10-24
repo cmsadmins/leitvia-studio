@@ -34,7 +34,7 @@ final class Read_Structure {
 		Gateway\Abilities::read(
 			'leitvia/get-page-outline',
 			__( 'Get page outline', 'leitvia-studio' ),
-			__( 'Returns a post as a compact block tree: per block the ID, name, pattern, the first 80 characters of text, size, hash and children. Blocks without a stable ID have a path ID such as p:0.2.1 until the next save. Use the document hash as base_hash for changes and get-block for full attributes.', 'leitvia-studio' ),
+			__( 'Returns a post as a compact block tree: per block the ID, name, pattern, the first 80 characters of text, the link targets of the block itself (links, only when it has any), size, hash and children. Blocks without a stable ID have a path ID such as p:0.2.1 until the next save. Use the document hash as base_hash for changes and get-block for full attributes.', 'leitvia-studio' ),
 			array(
 				'type'                 => 'object',
 				'properties'           => array( 'post' => $post ),

@@ -81,7 +81,7 @@
 					"pattern": "leitvia/content-two-columns",
 					"edits": [
 						{ "block": "p:0.0", "text": "Publisher and editor in charge" },
-						{ "block": "p:0.2.0.0", "text": "Name of the publisher, legal form, street, postcode and city." },
+						{ "block": "p:0.2.0.0", "text": "Placeholder: name of the publisher, legal form, street, postcode and city." },
 						{ "block": "p:0.2.0.1", "text": "Register court and register number, VAT ID where it applies." },
 						{ "block": "p:0.2.1.0", "text": "Editor responsible for the content, with name and address." },
 						{ "block": "p:0.2.1.1", "text": "How to reach the newsroom follows below." }
@@ -92,6 +92,7 @@
 		}
 	],
 	"navigation": [ "news", "about", "editorial-standards", "authors", "contact" ],
+	"footerNavigation": [ "about", "editorial-standards", "contact", "imprint" ],
 	"reading": {
 		"show_on_front": "page",
 		"page_on_front": "home",

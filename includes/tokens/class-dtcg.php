@@ -704,6 +704,7 @@ final class Dtcg {
 				}
 			}
 		}
+		$fonts += self::studio_fonts();
 		/**
 		 * Filters the font faces a token set can use, by lowercased first family name. An add-on that ships its own
 		 * fonts adds them here with absolute URLs of this site, so a token set that names the family gets the font
@@ -712,6 +713,28 @@ final class Dtcg {
 		 * @param array<string, array<mixed>> $fonts Font faces by lowercased family name.
 		 */
 		return $fonts + (array) apply_filters( 'leitvia_studio_bundled_fonts', $fonts );
+	}
+
+	/**
+	 * Font faces Leitvia Studio ships for token sets (assets/fonts/fonts.json), with URLs of this site, by lowercased
+	 * family name.
+	 *
+	 * @return array<string, array<mixed>>
+	 */
+	private static function studio_fonts(): array {
+		$data  = wp_json_file_decode( dirname( LEITVIA_STUDIO_FILE ) . '/assets/fonts/fonts.json', array( 'associative' => true ) );
+		$fonts = array();
+		foreach ( (array) ( is_array( $data ) ? ( $data['families'] ?? array() ) : array() ) as $family => $faces ) {
+			$fonts[ strtolower( (string) $family ) ] = array_map(
+				static function ( $face ): array {
+					$face        = (array) $face;
+					$face['src'] = array_map( static fn( $src ): string => plugins_url( 'assets/fonts/' . $src, LEITVIA_STUDIO_FILE ), (array) ( $face['src'] ?? array() ) );
+					return $face;
+				},
+				(array) $faces
+			);
+		}
+		return $fonts;
 	}
 
 	/**

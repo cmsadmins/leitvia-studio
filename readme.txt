@@ -4,7 +4,7 @@ Tags: ai, mcp, block theme, accessibility, design tokens
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.1.1
+Stable tag: 1.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -167,6 +167,10 @@ The accessibility check bundles [axe-core](https://github.com/dequelabs/axe-core
 
 The headings of the Studio admin screens use [Open Sans](https://github.com/googlefonts/opensans) by The Open Sans Project Authors, weights 600 and 700, reduced to the Latin characters and stored as WOFF2 in `assets/fonts/open-sans/`. Open Sans is licensed under the SIL Open Font License 1.1; the license text is in `licenses/OPEN-SANS`. The fonts are served from your own site.
 
+Token sets can name [Libre Franklin](https://github.com/googlefonts/Libre-Franklin) by The Libre Franklin Project Authors, one variable file for the weights 100 to 900, reduced to the Latin characters and stored as WOFF2 in `assets/fonts/libre-franklin/`. Libre Franklin is licensed under the SIL Open Font License 1.1; the license text is in `licenses/LIBRE-FRANKLIN`. The font is served from your own site and loads only on sites whose active token set uses it.
+
+Token sets can name [Young Serif](https://github.com/noirblancrouge/YoungSerif) by The Young Serif Project Authors, regular weight, reduced to the Latin characters and stored as WOFF2 in `assets/fonts/young-serif/`. Young Serif is licensed under the SIL Open Font License 1.1; the license text is in `licenses/YOUNG-SERIF`. The font is served from your own site and loads only on sites whose active token set uses it.
+
 The Map block bundles [Leaflet](https://leafletjs.com/) 1.9.4 by Volodymyr Agafonkin and contributors into `build/blocks/map/leaflet.js` and `build/blocks/map/leaflet.css`, loaded only after the visitor agrees to load the map. Leaflet is licensed under the BSD 2-Clause License, which is compatible with the GPL; the license text is in `licenses/LEAFLET`. The source code is available from the Leaflet repository and the npm package `leaflet`.
 
 == Source code ==
@@ -195,8 +199,19 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 
 == Changelog ==
 
+= 1.2.0 =
+* New ability create-product: creates a simple WooCommerce product with texts, prices, SKU, stock, categories and an image. Categories can be named by ID, slug or name; a new name creates the category. A price lands at most as a suggestion unless a person unlocked prices.
+* New pattern Entries of a type (leitvia-studio/teaser-type-entries): the overview of a content model type, with its fields bound in each row.
+* Recipe shop: About and Contact start with plain placeholders instead of sample texts of an agency, and the legal pages no longer carry a contact block with sample address and phone number.
+* create-product and update-product turn a long description in plain text into paragraph blocks, so the audit finds no classic content.
+* Recipes link the pages of footerNavigation in the footer instead of the sample links to "#" of the footer pattern; the shop footer links every legal page.
+* Entries of public content model types get a template of their own (single-<type>): no byline or reading time, and a section "More <type>" with other entries. A byline without an author leaves out "By".
+* New pattern Entry facts (leitvia-studio/content-entry-facts): the fields of an entry as a description list. The binding source leitvia/meta takes prefix and suffix, such as a currency.
+* get-page-outline lists the link targets of each block, audit-site reports placeholders in square brackets on legal pages, get-tokens returns the title of a token set as saved, and the preview of a package that only changes styles or template parts opens the front page.
+
 = 1.1.1 =
 * Reveal: content switches from invisible to fully visible in one step while it scrolls in, so text never shows below its contrast. The lift of "Rise" and "Stagger" stays gradual; the effect "Fade in" is now called "Appear" and shows its content without a fade.
+* Content that an agent writes keeps text colors as rgb(), rgba(), hsl() and hsla(), and create-content and update-content set comment_status (open or closed).
 
 = 1.1.0 =
 * New abilities: create-content creates posts, pages and entries of content model types with blocks or patterns, terms, fields and a featured image; list-content and list-media list what an agent may read; get-site-health reports versions and available updates without a request to other servers.

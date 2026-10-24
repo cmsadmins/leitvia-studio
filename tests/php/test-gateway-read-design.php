@@ -166,11 +166,12 @@ class Test_Gateway_Read_Design extends WP_UnitTestCase {
 		$this->assertSame( array(), $result['variations'] );
 		$this->assertArrayHasKey( 'color', $result['document'] );
 
-		$set = Token_Sets::create_from_active_theme( 'Brand' );
+		$set = Token_Sets::create_from_active_theme( 'Cinder & Thread' );
 		$this->assertIsInt( $set );
 		$this->assertTrue( Compiler::activate( $set ) );
 		$result = $this->call( 'leitvia/get-tokens' );
 		$this->assertSame( 'set', $result['source'] );
+		$this->assertSame( 'Cinder & Thread', wp_list_pluck( $result['sets'], 'title', 'id' )[ $set ], 'the title as saved, without "Private:" or entities' );
 		$this->assertSame( $set, $result['active'] );
 		$this->assertSame( 'active', wp_list_pluck( $result['sets'], 'status', 'id' )[ $set ] );
 		$this->assertFalse( $result['drift'] );

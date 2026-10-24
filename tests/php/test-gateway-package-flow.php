@@ -424,6 +424,15 @@ class Test_Gateway_Package_Flow extends WP_UnitTestCase {
 
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'author' ) ) );
 		$this->assertSame( $stored, Preview::posts( array( get_post( $post ) ) )[0]->post_content, 'nonce of another user' );
+		wp_set_current_user( $this->admin );
+		$styles = self::factory()->post->create(
+			array(
+				'post_type'   => 'wp_global_styles',
+				'post_status' => 'publish',
+			)
+		);
+		$design = $this->queue( $styles, array( 'post_content' => '{"version":3,"isGlobalStylesUserThemeJSON":true}' ) );
+		$this->assertStringStartsWith( home_url( '/?' ), Preview::url( $design ), 'a post without an address previews on the front page' );
 	}
 
 	/**

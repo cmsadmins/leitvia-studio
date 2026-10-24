@@ -109,8 +109,13 @@ final class Plugin {
 		add_action( 'init', array( Model\Registrar::class, 'maybe_flush' ), 999 );
 		add_filter( 'wp_insert_post_data', array( Model\Registrar::class, 'force_inherit' ) );
 		add_action( 'enqueue_block_editor_assets', array( Model\Registrar::class, 'enqueue_editor' ) );
-		add_filter( 'render_block_data', array( Model\Registrar::class, 'mark_children_query' ) );
+		add_filter( 'render_block_context', array( Model\Registrar::class, 'query_namespace' ), 10, 3 );
 		add_filter( 'query_loop_block_query_vars', array( Model\Registrar::class, 'children_query_vars' ), 10, 2 );
+		add_action( 'init', array( Model\Entry_View::class, 'register' ), 20 );
+		add_filter( 'query_loop_block_query_vars', array( Model\Entry_View::class, 'query_vars' ), 10, 2 );
+		add_filter( 'render_block_core/query', array( Model\Entry_View::class, 'hide_empty_more' ), 10, 2 );
+		add_filter( 'render_block_core/group', array( Model\Entry_View::class, 'facts' ), 10, 2 );
+		add_filter( 'render_block_core/group', array( Model\Entry_View::class, 'hide_empty_author' ), 10, 2 );
 		add_action( 'transition_post_status', array( Model\Registrar::class, 'follow_entry' ), 10, 3 );
 		add_action( 'before_delete_post', array( Model\Registrar::class, 'trash_children' ), 10, 2 );
 		add_filter( 'map_meta_cap', array( Model\Registrar::class, 'map_row_caps' ), 10, 4 );

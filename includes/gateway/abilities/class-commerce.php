@@ -18,8 +18,8 @@ use LeitviaStudio\Gateway\Scope;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Abilities leitvia/list-products, leitvia/get-product, leitvia/update-product, leitvia/update-product-category and
- * leitvia/set-merchandising, registered only while WooCommerce is active. Writes go through Pipeline::run() in the
+ * Abilities leitvia/list-products, leitvia/get-product, leitvia/create-product, leitvia/update-product,
+ * leitvia/update-product-category and leitvia/set-merchandising, registered only while WooCommerce is active. Writes go through Pipeline::run() in the
  * area products (default "draft"); the pipeline writes products with the CRUD of WooCommerce (save()). Prices, taxes
  * and shipping are content kinds and land at most as a suggestion unless a person unlocked them. Orders, refunds,
  * coupons and customers are out of scope; nothing here reads sales or customer figures.
@@ -42,6 +42,11 @@ final class Commerce {
 	 * Props of a variation; the others belong to its parent.
 	 */
 	public const VARIATION_PROPS = array( 'image_id', 'regular_price', 'sale_price', 'tax_class', 'shipping_class_id' );
+
+	/**
+	 * Props of a new product: PROPS plus SKU and stock, which only create-product sets.
+	 */
+	public const CREATE_PROPS = array( 'image_id', 'gallery_image_ids', 'category_ids', 'tag_ids', 'regular_price', 'sale_price', 'tax_status', 'tax_class', 'shipping_class_id', 'featured', 'upsell_ids', 'cross_sell_ids', 'sku', 'manage_stock', 'stock_quantity' );
 
 	/**
 	 * Content kinds by the props that make them.
@@ -150,6 +155,73 @@ final class Commerce {
 			static fn( $input ) => self::get( (int) ( $input['product'] ?? 0 ) )
 		);
 		Abilities::write(
+			'leitvia/create-product',
+			__( 'Create product', 'leitvia-studio' ),
+			__( 'Creates a simple product. It takes title, slug, texts as block markup or plain text (a long description in plain text becomes paragraph blocks, one per block of text between blank lines), prices, SKU, stock, categories and an image of the media library; base_hash is empty. Categories take IDs, slugs or names; a name no category has yet creates that category. The image needs alt text (leitvia/set-alt-text). The status is capped by the autonomy level, and a product with a price lands at most as a suggestion unless a person unlocked prices.', 'leitvia-studio' ),
+			'build',
+			array(
+				'destructive' => false,
+				'idempotent'  => false,
+			),
+			array(
+				'properties'           => array(
+					'title'             => array(
+						'type'      => 'string',
+						'minLength' => 1,
+						'maxLength' => 200,
+					),
+					'slug'              => array(
+						'type'    => 'string',
+						'pattern' => '^[a-z0-9-]+$',
+					),
+					'description'       => array(
+						'type'        => 'string',
+						'maxLength'   => 20000,
+						'description' => __( 'Long description, block markup or plain text. Plain text without HTML becomes paragraph blocks: a blank line starts a new paragraph, the text is escaped.', 'leitvia-studio' ),
+					),
+					'short_description' => array(
+						'type'        => 'string',
+						'maxLength'   => 5000,
+						'description' => __( 'Short description next to the price, block markup or plain text.', 'leitvia-studio' ),
+					),
+					'status'            => array(
+						'type' => 'string',
+						'enum' => array( 'draft', 'pending', 'publish' ),
+					),
+					'regular_price'     => $price,
+					'sale_price'        => $price,
+					'sku'               => array(
+						'type'      => 'string',
+						'minLength' => 1,
+						'maxLength' => 100,
+					),
+					'stock'             => array(
+						'type'        => 'integer',
+						'minimum'     => 0,
+						'description' => __( 'Units in stock; turns on stock management for the product. Without it the product is in stock without a count.', 'leitvia-studio' ),
+					),
+					'categories'        => array(
+						'type'        => 'array',
+						'maxItems'    => 20,
+						'items'       => array(
+							'type'      => array( 'integer', 'string' ),
+							'minLength' => 1,
+							'maxLength' => 200,
+						),
+						'description' => __( 'Product categories as IDs (numbers), slugs or names (text). A name no category has yet creates the category.', 'leitvia-studio' ),
+					),
+					'image'             => array(
+						'type'        => 'integer',
+						'minimum'     => 1,
+						'description' => __( 'Attachment ID of an image with alt text.', 'leitvia-studio' ),
+					),
+				),
+				'required'             => array( 'title' ),
+				'additionalProperties' => false,
+			),
+			array( self::class, 'describe_create_product' )
+		);
+		Abilities::write(
 			'leitvia/update-product',
 			__( 'Update product', 'leitvia-studio' ),
 			__( 'Updates texts, status, images, categories and tags of one product or variation, and its prices, tax and shipping class. Read the product with leitvia/get-product first and send its hash as base_hash. Images need alt text (set it with leitvia/set-alt-text first). Changes to prices, taxes or shipping land at most as a suggestion unless a person unlocked them.', 'leitvia-studio' ),
@@ -164,8 +236,9 @@ final class Commerce {
 						'maxLength' => 200,
 					),
 					'description'       => array(
-						'type'      => 'string',
-						'maxLength' => 20000,
+						'type'        => 'string',
+						'maxLength'   => 20000,
+						'description' => __( 'Long description, block markup or plain text. Plain text without HTML becomes paragraph blocks: a blank line starts a new paragraph, the text is escaped.', 'leitvia-studio' ),
 					),
 					'short_description' => array(
 						'type'      => 'string',
@@ -278,8 +351,9 @@ final class Commerce {
 	public static function kinds( $kinds, $op, $before, $after ): array {
 		unset( $op );
 		$kinds = (array) $kinds;
-		$old   = (array) ( $before['product'] ?? array() );
 		$new   = (array) ( $after['product'] ?? array() );
+		// A new product starts from the defaults, so only a price it brings counts.
+		$old = $before ? (array) ( $before['product'] ?? array() ) : ( $new ? self::defaults() : array() );
 		foreach ( self::KINDS as $kind => $props ) {
 			$keys = array_flip( $props );
 			// Loose: a stored state went through JSON, and 48.00 is 48.
@@ -310,14 +384,34 @@ final class Commerce {
 		if ( ! $product instanceof \WC_Product ) {
 			return array();
 		}
+		return self::read( $product, $product->is_type( 'variation' ) ? self::VARIATION_PROPS : self::PROPS );
+	}
+
+	/**
+	 * Props of a new simple product before create-product changes them: CREATE_PROPS with the defaults of WooCommerce.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function defaults(): array {
+		return self::read( new \WC_Product_Simple(), self::CREATE_PROPS );
+	}
+
+	/**
+	 * Props of a product as the state holds them.
+	 *
+	 * @param \WC_Product $product Product.
+	 * @param string[]    $names   Props to read.
+	 * @return array<string, mixed>
+	 */
+	private static function read( \WC_Product $product, array $names ): array {
 		$props = array();
-		foreach ( $product->is_type( 'variation' ) ? self::VARIATION_PROPS : self::PROPS as $prop ) {
+		foreach ( $names as $prop ) {
 			$value          = $product->{'get_' . $prop}( 'edit' );
 			$props[ $prop ] = match ( true ) {
-				in_array( $prop, self::ID_LISTS, true )                => array_map( 'intval', array_values( (array) $value ) ),
+				in_array( $prop, self::ID_LISTS, true )                           => array_map( 'intval', array_values( (array) $value ) ),
 				in_array( $prop, array( 'image_id', 'shipping_class_id' ), true ) => (int) $value,
-				'featured' === $prop                                   => (bool) $value,
-				default                                                => is_scalar( $value ) ? (string) $value : '',
+				in_array( $prop, array( 'featured', 'manage_stock' ), true )      => (bool) $value,
+				default                                                           => is_scalar( $value ) ? (string) $value : '',
 			};
 		}
 		return $props;
@@ -336,6 +430,41 @@ final class Commerce {
 		if ( ! $product instanceof \WC_Product ) {
 			return new \WP_Error( 'leitvia_execution_failed' );
 		}
+		return self::write( $product, $state );
+	}
+
+	/**
+	 * Creates a simple product from the state of create-product. Called by the pipeline; category names that no
+	 * category has yet become categories first.
+	 *
+	 * @param array<string, mixed> $state State, see Pipeline::state().
+	 * @return int|\WP_Error Product ID.
+	 */
+	public static function create( array $state ) {
+		$categories = array();
+		foreach ( (array) ( $state['product']['category_ids'] ?? array() ) as $category ) {
+			$term = is_int( $category ) ? $category : self::category( (string) $category );
+			if ( ! $term ) {
+				$created = wp_insert_term( (string) $category, 'product_cat' );
+				$term    = is_wp_error( $created ) ? 0 : (int) $created['term_id'];
+			}
+			if ( ! $term ) {
+				return new \WP_Error( 'leitvia_execution_failed' );
+			}
+			$categories[] = $term;
+		}
+		$state['product']['category_ids'] = $categories;
+		return self::write( new \WC_Product_Simple(), $state );
+	}
+
+	/**
+	 * Writes post fields and props of a state with the CRUD of WooCommerce.
+	 *
+	 * @param \WC_Product          $product Product.
+	 * @param array<string, mixed> $state   State.
+	 * @return int|\WP_Error Product ID.
+	 */
+	private static function write( \WC_Product $product, array $state ) {
 		$props = (array) ( $state['product'] ?? array() );
 		if ( ! $product->is_type( 'variation' ) ) {
 			$props += array(
@@ -471,6 +600,103 @@ final class Commerce {
 	}
 
 	/**
+	 * Operation of create-product: a simple product in the area products. Categories are resolved to IDs here; names
+	 * no category has yet stay names until the pipeline writes the product (see create()).
+	 *
+	 * @param array<string, mixed> $input Input.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public static function describe_create_product( array $input ) {
+		$target  = array( 'post' => 0 );
+		$regular = (string) ( $input['regular_price'] ?? '' );
+		$sale    = (string) ( $input['sale_price'] ?? '' );
+		if ( '' !== $sale && ( '' === $regular || (float) $sale >= (float) $regular ) ) {
+			return Block_Edit::invalid( 'sale_price', __( 'A sale price needs a regular price that is higher.', 'leitvia-studio' ), $target );
+		}
+		$sku = trim( (string) ( $input['sku'] ?? '' ) );
+		if ( '' !== $sku && wc_get_product_id_by_sku( $sku ) ) {
+			return Block_Edit::invalid( 'sku', __( 'Another product already has this SKU. Use another one or leave it out.', 'leitvia-studio' ), $target, 'leitvia/list-products' );
+		}
+		$categories = array();
+		foreach ( (array) ( $input['categories'] ?? array() ) as $value ) {
+			$term = is_int( $value ) ? ( term_exists( $value, 'product_cat' ) ? $value : 0 ) : self::category( (string) $value );
+			if ( is_int( $value ) && ! $term ) {
+				/* translators: %d: term ID */
+				return Block_Edit::invalid( 'categories', sprintf( __( 'There is no product category with the ID %d.', 'leitvia-studio' ), $value ), $target, 'leitvia/list-products' );
+			}
+			$taxonomy = get_taxonomy( 'product_cat' );
+			if ( ! $term && ( ! $taxonomy || ! current_user_can( $taxonomy->cap->edit_terms ) ) ) {
+				return Block_Edit::invalid( 'categories', __( 'Your user may not create product categories. Use existing ones from leitvia/list-products.', 'leitvia-studio' ), $target, 'leitvia/list-products' );
+			}
+			$categories[] = $term ? $term : trim( (string) $value );
+		}
+		$props = array_filter(
+			array(
+				'image_id'      => isset( $input['image'] ) ? (int) $input['image'] : null,
+				'category_ids'  => $categories ? array_values( array_unique( $categories ) ) : null,
+				'regular_price' => '' !== $regular ? $regular : null,
+				'sale_price'    => '' !== $sale ? $sale : null,
+				'sku'           => '' !== $sku ? $sku : null,
+			),
+			static fn( $value ): bool => null !== $value
+		);
+		if ( isset( $input['stock'] ) ) {
+			$props['manage_stock']   = true;
+			$props['stock_quantity'] = (string) (int) $input['stock'];
+		}
+		$invalid = self::invalid_images( isset( $props['image_id'] ) ? array( (int) $props['image_id'] ) : array(), $target );
+		if ( $invalid ) {
+			return $invalid;
+		}
+		$fields = array(
+			'post_title'   => (string) ( $input['title'] ?? '' ),
+			'post_content' => self::paragraphs( (string) ( $input['description'] ?? '' ) ),
+			'post_excerpt' => (string) ( $input['short_description'] ?? '' ),
+			'post_name'    => (string) ( $input['slug'] ?? '' ),
+			'post_status'  => (string) ( $input['status'] ?? 'draft' ),
+		);
+		return array(
+			'area'   => self::AREA,
+			'target' => $target + array( 'post_type' => 'product' ),
+			'record' => true,
+			'change' => static function ( array $state ) use ( $fields, $props ): array {
+				$state['product'] = $props + (array) ( $state['product'] ?? array() );
+				return $fields + $state;
+			},
+		);
+	}
+
+	/**
+	 * A long description as blocks: plain text becomes one escaped paragraph block per part between blank lines (single
+	 * line breaks become <br>), so the product holds no classic content. Block markup and HTML stay as they are. The
+	 * short description stays text: the product template prints it inside a paragraph of its own.
+	 *
+	 * @param string $text Block markup or plain text.
+	 */
+	public static function paragraphs( string $text ): string {
+		$text = trim( str_replace( array( "\r\n", "\r" ), "\n", $text ) );
+		if ( '' === $text || preg_match( '#<[a-z!/]#i', $text ) ) {
+			return $text;
+		}
+		$blocks = array();
+		foreach ( (array) preg_split( '/\n\s*\n/', $text ) as $part ) {
+			$blocks[] = "<!-- wp:paragraph -->\n<p>" . nl2br( esc_html( trim( (string) $part ) ), false ) . "</p>\n<!-- /wp:paragraph -->";
+		}
+		return implode( "\n\n", $blocks );
+	}
+
+	/**
+	 * ID of the product category with this slug or name, 0 for none.
+	 *
+	 * @param string $value Slug or name.
+	 */
+	private static function category( string $value ): int {
+		$term = get_term_by( 'slug', sanitize_title( $value ), 'product_cat' );
+		$term = $term instanceof \WP_Term ? $term : get_term_by( 'name', $value, 'product_cat' );
+		return $term instanceof \WP_Term ? $term->term_id : 0;
+	}
+
+	/**
 	 * Operation of update-product.
 	 *
 	 * @param array<string, mixed> $input Input.
@@ -482,7 +708,7 @@ final class Commerce {
 		$fields = array_filter(
 			array(
 				'post_title'   => $input['title'] ?? null,
-				'post_content' => $input['description'] ?? null,
+				'post_content' => isset( $input['description'] ) ? self::paragraphs( (string) $input['description'] ) : null,
 				'post_excerpt' => $input['short_description'] ?? null,
 				'post_status'  => $input['status'] ?? null,
 			),

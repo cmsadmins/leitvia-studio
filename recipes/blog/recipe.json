@@ -23,6 +23,7 @@
 		}
 	],
 	"navigation": [ "about", "contact" ],
+	"footerNavigation": [ "about", "contact" ],
 	"reading": {
 		"show_on_front": "posts"
 	},

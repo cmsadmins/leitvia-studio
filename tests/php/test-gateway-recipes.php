@@ -10,6 +10,7 @@ use LeitviaStudio\Gateway\Autonomy;
 use LeitviaStudio\Gateway\Gateway;
 use LeitviaStudio\Gateway\Packages;
 use LeitviaStudio\Gateway\Recipes;
+use LeitviaStudio\Tokens\Compiler;
 
 /**
  * Base recipes, the registry recipes, list-recipes and apply-recipe through the build abilities and the pipeline.
@@ -392,6 +393,92 @@ class Test_Gateway_Recipes extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The confirmation run of a package setup (setup step 5): variation, footer and navigation changed after the
+	 * package was applied are kept as exists, and the run proposes nothing.
+	 */
+	public function test_confirmation_run_keeps_what_changed_after_the_package(): void {
+		$this->sign_in( Gateway::ROLE );
+		$agent  = get_current_user_id();
+		$input  = array(
+			'recipe'  => 'leitvia/company',
+			'package' => 'setup-task',
+		);
+		$result = wp_get_ability( 'leitvia/apply-recipe' )->execute( $input );
+		$this->assertGreaterThan( 0, $result['package'] );
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+		$report = Packages::apply( $result['package'] );
+		$this->assertSame( 'applied', $report['state'], wp_json_encode( $report ) );
+
+		$styles                                = (int) WP_Theme_JSON_Resolver::get_user_data_from_wp_global_styles( wp_get_theme() )['ID'];
+		$data                                  = json_decode( (string) get_post_field( 'post_content', $styles ), true );
+		$data['styles']['color']['background'] = '#fbf8f3';
+		$menu                                  = get_posts(
+			array(
+				'post_type'   => 'wp_navigation',
+				'post_status' => 'publish',
+				'numberposts' => 1,
+			)
+		)[0];
+		$footer                                = (int) get_block_template( get_stylesheet() . '//footer', 'wp_template_part' )->wp_id;
+		wp_update_post(
+			wp_slash(
+				array(
+					'ID'           => $styles,
+					'post_content' => wp_json_encode( $data ),
+				)
+			)
+		);
+		wp_update_post(
+			wp_slash(
+				array(
+					'ID'           => $menu->ID,
+					'post_content' => '<!-- wp:navigation-link {"label":"Shop","url":"/shop/","kind":"custom"} /-->',
+				)
+			)
+		);
+		wp_update_post(
+			wp_slash(
+				array(
+					'ID'           => $footer,
+					'post_content' => '<!-- wp:site-title /-->',
+				)
+			)
+		);
+		WP_Theme_JSON_Resolver::clean_cached_data();
+
+		wp_set_current_user( $agent );
+		$before = self::footprint();
+		$again  = $this->apply( 'leitvia/company' );
+		$this->assert_nothing_new( $again, $before );
+		foreach ( array( 'variation', 'navigation' ) as $step ) {
+			$this->assertSame( array( 'exists' ), self::statuses( $again, $step ), $step );
+		}
+		$this->assertSame( array( 'unchanged', 'exists' ), self::statuses( $again, 'templateParts' ), 'header as written, footer changed' );
+		$this->assertStringContainsString( 'Shop', get_post_field( 'post_content', $menu->ID ) );
+	}
+
+	/**
+	 * An active token set keeps the variation of the recipe out of every later run, even when the styles still hold
+	 * what the recipe wrote.
+	 */
+	public function test_active_token_set_keeps_the_variation(): void {
+		$this->sign_in_live();
+		$this->apply( 'leitvia/company' );
+		update_option(
+			Compiler::ACTIVE_OPTION,
+			self::factory()->post->create(
+				array(
+					'post_type'   => 'leitvia_tokens',
+					'post_status' => 'private',
+				)
+			)
+		);
+		$again = $this->apply( 'leitvia/company' );
+		$this->assertSame( array( 'exists' ), self::statuses( $again, 'variation' ) );
+		$this->assertSame( 0, $again['package'] );
+	}
+
+	/**
 	 * Documentation: page-docs pages below the docs page.
 	 */
 	public function test_documentation_hierarchy(): void {
@@ -405,6 +492,49 @@ class Test_Gateway_Recipes extends WP_UnitTestCase {
 			$this->assertSame( 'page-docs', get_page_template_slug( $page ) );
 		}
 		$this->assertNull( get_page_by_path( 'getting-started' ) );
+	}
+
+	/**
+	 * The footer pattern of a recipe has sample links to "#": the recipe writes the footer with the pages of
+	 * footerNavigation instead, by title and address, and no link to "#" stays.
+	 */
+	public function test_footer_links_recipe_pages(): void {
+		$this->set_permalink_structure( '/%postname%/' );
+		$this->sign_in_live();
+		$this->apply( 'leitvia/company' );
+		$footer = get_block_template( get_stylesheet() . '//footer', 'wp_template_part' );
+		$this->assertNotNull( $footer );
+		$this->assertStringNotContainsString( '"url":"#"', $footer->content );
+		$links = array();
+		foreach ( parse_blocks( $footer->content ) as $block ) {
+			array_push( $links, ...self::navigation_links( $block ) );
+		}
+		$this->assertSame(
+			array(
+				'Services' => home_url( '/services/' ),
+				'About'    => home_url( '/about/' ),
+				'Contact'  => home_url( '/contact/' ),
+				'Imprint'  => home_url( '/imprint/' ),
+			),
+			array_column( $links, 'url', 'label' )
+		);
+		foreach ( array( 'services', 'about', 'contact', 'imprint' ) as $slug ) {
+			$this->assertSame( home_url( '/' . $slug . '/' ), get_permalink( get_page_by_path( $slug ) ), 'the link leads to the page' );
+		}
+	}
+
+	/**
+	 * Attributes of the navigation links in a parsed block and its inner blocks.
+	 *
+	 * @param array<string, mixed> $block Parsed block.
+	 * @return list<array<string, mixed>>
+	 */
+	private static function navigation_links( array $block ): array {
+		$links = 'core/navigation-link' === $block['blockName'] ? array( $block['attrs'] ) : array();
+		foreach ( $block['innerBlocks'] as $inner ) {
+			array_push( $links, ...self::navigation_links( $inner ) );
+		}
+		return $links;
 	}
 
 	/**

@@ -476,7 +476,8 @@ class Test_Gateway_Setup extends WP_UnitTestCase {
 
 	/**
 	 * A header from a header pattern gets a post with the terms core finds it by; patterns of another area and parts
-	 * outside the contract are refused; changed markup needs the hash; standard writes a new part as a draft.
+	 * outside the contract are refused; changed markup needs the hash; standard proposes a new part in a package, since
+	 * core renders no draft part.
 	 */
 	public function test_update_template_part(): void {
 		$this->sign_in( 'full' );
@@ -541,8 +542,9 @@ class Test_Gateway_Setup extends WP_UnitTestCase {
 		$this->assertGreaterThan( 0, $result['snapshot'] );
 
 		$this->sign_in( 'standard' );
+		$parts  = (int) array_sum( (array) wp_count_posts( 'wp_template_part' ) );
 		$result = $this->assert_mode(
-			'draft',
+			'package',
 			self::call(
 				'leitvia/update-template-part',
 				array(
@@ -551,7 +553,71 @@ class Test_Gateway_Setup extends WP_UnitTestCase {
 				)
 			)
 		);
-		$this->assertSame( 'draft', get_post_status( $result['target']['post'] ) );
+		$this->assertSame( $parts, (int) array_sum( (array) wp_count_posts( 'wp_template_part' ) ), 'no draft part' );
+		$this->assertSame( 'publish', Packages::operations( $result['package'] )[0]['state']['post_status'] );
+	}
+
+	/**
+	 * A part left as a draft by an earlier run (core renders it nowhere) with the content of the pattern already: the
+	 * same pattern with a package key still proposes it, and applying the package publishes it. Same for a draft menu.
+	 */
+	public function test_draft_part_is_published_by_a_package(): void {
+		$this->sign_in( 'standard' );
+		$pattern = WP_Block_Patterns_Registry::get_instance()->get_registered( 'leitvia/footer-minimal' );
+		$id      = self::factory()->post->create(
+			array(
+				'post_type'    => 'wp_template_part',
+				'post_status'  => 'draft',
+				'post_name'    => 'footer',
+				'post_title'   => 'Footer',
+				'post_content' => $pattern['content'],
+				'tax_input'    => array(
+					'wp_theme'              => array( get_stylesheet() ),
+					'wp_template_part_area' => array( 'footer' ),
+				),
+			)
+		);
+		wp_set_object_terms( $id, get_stylesheet(), 'wp_theme' );
+		wp_set_object_terms( $id, 'footer', 'wp_template_part_area' );
+		$this->assertSame( $id, (int) get_block_template( get_stylesheet() . '//footer', 'wp_template_part' )->wp_id );
+		$result = $this->assert_mode(
+			'package',
+			self::call(
+				'leitvia/update-template-part',
+				array(
+					'part'      => 'footer',
+					'pattern'   => 'leitvia/footer-minimal',
+					'base_hash' => Hashes::document( $id ),
+					'package'   => 'repair-footer',
+				)
+			)
+		);
+		$menu   = self::factory()->post->create(
+			array(
+				'post_type'    => 'wp_navigation',
+				'post_status'  => 'draft',
+				'post_content' => '<!-- wp:navigation-link {"label":"About","url":"/about/","kind":"custom"} /-->',
+			)
+		);
+		$this->assert_mode(
+			'package',
+			self::call(
+				'leitvia/update-navigation',
+				array(
+					'navigation' => $menu,
+					'content'    => (string) get_post_field( 'post_content', $menu ),
+					'base_hash'  => Hashes::document( $menu ),
+					'package'    => 'repair-footer',
+				)
+			)
+		);
+		$this->assertSame( 'draft', get_post_status( $id ) );
+
+		$this->sign_in( 'standard', 'administrator' );
+		$report = Packages::apply( $result['package'] );
+		$this->assertSame( 'applied', $report['state'], wp_json_encode( $report ) );
+		$this->assertSame( 'publish', get_post_status( $id ) );
+		$this->assertSame( 'publish', get_post_status( $menu ) );
 	}
 
 	/**

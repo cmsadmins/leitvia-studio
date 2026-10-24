@@ -7,6 +7,8 @@
 
 namespace LeitviaStudio\Gateway;
 
+use LeitviaStudio\Tokens\Compiler;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -19,7 +21,8 @@ defined( 'ABSPATH' ) || exit;
  *
  * Steps and the abilities they call, in this order: contentModel (leitvia/define-content-type with declaration),
  * tokenSet (leitvia/create-token-set with title and document), variation (leitvia/set-variation with variation),
- * templateParts (leitvia/update-template-part with part and pattern), pages (leitvia/compose-page), navigation
+ * templateParts (leitvia/update-template-part with part and pattern, or with content when the pattern holds sample
+ * links to "#": the footer gets the pages of footerNavigation instead), pages (leitvia/compose-page), navigation
  * (leitvia/update-navigation with items of label and url), reading, connect (settings that point to recipe pages)
  * and options. A step whose ability is not registered is reported as unavailable.
  */
@@ -39,6 +42,12 @@ final class Recipes {
 	 * Settings that point to a recipe page: the privacy policy page and the terms page of WooCommerce.
 	 */
 	public const CONNECT = array( 'wp_page_for_privacy_policy', 'woocommerce_terms_page_id' );
+
+	/**
+	 * What the recipes wrote, by part (variation, navigation, part:<name>): the post and its hash after the write, or
+	 * the package and operation that waits for it. A part changed since then is kept on the next run.
+	 */
+	public const WRITES_OPTION = 'leitvia_studio_recipe_writes';
 
 	/**
 	 * Package key of the recipe run without a key from the caller: it collects what the autonomy puts into a package.
@@ -150,7 +159,8 @@ final class Recipes {
 
 	/**
 	 * Applies a recipe. Pages that exist (same page kind, else same slug and parent) or wait in the open package are
-	 * skipped, as are template parts changed since the recipe wrote them, so a second run adds nothing twice.
+	 * skipped, as are the variation, template parts and navigation changed since a recipe wrote them and the variation
+	 * while a token set is active, so a second run adds nothing twice and resets nothing.
 	 *
 	 * @param string $name    Registry name of the recipe.
 	 * @param string $package Package key, '' for recipe-<name>.
@@ -218,28 +228,35 @@ final class Recipes {
 			);
 		}
 		if ( isset( $recipe['variation'] ) ) {
-			$call( 'variation', 'leitvia/set-variation', array( 'variation' => (string) $recipe['variation'] ) );
+			// An active token set replaces the presets of a variation; setting the variation again would undo the brand.
+			if ( (int) get_option( Compiler::ACTIVE_OPTION ) || self::changed( 'variation' ) ) {
+				$steps[] = self::step( 'variation', 'leitvia/set-variation', 'exists', array( 'variation' => (string) $recipe['variation'] ) );
+			} else {
+				self::remember( 'variation', $call( 'variation', 'leitvia/set-variation', array( 'variation' => (string) $recipe['variation'] ) ) );
+			}
 		}
 		foreach ( (array) ( $recipe['templateParts'] ?? array() ) as $part => $pattern ) {
-			// A part changed after the recipe wrote it (by hand or by a kit) is kept, like a page that exists.
+			// A part changed after the recipe wrote it (by hand, by a kit or by an agent) is kept, like a page that exists.
+			// _leitvia_recipe_hash: the record of earlier Studio versions.
 			$saved = get_block_template( get_stylesheet() . '//' . $part, 'wp_template_part' );
 			$wrote = $saved && $saved->wp_id ? (string) get_post_meta( (int) $saved->wp_id, '_leitvia_recipe_hash', true ) : '';
-			if ( '' !== $wrote && md5( $saved->content ) !== $wrote ) {
+			if ( self::changed( 'part:' . $part ) || ( '' !== $wrote && md5( $saved->content ) !== $wrote ) ) {
 				$steps[] = self::step( 'templateParts', 'leitvia/update-template-part', 'exists', array( 'part' => (string) $part ) );
 				continue;
 			}
-			$done  = $call(
-				'templateParts',
-				'leitvia/update-template-part',
-				array(
-					'part'    => (string) $part,
-					'pattern' => (string) $pattern,
+			// Only a recipe that names footerNavigation rewrites the links to "#"; without it the pattern stays as it is, so
+			// a kit can still put its own pages in place of those links.
+			$part_content = 'footer' === $part && ! empty( $recipe['footerNavigation'] )
+				? self::linked_part( (string) $pattern, self::links( (array) $recipe['footerNavigation'], $recipe, array() ) )
+				: '';
+			self::remember(
+				'part:' . $part,
+				$call(
+					'templateParts',
+					'leitvia/update-template-part',
+					array( 'part' => (string) $part ) + ( '' !== $part_content ? array( 'content' => $part_content ) : array( 'pattern' => (string) $pattern ) )
 				)
 			);
-			$saved = get_block_template( get_stylesheet() . '//' . $part, 'wp_template_part' );
-			if ( in_array( $done['status'], array( 'live', 'unchanged' ), true ) && $saved && $saved->wp_id ) {
-				update_post_meta( (int) $saved->wp_id, '_leitvia_recipe_hash', md5( $saved->content ) );
-			}
 		}
 		$pages  = array();
 		$queued = self::queued( $key );
@@ -272,27 +289,10 @@ final class Recipes {
 			$result         = $call( 'pages', 'leitvia/compose-page', $input );
 			$pages[ $slug ] = in_array( $result['status'], array( 'live', 'draft' ), true ) ? (int) $result['target']['post'] : 0;
 		}
-		if ( ! empty( $recipe['navigation'] ) ) {
-			$items  = array();
-			$titles = array_column( (array) $recipe['pages'], 'title', 'slug' );
-			foreach ( (array) $recipe['navigation'] as $slug ) {
-				if ( isset( $titles[ $slug ] ) ) {
-					$items[] = array(
-						'label' => (string) $titles[ $slug ],
-						'url'   => ! empty( $pages[ $slug ] ) ? (string) get_permalink( $pages[ $slug ] ) : home_url( '/' . $slug . '/' ),
-					);
-					continue;
-				}
-				// A page of the site the recipe does not create, such as the shop page of WooCommerce.
-				$post = get_page_by_path( $slug );
-				if ( $post && 'publish' === $post->post_status ) {
-					$items[] = array(
-						'label' => get_the_title( $post ),
-						'url'   => (string) get_permalink( $post ),
-					);
-				}
-			}
-			$call( 'navigation', 'leitvia/update-navigation', array( 'items' => $items ) );
+		if ( ! empty( $recipe['navigation'] ) && self::changed( 'navigation' ) ) {
+			$steps[] = self::step( 'navigation', 'leitvia/update-navigation', 'exists', array() );
+		} elseif ( ! empty( $recipe['navigation'] ) ) {
+			self::remember( 'navigation', $call( 'navigation', 'leitvia/update-navigation', array( 'items' => self::links( (array) $recipe['navigation'], $recipe, $pages ) ) ) );
 		}
 		foreach ( (array) ( $recipe['reading'] ?? array() ) + (array) ( $recipe['connect'] ?? array() ) + (array) ( $recipe['options'] ?? array() ) as $option => $value ) {
 			$steps[] = self::option( (string) $option, (string) $value, $pages, $key, in_array( 'option:' . $option, $queued, true ) );
@@ -315,6 +315,146 @@ final class Recipes {
 			'package' => $ids ? (int) max( $ids ) : Packages::find( $key ),
 			'steps'   => $steps,
 		);
+	}
+
+	/**
+	 * Links to pages by slug, label and url each: a recipe page by its title, at its address or, while it is not on the
+	 * site yet, at the address its slug gives it; another slug links to the published page of the site with that path,
+	 * such as the shop page of WooCommerce, and is left out without one.
+	 *
+	 * @param string[]             $slugs  Page slugs in order.
+	 * @param array<string, mixed> $recipe Recipe.
+	 * @param array<string, int>   $pages  Page IDs by recipe slug, 0 for a page that is not on the site yet.
+	 * @return list<array{label: string, url: string}>
+	 */
+	private static function links( array $slugs, array $recipe, array $pages ): array {
+		$items  = array();
+		$titles = array_column( (array) $recipe['pages'], 'title', 'slug' );
+		foreach ( $slugs as $slug ) {
+			$slug = (string) $slug;
+			if ( isset( $titles[ $slug ] ) ) {
+				$items[] = array(
+					'label' => (string) $titles[ $slug ],
+					'url'   => ! empty( $pages[ $slug ] ) ? (string) get_permalink( $pages[ $slug ] ) : home_url( '/' . $slug . '/' ),
+				);
+				continue;
+			}
+			$post = get_page_by_path( $slug );
+			if ( $post && 'publish' === $post->post_status ) {
+				$items[] = array(
+					'label' => get_the_title( $post ),
+					'url'   => (string) get_permalink( $post ),
+				);
+			}
+		}
+		return $items;
+	}
+
+	/**
+	 * Markup of a template part pattern without its sample links: every navigation link to "#" is dropped, the first
+	 * navigation gets the links instead, and a navigation left without links is dropped, since core would fill it with
+	 * every page. '' when the pattern has no link to "#", so the part is written from the pattern itself.
+	 *
+	 * @param string                                  $pattern Pattern name.
+	 * @param list<array{label: string, url: string}> $links   Links for the first navigation.
+	 */
+	private static function linked_part( string $pattern, array $links ): string {
+		$registered = \WP_Block_Patterns_Registry::get_instance()->get_registered( $pattern );
+		$content    = $registered ? (string) $registered['content'] : '';
+		if ( ! str_contains( $content, '"url":"#"' ) ) {
+			return '';
+		}
+		$markup = '';
+		foreach ( parse_blocks( $content ) as $block ) {
+			$markup .= self::replace_links( $block, $links );
+		}
+		return $markup;
+	}
+
+	/**
+	 * Markup of a parsed block with its navigation links to "#" replaced, see linked_part(); '' to drop it. Inner
+	 * blocks are serialized into the inner content of their parent.
+	 *
+	 * @param array{blockName: string|null, attrs: array<string, mixed>, innerBlocks: array<int, mixed>, innerHTML: string, innerContent: array<int, string|null>} $block Parsed block.
+	 * @param list<array{label: string, url: string}>                                                                                                              $links Links for the first navigation; emptied once it got them.
+	 */
+	private static function replace_links( array $block, array &$links ): string {
+		if ( 'core/navigation' === $block['blockName'] ) {
+			$kept = array_filter( $block['innerBlocks'], static fn( $inner ): bool => is_array( $inner ) && '#' !== ( $inner['attrs']['url'] ?? '' ) );
+			$kept = array_map( 'serialize_block', $kept );
+			foreach ( $links as $link ) {
+				$kept[] = '<!-- wp:navigation-link ' . serialize_block_attributes(
+					array(
+						'label' => $link['label'],
+						'url'   => $link['url'],
+						'kind'  => 'custom',
+					)
+				) . ' /-->';
+			}
+			$links = array();
+			if ( ! $kept ) {
+				return '';
+			}
+			$block['innerContent'] = array( "\n" . implode( "\n", $kept ) . "\n" );
+		} else {
+			$next = 0;
+			foreach ( $block['innerContent'] as $index => $chunk ) {
+				if ( null === $chunk ) {
+					$block['innerContent'][ $index ] = self::replace_links( $block['innerBlocks'][ $next++ ], $links );
+				}
+			}
+		}
+		$block['innerBlocks'] = array();
+		return serialize_block( $block );
+	}
+
+	/**
+	 * Records what a step of the variation, a template part or the navigation wrote: the post and its hash when it is on
+	 * the site (live, unchanged), the package and operation when it waits.
+	 *
+	 * @param string               $name Part: variation, navigation or part:<name>.
+	 * @param array<string, mixed> $step Step of the run.
+	 */
+	private static function remember( string $name, array $step ): void {
+		$post   = (int) ( $step['target']['post'] ?? 0 );
+		$record = null;
+		if ( in_array( $step['status'], array( 'live', 'unchanged' ), true ) && $post ) {
+			$record = array(
+				'post' => $post,
+				'hash' => Hashes::document( $post ),
+			);
+		} elseif ( 'package' === $step['status'] && $step['package'] ) {
+			$part = str_starts_with( $name, 'part:' ) ? substr( $name, 5 ) : null;
+			foreach ( Packages::operations( (int) $step['package'] ) as $op ) {
+				if ( $op['ability'] === $step['ability'] && ( null === $part || ( $op['state']['post_name'] ?? '' ) === $part ) ) {
+					$record = array(
+						'package' => (int) $step['package'],
+						'op'      => (int) $op['id'],
+					);
+				}
+			}
+		}
+		if ( $record ) {
+			$writes          = (array) get_option( self::WRITES_OPTION, array() );
+			$writes[ $name ] = $record;
+			update_option( self::WRITES_OPTION, $writes, false );
+		}
+	}
+
+	/**
+	 * Whether a part changed after a recipe wrote it: its post now has another hash than the write left. A write that
+	 * still waits in a package, or was never applied, counts as not written, so the run proposes it again.
+	 *
+	 * @param string $name Part: variation, navigation or part:<name>.
+	 */
+	private static function changed( string $name ): bool {
+		$record = (array) ( ( (array) get_option( self::WRITES_OPTION, array() ) )[ $name ] ?? array() );
+		if ( isset( $record['package'] ) ) {
+			$entry  = array_column( Packages::operations( (int) $record['package'] ), null, 'id' )[ (int) $record['op'] ] ?? array();
+			$record = (array) ( $entry['applied'] ?? array() );
+		}
+		$current = empty( $record['post'] ) ? '' : Hashes::document( (int) $record['post'] );
+		return '' !== $current && (string) ( $record['hash'] ?? '' ) !== $current;
 	}
 
 	/**
@@ -355,7 +495,7 @@ final class Recipes {
 			return self::step( $step, $ability, 'rejected', $target, (string) $result->get_error_code() ) + array( 'message' => $result->get_error_message() );
 		}
 		$result = (array) $result;
-		return self::step( $step, $ability, (string) ( $result['mode'] ?? 'live' ), (array) ( $result['target'] ?? array() ) + $target ) + array( 'package' => (int) ( $result['package'] ?? 0 ) );
+		return array( 'package' => (int) ( $result['package'] ?? 0 ) ) + self::step( $step, $ability, (string) ( $result['mode'] ?? 'live' ), (array) ( $result['target'] ?? array() ) + $target );
 	}
 
 	/**

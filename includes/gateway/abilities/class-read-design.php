@@ -310,7 +310,8 @@ final class Read_Design {
 		foreach ( $posts as $post ) {
 			$sets[] = array(
 				'id'       => $post->ID,
-				'title'    => get_the_title( $post ),
+				// The title as saved: get_the_title() adds "Private:" and entities to a set, which is always private.
+				'title'    => html_entity_decode( $post->post_title, ENT_QUOTES | ENT_HTML5, 'UTF-8' ),
 				'status'   => $post->ID === $active ? 'active' : 'inactive',
 				'modified' => (string) get_post_modified_time( 'c', true, $post ),
 			);

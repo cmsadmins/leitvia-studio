@@ -28,14 +28,19 @@ final class Preview {
 	}
 
 	/**
-	 * Link to the preview of a package for the current user: the first post an open operation changes, '' when it
-	 * changes no existing post.
+	 * Link to the preview of a package for the current user: the first post with an address that an open operation
+	 * changes, the front page when it only changes posts without one (global styles, template parts, navigation), ''
+	 * when it changes no existing post.
 	 *
 	 * @param int $id Package ID.
 	 */
 	public static function url( int $id ): string {
-		foreach ( self::states( $id ) as $post_id => $state ) {
-			$link = get_permalink( $post_id );
+		$states = self::states( $id );
+		foreach ( array_keys( $states ) as $post_id ) {
+			$link = is_post_type_viewable( (string) get_post_type( $post_id ) ) ? get_permalink( $post_id ) : false;
+			if ( ! $link && array_key_last( $states ) === $post_id ) {
+				$link = home_url( '/' );
+			}
 			if ( $link ) {
 				return add_query_arg(
 					array(

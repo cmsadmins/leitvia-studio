@@ -48,7 +48,8 @@ final class Abilities {
 			),
 		);
 		if ( $input_schema ) {
-			$args['input_schema'] = $input_schema;
+			// Without a required input a call without any (GET with no query arguments) reads with the defaults.
+			$args['input_schema'] = $input_schema + ( empty( $input_schema['required'] ) && 'object' === ( $input_schema['type'] ?? '' ) ? array( 'default' => array() ) : array() );
 		}
 		return leitvia_studio()->registry( 'abilities' )->register(
 			$name,

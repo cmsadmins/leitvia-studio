@@ -71,6 +71,12 @@ final class Pipeline {
 	private const PUBLIC_STATUSES = array( 'publish', 'future' );
 
 	/**
+	 * Post types without a useful draft: core renders only published template parts and navigation menus, and no
+	 * ability publishes a draft. Under the level draft a new one waits in a package instead.
+	 */
+	private const NO_DRAFT = array( 'wp_template_part', 'wp_navigation' );
+
+	/**
 	 * Runs an operation and writes its audit entry. Fires leitvia_studio_gateway_executed after a write or a package.
 	 *
 	 * A replay (package > 0) writes a stored operation of that package live: no rate limit (the call that applies the
@@ -447,6 +453,10 @@ final class Pipeline {
 				'menu_order'     => 0,
 				'comment_status' => get_default_comment_status( (string) $op->target['post_type'] ),
 			);
+			// A new product brings the props of create-product, see Commerce::CREATE_PROPS.
+			if ( 'product' === $op->target['post_type'] && Commerce::handles( 'product' ) ) {
+				$start['product'] = Commerce::defaults();
+			}
 		}
 		$after = ( $op->change )( $start );
 		if ( is_wp_error( $after ) ) {
@@ -637,7 +647,8 @@ final class Pipeline {
 
 	/**
 	 * How the operation is carried out: package for "suggest" and for settings changes of users without
-	 * manage_options; for "draft" new posts and changes to unpublished posts as drafts, everything public as a package;
+	 * manage_options; for "draft" new posts and changes to unpublished posts as drafts, everything public and new
+	 * posts of NO_DRAFT as a package;
 	 * for "autonomous" live, or a package when a check warned.
 	 *
 	 * @param Operation            $op       Operation.
@@ -658,10 +669,10 @@ final class Pipeline {
 		if ( 'draft' !== $level || '' !== $op->option() || isset( $op->target['term'] ) ) {
 			return 'package';
 		}
-		if ( $op->creates() ) {
+		if ( $op->creates() && ! in_array( $after['post_type'], self::NO_DRAFT, true ) ) {
 			return 'draft';
 		}
-		$public = in_array( $before['post_status'], self::PUBLIC_STATUSES, true ) || in_array( $after['post_status'], self::PUBLIC_STATUSES, true );
+		$public = in_array( $before['post_status'] ?? '', self::PUBLIC_STATUSES, true ) || in_array( $after['post_status'], self::PUBLIC_STATUSES, true );
 		return $public ? 'package' : 'draft';
 	}
 
@@ -747,9 +758,13 @@ final class Pipeline {
 				$id        = is_wp_error( $activated ) ? 0 : (int) ( \WP_Theme_JSON_Resolver::get_user_data_from_wp_global_styles( wp_get_theme() )['ID'] ?? 0 );
 				$failed    = ! $id;
 			} else {
-				$written = $op->creates() ? wp_insert_post( wp_slash( Content::prepare( 0, $after ) ), true ) : self::update( $id, $after );
-				$id      = is_wp_error( $written ) ? 0 : (int) $written;
-				$failed  = ! $id || ( $op->creates() && ! Content::set_terms( $id, $after ) );
+				$written = match ( true ) {
+					! $op->creates()           => self::update( $id, $after ),
+					isset( $after['product'] ) => Commerce::create( $after ),
+					default                    => wp_insert_post( wp_slash( Content::prepare( 0, $after ) ), true ),
+				};
+				$id     = is_wp_error( $written ) ? 0 : (int) $written;
+				$failed = ! $id || ( $op->creates() && ! Content::set_terms( $id, $after ) );
 			}
 		} catch ( \Throwable $e ) {
 			$failed = true;

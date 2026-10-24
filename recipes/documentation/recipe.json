@@ -46,6 +46,7 @@
 		}
 	],
 	"navigation": [ "docs", "contact" ],
+	"footerNavigation": [ "docs", "contact" ],
 	"reading": {
 		"show_on_front": "page",
 		"page_on_front": "home"

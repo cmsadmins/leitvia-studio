@@ -297,4 +297,74 @@ class Test_Gateway_Content_Checks extends WP_UnitTestCase {
 		$this->assertNull( $rest['next'] );
 		$this->assertWPError( $ability->execute( array( 'limit' => 21 ) ) );
 	}
+
+	/**
+	 * Placeholders in square brackets on a legal page (by page kind or by a legal slug) are open points of the audit,
+	 * each once; registered shortcodes and pages that are no legal text are left alone.
+	 */
+	public function test_audit_legal_placeholders(): void {
+		add_shortcode( 'leitvia_test_code', '__return_empty_string' );
+		$content  = '<!-- wp:paragraph --><p>We aim to make [domain, for example www.example.org] accessible. Date: [date].</p><!-- /wp:paragraph --><!-- wp:paragraph --><p>Updated [date]. [leitvia_test_code id="1"]</p><!-- /wp:paragraph -->';
+		$kind     = self::factory()->post->create(
+			array(
+				'post_type'    => 'page',
+				'post_name'    => 'our-accessibility',
+				'post_content' => $content,
+				'meta_input'   => array( '_leitvia_page_kind' => 'accessibility' ),
+			)
+		);
+		$slug     = self::factory()->post->create(
+			array(
+				'post_type'    => 'page',
+				'post_name'    => 'imprint',
+				'post_content' => '<!-- wp:paragraph --><p>[Organization name], [postal address]</p><!-- /wp:paragraph -->',
+			)
+		);
+		$other    = self::factory()->post->create(
+			array(
+				'post_type'    => 'page',
+				'post_name'    => 'about',
+				'post_content' => $content,
+			)
+		);
+		$items    = array_column( wp_get_ability( 'leitvia/audit-site' )->execute( array( 'after' => $kind - 1 ) )['items'], null, 'post' );
+		$messages = static fn( int $id ): array => array_column( wp_list_filter( $items[ $id ]['findings'], array( 'check' => 'leitvia/legal-placeholder' ) ), 'message' );
+		$this->assertCount( 2, $messages( $kind ) );
+		$this->assertStringContainsString( '[domain, for example www.example.org]', $messages( $kind )[0] );
+		$this->assertStringContainsString( '[date]', $messages( $kind )[1] );
+		$this->assertCount( 2, $messages( $slug ) );
+		$this->assertSame( array(), $messages( $other ) );
+		remove_shortcode( 'leitvia_test_code' );
+	}
+
+	/**
+	 * Every legal page a base recipe writes holds a placeholder the audit reports: the texts of its edits as the
+	 * recipe puts them on the page, one block each.
+	 */
+	public function test_audit_finds_the_placeholders_of_the_recipes(): void {
+		$legal = array_unique( array_values( LeitviaStudio\Gateway\Abilities\Read_Audit::LEGAL_SLUGS ) );
+		$pages = 0;
+		foreach ( LeitviaStudio\Gateway\Recipes::BASE as $name ) {
+			$recipe = LeitviaStudio\Gateway\Recipes::load( dirname( __DIR__, 2 ) . '/recipes/' . $name . '/recipe.json' );
+			foreach ( (array) $recipe['pages'] as $page ) {
+				if ( ! in_array( $page['kind'] ?? '', $legal, true ) ) {
+					continue;
+				}
+				$texts   = array_column( array_merge( ...array_map( static fn( $section ): array => (array) ( $section['edits'] ?? array() ), (array) $page['sections'] ) ), 'text' );
+				$content = implode( "\n\n", array_map( static fn( string $text ): string => '<!-- wp:paragraph --><p>' . esc_html( $text ) . '</p><!-- /wp:paragraph -->', $texts ) );
+				$id      = self::factory()->post->create(
+					array(
+						'post_type'    => 'page',
+						'post_name'    => $name . '-' . $page['slug'],
+						'post_content' => $content,
+						'meta_input'   => array( '_leitvia_page_kind' => $page['kind'] ),
+					)
+				);
+				$item    = array_column( wp_get_ability( 'leitvia/audit-site' )->execute( array( 'after' => $id - 1 ) )['items'], null, 'post' )[ $id ];
+				$this->assertNotEmpty( wp_list_filter( $item['findings'], array( 'check' => 'leitvia/legal-placeholder' ) ), $name . ' ' . $page['slug'] );
+				++$pages;
+			}
+		}
+		$this->assertGreaterThanOrEqual( 6, $pages, 'imprints of company and publication, four legal pages of the shop' );
+	}
 }

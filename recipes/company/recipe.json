@@ -56,7 +56,7 @@
 					"pattern": "leitvia/content-two-columns",
 					"edits": [
 						{ "block": "p:0.0", "text": "Who is responsible for this site" },
-						{ "block": "p:0.2.0.0", "text": "Company name, legal form, street, postcode and city." },
+						{ "block": "p:0.2.0.0", "text": "Placeholder: company name, legal form, street, postcode and city." },
 						{ "block": "p:0.2.0.1", "text": "Register court and register number, VAT ID where it applies." },
 						{ "block": "p:0.2.1.0", "text": "Managing directors or other people authorised to represent the company." },
 						{ "block": "p:0.2.1.1", "text": "How to reach us follows below." }
@@ -67,6 +67,7 @@
 		}
 	],
 	"navigation": [ "services", "about", "contact" ],
+	"footerNavigation": [ "services", "about", "contact", "imprint" ],
 	"reading": {
 		"show_on_front": "page",
 		"page_on_front": "home"

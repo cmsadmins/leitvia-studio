@@ -41,6 +41,9 @@ class WC_Product {
 	public function get_tax_class( string $context = 'view' ): string {}
 	public function get_shipping_class_id( string $context = 'view' ): int {}
 	public function get_featured( string $context = 'view' ): bool {}
+	public function get_sku( string $context = 'view' ): string {}
+	public function get_manage_stock( string $context = 'view' ): bool {}
+	public function get_stock_quantity( string $context = 'view' ): int|float|null {}
 	/** @return array<int|string> */
 	public function get_category_ids( string $context = 'view' ): array {}
 	/** @return array<int|string> */
@@ -66,6 +69,8 @@ class WC_Product {
 	public function is_in_stock(): bool {}
 	public function add_to_cart_url(): string {}
 }
+
+class WC_Product_Simple extends WC_Product {}
 
 class WC_Product_Attribute {
 	public function get_name(): string {}
@@ -100,6 +105,8 @@ function wc_get_product_terms( int $product_id, string $taxonomy, array $args = 
 function wc_get_product( $the_product = false ) {}
 
 function wc_tax_enabled(): bool {}
+
+function wc_get_product_id_by_sku( string $sku ): int {}
 
 function wc_review_ratings_enabled(): bool {}
 

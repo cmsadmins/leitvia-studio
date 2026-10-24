@@ -1,0 +1,31 @@
+<!-- wp:template-part {"slug":"header","tagName":"header"} /-->
+
+<!-- wp:group {"tagName":"main","style":{"spacing":{"padding":{"top":"var:preset|spacing|xl","bottom":"var:preset|spacing|xl"}}},"layout":{"type":"constrained","justifyContent":"left"},"anchor":"main"} -->
+<main id="main" class="wp-block-group" style="padding-top:var(--wp--preset--spacing--xl);padding-bottom:var(--wp--preset--spacing--xl)"><!-- wp:breadcrumbs /-->
+
+<!-- wp:group {"tagName":"article","metadata":{"name":"Entry"},"align":"wide","layout":{"type":"constrained","justifyContent":"left"}} -->
+<article class="wp-block-group alignwide"><!-- wp:post-title {"level":1,"fontSize":"heading-l"} /-->
+
+<!-- wp:post-excerpt {"textColor":"ink-muted","fontSize":"lead"} /-->
+
+<!-- wp:post-featured-image {"aspectRatio":"16/9","align":"wide"} /-->
+
+<!-- wp:post-content {"align":"wide","layout":{"type":"constrained","justifyContent":"left"}} /--></article>
+<!-- /wp:group -->
+
+<!-- wp:query {"query":{"perPage":3,"pages":0,"offset":0,"postType":"{{key}}","order":"desc","orderBy":"date","author":"","search":"","exclude":[],"sticky":"","inherit":false},"namespace":"leitvia/more-entries","tagName":"section","align":"wide","style":{"spacing":{"margin":{"top":"var:preset|spacing|xl"}}},"layout":{"type":"constrained","justifyContent":"left"}} -->
+<section class="wp-block-query alignwide" style="margin-top:var(--wp--preset--spacing--xl)"><!-- wp:heading {"fontSize":"heading-m"} -->
+<h2 class="wp-block-heading has-heading-m-font-size">{{more}}</h2>
+<!-- /wp:heading -->
+
+<!-- wp:post-template {"style":{"spacing":{"blockGap":"var:preset|spacing|m"}}} -->
+<!-- wp:group {"style":{"border":{"top":{"color":"var:preset|color|stroke","width":"0.0625rem"}},"spacing":{"padding":{"top":"var:preset|spacing|m"},"blockGap":"var:preset|spacing|xs"}},"layout":{"type":"constrained","justifyContent":"left"}} -->
+<div class="wp-block-group" style="border-top-color:var(--wp--preset--color--stroke);border-top-width:0.0625rem;padding-top:var(--wp--preset--spacing--m)"><!-- wp:post-title {"level":3,"isLink":true,"fontSize":"heading-s"} /-->
+
+<!-- wp:post-excerpt {"excerptLength":25,"textColor":"ink-muted"} /--></div>
+<!-- /wp:group -->
+<!-- /wp:post-template --></section>
+<!-- /wp:query --></main>
+<!-- /wp:group -->
+
+<!-- wp:template-part {"slug":"footer","tagName":"footer"} /-->

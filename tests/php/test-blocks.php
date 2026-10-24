@@ -117,6 +117,20 @@ class Test_Blocks extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The pattern Annotated image renders one h2, an image with alt text and three named points that each open a note.
+	 */
+	public function test_annotated_image_pattern_renders_named_points(): void {
+		$pattern = WP_Block_Patterns_Registry::get_instance()->get_registered( 'leitvia-studio/content-spotlight' );
+		$this->assertIsArray( $pattern );
+		$html = do_blocks( $pattern['content'] );
+		$this->assertSame( 1, substr_count( $html, '<h2' ) );
+		$this->assertMatchesRegularExpression( '/<img [^>]*alt="[^"]+"/', $html );
+		$this->assertSame( 3, preg_match_all( '#<details [^>]*class="wp-block-leitvia-spotlight-hotspot"#', $html ) );
+		$this->assertSame( 3, preg_match_all( '#<span class="wp-block-leitvia-spotlight-hotspot__label">[^<]+</span>#', $html ) );
+		$this->assertStringContainsString( 'data-wp-interactive="leitvia/spotlight"', $html );
+	}
+
+	/**
 	 * A page without a Studio block queues no Studio script, style or module; the timeline queues its style.
 	 */
 	public function test_assets_load_only_with_the_block(): void {

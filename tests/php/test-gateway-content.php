@@ -552,7 +552,7 @@ class Test_Gateway_Content extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The ability list-media: images with file name, alt text, size and the hash for set-alt-text; MIME filter.
+	 * The ability list-media: images with file name, MIME type, file size, alt text, size and the hash for set-alt-text; MIME filter.
 	 */
 	public function test_list_media(): void {
 		$image = $this->image();
@@ -561,6 +561,8 @@ class Test_Gateway_Content extends WP_UnitTestCase {
 		$item = $list['items'][0];
 		$this->assertSame( array( 'Trail sign in the forest', wp_basename( (string) get_attached_file( $image ) ), Hashes::document( $image ) ), array( $item['alt'], $item['filename'], $item['hash'] ) );
 		$this->assertGreaterThan( 0, $item['width'] );
+		// Format and size for the link text of a file to download.
+		$this->assertSame( array( 'image/png', wp_filesize( (string) get_attached_file( $image ) ) ), array( $item['mime'], $item['filesize'] ) );
 		$this->assertSame( array(), self::call( 'leitvia/list-media', array( 'mime' => 'video' ) )['items'] );
 	}
 

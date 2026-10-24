@@ -5,6 +5,7 @@
  * @package LeitviaStudio
  */
 
+use LeitviaStudio\Gateway\Abilities\Read_Audit;
 use LeitviaStudio\Gateway\Gateway;
 use LeitviaStudio\Gateway\Hashes;
 use LeitviaStudio\Gateway\Packages;
@@ -13,7 +14,7 @@ use LeitviaStudio\Gateway\Scope;
 use LeitviaStudio\Gateway\Store;
 
 /**
- * Abilities list-products, get-product, update-product, update-product-category and set-merchandising: reads without
+ * Abilities list-products, get-product, create-product, update-product, update-product-category and set-merchandising: reads without
  * sales or customer figures, writes through the pipeline in the area products, prices, taxes and shipping at most
  * "suggest", orders, refunds, coupons and customers out of scope, rollback for products. The group woocommerce runs
  * with WooCommerce loaded (npm run test:php:commerce).
@@ -21,9 +22,19 @@ use LeitviaStudio\Gateway\Store;
 class Test_Gateway_Commerce extends WP_UnitTestCase {
 
 	/**
-	 * Names of the five abilities.
+	 * Block markup without the leitviaId the pipeline adds to every block.
+	 *
+	 * @param string $markup Block markup.
 	 */
-	private const ABILITIES = array( 'leitvia/list-products', 'leitvia/get-product', 'leitvia/update-product', 'leitvia/update-product-category', 'leitvia/set-merchandising' );
+	private static function without_ids( string $markup ): string {
+		return (string) preg_replace( '/ \{"metadata":\{"leitviaId":"[a-z0-9]+"\}\}/', '', $markup );
+	}
+
+
+	/**
+	 * Names of the six abilities.
+	 */
+	private const ABILITIES = array( 'leitvia/list-products', 'leitvia/get-product', 'leitvia/create-product', 'leitvia/update-product', 'leitvia/update-product-category', 'leitvia/set-merchandising' );
 
 	/**
 	 * Agent user.
@@ -146,7 +157,7 @@ class Test_Gateway_Commerce extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Without WooCommerce the five abilities, the products area and product types do not exist.
+	 * Without WooCommerce the six abilities, the products area and product types do not exist.
 	 */
 	public function test_without_woocommerce_not_registered(): void {
 		$this->assertFalse( class_exists( 'WooCommerce' ) );
@@ -209,6 +220,7 @@ class Test_Gateway_Commerce extends WP_UnitTestCase {
 		$this->assertSame( Hashes::document( $id ), $list['products'][0]['hash'] );
 		$this->assertContains( $category, wp_list_pluck( $list['categories'], 'id' ) );
 		$this->assertStringNotContainsString( 'sales"', (string) wp_json_encode( $list ) );
+		$this->assertSame( $list['total'], $this->assert_ok( wp_get_ability( 'leitvia/list-products' )->execute() )['total'], 'no input reads with the defaults, as GET without query arguments' );
 	}
 
 	/**
@@ -517,5 +529,232 @@ class Test_Gateway_Commerce extends WP_UnitTestCase {
 				)
 			)
 		);
+	}
+
+	/**
+	 * Create-product in the profile standard: a product without a price is written as a draft with SKU, stock, image and
+	 * categories by ID, slug and a new name; a product with a price waits in a package as a suggestion until a person
+	 * applies it.
+	 *
+	 * @group woocommerce
+	 */
+	public function test_create_product_draft_and_package(): void {
+		$kitchen = self::factory()->term->create(
+			array(
+				'taxonomy' => 'product_cat',
+				'name'     => 'Kitchen',
+			)
+		);
+		$desk    = self::factory()->term->create(
+			array(
+				'taxonomy' => 'product_cat',
+				'name'     => 'Desk',
+				'slug'     => 'desk',
+			)
+		);
+		$image   = $this->image( 'Notebook bound in brown leather' );
+		$input   = array(
+			'title'             => 'Leather notebook A5',
+			'slug'              => 'leather-notebook-a5',
+			'description'       => 'Hand bound with 192 pages of cream paper.',
+			'short_description' => '<!-- wp:paragraph --><p>Bound in our workshop.</p><!-- /wp:paragraph -->',
+			'status'            => 'publish',
+			'sku'               => 'CT-NB-A5',
+			'stock'             => 5,
+			'categories'        => array( $kitchen, 'desk', 'Notebooks' ),
+			'image'             => $image,
+			'base_hash'         => '',
+		);
+
+		$result = $this->assert_ok( wp_get_ability( 'leitvia/create-product' )->execute( $input ) );
+		$this->assertSame( 'draft', $result['mode'] );
+		$this->assertSame( 'draft', $result['level'] );
+		$this->assertSame( array(), $result['kinds'] );
+		$product = wc_get_product( $result['target']['post'] );
+		$this->assertInstanceOf( WC_Product_Simple::class, $product );
+		$this->assertSame( 'draft', $product->get_status(), 'the level caps the status' );
+		$this->assertSame( 'Leather notebook A5', $product->get_name() );
+		$this->assertSame( 'leather-notebook-a5', $product->get_slug() );
+		$this->assertSame( "<!-- wp:paragraph -->\n<p>Hand bound with 192 pages of cream paper.</p>\n<!-- /wp:paragraph -->", self::without_ids( $product->get_description() ), 'plain text becomes a paragraph block' );
+		$this->assertStringContainsString( 'Bound in our workshop.', $product->get_short_description() );
+		$this->assertSame( 'CT-NB-A5', $product->get_sku() );
+		$this->assertTrue( $product->get_manage_stock() );
+		$this->assertSame( 5, $product->get_stock_quantity() );
+		$this->assertSame( $image, (int) $product->get_image_id() );
+		$created = get_term_by( 'name', 'Notebooks', 'product_cat' );
+		$this->assertInstanceOf( WP_Term::class, $created, 'a new name creates the category' );
+		$ids = array_map( 'intval', $product->get_category_ids() );
+		sort( $ids );
+		$expected = array( $kitchen, $desk, $created->term_id );
+		sort( $expected );
+		$this->assertSame( $expected, $ids );
+		$this->assertSame( Hashes::document( $product->get_id() ), $result['hash'] );
+
+		$priced = $this->assert_ok(
+			wp_get_ability( 'leitvia/create-product' )->execute(
+				array(
+					'title'         => 'Belt in oxblood',
+					'regular_price' => '68.00',
+					'sale_price'    => '59.00',
+					'categories'    => array( 'Belts' ),
+					'base_hash'     => '',
+				)
+			)
+		);
+		$this->assertContains( 'prices', $priced['kinds'] );
+		$this->assertSame( 'suggest', $priced['level'] );
+		$this->assertSame( 'package', $priced['mode'] );
+		$this->assertSame(
+			array(),
+			get_posts(
+				array(
+					'post_type'   => 'product',
+					'title'       => 'Belt in oxblood',
+					'post_status' => 'any',
+					'fields'      => 'ids',
+				)
+			),
+			'nothing written before a person applies'
+		);
+		$this->assertFalse( get_term_by( 'name', 'Belts', 'product_cat' ), 'the new category waits with the product' );
+
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+		$applied = $this->assert_ok( Packages::apply( $priced['package'] ) );
+		$this->assertSame( 'applied', $applied['state'] );
+		$belt = wc_get_product( (int) Packages::operations( $priced['package'] )[0]['applied']['post'] );
+		$this->assertInstanceOf( WC_Product::class, $belt );
+		$this->assertSame( 'Belt in oxblood', $belt->get_name() );
+		$this->assertSame( '68.00', $belt->get_regular_price() );
+		$this->assertSame( '59.00', $belt->get_price() );
+		$this->assertSame( array( get_term_by( 'name', 'Belts', 'product_cat' )->term_id ), array_map( 'intval', $belt->get_category_ids() ) );
+	}
+
+	/**
+	 * Create-product rejects a sale price without a higher regular price, a SKU another product has, an unknown category
+	 * ID, an image without alt text and unsafe texts, and writes nothing.
+	 *
+	 * @group woocommerce
+	 */
+	public function test_create_product_rejections(): void {
+		self::product( array( 'sku' => 'CT-TAKEN' ) );
+		$before = array_sum( array_map( 'intval', (array) wp_count_posts( 'product' ) ) );
+		$cases  = array(
+			'sale_price' => array( 'sale_price' => '20.00' ),
+			'sku'        => array( 'sku' => 'CT-TAKEN' ),
+			'categories' => array( 'categories' => array( 999999 ) ),
+		);
+		foreach ( $cases as $reason => $change ) {
+			$data = $this->assert_rejected(
+				'leitvia_invalid_input',
+				wp_get_ability( 'leitvia/create-product' )->execute(
+					$change + array(
+						'title'     => 'Pen case',
+						'base_hash' => '',
+					)
+				)
+			);
+			$this->assertSame( $reason, $data['reason'] );
+		}
+		$data = $this->assert_rejected(
+			'leitvia_invalid_input',
+			wp_get_ability( 'leitvia/create-product' )->execute(
+				array(
+					'title'         => 'Pen case',
+					'regular_price' => '20.00',
+					'sale_price'    => '20.00',
+					'base_hash'     => '',
+				)
+			)
+		);
+		$this->assertSame( 'sale_price', $data['reason'] );
+		$this->assert_rejected(
+			'leitvia_check_failed',
+			wp_get_ability( 'leitvia/create-product' )->execute(
+				array(
+					'title'     => 'Pen case',
+					'image'     => $this->image( '' ),
+					'base_hash' => '',
+				)
+			)
+		);
+		$this->assert_rejected(
+			'leitvia_unsafe_content',
+			wp_get_ability( 'leitvia/create-product' )->execute(
+				array(
+					'title'       => 'Pen case',
+					'description' => '<p>Leather</p><script>alert(1)</script>',
+					'base_hash'   => '',
+				)
+			)
+		);
+		wp_cache_flush();
+		$this->assertSame( $before, array_sum( array_map( 'intval', (array) wp_count_posts( 'product' ) ) ) );
+	}
+
+	/**
+	 * In the profile full a product without a price goes live with a package for the rollback, which deletes it.
+	 *
+	 * @group woocommerce
+	 */
+	public function test_create_product_live_and_rollback(): void {
+		self::settings( array( 'profile' => 'full' ) );
+		$result = $this->assert_ok(
+			wp_get_ability( 'leitvia/create-product' )->execute(
+				array(
+					'title'     => 'Repair voucher',
+					'status'    => 'publish',
+					'base_hash' => '',
+				)
+			)
+		);
+		$this->assertSame( 'live', $result['mode'] );
+		$id = (int) $result['target']['post'];
+		$this->assertSame( 'publish', get_post_status( $id ) );
+		$this->assertGreaterThan( 0, $result['package'] );
+
+		$this->assert_ok( wp_get_ability( 'leitvia/rollback' )->execute( array( 'id' => $result['package'] ) ) );
+		$this->assertNull( get_post( $id ) );
+	}
+
+	/**
+	 * A long description in plain text becomes escaped paragraph blocks, one per part between blank lines, in
+	 * create-product and update-product, so leitvia/audit-site finds no classic content. Block markup and HTML stay as
+	 * they are; the short description stays text.
+	 *
+	 * @group woocommerce
+	 */
+	public function test_plain_text_description_becomes_paragraphs(): void {
+		self::settings( array( 'profile' => 'full' ) );
+		$result  = $this->assert_ok(
+			wp_get_ability( 'leitvia/create-product' )->execute(
+				array(
+					'title'             => 'Card case',
+					'status'            => 'publish',
+					'description'       => "Vegetable-tanned leather & waxed thread.\r\nFits 6 > 5 cards.\n\n  Made in Leipzig.  ",
+					'short_description' => 'Six cards, one piece of leather.',
+					'base_hash'         => '',
+				)
+			)
+		);
+		$id      = (int) $result['target']['post'];
+		$product = wc_get_product( $id );
+		$this->assertSame(
+			"<!-- wp:paragraph -->\n<p>Vegetable-tanned leather &amp; waxed thread.<br>\nFits 6 &gt; 5 cards.</p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p>Made in Leipzig.</p>\n<!-- /wp:paragraph -->",
+			self::without_ids( $product->get_description() )
+		);
+		$this->assertSame( 'Six cards, one piece of leather.', $product->get_short_description() );
+		$audit = wp_list_filter( Read_Audit::audit( $id - 1, 1 )['items'], array( 'post' => $id ) );
+		$this->assertNotEmpty( $audit );
+		$this->assertNotContains( 'leitvia/classic-content', array_column( current( $audit )['findings'], 'check' ) );
+
+		$update = array(
+			'product'     => $id,
+			'description' => 'Now with a pen loop.',
+		);
+		$this->assert_ok( self::call( 'leitvia/update-product', $id, $update ) );
+		$this->assertSame( "<!-- wp:paragraph -->\n<p>Now with a pen loop.</p>\n<!-- /wp:paragraph -->", self::without_ids( wc_get_product( $id )->get_description() ) );
+		$update['description'] = "<!-- wp:paragraph -->\n<p>Kept as <strong>sent</strong>.</p>\n<!-- /wp:paragraph -->";
+		$this->assert_ok( self::call( 'leitvia/update-product', $id, $update ) );
+		$this->assertSame( $update['description'], self::without_ids( wc_get_product( $id )->get_description() ) );
 	}
 }

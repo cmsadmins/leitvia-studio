@@ -171,6 +171,14 @@
 				"pattern": "^[a-z0-9-]+$"
 			}
 		},
+		"footerNavigation": {
+			"type": "array",
+			"description": "Slugs of pages the footer links to, in order, like navigation. They replace the sample links to # of the footer pattern; without the key those links are left out.",
+			"items": {
+				"type": "string",
+				"pattern": "^[a-z0-9-]+$"
+			}
+		},
 		"reading": {
 			"type": "object",
 			"additionalProperties": false,

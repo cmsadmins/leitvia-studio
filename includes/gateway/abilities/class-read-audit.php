@@ -14,8 +14,8 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Ability leitvia/audit-site: the content checks over published content, page by page, plus classic content,
- * deprecated patterns, token drift, internal links without a target and pages that look like legal texts without a
- * page kind.
+ * deprecated patterns, token drift, internal links without a target, pages that look like legal texts without a
+ * page kind and placeholders left on legal pages.
  */
 final class Read_Audit {
 
@@ -64,7 +64,7 @@ final class Read_Audit {
 		Gateway\Abilities::read(
 			'leitvia/audit-site',
 			__( 'Audit site', 'leitvia-studio' ),
-			__( 'Runs the content checks (headings, alt text, link text, block validity, tokens, contrast, one h1 and landmarks) over published content, at most 20 posts per call in ID order. Also reports classic content without blocks, deprecated patterns, preset slugs missing from the active tokens, internal links that lead to no page or to the old address of a renamed post, and pages that look like legal texts without a page kind. Pass next as after for the following page; next is null at the end.', 'leitvia-studio' ),
+			__( 'Runs the content checks (headings, alt text, link text, block validity, tokens, contrast, one h1 and landmarks) over published content, at most 20 posts per call in ID order. Also reports classic content without blocks, deprecated patterns, preset slugs missing from the active tokens, internal links that lead to no page or to the old address of a renamed post, pages that look like legal texts without a page kind, and placeholders left on legal pages: square brackets such as [Organization name] and sentences that say they are a placeholder, as the recipes write them. Pass next as after for the following page; next is null at the end.', 'leitvia-studio' ),
 			array(
 				'type'                 => 'object',
 				'properties'           => array(
@@ -175,6 +175,12 @@ final class Read_Audit {
 			$findings[] = self::finding( 'leitvia/classic-content', __( 'The page holds classic content without blocks.', 'leitvia-studio' ), __( 'Turn it into blocks with leitvia/update-content and content.', 'leitvia-studio' ) );
 		}
 		$legal = self::LEGAL_SLUGS[ $post->post_name ] ?? '';
+		if ( in_array( '' !== $kind ? $kind : $legal, self::LEGAL_SLUGS, true ) ) {
+			foreach ( self::placeholders( $post->post_content ) as $placeholder ) {
+				/* translators: %s: placeholder in square brackets, or a sentence that says it is a placeholder. */
+				$findings[] = self::finding( 'leitvia/legal-placeholder', sprintf( __( 'The legal text still holds the placeholder %s.', 'leitvia-studio' ), $placeholder ), __( 'Replace it with the fact the person supplied, or list it as open for the person.', 'leitvia-studio' ) );
+			}
+		}
 		if ( '' === $kind && '' !== $legal ) {
 			/* translators: %s: page kind. */
 			$findings[] = self::finding( 'leitvia/page-kind', sprintf( __( 'The page looks like a legal text but has no page kind; expected %s.', 'leitvia-studio' ), $legal ), __( 'A person sets the page kind so legal texts stay at "suggest".', 'leitvia-studio' ) );
@@ -209,6 +215,32 @@ final class Read_Audit {
 			}
 		}
 		return $broken;
+	}
+
+	/**
+	 * Placeholders in the text of a legal page, each once: square brackets such as [Organization name] or [date], and
+	 * sentences that say they are a placeholder. Shortcodes that are registered are no placeholders. Each block starts
+	 * a new line, so a sentence ends with its block.
+	 *
+	 * @param string $content Block markup.
+	 * @return list<string>
+	 */
+	private static function placeholders( string $content ): array {
+		$text = html_entity_decode( wp_strip_all_tags( (string) preg_replace( '/<!--.*?-->/s', "\n", $content ) ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+		preg_match_all( '/\[([^\[\]\n]{2,120})\]/u', $text, $matches );
+		$found = array();
+		foreach ( $matches[1] as $inner ) {
+			if ( ! shortcode_exists( strtok( $inner, ' ' ) ) ) {
+				$found[ '[' . $inner . ']' ] = true;
+			}
+		}
+		// Text that says it is a placeholder, as the legal pages of the recipes do ("Placeholder: …", "This page is a
+		// placeholder …"): the sentence once.
+		preg_match_all( '/[^.!?:\n]*\bplaceholder\b[^.!?\n]*/iu', $text, $said );
+		foreach ( $said[0] as $sentence ) {
+			$found[ mb_substr( trim( $sentence ), 0, 120 ) ] = true;
+		}
+		return array_keys( $found );
 	}
 
 	/**
