@@ -1,0 +1,67 @@
+// Recipes screen. Logical properties only, so the RTL build mirrors it.
+// The tables have four short columns whose texts wrap, so they fit
+// 320 px without scrolling.
+
+.leitvia-studio-recipes {
+	max-width: 1200px;
+
+	table.widefat {
+		margin-block: 8px 16px;
+	}
+
+	caption {
+		padding-block: 8px;
+		font-weight: 600;
+		text-align: start;
+	}
+
+	:is(th, td) {
+		overflow-wrap: break-word;
+	}
+
+	code {
+		overflow-wrap: anywhere;
+	}
+}
+
+.leitvia-studio-recipes__breadcrumbs ol {
+	display: flex;
+	flex-wrap: wrap;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+
+	li {
+		margin: 0;
+	}
+
+	li + li::before {
+		content: "/";
+		margin-inline: 8px;
+		color: #50575e;
+	}
+
+	a {
+		display: inline-block;
+		min-height: 24px;
+		line-height: 24px;
+	}
+}
+
+.leitvia-studio-recipes__facts {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+	gap: 8px 24px;
+
+	dt {
+		font-weight: 600;
+	}
+
+	dd {
+		margin: 0;
+	}
+}
+
+.leitvia-studio-recipes__reason {
+	color: #50575e;
+}

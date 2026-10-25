@@ -83,6 +83,17 @@ if ( controls ) {
 		actions[ event.target.closest( 'button' )?.dataset.action ]?.()
 	);
 
+	// On a narrow screen the controls open from a disclosure button (CSS hides the button on wider screens).
+	const toggle = controls.previousElementSibling;
+	if ( toggle?.matches( '.wp-block-leitvia-a11y-bar__toggle' ) ) {
+		toggle.addEventListener( 'click', () => {
+			const open = 'true' !== toggle.getAttribute( 'aria-expanded' );
+			toggle.setAttribute( 'aria-expanded', String( open ) );
+			controls.parentElement.classList.toggle( 'is-open', open );
+		} );
+		toggle.hidden = false;
+	}
+
 	apply();
 	// Only now, so the restored size is not announced on load.
 	value.setAttribute( 'role', 'status' );

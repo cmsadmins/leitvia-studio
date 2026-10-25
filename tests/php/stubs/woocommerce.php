@@ -10,6 +10,7 @@
 
 class WooCommerce {
 	public WC_Countries $countries;
+	public ?WC_Session $session;
 }
 
 class WC_Countries {
@@ -54,6 +55,8 @@ class WC_Product {
 	public function get_cross_sell_ids( string $context = 'view' ): array {}
 	/** @return array<int> */
 	public function get_children(): array {}
+	/** @return array<string, array<int, string>> */
+	public function get_variation_attributes(): array {}
 	public function get_type(): string {}
 	/** @return array<string, WC_Product_Attribute|string> */
 	public function get_attributes(): array {}
@@ -68,6 +71,7 @@ class WC_Product {
 	public function is_purchasable(): bool {}
 	public function is_in_stock(): bool {}
 	public function add_to_cart_url(): string {}
+	public function single_add_to_cart_text(): string {}
 }
 
 class WC_Product_Simple extends WC_Product {}

@@ -10,8 +10,8 @@ namespace LeitviaStudio\Gateway;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Registers the own MCP server leitvia with a fixed list of the Leitvia abilities when the MCP Adapter is active in a
- * supported version. Leitvia abilities never set meta.public, so the default server of the adapter lists none of them.
+ * Registers the own MCP server leitvia with the abilities of Studio and its compatible add-ons when the MCP Adapter is
+ * active in a supported version. Leitvia abilities never set meta.public, so the default server of the adapter lists none of them.
  * Without the adapter nothing happens and the abilities stay available over REST.
  */
 final class Mcp {
@@ -66,14 +66,15 @@ final class Mcp {
 	}
 
 	/**
-	 * Names of all registered Leitvia abilities that are shown in REST: the tools of the server.
+	 * Names of all abilities of the Studio registry that are shown in REST, those of Studio and of compatible add-ons:
+	 * the tools of the server.
 	 *
 	 * @return list<string>
 	 */
 	public static function abilities(): array {
 		$names = array();
 		foreach ( wp_get_abilities() as $ability ) {
-			if ( str_starts_with( $ability->get_name(), 'leitvia/' ) && true === $ability->get_meta_item( 'show_in_rest' ) ) {
+			if ( null !== leitvia_studio()->registry( 'abilities' )->get( $ability->get_name() ) && true === $ability->get_meta_item( 'show_in_rest' ) ) {
 				$names[] = $ability->get_name();
 			}
 		}

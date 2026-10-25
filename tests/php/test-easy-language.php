@@ -146,7 +146,7 @@ class Test_Easy_Language extends WP_UnitTestCase {
 	public function test_bar_adds_hidden_controls_and_script(): void {
 		$html = do_blocks( '<!-- wp:leitvia/a11y-bar --><nav class="wp-block-leitvia-a11y-bar" aria-label="Accessibility"><a class="wp-block-leitvia-a11y-bar__statement" href="/accessibility/">Accessibility statement</a></nav><!-- /wp:leitvia/a11y-bar -->' );
 		$this->assertMatchesRegularExpression( '#^<script>\s*try\{var s=JSON.parse\(localStorage.getItem\("leitvia-a11y"\)\).*?</script>\s*<nav #s', $html );
-		$this->assertStringContainsString( '<a class="wp-block-leitvia-a11y-bar__statement" href="/accessibility/">Accessibility statement</a><div class="wp-block-leitvia-a11y-bar__controls" hidden>', $html );
+		$this->assertStringContainsString( '<a class="wp-block-leitvia-a11y-bar__statement" href="/accessibility/">Accessibility statement</a><button type="button" class="wp-block-leitvia-a11y-bar__toggle" aria-expanded="false" aria-controls="leitvia-a11y-controls" hidden>Display settings</button><div class="wp-block-leitvia-a11y-bar__controls" id="leitvia-a11y-controls" hidden>', $html );
 		$this->assertStringContainsString( '<button type="button" data-action="contrast" aria-pressed="false">High contrast</button>', $html );
 		$this->assertMatchesRegularExpression( '#<button type="button" data-action="read" hidden data-stop="Stop reading">Read aloud</button></div></nav>$#', $html );
 		preg_match( '#<script[^>]*>(.*?)</script>#s', $html, $m );

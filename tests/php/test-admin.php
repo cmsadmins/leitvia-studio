@@ -63,6 +63,7 @@ class Test_Admin extends WP_UnitTestCase {
 		$this->assertSame( Admin::menu_icon(), $menu[61][6] );
 		$this->assertSame( array( 'Lab', 'edit_theme_options', 'leitvia-studio' ), array_slice( $submenu['leitvia-studio'][0], 0, 3 ) );
 		$this->assertSame( array( 'Tokens', 'edit_theme_options', 'leitvia-studio-tokens' ), array_slice( $submenu['leitvia-studio'][1], 0, 3 ) );
+		$this->assertSame( array( 'Recipes', 'edit_theme_options', 'leitvia-studio-recipes' ), array_slice( $submenu['leitvia-studio'][3], 0, 3 ) );
 	}
 
 	/**

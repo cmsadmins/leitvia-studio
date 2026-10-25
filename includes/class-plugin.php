@@ -123,6 +123,7 @@ final class Plugin {
 		add_filter( 'map_meta_cap', array( Model\Registrar::class, 'map_row_caps' ), 10, 4 );
 		add_action( 'switch_blog', array( Model\Model::class, 'forget' ) );
 		add_action( 'rest_api_init', static fn() => ( new Rest\Model_Controller() )->register_routes() );
+		add_action( 'rest_api_init', static fn() => ( new Rest\Recipes_Controller() )->register_routes() );
 		add_action( 'admin_enqueue_scripts', array( self::class, 'enqueue_model_editor' ), 21 );
 		add_action( 'init', array( Model\Bindings::class, 'register' ) );
 		add_action( 'save_post', array( Lab\Usage_Index::class, 'index' ), 10, 2 );

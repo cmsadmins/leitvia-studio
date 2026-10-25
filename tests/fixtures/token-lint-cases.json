@@ -307,6 +307,11 @@
 			"expected": []
 		},
 		{
+			"name": "pattern shop-legal-guarantee.php",
+			"content": "<?php\n/**\n * Title: Legal guarantee notice\n * Slug: leitvia/shop-legal-guarantee\n * Categories: leitvia-shop\n * Description: The EU notice on the legal guarantee from Germanized, as a disclosure with a text summary, the official label and a link to europa.eu. Shows only while the notice is switched on in Germanized and the product is not virtual. Available only while Germanized is active. Use in the single product template below the add to cart form.\n * Keywords: shop, legal, guarantee, warranty, eu, notice, germanized, woocommerce\n * Viewport Width: 600\n *\n * @package Leitvia\n */\n\n?>\n<!-- wp:woocommerce-germanized/product-legal-guarantee /-->\n",
+			"expected": []
+		},
+		{
 			"name": "pattern shop-legal-info.php",
 			"content": "<?php\n/**\n * Title: Legal price information\n * Slug: leitvia/shop-legal-info\n * Categories: leitvia-shop\n * Description: The price information German law asks for next to a product price: tax note (incl. VAT), shipping note with a link to the shipping costs, unit price and delivery time, from the blocks of Germanized. Available only while Germanized is active. Use below the price in a product template or a product grid.\n * Keywords: shop, legal, vat, tax, shipping costs, unit price, delivery time, germanized, woocommerce\n * Viewport Width: 600\n *\n * @package Leitvia\n */\n\n?>\n<!-- wp:group {\"metadata\":{\"name\":\"Legal price information\"},\"style\":{\"spacing\":{\"blockGap\":\"var:preset|spacing|xxs\"}},\"textColor\":\"ink-muted\",\"fontSize\":\"meta\",\"layout\":{\"type\":\"flex\",\"orientation\":\"vertical\"}} -->\n<div class=\"wp-block-group has-ink-muted-color has-text-color has-meta-font-size\">\n\t<!-- wp:woocommerce-germanized/product-tax-info /-->\n\t<!-- wp:woocommerce-germanized/product-shipping-costs-info /-->\n\t<!-- wp:woocommerce-germanized/product-unit-price /-->\n\t<!-- wp:woocommerce-germanized/product-delivery-time /-->\n</div>\n<!-- /wp:group -->\n",
 			"expected": []

@@ -64,6 +64,7 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 	 */
 	public function tear_down(): void {
 		self::unregister();
+		remove_all_filters( 'leitvia_studio_seo_adapter' );
 		_set_cron_array( array() );
 		WP_Theme_JSON_Resolver::clean_cached_data();
 		wp_clean_theme_json_cache();
@@ -428,6 +429,13 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 				'title'     => 'Security post',
 				'content'   => '<!-- wp:paragraph --><p>News</p><!-- /wp:paragraph -->',
 			),
+			'leitvia/update-seo'           => function (): array {
+				add_filter( 'leitvia_studio_seo_adapter', static fn(): string => 'yoast' );
+				return array(
+					'post'  => $this->page(),
+					'title' => 'About our team',
+				);
+			},
 			'leitvia/update-content'       => fn(): array => array(
 				'post'  => $this->page(),
 				'title' => 'New title',
@@ -593,6 +601,7 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 				'block' => 'aaaa1111',
 			),
 			'leitvia/get-pattern'       => array( 'slug' => 'leitvia/content-quote' ),
+			'leitvia/get-seo'           => array( 'posts' => array( $page ) ),
 			'leitvia/get-package'       => array( 'id' => $package ),
 			'leitvia/check-composition' => array( 'slugs' => array( 'leitvia/hero-cover-image', 'leitvia/content-quote' ) ),
 			'leitvia/plan-page'         => array(

@@ -11,6 +11,7 @@ use LeitviaStudio\Gateway\Abilities\Commerce;
 use LeitviaStudio\Gateway\Abilities\Content;
 use LeitviaStudio\Model\Model;
 use LeitviaStudio\Tokens\Compiler;
+use LeitviaStudio\Tokens\Token_Sets;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -35,9 +36,12 @@ final class Pipeline {
 
 	/**
 	 * Meta keys per post type that belong to the state of an existing post, under meta_input: hashed, snapshotted,
-	 * written and rolled back like the post fields.
+	 * written and rolled back like the post fields. The DTCG document is the content of a token set.
 	 */
-	public const META = array( 'attachment' => array( '_wp_attachment_image_alt' ) );
+	public const META = array(
+		'attachment'     => array( '_wp_attachment_image_alt' ),
+		'leitvia_tokens' => array( Token_Sets::META ),
+	);
 
 	/**
 	 * Term fields of the state of a term; TERM_META adds meta keys per taxonomy (the image of a product category).

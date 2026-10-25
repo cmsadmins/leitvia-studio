@@ -599,7 +599,7 @@ final class Recipes {
 	 * @param string $path Relative path.
 	 * @return array<mixed>
 	 */
-	private static function file( string $dir, string $path ): array {
+	public static function file( string $dir, string $path ): array {
 		$file = realpath( $dir . '/' . $path );
 		$root = realpath( $dir );
 		if ( ! $file || ! $root || ! str_starts_with( $file, trailingslashit( $root ) ) ) {

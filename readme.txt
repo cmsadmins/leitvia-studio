@@ -4,7 +4,7 @@ Tags: ai, mcp, block theme, accessibility, design tokens
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.2.1
+Stable tag: 1.3.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -200,6 +200,20 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * Terms for the paid Leitvia Pro plans and the account on leitvia.com (they do not apply to this free software): https://leitvia.com/terms/
 
 == Changelog ==
+
+= 1.3.1 =
+* MCP server lists the abilities of compatible add-ons: every ability in the registry of Studio is a tool of the MCP server leitvia, not only the abilities of Studio itself.
+
+= 1.3.0 =
+* New screen Recipes: every registered recipe with source, status and the plan read from its file. Apply runs the ability apply-recipe, so autonomy, change package, rate limit and audit work as for an agent. New REST route GET /leitvia-studio/v1/recipes.
+* New abilities get-seo and update-seo: read title, description, canonical, robots, Open Graph fields, focus keyword and schema type from Yoast SEO, Rank Math, SEOPress or The SEO Framework, and write title, description, noindex and nofollow through the pipeline with length checks, change package and rollback. Without one of these plugins both answer leitvia_no_seo_plugin.
+* New ability export: pages, menus, token sets, template parts and the content model as a portable JSON package, page by page with every call under 1 MB.
+* The SEO fields of an entry belong to its state, so the hashes of entries change once while an SEO plugin is active.
+* The DTCG document of a token set belongs to its state: hashes, snapshots, change packages and rollback cover it, so a change package can update an existing set.
+
+= 1.2.2 =
+* Accessibility bar: a pressed High contrast button keeps a readable label, so high contrast can be switched off again. Before, label and background took the same color.
+* Accessibility bar: on a narrow screen text size, high contrast and read aloud open from a Display settings button, so the bar stays one or two lines above the header.
 
 = 1.2.1 =
 * Studio screens name what Leitvia Pro adds in a quiet note with a link to its plans. The note is gone while Pro is active or another brand is set, and can be dismissed per user or switched off for everyone in the settings.

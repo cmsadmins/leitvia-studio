@@ -105,7 +105,8 @@ final class Easy_Language {
 
 	/**
 	 * Adds to the saved accessibility bar what only works with JavaScript: text size, high contrast and read aloud,
-	 * hidden until the view module shows them. An inline script before the bar applies the stored settings before the
+	 * hidden until the view module shows them. On a narrow screen they sit behind a disclosure button, so the bar
+	 * stays one or two lines above the header. An inline script before the bar applies the stored settings before the
 	 * first paint, so a reload does not shift the layout. Runs on render_block_leitvia/a11y-bar.
 	 *
 	 * @param string $html Saved block markup.
@@ -120,7 +121,8 @@ final class Easy_Language {
 			wp_add_inline_style( 'leitvia-a11y-bar-style', $css );
 		}
 		$button   = static fn( string $action, string $text, string $extra = '' ) => sprintf( '<button type="button" data-action="%s"%s>%s</button>', esc_attr( $action ), $extra, $text );
-		$controls = '<div class="wp-block-leitvia-a11y-bar__controls" hidden>'
+		$controls = '<button type="button" class="wp-block-leitvia-a11y-bar__toggle" aria-expanded="false" aria-controls="leitvia-a11y-controls" hidden>' . esc_html__( 'Display settings', 'leitvia-studio' ) . '</button>'
+			. '<div class="wp-block-leitvia-a11y-bar__controls" id="leitvia-a11y-controls" hidden>'
 			. '<div class="wp-block-leitvia-a11y-bar__size" role="group" aria-label="' . esc_attr__( 'Text size', 'leitvia-studio' ) . '">'
 			. $button( 'smaller', 'A&minus;<span class="screen-reader-text"> ' . esc_html__( 'Decrease text size', 'leitvia-studio' ) . '</span>' )
 			. '<span class="wp-block-leitvia-a11y-bar__value" role="status">100&nbsp;%</span>'

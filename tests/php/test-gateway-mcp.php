@@ -121,6 +121,56 @@ class Test_Gateway_Mcp extends WP_UnitTestCase {
 	}
 
 	/**
+	 * An ability a compatible add-on registers through the Studio registry is a tool too.
+	 */
+	public function test_abilities_lists_abilities_of_add_ons(): void {
+		$args = array(
+			'label'               => 'Add-on read',
+			'description'         => 'Reads something for an add-on.',
+			'execute_callback'    => '__return_empty_array',
+			'permission_callback' => array( Abilities::class, 'can_use' ),
+			'output_schema'       => array( 'type' => 'object' ),
+			'meta'                => array(
+				'annotations'  => array(
+					'readonly'    => true,
+					'destructive' => false,
+					'idempotent'  => true,
+				),
+				'show_in_rest' => true,
+			),
+		);
+		$init = static function ( $studio ) use ( $args ): void {
+			$studio->extensions()->register(
+				'demo-addon',
+				array(
+					'label'           => 'Demo add-on',
+					'version'         => '1.0.0',
+					'requires_studio' => '0.1.0',
+					'requires_api'    => 1,
+				)
+			);
+			$studio->registry( 'abilities' )->register(
+				'demo-addon/read-thing',
+				array(
+					'args'  => $args,
+					'group' => 'read',
+				),
+				'demo-addon'
+			);
+		};
+		add_action( 'leitvia_studio_init', $init );
+		self::unregister();
+		leitvia_studio()->reset_for_tests();
+		do_action( 'wp_abilities_api_categories_init' );
+		do_action( 'wp_abilities_api_init' );
+		remove_action( 'leitvia_studio_init', $init );
+
+		$tools = Mcp::abilities();
+		$this->assertContains( 'demo-addon/read-thing', $tools );
+		$this->assertContains( 'leitvia/get-contract', $tools );
+	}
+
+	/**
 	 * Without the adapter the hook never fires: nothing registered, no output, a reason for the Agents page.
 	 */
 	public function test_without_adapter_nothing_happens(): void {

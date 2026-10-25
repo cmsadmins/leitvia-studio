@@ -24,10 +24,11 @@
 		cursor: pointer;
 	}
 
+	// Ink and surface of the contract, never currentcolor: the button sets its own color, so a background of
+	// currentcolor would take the text color and hide the label (and with it the way back out of high contrast).
 	button[aria-pressed="true"] {
-		background: currentcolor;
-
-		// The text takes the background of the bar again.
+		border-color: var(--wp--preset--color--ink, CanvasText);
+		background: var(--wp--preset--color--ink, CanvasText);
 		color: var(--wp--preset--color--surface, Canvas);
 	}
 }
@@ -60,6 +61,47 @@
 	min-inline-size: 3.5em;
 	text-align: center;
 	font-variant-numeric: tabular-nums;
+}
+
+// The disclosure button only shows on a narrow screen; there the controls take their own line once opened.
+.wp-block-leitvia-a11y-bar__toggle {
+	display: none;
+}
+
+@media (max-width: 39.99rem) {
+	.wp-block-leitvia-a11y-bar .wp-block-leitvia-a11y-bar__toggle:not([hidden]),
+	.leitvia-a11y-js .wp-block-leitvia-a11y-bar .wp-block-leitvia-a11y-bar__toggle[hidden] {
+		display: inline-flex;
+		gap: 0.5em;
+		align-items: center;
+	}
+
+	.leitvia-a11y-js .wp-block-leitvia-a11y-bar .wp-block-leitvia-a11y-bar__toggle[hidden] {
+		visibility: hidden;
+	}
+
+	.wp-block-leitvia-a11y-bar__toggle::after {
+		content: "";
+		inline-size: 0.4em;
+		block-size: 0.4em;
+		border: solid currentcolor;
+		border-width: 0 2px 2px 0;
+		transform: translateY(-0.15em) rotate(45deg);
+	}
+
+	.wp-block-leitvia-a11y-bar__toggle[aria-expanded="true"]::after {
+		transform: translateY(0.1em) rotate(-135deg);
+	}
+
+	.wp-block-leitvia-a11y-bar__controls {
+		flex-basis: 100%;
+		margin-inline-start: 0;
+	}
+
+	.wp-block-leitvia-a11y-bar:not(.is-open) .wp-block-leitvia-a11y-bar__controls,
+	.leitvia-a11y-js .wp-block-leitvia-a11y-bar:not(.is-open) .wp-block-leitvia-a11y-bar__controls[hidden] {
+		display: none;
+	}
 }
 
 // Focus ring in the focus role of the contract, as the theme draws it on links and buttons (WCAG 2.4.7, 2.4.13).

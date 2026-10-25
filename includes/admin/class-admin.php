@@ -27,6 +27,9 @@ final class Admin {
 		'leitvia-studio-model'    => array(
 			'capability' => 'manage_options',
 		),
+		'leitvia-studio-recipes'  => array(
+			'capability' => 'edit_theme_options',
+		),
 		'leitvia-studio-inbox'    => array(
 			'capability' => 'edit_theme_options',
 		),
@@ -60,6 +63,7 @@ final class Admin {
 			'leitvia-studio'          => __( 'Lab', 'leitvia-studio' ),
 			'leitvia-studio-tokens'   => __( 'Tokens', 'leitvia-studio' ),
 			'leitvia-studio-model'    => __( 'Content Model', 'leitvia-studio' ),
+			'leitvia-studio-recipes'  => __( 'Recipes', 'leitvia-studio' ),
 			'leitvia-studio-inbox'    => __( 'Inbox', 'leitvia-studio' ),
 			'leitvia-studio-agents'   => __( 'Agents', 'leitvia-studio' ),
 			'leitvia-studio-settings' => __( 'Settings', 'leitvia-studio' ),

@@ -353,7 +353,8 @@ final class Content {
 
 	/**
 	 * Part of the state of a post of a content type: post_date, terms by taxonomy (IDs) and, under meta_input, the
-	 * featured image and the fields of the content model. Empty for other post types.
+	 * featured image, the fields of the content model and the SEO meta update-seo writes (Seo::keys()). Empty for other
+	 * post types.
 	 *
 	 * @param int    $id   Post ID.
 	 * @param string $type Post type.
@@ -373,7 +374,7 @@ final class Content {
 		if ( post_type_supports( $type, 'thumbnail' ) ) {
 			$state['meta_input']['_thumbnail_id'] = (int) get_post_thumbnail_id( $id );
 		}
-		foreach ( array_keys( self::fields( $type ) ) as $key ) {
+		foreach ( array_merge( array_keys( self::fields( $type ) ), Seo::keys() ) as $key ) {
 			$state['meta_input'][ $key ] = get_post_meta( $id, $key, true );
 		}
 		return $state;
