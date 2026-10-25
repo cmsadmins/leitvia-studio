@@ -4,7 +4,7 @@ Tags: ai, mcp, block theme, accessibility, design tokens
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.2.0
+Stable tag: 1.2.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -31,6 +31,8 @@ Pages in easy language (Leichte Sprache), which public bodies offer under BITV 2
 Profile pictures come from your own media library. Users pick one on their profile screen; everyone without a picture, including people who leave comments, gets a neutral placeholder that ships with the plugin. Gravatar stays off unless an administrator switches it on.
 
 For shops built with WooCommerce, Leitvia Studio adds the block "Product comparison", gateway abilities for products and categories, and the site recipe "Shop". All three are available only while WooCommerce is active; WooCommerce is never required (see the questions below).
+
+**Leitvia Pro.** Everything above is free and stays free. The paid add-on Leitvia Pro adds the blocks Slider, Scroll story, Before and after and Entry list, and eight industry kits (SaaS, law firm, trades, medical practice, restaurant, public authority, publisher, association) with their own brand, pages and patterns. Plans and prices: https://leitvia.com/pricing/
 
 == Accessibility ==
 
@@ -198,6 +200,11 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * Terms for the paid Leitvia Pro plans and the account on leitvia.com (they do not apply to this free software): https://leitvia.com/terms/
 
 == Changelog ==
+
+= 1.2.1 =
+* Studio screens name what Leitvia Pro adds in a quiet note with a link to its plans. The note is gone while Pro is active or another brand is set, and can be dismissed per user or switched off for everyone in the settings.
+* get-block returns the block with its inner blocks as markup, so an agent can change a nested block and write it back.
+* Entry pages of a content model type lead through the overview page of the type in the breadcrumbs.
 
 = 1.2.0 =
 * New ability create-product: creates a simple WooCommerce product with texts, prices, SKU, stock, categories and an image. Categories can be named by ID, slug or name; a new name creates the category. A price lands at most as a suggestion unless a person unlocked prices.

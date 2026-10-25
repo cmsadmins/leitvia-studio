@@ -142,7 +142,8 @@ class Test_Gateway_Outline extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Ability get-block returns attributes, markup, hash and children; an unknown ID points to the outline.
+	 * Ability get-block returns attributes, own markup, markup with children, hash and children; an unknown ID points to
+	 * the outline.
 	 */
 	public function test_get_block(): void {
 		$page  = $this->page( '<!-- wp:group {"metadata":{"leitviaId":"grp00001"},"align":"wide"} --><div class="wp-block-group alignwide"><!-- wp:paragraph {"metadata":{"leitviaId":"par00001"}} --><p>Hi</p><!-- /wp:paragraph --></div><!-- /wp:group -->' );
@@ -156,6 +157,7 @@ class Test_Gateway_Outline extends WP_UnitTestCase {
 		$this->assertSame( 'core/group', $block['name'] );
 		$this->assertSame( 'wide', $block['attributes']->align );
 		$this->assertSame( '<div class="wp-block-group alignwide"></div>', $block['inner_html'] );
+		$this->assertSame( get_post_field( 'post_content', $page, 'raw' ), $block['markup'], 'the whole block with its children' );
 		$this->assertSame( Hashes::block( parse_blocks( get_post_field( 'post_content', $page, 'raw' ) )[0] ), $block['hash'] );
 		$this->assertSame( array( 'par00001' ), $block['children'] );
 		$this->assertSame( array(), $block['attachments'] );
@@ -197,6 +199,7 @@ class Test_Gateway_Outline extends WP_UnitTestCase {
 		$this->assertSame( 'core/freeform', $outline['blocks'][0]['name'] );
 		$this->assertSame( 'core/freeform', $block['name'] );
 		$this->assertSame( $content, $block['inner_html'] );
+		$this->assertSame( $content, $block['markup'] );
 		$this->assertSame(
 			array(
 				array(

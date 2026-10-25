@@ -104,6 +104,7 @@ final class Plugin {
 		add_action( 'init', array( Admin\Settings::class, 'remove_emoji_loader' ) );
 		add_action( 'admin_init', array( Admin\Settings::class, 'remove_emoji_loader' ) );
 		add_action( 'rest_api_init', array( Admin\Admin::class, 'register_routes' ) );
+		add_action( 'leitvia_studio_upsell_slot', array( Admin\Admin::class, 'pro_note' ) );
 		Avatars\Avatars::boot();
 		add_action( 'init', array( Model\Registrar::class, 'register' ), 9 );
 		add_action( 'init', array( Model\Registrar::class, 'maybe_flush' ), 999 );
@@ -114,6 +115,7 @@ final class Plugin {
 		add_action( 'init', array( Model\Entry_View::class, 'register' ), 20 );
 		add_filter( 'query_loop_block_query_vars', array( Model\Entry_View::class, 'query_vars' ), 10, 2 );
 		add_filter( 'render_block_core/query', array( Model\Entry_View::class, 'hide_empty_more' ), 10, 2 );
+		add_filter( 'block_core_breadcrumbs_items', array( Model\Entry_View::class, 'breadcrumbs' ) );
 		add_filter( 'render_block_core/group', array( Model\Entry_View::class, 'facts' ), 10, 2 );
 		add_filter( 'render_block_core/group', array( Model\Entry_View::class, 'hide_empty_author' ), 10, 2 );
 		add_action( 'transition_post_status', array( Model\Registrar::class, 'follow_entry' ), 10, 3 );

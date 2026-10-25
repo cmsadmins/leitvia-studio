@@ -59,7 +59,7 @@ final class Read_Structure {
 		Gateway\Abilities::read(
 			'leitvia/get-block',
 			__( 'Get block', 'leitvia-studio' ),
-			__( 'Returns one block of a post by its ID or path ID with all attributes, its own markup, the attachments of the images in that markup, its hash, the IDs of its children and the document hash. Classic content without blocks is one block p:0 named core/freeform.', 'leitvia-studio' ),
+			__( 'Returns one block of a post by its ID or path ID with all attributes, its markup alone and with children, the image attachments, its hash, the IDs of its children and the document hash. Classic content without blocks is one block p:0 named core/freeform.', 'leitvia-studio' ),
 			array(
 				'type'                 => 'object',
 				'properties'           => array(
@@ -82,6 +82,10 @@ final class Read_Structure {
 					'name'          => $string,
 					'attributes'    => array( 'type' => 'object' ),
 					'inner_html'    => $string,
+					'markup'        => array(
+						'type'        => 'string',
+						'description' => __( 'The block with its children as block markup: change it and send it as content of leitvia/update-template-part, or with the other top-level blocks of a post as content of leitvia/update-content.', 'leitvia-studio' ),
+					),
 					'attachments'   => array(
 						'type'        => 'array',
 						'description' => __( 'Images in inner_html that are attachments of this site, in order: attachment ID and the src as written.', 'leitvia-studio' ),

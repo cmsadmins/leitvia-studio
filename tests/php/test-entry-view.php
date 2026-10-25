@@ -126,6 +126,48 @@ class Test_Entry_View extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Breadcrumbs of an entry of a type without archive name the first published page with a query of the type
+	 * between Home and the entry; a type with archive keeps the archive link of core alone.
+	 */
+	public function test_breadcrumbs_link_the_overview_page(): void {
+		$home  = array(
+			'label' => 'Home',
+			'url'   => home_url( '/' ),
+		);
+		$entry = array( 'label' => 'Ada Brandt' );
+		$query = '<!-- wp:query {"query":{"perPage":10,"postType":"person"}} --><div class="wp-block-query"></div><!-- /wp:query -->';
+		self::factory()->post->create(
+			array(
+				'post_type'    => 'page',
+				'post_title'   => 'Draft people',
+				'post_status'  => 'draft',
+				'post_content' => $query,
+			)
+		);
+		$overview = self::factory()->post->create(
+			array(
+				'post_type'    => 'page',
+				'post_title'   => 'Our team',
+				'post_status'  => 'publish',
+				'post_content' => $query,
+			)
+		);
+
+		$this->go_to( get_permalink( $this->entry( 'person', 'Ada Brandt' ) ) );
+		$items = Entry_View::breadcrumbs( array( $home, $entry ) );
+		$this->assertCount( 3, $items );
+		$this->assertSame( 'Our team', $items[1]['label'] );
+		$this->assertSame( get_permalink( $overview ), $items[1]['url'] );
+		$this->assertSame( $entry, $items[2] );
+
+		$this->go_to( get_permalink( $this->entry( 'event', 'Spring walk' ) ) );
+		$this->assertSame( array( $home, $entry ), Entry_View::breadcrumbs( array( $home, $entry ) ), 'archive of core, no page' );
+
+		$this->go_to( get_permalink( $overview ) );
+		$this->assertSame( array( $home, $entry ), Entry_View::breadcrumbs( array( $home, $entry ) ), 'pages stay as they are' );
+	}
+
+	/**
 	 * The pattern Entry facts renders as a description list with the label as dt and the bound value as dd; the
 	 * suffix adds the currency to a value and stays away from an empty one.
 	 */

@@ -174,7 +174,32 @@ final class Admin {
 	}
 
 	/**
-	 * Product notes above the app of a Studio screen. Free adds nothing; the slot stays empty unless an add-on prints
+	 * The note on Leitvia Pro in the product notes: what Pro adds and a link to its plans. Runs on
+	 * leitvia_studio_upsell_slot; prints nothing while Leitvia Pro is active or another brand is set (filter
+	 * leitvia_studio_brand), so client sites of an agency never see it.
+	 */
+	public static function pro_note(): void {
+		if ( defined( 'LEITVIA_PRO_VERSION' ) || __( 'Leitvia Studio', 'leitvia-studio' ) !== leitvia_studio_brand()['name'] ) {
+			return;
+		}
+		echo self::pro_note_markup(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in pro_note_markup().
+	}
+
+	/**
+	 * Markup of the note on Leitvia Pro.
+	 */
+	public static function pro_note_markup(): string {
+		return sprintf(
+			'<p><strong>%1$s</strong> %2$s <a href="%3$s">%4$s</a></p>',
+			esc_html__( 'Leitvia Pro', 'leitvia-studio' ),
+			esc_html__( 'adds the blocks Slider, Scroll story, Before and after and Entry list, and eight industry kits with their own brand, pages and patterns. Everything in Leitvia Studio stays free.', 'leitvia-studio' ),
+			esc_url( 'https://leitvia.com/pricing/' ),
+			esc_html__( 'Plans of Leitvia Pro', 'leitvia-studio' )
+		);
+	}
+
+	/**
+	 * Product notes above the app of a Studio screen: the note on Leitvia Pro (pro_note()) and what add-ons print
 	 * into leitvia_studio_upsell_slot. Nothing is printed outside Studio screens, with the setting hide_product_notes
 	 * or after the user dismissed the notes.
 	 *

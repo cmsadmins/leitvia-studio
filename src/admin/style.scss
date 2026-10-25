@@ -94,6 +94,20 @@ $leitvia-studio-accent-20: color.adjust($leitvia-studio-accent, $lightness: -10%
 	font-size: 12px;
 }
 
+// Product notes: quiet, a hairline frame like a WordPress notice without its colour, sharp corners.
+.leitvia-studio-notes {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0 16px;
+	align-items: center;
+	justify-content: space-between;
+	max-width: 960px;
+	margin: 16px 0;
+	padding: 0 16px;
+	border: 1px solid #c3c4c7;
+	background: #fff;
+}
+
 .leitvia-studio {
 	.dataviews-wrapper {
 		margin-top: 16px;

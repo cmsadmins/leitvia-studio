@@ -40,7 +40,7 @@ domReady( () => {
 		createRoot( root ).render( <App screen={ root.dataset.screen } /> );
 	}
 
-	// Product notes of add-ons (Admin::render_slot()); dismissing hides them for this user on every Studio screen.
+	// Product notes (Admin::render_slot()); dismissing hides them for this user on every Studio screen.
 	const notes = document.querySelector( '.leitvia-studio-notes' );
 	notes
 		?.querySelector( '.leitvia-studio-notes__dismiss' )

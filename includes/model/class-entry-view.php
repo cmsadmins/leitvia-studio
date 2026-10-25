@@ -98,6 +98,52 @@ final class Entry_View {
 	}
 
 	/**
+	 * Puts the overview page of the type between Home and the entry in the breadcrumbs of an entry of the model, when
+	 * the type has no archive. The overview is the first published page with a query of the type (entries.md), not
+	 * the front page. Runs on block_core_breadcrumbs_items.
+	 *
+	 * @param array<int, array<string, mixed>> $items Breadcrumb items.
+	 * @return array<int, array<string, mixed>>
+	 */
+	public static function breadcrumbs( array $items ): array {
+		$type = is_singular() ? (string) get_post_type() : '';
+		if ( '' === $type || ! Registrar::owns_post_type( $type ) || get_post_type_archive_link( $type ) ) {
+			return $items;
+		}
+		// ponytail: LIKE search over page content per entry view; store the overview page in the model if it gets slow.
+		$pages = get_posts(
+			array(
+				'post_type'      => 'page',
+				'post_status'    => 'publish',
+				's'              => '"postType":"' . $type . '"',
+				'sentence'       => true,
+				'search_columns' => array( 'post_content' ),
+				'orderby'        => 'ID',
+				'order'          => 'ASC',
+				'numberposts'    => 2,
+			)
+		);
+		// The front page may hold such a query too; two results leave one other page (no exclude, Plugin Check).
+		$pages = array_values( array_filter( $pages, static fn( $page ) => (int) get_option( 'page_on_front' ) !== $page->ID ) );
+		if ( ! $pages ) {
+			return $items;
+		}
+		$home = isset( $items[0]['url'] ) && home_url( '/' ) === $items[0]['url'] ? 1 : 0;
+		array_splice(
+			$items,
+			$home,
+			0,
+			array(
+				array(
+					'label' => get_the_title( $pages[0] ),
+					'url'   => get_permalink( $pages[0] ),
+				),
+			)
+		);
+		return $items;
+	}
+
+	/**
 	 * Drops "More <type>" with its heading while there are no other entries. Runs on render_block_core/query.
 	 *
 	 * @param string               $html  Block HTML.

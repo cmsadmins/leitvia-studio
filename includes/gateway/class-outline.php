@@ -44,7 +44,8 @@ final class Outline {
 	}
 
 	/**
-	 * One block by leitviaId or path ID, with attributes, own markup, hash, child IDs and the document hash.
+	 * One block by leitviaId or path ID, with attributes, own markup, markup with children, hash, child IDs and the
+	 * document hash.
 	 *
 	 * @param int    $post_id Post ID.
 	 * @param string $id      leitviaId or path ID such as p:0.2.1.
@@ -80,6 +81,7 @@ final class Outline {
 			'name'          => self::name( $block ),
 			'attributes'    => (object) $block['attrs'],
 			'inner_html'    => (string) $block['innerHTML'],
+			'markup'        => serialize_block( $block ),
 			'attachments'   => self::attachments( (string) $block['innerHTML'] ),
 			'hash'          => Hashes::block( $block ),
 			'children'      => $children,

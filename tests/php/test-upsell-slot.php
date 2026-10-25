@@ -51,11 +51,29 @@ class Test_Upsell_Slot extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Without add-ons nothing hooks into the slot, so Studio prints no aside.
+	 * Free hooks only its note on Leitvia Pro into the slot. The note names what Pro adds and links its plans; it
+	 * stays away while Pro is active (as on the test site) and under another brand.
 	 */
-	public function test_free_adds_nothing_to_the_slot(): void {
-		$this->assertFalse( has_action( 'leitvia_studio_upsell_slot' ) );
-		$this->assertSame( '', Admin::render_slot( 'toplevel_page_leitvia-studio' ) );
+	public function test_free_adds_only_the_note_on_pro(): void {
+		global $wp_filter;
+		$callbacks = array_merge( ...array_values( $wp_filter['leitvia_studio_upsell_slot']->callbacks ) );
+		$this->assertSame( array( array( Admin::class, 'pro_note' ) ), array_column( $callbacks, 'function' ) );
+
+		$note = Admin::pro_note_markup();
+		$this->assertStringContainsString( '<strong>Leitvia Pro</strong> adds the blocks Slider', $note );
+		$this->assertStringContainsString( '<a href="https://leitvia.com/pricing/">Plans of Leitvia Pro</a>', $note );
+
+		ob_start();
+		Admin::pro_note();
+		$printed = (string) ob_get_clean();
+		$this->assertSame( defined( 'LEITVIA_PRO_VERSION' ) ? '' : $note, $printed );
+
+		$brand = static fn( array $brand ): array => array_merge( $brand, array( 'name' => 'Agency Studio' ) );
+		add_filter( 'leitvia_studio_brand', $brand );
+		ob_start();
+		Admin::pro_note();
+		$this->assertSame( '', (string) ob_get_clean() );
+		remove_filter( 'leitvia_studio_brand', $brand );
 	}
 
 	/**
