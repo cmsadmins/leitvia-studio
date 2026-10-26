@@ -26,6 +26,11 @@ final class Schema {
 	public const LOGO_MIN = 112;
 
 	/**
+	 * Smallest width of an original that stands in for missing crops, the width of the crops in Image_Sizes.
+	 */
+	public const IMAGE_MIN_WIDTH = 1200;
+
+	/**
 	 * Prints the JSON-LD for the current request. Runs on wp_head.
 	 */
 	public static function print(): void {
@@ -83,7 +88,14 @@ final class Schema {
 			'publisher'     => self::organization(),
 		);
 		$thumbnail = (int) get_post_thumbnail_id( $post );
-		$images    = $thumbnail && (int) get_theme_mod( 'custom_logo' ) !== $thumbnail ? Image_Sizes::urls( $thumbnail ) : array();
+		$thumbnail = (int) get_theme_mod( 'custom_logo' ) !== $thumbnail ? $thumbnail : 0;
+		$images    = $thumbnail ? Image_Sizes::urls( $thumbnail ) : array();
+		// An image uploaded before Studio registered its crops has none of them: the original stands in when it is at
+		// least as wide as the crops.
+		$original = $thumbnail && ! $images ? wp_get_attachment_image_src( $thumbnail, 'full' ) : false;
+		if ( $original && $original[1] >= self::IMAGE_MIN_WIDTH ) {
+			$images = array( $original[0] );
+		}
 		if ( $images ) {
 			$data['image'] = $images;
 		}

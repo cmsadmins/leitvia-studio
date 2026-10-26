@@ -216,7 +216,7 @@ $leitvia-studio-accent-20: color.adjust($leitvia-studio-accent, $lightness: -10%
 .leitvia-studio-check-list,
 .leitvia-studio-usage {
 	margin: 0;
-	padding-left: 1.2em;
+	padding-inline-start: 1.2em;
 	list-style: disc;
 }
 
@@ -225,7 +225,7 @@ $leitvia-studio-accent-20: color.adjust($leitvia-studio-accent, $lightness: -10%
 	overflow-wrap: anywhere;
 
 	caption {
-		text-align: left;
+		text-align: start;
 		font-weight: 600;
 		padding-bottom: 8px;
 	}
@@ -270,7 +270,7 @@ $leitvia-studio-accent-20: color.adjust($leitvia-studio-accent, $lightness: -10%
 
 .leitvia-studio-annotations {
 	margin: 0;
-	padding-left: 1.2em;
+	padding-inline-start: 1.2em;
 }
 
 .leitvia-studio-annotations__entry {

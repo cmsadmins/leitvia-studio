@@ -1,5 +1,7 @@
 // Below 782 px the points follow the image as a numbered list in the flow. From 782 px each point sits on the image
-// at its position (--x, --y in percent of the image), the text opens below the marker.
+// at its position (--x, --y in percent of the image), the text opens below the marker. The image does not mirror in
+// right-to-left languages: there the inline start is the right edge, so --x counts from the other side (100% - --x)
+// and the centring translate turns round. Logical properties, so the generated -rtl stylesheet leaves them alone.
 .wp-block-leitvia-spotlight {
 	counter-reset: leitvia-spotlight;
 
@@ -49,8 +51,13 @@
 			}
 		}
 	}
-}
 
-:dir(rtl) .wp-block-leitvia-spotlight > .wp-block-leitvia-spotlight-hotspot {
-	translate: 50% -50%;
+	:dir(rtl) .wp-block-leitvia-spotlight > .wp-block-leitvia-spotlight-hotspot {
+		inset-inline-start: calc(100% - var(--x, 50%));
+		translate: 50% -50%;
+
+		> .wp-block-leitvia-spotlight-hotspot__content {
+			translate: 50% 0;
+		}
+	}
 }

@@ -3,7 +3,7 @@
  * Plugin Name:       Leitvia Studio
  * Plugin URI:        https://leitvia.com
  * Description:       Pattern lab, design tokens and a content model for block themes, stored in WordPress core structures.
- * Version:           1.3.2
+ * Version:           1.3.3
  * Requires at least: 7.1
  * Requires PHP:      8.2
  * Author:            CMS ADMINS
@@ -17,7 +17,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-const LEITVIA_STUDIO_VERSION = '1.3.2';
+const LEITVIA_STUDIO_VERSION = '1.3.3';
 const LEITVIA_STUDIO_API     = 1;
 // Oldest Extension API version add-ons may still declare; raised two major Studio versions after a breaking change.
 const LEITVIA_STUDIO_API_MIN = 1;

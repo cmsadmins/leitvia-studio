@@ -164,6 +164,20 @@ class Test_News_Schema extends WP_UnitTestCase {
 	}
 
 	/**
+	 * 16: an image uploaded before Studio registered its crops has none of them; the original stands in when it is at
+	 * least 1200 px wide, a narrower one is still left out.
+	 */
+	public function test_original_stands_in_for_missing_crops(): void {
+		$image = $this->upload_without_crops( 'news-old-photo', 1600, 1000 );
+		set_post_thumbnail( $this->post, $image );
+		$this->go_to( get_permalink( $this->post ) );
+		$this->assertSame( array( wp_get_attachment_url( $image ) ), Schema::current()['image'] );
+
+		set_post_thumbnail( $this->post, $this->upload_without_crops( 'news-old-small', 1000, 800 ) );
+		$this->assertArrayNotHasKey( 'image', Schema::current() );
+	}
+
+	/**
 	 * 21: without a usable custom logo (missing, under 112 px, SVG) the site icon at 512 px is the publisher logo; with
 	 * neither the logo is left out.
 	 */
@@ -306,6 +320,22 @@ class Test_News_Schema extends WP_UnitTestCase {
 		file_put_contents( $file, $pretty ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Writes the reference output.
 		$this->assertNotNull( $expected, "$file was missing and is written now; review and commit it." );
 		$this->assertSame( $expected, $pretty, "$file changed; review the diff and commit it." );
+	}
+
+	/**
+	 * Uploads a generated PNG and drops Studio's crops from its metadata, as for an image uploaded before Studio.
+	 *
+	 * @param string $name   File name without extension.
+	 * @param int    $width  Width in pixels.
+	 * @param int    $height Height in pixels.
+	 * @return int Attachment ID.
+	 */
+	private function upload_without_crops( string $name, int $width, int $height ): int {
+		$id            = $this->upload( $name, $width, $height );
+		$meta          = wp_get_attachment_metadata( $id );
+		$meta['sizes'] = array_diff_key( $meta['sizes'], Image_Sizes::SIZES );
+		wp_update_attachment_metadata( $id, $meta );
+		return $id;
 	}
 
 	/**
