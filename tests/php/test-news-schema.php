@@ -245,8 +245,28 @@ class Test_News_Schema extends WP_UnitTestCase {
 
 		$this->go_to( get_permalink( self::factory()->post->create( array( 'post_type' => 'page' ) ) ) );
 		$this->assertNull( Schema::current() );
-		$this->go_to( home_url( '/' ) );
+		$this->go_to( get_category_link( 1 ) );
 		$this->assertNull( Schema::current() );
+	}
+
+	/**
+	 * The front page carries a WebSite with name, tagline and the site as publisher, for the site name in results.
+	 */
+	public function test_front_page_website(): void {
+		update_option( 'blogdescription', 'Pages &amp; posts' );
+		set_theme_mod( 'custom_logo', $this->upload( 'news-logo', 200, 200 ) );
+		$this->go_to( home_url( '/' ) );
+		$data = Schema::current();
+		$this->assertSame( 'WebSite', $data['@type'] );
+		$this->assertSame( 'Leitvia News', $data['name'] );
+		$this->assertSame( home_url( '/' ), $data['url'] );
+		$this->assertSame( 'Pages & posts', $data['description'] );
+		$this->assertSame( 'Organization', $data['publisher']['@type'] );
+		$this->assertSame( 200, $data['publisher']['logo']['width'] );
+		$this->assertSame( 1, substr_count( get_echo( 'wp_head' ), 'application/ld+json' ) );
+
+		update_option( 'blogdescription', '' );
+		$this->assertArrayNotHasKey( 'description', Schema::current() );
 	}
 
 	/**

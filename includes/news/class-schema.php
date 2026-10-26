@@ -1,6 +1,6 @@
 <?php
 /**
- * JSON-LD for posts and author archives.
+ * JSON-LD for posts, author archives and the front page.
  *
  * @package LeitviaStudio
  */
@@ -14,7 +14,8 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Prints one JSON-LD block in the head: BlogPosting or NewsArticle with author and publisher on single posts,
- * ProfilePage on author archives. Off with the setting news_schema and whenever an SEO plugin is active, so a page
+ * ProfilePage on author archives, WebSite with the site as publisher on the front page (site name and logo in search
+ * results). Off with the setting news_schema and whenever an SEO plugin is active, so a page
  * never carries two article nodes. No Open Graph tags and no sitemap: that stays the job of SEO plugins.
  */
 final class Schema {
@@ -45,6 +46,9 @@ final class Schema {
 			return null;
 		}
 		$object = get_queried_object();
+		if ( is_front_page() ) {
+			return self::website();
+		}
 		if ( is_singular( 'post' ) && $object instanceof WP_Post ) {
 			return self::article( $object );
 		}
@@ -98,6 +102,26 @@ final class Schema {
 			'@type'      => 'ProfilePage',
 			'mainEntity' => self::person( $user->ID ),
 		);
+	}
+
+	/**
+	 * WebSite of the front page: name, address, tagline when there is one, the site as publisher.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function website(): array {
+		$data        = array(
+			'@context'  => 'https://schema.org',
+			'@type'     => 'WebSite',
+			'name'      => self::text( get_bloginfo( 'name' ) ),
+			'url'       => home_url( '/' ),
+			'publisher' => self::organization(),
+		);
+		$description = self::text( get_bloginfo( 'description' ) );
+		if ( '' !== $description ) {
+			$data['description'] = $description;
+		}
+		return $data;
 	}
 
 	/**

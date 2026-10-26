@@ -4,7 +4,7 @@ Tags: ai, mcp, block theme, accessibility, design tokens
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.1
+Stable tag: 1.3.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -200,6 +200,9 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * Terms for the paid Leitvia Pro plans and the account on leitvia.com (they do not apply to this free software): https://leitvia.com/terms/
 
 == Changelog ==
+
+= 1.3.2 =
+* The front page carries JSON-LD of type WebSite with name, tagline and the site as publisher with its logo, so search engines can show the site name. Same switch as the article data: off with the setting or an active SEO plugin.
 
 = 1.3.1 =
 * MCP server lists the abilities of compatible add-ons: every ability in the registry of Studio is a tool of the MCP server leitvia, not only the abilities of Studio itself.
