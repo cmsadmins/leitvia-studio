@@ -50,12 +50,100 @@
 			"additionalProperties": false,
 			"properties": {
 				"header": {
-					"type": "string",
-					"pattern": "^[a-z0-9-]+/[a-z0-9-]+$"
+					"anyOf": [
+						{
+							"type": "string",
+							"pattern": "^[a-z0-9-]+/[a-z0-9-]+$"
+						},
+						{
+							"type": "object",
+							"additionalProperties": false,
+							"required": [
+								"pattern",
+								"edits"
+							],
+							"properties": {
+								"pattern": {
+									"type": "string",
+									"pattern": "^[a-z0-9-]+/[a-z0-9-]+$"
+								},
+								"edits": {
+									"type": "array",
+									"description": "Edits at block IDs of the pattern outline, as in leitvia/compose-page: text, link_text and url. Links starting with / point into the site, tel: and mailto: links stay as they are.",
+									"items": {
+										"type": "object",
+										"additionalProperties": false,
+										"required": [
+											"block"
+										],
+										"properties": {
+											"block": {
+												"type": "string"
+											},
+											"text": {
+												"type": "string"
+											},
+											"link_text": {
+												"type": "string",
+												"description": "The part of text that stays linked, for a text with one link such as a phone number."
+											},
+											"url": {
+												"type": "string"
+											}
+										}
+									}
+								}
+							}
+						}
+					]
 				},
 				"footer": {
-					"type": "string",
-					"pattern": "^[a-z0-9-]+/[a-z0-9-]+$"
+					"anyOf": [
+						{
+							"type": "string",
+							"pattern": "^[a-z0-9-]+/[a-z0-9-]+$"
+						},
+						{
+							"type": "object",
+							"additionalProperties": false,
+							"required": [
+								"pattern",
+								"edits"
+							],
+							"properties": {
+								"pattern": {
+									"type": "string",
+									"pattern": "^[a-z0-9-]+/[a-z0-9-]+$"
+								},
+								"edits": {
+									"type": "array",
+									"description": "Edits at block IDs of the pattern outline, as in leitvia/compose-page: text, link_text and url. Links starting with / point into the site, tel: and mailto: links stay as they are.",
+									"items": {
+										"type": "object",
+										"additionalProperties": false,
+										"required": [
+											"block"
+										],
+										"properties": {
+											"block": {
+												"type": "string"
+											},
+											"text": {
+												"type": "string"
+											},
+											"link_text": {
+												"type": "string",
+												"description": "The part of text that stays linked, for a text with one link such as a phone number."
+											},
+											"url": {
+												"type": "string"
+											}
+										}
+									}
+								}
+							}
+						}
+					]
 				}
 			}
 		},

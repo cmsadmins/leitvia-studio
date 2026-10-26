@@ -22,9 +22,9 @@ defined( 'ABSPATH' ) || exit;
  * Steps and the abilities they call, in this order: contentModel (leitvia/define-content-type with declaration),
  * tokenSet (leitvia/create-token-set with title and document), variation (leitvia/set-variation with variation),
  * templateParts (leitvia/update-template-part with part and pattern, or with content when the pattern holds sample
- * links to "#": the footer gets the pages of footerNavigation instead), pages (leitvia/compose-page), navigation
- * (leitvia/update-navigation with items of label and url), reading, connect (settings that point to recipe pages)
- * and options. A step whose ability is not registered is reported as unavailable.
+ * links to "#": the footer gets the pages of footerNavigation instead, a part with edits gets them as a page section
+ * does), pages (leitvia/compose-page), navigation (leitvia/update-navigation with items of label and url), reading,
+ * connect (settings that point to recipe pages) and options. A step whose ability is not registered is reported as unavailable.
  */
 final class Recipes {
 
@@ -236,6 +236,10 @@ final class Recipes {
 			}
 		}
 		foreach ( (array) ( $recipe['templateParts'] ?? array() ) as $part => $pattern ) {
+			// A part names its pattern, or the pattern with edits at block IDs as a page section does: the button and the
+			// service bar of a header pattern link to "#" until the recipe gives them targets.
+			$edits   = is_array( $pattern ) ? (array) ( $pattern['edits'] ?? array() ) : array();
+			$pattern = is_array( $pattern ) ? (string) ( $pattern['pattern'] ?? '' ) : (string) $pattern;
 			// A part changed after the recipe wrote it (by hand, by a kit or by an agent) is kept, like a page that exists.
 			// _leitvia_recipe_hash: the record of earlier Studio versions.
 			$saved = get_block_template( get_stylesheet() . '//' . $part, 'wp_template_part' );
@@ -247,14 +251,22 @@ final class Recipes {
 			// Only a recipe that names footerNavigation rewrites the links to "#"; without it the pattern stays as it is, so
 			// a kit can still put its own pages in place of those links.
 			$part_content = 'footer' === $part && ! empty( $recipe['footerNavigation'] )
-				? self::linked_part( (string) $pattern, self::links( (array) $recipe['footerNavigation'], $recipe, array() ) )
+				? self::linked_part( $pattern, self::links( (array) $recipe['footerNavigation'], $recipe, array() ) )
 				: '';
+			if ( $edits ) {
+				$registered   = \WP_Block_Patterns_Registry::get_instance()->get_registered( $pattern );
+				$part_content = Abilities\Build::edit( '' !== $part_content ? $part_content : (string) ( $registered['content'] ?? '' ), $edits, array( 'part' => (string) $part ) );
+				if ( is_wp_error( $part_content ) ) {
+					$steps[] = self::result( 'templateParts', 'leitvia/update-template-part', $part_content, array( 'part' => (string) $part ) );
+					continue;
+				}
+			}
 			self::remember(
 				'part:' . $part,
 				$call(
 					'templateParts',
 					'leitvia/update-template-part',
-					array( 'part' => (string) $part ) + ( '' !== $part_content ? array( 'content' => $part_content ) : array( 'pattern' => (string) $pattern ) )
+					array( 'part' => (string) $part ) + ( '' !== $part_content ? array( 'content' => $part_content ) : array( 'pattern' => $pattern ) )
 				)
 			);
 		}

@@ -76,7 +76,7 @@ final class Recipes_Controller {
 			'contentModel'     => $types,
 			'tokenSet'         => isset( $recipe['tokenSet'] ) ? (string) $recipe['title'] : '',
 			'variation'        => (string) ( $recipe['variation'] ?? '' ),
-			'templateParts'    => (object) ( $recipe['templateParts'] ?? array() ),
+			'templateParts'    => (object) array_map( static fn( $part ): string => (string) ( is_array( $part ) ? ( $part['pattern'] ?? '' ) : $part ), (array) ( $recipe['templateParts'] ?? array() ) ),
 			'pages'            => array_map(
 				static fn( array $page ): array => array(
 					'slug'     => (string) $page['slug'],

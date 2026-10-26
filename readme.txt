@@ -4,7 +4,7 @@ Tags: ai, mcp, block theme, accessibility, design tokens
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.3
+Stable tag: 1.3.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -200,6 +200,9 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * Terms for the paid Leitvia Pro plans and the account on leitvia.com (they do not apply to this free software): https://leitvia.com/terms/
 
 == Changelog ==
+
+= 1.3.4 =
+* Recipes: a header or footer in templateParts can carry edits at block IDs, like a page section, so the button and the service bar of a header pattern get their own texts and targets instead of sample links.
 
 = 1.3.3 =
 * A featured image uploaded before Studio was active, without the three 1200 px crops, now stands in with its original in the article JSON-LD when it is at least 1200 px wide, so older posts keep their image for rich results.
