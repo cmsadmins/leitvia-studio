@@ -188,7 +188,7 @@ class Test_Cli extends WP_UnitTestCase {
 			array( 'package_apply', array( '1' ) ),
 			array( 'package_reject', array( '1' ) ),
 			array( 'package_rollback', array( '1' ) ),
-			array( 'package_export', array( '1', $this->file() ) ),
+			array( 'package_export', array( '1' ) ),
 			array( 'package_import', array( $package ) ),
 			array( 'recipe_apply', array( 'leitvia/blog' ) ),
 		) as [ $method, $args ] ) {
@@ -233,10 +233,11 @@ class Test_Cli extends WP_UnitTestCase {
 		$original = Packages::operations( $queued['package'] )[1]['state']['file'];
 
 		wp_set_current_user( $this->admin );
-		$file           = $this->file();
-		[ $code, $out ] = self::cli( 'package_export', array( (string) $queued['package'], $file ) );
+		[ $code, $out ] = self::cli( 'package_export', array( (string) $queued['package'] ) );
 		$this->assertSame( 0, $code, implode( "\n", $out ) );
-		$export = json_decode( (string) file_get_contents( $file ), true ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Test.
+		$this->assertCount( 1, $out, 'only the JSON on standard output, ready to redirect into a file' );
+		$export = json_decode( $out[0], true );
+		$file   = $this->file( $export );
 		$this->assertSame( array( 'objects', 'operations', 'created', 'studio_version', 'title' ), array_keys( $export ) );
 		$this->assertSame(
 			array(
@@ -294,6 +295,21 @@ class Test_Cli extends WP_UnitTestCase {
 			$error['data']['conflicts']
 		);
 		$this->assertSame( $count, count( get_posts( array( 'post_type' => Packages::POST_TYPE, 'post_status' => 'private', 'fields' => 'ids', 'posts_per_page' => -1 ) ) ) ); // phpcs:ignore WordPress.Arrays.ArrayDeclarationSpacing.AssociativeArrayFound -- Test.
+	}
+
+	/**
+	 * Only images of an allowed type reach the private area, also from an imported package: a script under an image
+	 * name and an image under a script name are refused, an image keeps its name.
+	 */
+	public function test_stash_file_takes_images_only(): void {
+		$png = (string) file_get_contents( dirname( __DIR__ ) . '/fixtures/avatar.png' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Test fixture.
+		$this->assertSame( '', Packages::stash_file( 'shell.php', '<?php echo 1;' ) );
+		$this->assertSame( '', Packages::stash_file( 'shell.png', '<?php echo 1;' ) );
+		$this->assertSame( '', Packages::stash_file( 'picture.php', $png ) );
+		$path = Packages::stash_file( 'picture.png', $png );
+		$this->assertStringEndsWith( '/picture.png', $path );
+		$this->assertFileExists( $path );
+		Packages::discard_file( array( 'file' => $path ) );
 	}
 
 	/**

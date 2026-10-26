@@ -4,7 +4,7 @@ Tags: ai, mcp, block theme, accessibility, design tokens
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.4
+Stable tag: 1.3.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -55,7 +55,7 @@ Automated tests run axe in three widths and keyboard tests on the admin screens,
 
 = How do AI agents use Leitvia? =
 
-An agent such as Claude Code, Codex or Cursor connects to your site over MCP or the REST API with the application password of an agent user from Leitvia Studio, Agents. It reads the design contract and the outline of a page first, then calls the Leitvia abilities, and every change runs through the gateway checks and your autonomy levels. Ready-made agent skills for setup, design, pages, patterns, maintenance, accessibility and migration, with the full reference of all abilities, are described at https://leitvia.com/docs/.
+An agent such as Claude Code, Codex or Cursor connects to your site over MCP or the REST API with the application password of an agent user from Leitvia Studio, Agents. It reads the design contract and the outline of a page first, then calls the Leitvia abilities, and every change runs through the gateway checks and your autonomy levels. No service of ours sits in between: the agent signs in as a user of your site that an administrator created, with the role Leitvia Agent and without administrator rights. It cannot install, activate or remove plugins or themes, manage users or log in to wp-admin. Changes to site settings, such as the front page or the comment defaults, only ever reach the inbox as a suggestion that an administrator applies or rejects. Ready-made agent skills for setup, design, pages, patterns, maintenance, accessibility and migration, with the full reference of all abilities, are described at https://leitvia.com/docs/.
 
 = Does the plugin change my front end? =
 
@@ -136,7 +136,7 @@ The Accessibility bar stores text size and high contrast in the visitor's browse
 
 == External services ==
 
-This plugin does not connect to any external service by default.
+This plugin does not connect to any external service by default. The check after an agent changed a page live loads that page from your own site (a loopback request, see the question on requests from your server); it contacts no other host.
 
 AI provider of the site owner: only when an agent or a user calls the ability "Plan page" (leitvia/plan-page) with ai set to true, Leitvia Studio sends one request through the AI client of WordPress to the AI connector an administrator set up under Settings, Connectors (for example OpenAI, Anthropic or Google). Leitvia Studio has no provider of its own and stores no keys. The request holds the goal and the content points given in that call, the page frame and composition rules of the contract, and the names and metadata of the patterns; no posts, no user data and no other content of the database. Without that call, nothing is sent. The terms and privacy policy of the provider the administrator chose apply.
 
@@ -200,6 +200,11 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * Terms for the paid Leitvia Pro plans and the account on leitvia.com (they do not apply to this free software): https://leitvia.com/terms/
 
 == Changelog ==
+
+= 1.3.5 =
+* Media of a change package are stored only after core confirmed an image type the site allows, also for packages imported on the command line.
+* WP-CLI: wp leitvia package export prints the package as JSON on standard output instead of writing a file (wp leitvia package export 12 > package.json).
+* Tabs and wizard without JavaScript: the styles for that case load with the block stylesheets (media feature scripting: none) instead of a style element in the markup. JSON-LD is printed with wp_print_inline_script_tag().
 
 = 1.3.4 =
 * Recipes: a header or footer in templateParts can carry edits at block IDs, like a page section, so the button and the service bar of a header pattern get their own texts and targets instead of sample links.

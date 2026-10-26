@@ -19,12 +19,19 @@ defined( 'ABSPATH' ) || exit;
 final class Tabs {
 
 	/**
-	 * Appends the stylesheet for browsers without scripting. Runs on render_block_core/tabs.
+	 * Enqueues the rules for browsers without scripting (media feature scripting: none) once a tabs block is on the
+	 * page. Block themes render the content before the head is printed, so the style still lands in the head. Runs on
+	 * render_block_core/tabs.
 	 *
 	 * @param string $content Rendered block HTML.
 	 */
 	public static function render_tabs( string $content ): string {
-		return $content . '<noscript><style>.wp-block-tabs .wp-block-tab-list{display:none}.wp-block-tabs .wp-block-tab-panel[hidden]{display:block!important}</style></noscript>';
+		if ( ! wp_style_is( 'leitvia-studio-tabs', 'enqueued' ) ) {
+			wp_register_style( 'leitvia-studio-tabs', false, array(), LEITVIA_STUDIO_VERSION );
+			wp_add_inline_style( 'leitvia-studio-tabs', '@media (scripting: none){.wp-block-tabs .wp-block-tab-list{display:none}.wp-block-tabs .wp-block-tab-panel[hidden]{display:block!important}}' );
+			wp_enqueue_style( 'leitvia-studio-tabs' );
+		}
+		return $content;
 	}
 
 	/**

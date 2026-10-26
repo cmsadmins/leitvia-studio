@@ -68,7 +68,7 @@ JS;
 		foreach ( $response['headers'] as $name => $value ) {
 			header( "{$name}: {$value}" );
 		}
-		echo $response['body']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Full HTML document rendered by WordPress.
+		echo $response['body']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- The preview document respond() builds for a user with edit_posts and a valid nonce: escaped head and rendered blocks.
 		exit;
 	}
 
@@ -164,7 +164,7 @@ JS;
 </head>
 <body class="leitvia-studio-preview">
 <main id="main">
-		<?php echo $blocks; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Rendered blocks. ?>
+		<?php echo $blocks; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Output of do_blocks(), as core prints the_content; kses would strip forms and inline SVG the pattern shows. ?>
 </main>
 		<?php
 		// Reports the page height to the Lab so the frame can grow with the pattern; links and forms stay inert.

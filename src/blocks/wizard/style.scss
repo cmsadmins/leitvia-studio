@@ -64,3 +64,19 @@
 	margin-inline: 0 auto;
 	font-variant-numeric: tabular-nums;
 }
+
+// Without scripting the steps hidden by the server stay readable as one form: every step, the submit button, no
+// step navigation (the buttons need the script).
+@media (scripting: none) {
+	.wp-block-leitvia-wizard .wp-block-leitvia-wizard__submit[hidden] {
+		display: flex !important;
+	}
+
+	.wp-block-leitvia-wizard .wp-block-leitvia-wizard-step[hidden] {
+		display: grid !important;
+	}
+
+	.wp-block-leitvia-wizard__nav {
+		display: none !important;
+	}
+}

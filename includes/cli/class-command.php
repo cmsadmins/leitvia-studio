@@ -53,7 +53,7 @@ final class Command {
 		'package apply'    => array( 'package_apply', 'Applies the open operations of a change package.', '<id> [--ops=<ids>] [--format=<format>]' ),
 		'package reject'   => array( 'package_reject', 'Rejects a change package.', '<id> [--format=<format>]' ),
 		'package rollback' => array( 'package_rollback', 'Rolls back a change package.', '<id> [--format=<format>]' ),
-		'package export'   => array( 'package_export', 'Writes a change package with hash manifest and embedded media to a file.', '<id> <file>' ),
+		'package export'   => array( 'package_export', 'Prints a change package with hash manifest and embedded media as JSON; redirect it into a file.', '<id>' ),
 		'package import'   => array( 'package_import', 'Creates an open change package from an export after checking every base hash.', '<file> [--format=<format>]' ),
 		'recipe list'      => array( 'recipe_list', 'Lists the site recipes.', '[--format=<format>]' ),
 		'recipe apply'     => array( 'recipe_apply', 'Applies a site recipe.', '<name> [--format=<format>]' ),
@@ -392,16 +392,15 @@ final class Command {
 	}
 
 	/**
-	 * Wp leitvia package export <id> <file>: the operations that are not rolled back, each with the hash its target had
-	 * before, and the manifest of the objects they change. Files of new media are embedded; a new attachment without
-	 * its file is refused.
+	 * Wp leitvia package export <id>: the operations that are not rolled back, each with the hash its target had before,
+	 * and the manifest of the objects they change, printed as JSON (wp leitvia package export 12 > package.json); the
+	 * plugin writes no file of its own. Files of new media are embedded; a new attachment without its file is refused.
 	 *
 	 * @param string[]             $args  Positional arguments.
 	 * @param array<string, mixed> $assoc Options.
 	 */
 	public function package_export( array $args, array $assoc ): void {
-		$id   = (int) ( $args[0] ?? 0 );
-		$file = (string) ( $args[1] ?? '' );
+		$id = (int) ( $args[0] ?? 0 );
 		self::user( $assoc );
 		self::own( $id, $assoc );
 		$operations = array();
@@ -417,11 +416,7 @@ final class Command {
 			'studio_version' => LEITVIA_STUDIO_VERSION,
 			'title'          => get_the_title( $id ),
 		);
-		if ( false === file_put_contents( $file, (string) wp_json_encode( $export, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- File the operator names on the command line.
-			self::fail( new \WP_Error( 'leitvia_cli_write', __( 'The file could not be written.', 'leitvia-studio' ), array( 'file' => $file ) ), $assoc );
-		}
-		/* translators: 1: number of operations, 2: file */
-		\WP_CLI::success( sprintf( __( 'Exported %1$d operations to %2$s.', 'leitvia-studio' ), count( $operations ), $file ) );
+		\WP_CLI::line( (string) wp_json_encode( $export, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 	}
 
 	/**

@@ -147,7 +147,7 @@ class Test_Uninstall extends WP_UnitTestCase {
 					'post_title'  => 'Package',
 				)
 			);
-			$files[ $site ]    = \LeitviaStudio\Gateway\Packages::stash_file( 'waiting.png', 'bytes' );
+			$files[ $site ]    = \LeitviaStudio\Gateway\Packages::stash_file( 'waiting.png', (string) file_get_contents( dirname( __DIR__ ) . '/fixtures/avatar.png' ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Test fixture.
 			// A check after writing that has not run yet, and the token of one that is running.
 			wp_schedule_single_event( time() + MINUTE_IN_SECONDS, 'leitvia_studio_verify', array( array( 'post' => $packages[ $site ] ) ) );
 			set_transient( 'leitvia_verify_' . $site, 'pending', 5 * MINUTE_IN_SECONDS );

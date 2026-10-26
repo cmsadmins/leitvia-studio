@@ -594,7 +594,32 @@ final class Packages {
 	}
 
 	/**
-	 * Writes a file of an operation to the private area: a folder with a random name below uploads/leitvia-private,
+	 * MIME type and file name of image bytes after core's check of content and extension, null when it is no image of
+	 * an allowed type.
+	 *
+	 * @param string $bytes File content.
+	 * @param string $name  File name.
+	 * @return array{type: string, name: non-empty-string}|null
+	 */
+	public static function image_type( string $bytes, string $name ): ?array {
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+		$temp = wp_tempnam( $name );
+		file_put_contents( $temp, $bytes ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Temporary file for the type check.
+		$check = wp_check_filetype_and_ext( $temp, $name );
+		wp_delete_file( $temp );
+		$type = (string) $check['type'];
+		$name = $check['proper_filename'] ? (string) $check['proper_filename'] : $name;
+		if ( '' === $name || ! str_starts_with( $type, 'image/' ) || ! in_array( $type, get_allowed_mime_types(), true ) ) {
+			return null;
+		}
+		return array(
+			'type' => $type,
+			'name' => $name,
+		);
+	}
+
+	/**
+	 * Writes an image of an operation to the private area: a folder with a random name below uploads/leitvia-private,
 	 * which denies web access where the server reads .htaccess. The pipeline moves it into the uploads folder when it
 	 * writes the attachment; rejecting the package deletes it.
 	 *
@@ -603,6 +628,12 @@ final class Packages {
 	 * @return string Path, '' on failure.
 	 */
 	public static function stash_file( string $name, string $bytes ): string {
+		// Only images of a type the site allows, under the name core's check gives them; never a script or other file.
+		$type = self::image_type( $bytes, $name );
+		if ( ! $type ) {
+			return '';
+		}
+		$name = $type['name'];
 		$root = self::private_root();
 		$dir  = '' !== $root ? $root . '/' . wp_generate_password( 32, false ) : '';
 		if ( '' === $dir || ! wp_mkdir_p( $dir ) ) {

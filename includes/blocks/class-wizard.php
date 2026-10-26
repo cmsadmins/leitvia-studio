@@ -12,8 +12,8 @@ defined( 'ABSPATH' ) || exit;
 /**
  * The saved leitvia/wizard is a GET form with all steps and a submit button. On render this class hides every step
  * but the first, the submit button, and adds the progress text, Back and Next, translated. The page keeps that
- * layout from the first paint, so view.js shifts nothing. Without scripting a <noscript> style shows all steps and the
- * submit button again and hides the step controls (plan 3.3, point 1).
+ * layout from the first paint, so view.js shifts nothing. Without scripting the block stylesheet (media feature
+ * scripting: none) shows all steps and the submit button again and hides the step controls (plan 3.3, point 1).
  */
 final class Wizard {
 
@@ -70,6 +70,7 @@ final class Wizard {
 		) ) {
 			$html->set_attribute( 'hidden', true );
 		}
-		return $html->get_updated_html() . '<noscript><style>.wp-block-leitvia-wizard .wp-block-leitvia-wizard__submit[hidden]{display:flex!important}.wp-block-leitvia-wizard .wp-block-leitvia-wizard-step[hidden]{display:grid!important}.wp-block-leitvia-wizard__nav{display:none!important}</style></noscript>';
+		// Without scripting the block stylesheet shows every step and the submit button (style.scss, scripting: none).
+		return $html->get_updated_html();
 	}
 }

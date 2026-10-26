@@ -510,7 +510,7 @@ final class Build {
 		if ( strlen( $file ) > self::MAX_MEDIA_BYTES ) {
 			return Block_Edit::invalid( 'size', __( 'The file is larger than 5 MB.', 'leitvia-studio' ) );
 		}
-		$type = self::image_type( $file, $name );
+		$type = Packages::image_type( $file, $name );
 		if ( ! $type ) {
 			return Block_Edit::invalid( 'type', __( 'Only images of a type this site allows can be added: JPEG, PNG, GIF, WebP or AVIF.', 'leitvia-studio' ) );
 		}
@@ -675,31 +675,6 @@ final class Build {
 			return (string) file_get_contents( $file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Local file of this site.
 		}
 		return Block_Edit::invalid( 'url', __( 'The URL does not point to a file of this site.', 'leitvia-studio' ) );
-	}
-
-	/**
-	 * MIME type and file name of image bytes after core's check of content and extension, null when it is no image of
-	 * an allowed type.
-	 *
-	 * @param string $bytes File content.
-	 * @param string $name  File name.
-	 * @return array{type: string, name: non-empty-string}|null
-	 */
-	private static function image_type( string $bytes, string $name ): ?array {
-		require_once ABSPATH . 'wp-admin/includes/file.php';
-		$temp = wp_tempnam( $name );
-		file_put_contents( $temp, $bytes ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Temporary file for the type check.
-		$check = wp_check_filetype_and_ext( $temp, $name );
-		wp_delete_file( $temp );
-		$type = (string) $check['type'];
-		$name = $check['proper_filename'] ? (string) $check['proper_filename'] : $name;
-		if ( '' === $name || ! str_starts_with( $type, 'image/' ) || ! in_array( $type, get_allowed_mime_types(), true ) ) {
-			return null;
-		}
-		return array(
-			'type' => $type,
-			'name' => $name,
-		);
 	}
 
 	/**

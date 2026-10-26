@@ -112,7 +112,7 @@ final class Admin {
 		?>
 		<div class="wrap leitvia-studio">
 			<?php self::render_brand(); ?>
-			<?php echo self::render_slot( $screen ? $screen->id : '' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Markup of render_slot(), its parts are escaped there or printed by add-ons. ?>
+			<?php echo wp_kses_post( self::render_slot( $screen ? $screen->id : '' ) ); ?>
 			<div id="leitvia-studio-root" data-screen="<?php echo esc_attr( self::current_screen() ); ?>"></div>
 		</div>
 		<?php
@@ -173,7 +173,15 @@ final class Admin {
 			'<p class="leitvia-studio-brand">%1$s<span class="leitvia-studio-brand__name">%2$s</span>%3$s</p>',
 			wp_kses( $logo, $svg ),
 			esc_html( $brand['name'] ),
-			$link // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Built above from escaped parts.
+			wp_kses(
+				$link,
+				array(
+					'a' => array(
+						'class' => true,
+						'href'  => true,
+					),
+				)
+			)
 		);
 	}
 
@@ -186,7 +194,7 @@ final class Admin {
 		if ( defined( 'LEITVIA_PRO_VERSION' ) || __( 'Leitvia Studio', 'leitvia-studio' ) !== leitvia_studio_brand()['name'] ) {
 			return;
 		}
-		echo self::pro_note_markup(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in pro_note_markup().
+		echo wp_kses_post( self::pro_note_markup() );
 	}
 
 	/**
