@@ -4,7 +4,7 @@ Tags: ai, mcp, block theme, accessibility, design tokens
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.5
+Stable tag: 1.3.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -200,6 +200,10 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * Terms for the paid Leitvia Pro plans and the account on leitvia.com (they do not apply to this free software): https://leitvia.com/terms/
 
 == Changelog ==
+
+= 1.3.6 =
+* Highlight: the circle style is drawn on every line of a wrapped mark instead of one ellipse around all lines.
+* Studio screens show a focus outline in forced colors (Windows contrast themes) on buttons, card headers and search fields.
 
 = 1.3.5 =
 * Media of a change package are stored only after core confirmed an image type the site allows, also for packages imported on the command line.

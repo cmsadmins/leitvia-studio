@@ -317,3 +317,13 @@ $leitvia-studio-accent-20: color.adjust($leitvia-studio-accent, $lightness: -10%
 	text-overflow: clip;
 	overflow-wrap: anywhere;
 }
+
+// Forced colors remove box shadows, and with them the focus ring of the admin components on buttons, card headers and
+// the DataViews fields; an outline in a system color takes its place (WCAG 2.4.7). Important, because the button
+// variants of the components set their own outline with more specific selectors.
+@media (forced-colors: active) {
+	.leitvia-studio :focus-visible {
+		outline: 2px solid Highlight !important;
+		outline-offset: 2px;
+	}
+}

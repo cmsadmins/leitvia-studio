@@ -36,17 +36,16 @@
 	background-size: 100% var(--leitvia-highlight-height);
 }
 
-/* An ellipse around the words, drawn with a border; it does not take space, so the line does not move. */
-.leitvia-highlight.is-circle::after {
-	content: "";
-	position: absolute;
-	inset: -0.2em -0.35em;
+/*
+ * An ellipse around the words, drawn as the border of the mark itself: with box-decoration-break each line of a
+ * wrapped mark gets its own ellipse (a pseudo element would span the box of all lines). The negative margin gives
+ * back most of the inline space of padding and border; the rest keeps the ring clear of the neighbouring words.
+ */
+.leitvia-highlight.is-circle {
+	margin-inline: -0.2em;
+	padding: 0.15em 0.3em;
 	border: 0.1em solid var(--leitvia-highlight);
 	border-radius: 50%;
-	pointer-events: none;
-}
-
-.leitvia-highlight.is-circle {
 	background: none;
 }
 
@@ -79,10 +78,6 @@
 
 @keyframes leitvia-highlight-circle {
 	from {
-		clip-path: inset(0 100% 0 0);
-	}
-
-	to {
-		clip-path: inset(0);
+		border-color: transparent;
 	}
 }
