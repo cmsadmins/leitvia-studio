@@ -12,7 +12,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Uses the JSON format core exports patterns in ({"__file":"wp_block","title","content","syncStatus"}) and adds one
  * "leitvia" member with the lab metadata and the variants. Core imports the files as plain patterns; Studio imports
- * core files as well as its own.
+ * core files as well as its own; add-ons convert other formats (filter leitvia_studio_import_pattern_file).
  */
 final class Pattern_IO {
 
@@ -75,6 +75,15 @@ final class Pattern_IO {
 		$data = json_decode( $json, true, 64 );
 		if ( ! is_array( $data ) ) {
 			return self::invalid( __( 'The file is not valid JSON.', 'leitvia-studio' ) );
+		}
+		/**
+		 * Filters a decoded import before it is checked, so an add-on can turn another format into a pattern file.
+		 *
+		 * @param array<mixed>|\WP_Error $data Decoded file; a WP_Error refuses the import with its message.
+		 */
+		$data = apply_filters( 'leitvia_studio_import_pattern_file', $data );
+		if ( is_wp_error( $data ) ) {
+			return $data;
 		}
 		$original = self::normalize( $data, false );
 		if ( is_wp_error( $original ) ) {

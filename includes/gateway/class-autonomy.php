@@ -65,7 +65,7 @@ final class Autonomy {
 		}
 		/**
 		 * Filters the autonomy level per area after profile and overrides, for example to add the area of an add-on or
-		 * to apply the policy of a fleet of sites. Levels are locked, suggest, draft or autonomous; admin and areas
+		 * to apply a policy shared by several sites. Levels are locked, suggest, draft or autonomous; admin and areas
 		 * without a valid level stay locked.
 		 *
 		 * @param array<string, string> $levels   Level by area.

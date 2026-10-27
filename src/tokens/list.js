@@ -528,6 +528,20 @@ export default function List() {
 						notify( 'error', errorFindings( error )[ 0 ].message )
 					),
 			},
+			// Exports that add-ons register as sync targets, labelled by them.
+			...( window.leitviaStudioAdmin?.syncTargets ?? [] )
+				.filter( ( target ) => target.name !== 'leitvia/download' )
+				.map( ( target ) => ( {
+					id: `export-${ target.name }`,
+					label: target.label,
+					callback: ( [ item ] ) =>
+						downloadSet( item.id, target.name ).catch( ( error ) =>
+							notify(
+								'error',
+								errorFindings( error )[ 0 ].message
+							)
+						),
+				} ) ),
 			{
 				id: 'duplicate',
 				label: __( 'Duplicate', 'leitvia-studio' ),

@@ -186,12 +186,14 @@ final class Admin {
 	}
 
 	/**
-	 * The note on Leitvia Pro in the product notes: what Pro adds and a link to its plans. Runs on
-	 * leitvia_studio_upsell_slot; prints nothing while Leitvia Pro is active or another brand is set (filter
-	 * leitvia_studio_brand), so client sites of an agency never see it.
+	 * The note on Leitvia Pro in the product notes of the Settings screen only: what Pro adds and a link to its
+	 * plans. Runs on leitvia_studio_screen_notes; prints nothing while Leitvia Pro is active or another brand is set
+	 * (filter leitvia_studio_brand).
+	 *
+	 * @param string $slug Page slug of the screen.
 	 */
-	public static function pro_note(): void {
-		if ( defined( 'LEITVIA_PRO_VERSION' ) || __( 'Leitvia Studio', 'leitvia-studio' ) !== leitvia_studio_brand()['name'] ) {
+	public static function pro_note( string $slug = '' ): void {
+		if ( 'leitvia-studio-settings' !== $slug || defined( 'LEITVIA_PRO_VERSION' ) || __( 'Leitvia Studio', 'leitvia-studio' ) !== leitvia_studio_brand()['name'] ) {
 			return;
 		}
 		echo wp_kses_post( self::pro_note_markup() );
@@ -211,8 +213,8 @@ final class Admin {
 	}
 
 	/**
-	 * Product notes above the app of a Studio screen: the note on Leitvia Pro (pro_note()) and what add-ons print
-	 * into leitvia_studio_upsell_slot. Nothing is printed outside Studio screens, with the setting hide_product_notes
+	 * Product notes above the app of a Studio screen: the note on Leitvia Pro on Settings (pro_note()) and what
+	 * add-ons print into leitvia_studio_screen_notes. Nothing is printed outside Studio screens, with the setting hide_product_notes
 	 * or after the user dismissed the notes.
 	 *
 	 * @param string $screen_id WordPress screen ID, for example toplevel_page_leitvia-studio.
@@ -225,11 +227,12 @@ final class Admin {
 		}
 		ob_start();
 		/**
-		 * Fires above the app of every Studio screen. Output appears in an aside the user can dismiss.
+		 * Fires above the app of every Studio screen, for notes on the screen. Output appears in an aside the user can
+		 * dismiss.
 		 *
 		 * @param string $slug Page slug of the screen, for example leitvia-studio.
 		 */
-		do_action( 'leitvia_studio_upsell_slot', $slug );
+		do_action( 'leitvia_studio_screen_notes', $slug );
 		$notes = trim( (string) ob_get_clean() );
 		if ( '' === $notes ) {
 			return '';
@@ -326,6 +329,15 @@ final class Admin {
 				leitvia_studio_contract()->is_valid() ? leitvia_studio_contract()->variations() : array()
 			),
 			'labPanels'      => $panels,
+			// Exports of add-ons in the token list; Studio's own download is the action "Export".
+			'syncTargets'    => array_map(
+				static fn( string $name, array $target ): array => array(
+					'name'  => $name,
+					'label' => (string) $target['label'],
+				),
+				array_keys( leitvia_studio()->registry( 'sync_targets' )->all() ),
+				leitvia_studio()->registry( 'sync_targets' )->all()
+			),
 			'notesDismissed' => (bool) get_user_meta( get_current_user_id(), self::NOTES_DISMISSED, true ),
 			'usageIndex'     => \LeitviaStudio\Lab\Usage_Index::is_built(),
 			'brand'          => leitvia_studio_brand()['name'],

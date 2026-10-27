@@ -72,6 +72,12 @@ final class Tokens_Controller extends \WP_REST_Controller {
 						'type'    => 'boolean',
 						'default' => false,
 					),
+					'target'   => array(
+						'description' => 'Sync target that exports the file; another one than leitvia/download always sends a file.',
+						'type'        => 'string',
+						'pattern'     => '^[a-z0-9-]+/[a-z0-9-]+$',
+						'default'     => 'leitvia/download',
+					),
 				),
 			)
 		);
@@ -169,7 +175,8 @@ final class Tokens_Controller extends \WP_REST_Controller {
 
 	/**
 	 * The stored document of a set, unchanged. With download=1 it goes through the sync target leitvia/download
-	 * and is sent as a .tokens.json file.
+	 * and is sent as a .tokens.json file; target names another sync target, whose export is sent as
+	 * <slug>.<target>.tokens.json.
 	 *
 	 * @param \WP_REST_Request $request Request.
 	 * @return \WP_REST_Response|\WP_Error
@@ -181,18 +188,22 @@ final class Tokens_Controller extends \WP_REST_Controller {
 			return $valid;
 		}
 		// Objects keep {} and [] apart, so the export is the stored document as it is.
-		$doc = json_decode( (string) get_post_meta( $id, Token_Sets::META, true ) );
-		if ( ! $request['download'] ) {
+		$doc  = json_decode( (string) get_post_meta( $id, Token_Sets::META, true ) );
+		$name = (string) $request['target'];
+		if ( ! $request['download'] && 'leitvia/download' === $name ) {
 			return rest_ensure_response( $doc );
 		}
-		$post     = get_post( $id );
-		$slug     = $post && '' !== $post->post_name ? $post->post_name : 'token-set-' . $id;
-		$target   = leitvia_studio()->registry( 'sync_targets' )->get( 'leitvia/download' );
+		$post   = get_post( $id );
+		$slug   = $post && '' !== $post->post_name ? $post->post_name : 'token-set-' . $id;
+		$target = leitvia_studio()->registry( 'sync_targets' )->get( $name );
+		if ( null === $target && 'leitvia/download' !== $name ) {
+			return new \WP_Error( 'leitvia_studio_unknown_sync_target', __( 'This export is not available.', 'leitvia-studio' ), array( 'status' => 404 ) );
+		}
 		$exported = call_user_func(
 			$target['export'] ?? array( Sources::class, 'download' ),
 			array(
 				'id'       => $id,
-				'title'    => get_the_title( $id ),
+				'title'    => (string) get_post_field( 'post_title', $id ),
 				'document' => $doc,
 			)
 		);
@@ -205,7 +216,9 @@ final class Tokens_Controller extends \WP_REST_Controller {
 		}
 		$response = rest_ensure_response( $exported );
 		$response->header( 'Content-Type', 'application/design-tokens+json' );
-		$response->header( 'Content-Disposition', 'attachment; filename="' . sanitize_file_name( $slug ) . '.tokens.json"' );
+		// Other targets name their files after the second part of their name: brand.flat.tokens.json for my-addon/flat.
+		$suffix = 'leitvia/download' === $name ? '' : '.' . explode( '/', $name )[1];
+		$response->header( 'Content-Disposition', 'attachment; filename="' . sanitize_file_name( $slug . $suffix ) . '.tokens.json"' );
 		return $response;
 	}
 

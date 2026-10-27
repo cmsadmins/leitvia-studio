@@ -15,8 +15,8 @@ defined( 'ABSPATH' ) || exit;
  * Applies the set of the running overlay at runtime on the front end only. Nothing is written into the global styles,
  * so the overlay ends with its end time or when Studio is deactivated.
  *
- * REST writes go through validate_rest(). Writes past REST (update_post_meta(), fleet overlays of 7b through
- * sync_targets) must call check() first; current() ignores sets that fail the checks either way.
+ * REST writes go through validate_rest(). Writes past REST (update_post_meta(), writes of add-ons) must call
+ * check() first; current() ignores sets that fail the checks either way.
  */
 final class Overlays {
 

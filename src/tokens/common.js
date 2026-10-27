@@ -127,13 +127,16 @@ export function Findings( { heading, findings, linkTo } ) {
  * Downloads the export of a set as a file. The REST nonce rides along with apiFetch, so the file comes as a blob
  * and leaves through an object URL; the name comes from Content-Disposition.
  *
- * @param {number} id Token set ID.
+ * @param {number} id     Token set ID.
+ * @param {string} target Sync target that exports the file.
  */
-export async function downloadSet( id ) {
+export async function downloadSet( id, target = 'leitvia/download' ) {
 	let response;
 	try {
 		response = await apiFetch( {
-			path: `/leitvia-studio/v1/token-sets/${ id }/export?download=1`,
+			path: `/leitvia-studio/v1/token-sets/${ id }/export?download=1&target=${ encodeURIComponent(
+				target
+			) }`,
 			parse: false,
 		} );
 	} catch ( error ) {

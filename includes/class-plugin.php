@@ -104,7 +104,7 @@ final class Plugin {
 		add_action( 'init', array( Admin\Settings::class, 'remove_emoji_loader' ) );
 		add_action( 'admin_init', array( Admin\Settings::class, 'remove_emoji_loader' ) );
 		add_action( 'rest_api_init', array( Admin\Admin::class, 'register_routes' ) );
-		add_action( 'leitvia_studio_upsell_slot', array( Admin\Admin::class, 'pro_note' ) );
+		add_action( 'leitvia_studio_screen_notes', array( Admin\Admin::class, 'pro_note' ) );
 		Avatars\Avatars::boot();
 		add_action( 'init', array( Model\Registrar::class, 'register' ), 9 );
 		add_action( 'init', array( Model\Registrar::class, 'maybe_flush' ), 999 );

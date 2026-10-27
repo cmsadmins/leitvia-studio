@@ -4,7 +4,7 @@ Tags: ai, mcp, block theme, accessibility, design tokens
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.6
+Stable tag: 1.3.7
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -197,9 +197,13 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 
 * Imprint: https://leitvia.com/legal-notice/ (German original: https://leitvia.com/de/impressum/)
 * Privacy policy: https://leitvia.com/privacy-policy/
-* Terms for the paid Leitvia Pro plans and the account on leitvia.com (they do not apply to this free software): https://leitvia.com/terms/
 
 == Changelog ==
+
+= 1.3.7 =
+* Extension API: add-ons can turn other file formats into Lab patterns on import (filter leitvia_studio_import_pattern_file).
+* Extension API: exports that add-ons register as sync targets appear as actions in the token list (REST: export with target).
+* Extension API: the action for notes above Studio screens is now leitvia_studio_screen_notes. The note on Leitvia Pro shows on the Settings screen only.
 
 = 1.3.6 =
 * Highlight: the circle style is drawn on every line of a wrapped mark instead of one ellipse around all lines.

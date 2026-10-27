@@ -67,13 +67,13 @@ class Test_Admin extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Every screen prints only the frame with the upsell slot and the app root.
+	 * Every screen prints only the frame with the notes and the app root.
 	 */
 	public function test_render_prints_the_frame(): void {
 		set_current_screen( 'toplevel_page_leitvia-studio' );
 		$slot = '';
 		add_action(
-			'leitvia_studio_upsell_slot',
+			'leitvia_studio_screen_notes',
 			static function ( string $screen_id ) use ( &$slot ): void {
 				$slot = $screen_id;
 			}

@@ -223,4 +223,24 @@ class Test_Pattern_IO extends WP_UnitTestCase {
 		$this->assertSame( 0, $response->get_data()['imported_variants'] );
 		$this->assertSame( 1, $response->get_data()['failed_variants'] );
 	}
+
+	/**
+	 * An add-on turns its own format into a pattern file through the filter, or refuses it with an error.
+	 */
+	public function test_import_filter_converts_other_formats(): void {
+		$convert  = static fn( $data ) => is_array( $data ) && isset( $data['flat'] ) ? array(
+			'__file'     => 'wp_block',
+			'title'      => $data['flat'],
+			'content'    => '<!-- wp:paragraph --><p>Flat</p><!-- /wp:paragraph -->',
+			'syncStatus' => 'unsynced',
+		) : $data;
+		add_filter( 'leitvia_studio_import_pattern_file', $convert );
+		$response = self::import( '{"flat":"From elsewhere"}' );
+		$this->assertSame( 201, $response->get_status() );
+		$this->assertSame( 'From elsewhere', $response->get_data()['title'] );
+
+		add_filter( 'leitvia_studio_import_pattern_file', static fn() => new WP_Error( 'test_refused', 'Refused.', array( 'status' => 422 ) ), 20 );
+		$this->assertSame( 422, self::import( '{"flat":"Again"}' )->get_status() );
+		remove_all_filters( 'leitvia_studio_import_pattern_file' );
+	}
 }

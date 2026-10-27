@@ -301,6 +301,37 @@ class Test_Dtcg_Io extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Another sync target exports the file in its own form, named after it; an unknown target is refused.
+	 */
+	public function test_export_through_a_sync_target(): void {
+		add_action(
+			'leitvia_studio_init',
+			static function ( $studio ): void {
+				$studio->registry( 'sync_targets' )->register(
+					'leitvia/test-flat',
+					array(
+						'label'  => 'Flat file',
+						'export' => static fn( array $package ): array => array( 'title' => $package['title'] ),
+					),
+					'leitvia-studio'
+				);
+			},
+			99
+		);
+		leitvia_studio()->reset_for_tests();
+		$id      = self::import( 'Foreign Tool', self::fixture() )->get_data()['id'];
+		$request = new WP_REST_Request( 'GET', "/leitvia-studio/v1/token-sets/$id/export" );
+		$request->set_param( 'target', 'leitvia/test-flat' );
+		$response = rest_do_request( $request );
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( 'attachment; filename="foreign-tool.test-flat.tokens.json"', $response->get_headers()['Content-Disposition'] );
+		$this->assertSame( array( 'title' => 'Foreign Tool' ), $response->get_data() );
+
+		$request->set_param( 'target', 'leitvia/missing' );
+		$this->assertSame( 404, rest_do_request( $request )->get_status() );
+	}
+
+	/**
 	 * Raw fixture JSON.
 	 */
 	private static function fixture(): string {

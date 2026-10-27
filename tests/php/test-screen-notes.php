@@ -1,6 +1,6 @@
 <?php
 /**
- * Upsell slot on Studio screens.
+ * Product notes on Studio screens.
  *
  * @package LeitviaStudio
  */
@@ -10,7 +10,7 @@ use LeitviaStudio\Admin\Admin;
 /**
  * The slot prints only on Studio screens, respects the global switch and the per-user dismissal, and Free leaves it empty.
  */
-class Test_Upsell_Slot extends WP_UnitTestCase {
+class Test_Screen_Notes extends WP_UnitTestCase {
 
 	/**
 	 * Registers the menu as an administrator, so Admin knows the Studio screen IDs.
@@ -30,7 +30,7 @@ class Test_Upsell_Slot extends WP_UnitTestCase {
 	public function test_slot_renders_only_on_studio_screens_and_respects_switches(): void {
 		$admin = get_current_user_id();
 		add_action(
-			'leitvia_studio_upsell_slot',
+			'leitvia_studio_screen_notes',
 			static function (): void {
 				echo '<p>note</p>';
 			}
@@ -51,12 +51,13 @@ class Test_Upsell_Slot extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Free hooks only its note on Leitvia Pro into the slot. The note names what Pro adds and links its plans; it
-	 * stays away while Pro is active (as on the test site) and under another brand.
+	 * Free hooks only its note on Leitvia Pro into the notes. The note names what Pro adds and links its plans; it
+	 * shows on the Settings screen only and stays away while Pro is active (as on the test site) and under another
+	 * brand.
 	 */
 	public function test_free_adds_only_the_note_on_pro(): void {
 		global $wp_filter;
-		$callbacks = array_merge( ...array_values( $wp_filter['leitvia_studio_upsell_slot']->callbacks ) );
+		$callbacks = array_merge( ...array_values( $wp_filter['leitvia_studio_screen_notes']->callbacks ) );
 		$this->assertSame( array( array( Admin::class, 'pro_note' ) ), array_column( $callbacks, 'function' ) );
 
 		$note = Admin::pro_note_markup();
@@ -64,14 +65,17 @@ class Test_Upsell_Slot extends WP_UnitTestCase {
 		$this->assertStringContainsString( '<a href="https://leitvia.com/pricing/">Plans of Leitvia Pro</a>', $note );
 
 		ob_start();
-		Admin::pro_note();
+		Admin::pro_note( 'leitvia-studio-settings' );
 		$printed = (string) ob_get_clean();
 		$this->assertSame( defined( 'LEITVIA_PRO_VERSION' ) ? '' : $note, $printed );
+		ob_start();
+		Admin::pro_note( 'leitvia-studio' );
+		$this->assertSame( '', (string) ob_get_clean(), 'not on the other screens' );
 
 		$brand = static fn( array $brand ): array => array_merge( $brand, array( 'name' => 'Agency Studio' ) );
 		add_filter( 'leitvia_studio_brand', $brand );
 		ob_start();
-		Admin::pro_note();
+		Admin::pro_note( 'leitvia-studio-settings' );
 		$this->assertSame( '', (string) ob_get_clean() );
 		remove_filter( 'leitvia_studio_brand', $brand );
 	}
