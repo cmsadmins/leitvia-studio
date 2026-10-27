@@ -41,8 +41,66 @@ final class Diff {
 	 * @return list<array<string, mixed>>|\WP_Error
 	 */
 	public static function operation( array $entry, int $max = self::MAX_BYTES ) {
-		$op = new Operation( (string) $entry['ability'], (string) $entry['area'], (array) $entry['target'], (string) $entry['base_hash'], static fn( array $state ): array => $state );
-		return self::states( self::current( $op ), (array) $entry['state'], $max );
+		return self::states( self::before( $entry ), (array) $entry['state'], $max );
+	}
+
+	/**
+	 * Current state of the target of a stored operation.
+	 *
+	 * @param array<string, mixed> $entry Stored operation.
+	 * @return array<string, mixed>
+	 */
+	public static function before( array $entry ): array {
+		return self::current( new Operation( (string) $entry['ability'], (string) $entry['area'], (array) $entry['target'], (string) $entry['base_hash'], static fn( array $state ): array => $state ) );
+	}
+
+	/**
+	 * Readable summary of a change to the global styles: the color and font presets whose value changes, each with
+	 * slug, name, before and after ('' where the preset is missing on that side). Presets come from the theme
+	 * (settings of theme.json) with the user presets of the state laid over them.
+	 *
+	 * @param array<string, mixed> $before State before (post_content is the global styles JSON).
+	 * @param array<string, mixed> $after  State after.
+	 * @param array<string, mixed> $theme  Settings of the theme, as WP_Theme_JSON::get_settings() returns them.
+	 * @return array{colors: list<array<string, string>>, fonts: list<array<string, string>>}
+	 */
+	public static function styles( array $before, array $after, array $theme = array() ): array {
+		$lists = array(
+			'colors' => array( 'color', 'palette', 'color' ),
+			'fonts'  => array( 'typography', 'fontFamilies', 'fontFamily' ),
+		);
+		$old   = json_decode( (string) ( $before['post_content'] ?? '' ), true );
+		$new   = json_decode( (string) ( $after['post_content'] ?? '' ), true );
+		$out   = array(
+			'colors' => array(),
+			'fonts'  => array(),
+		);
+		foreach ( $lists as $key => list( $section, $list, $field ) ) {
+			$presets     = static function ( $settings ) use ( $section, $list, $field ): array {
+				$map = array();
+				foreach ( (array) ( $settings[ $section ][ $list ]['theme'] ?? array() ) as $preset ) {
+					if ( is_array( $preset ) && is_scalar( $preset['slug'] ?? null ) && is_scalar( $preset[ $field ] ?? null ) ) {
+						$map[ (string) $preset['slug'] ] = array( (string) ( $preset['name'] ?? $preset['slug'] ), (string) $preset[ $field ] );
+					}
+				}
+				return $map;
+			};
+			$base        = $presets( $theme );
+			$a           = $presets( is_array( $old ) ? ( $old['settings'] ?? array() ) : array() ) + $base;
+			$b           = $presets( is_array( $new ) ? ( $new['settings'] ?? array() ) : array() ) + $base;
+			$out[ $key ] = array();
+			foreach ( array_keys( $b + $a ) as $slug ) {
+				if ( ( $a[ $slug ][1] ?? '' ) !== ( $b[ $slug ][1] ?? '' ) ) {
+					$out[ $key ][] = array(
+						'slug'   => (string) $slug,
+						'name'   => (string) ( $b[ $slug ][0] ?? $a[ $slug ][0] ),
+						'before' => (string) ( $a[ $slug ][1] ?? '' ),
+						'after'  => (string) ( $b[ $slug ][1] ?? '' ),
+					);
+				}
+			}
+		}
+		return $out;
 	}
 
 	/**

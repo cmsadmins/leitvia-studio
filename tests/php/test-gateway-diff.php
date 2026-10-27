@@ -158,4 +158,94 @@ class Test_Gateway_Diff extends WP_UnitTestCase {
 		$this->assertSame( 413, $big->get_error_data()['status'] );
 		$this->assertWPError( Diff::states( array( 'value' => 'a' ), array( 'value' => str_repeat( 'b', 200 ) ), 100 ) );
 	}
+
+	/**
+	 * Global styles in words: changed color and font presets, theme presets as the base, unchanged ones left out.
+	 */
+	public function test_styles_summary(): void {
+		$styles = static fn( array $palette, array $fonts = array() ): array => array(
+			'post_type'    => 'wp_global_styles',
+			'post_content' => (string) wp_json_encode(
+				array(
+					'settings' => array(
+						'color'      => array( 'palette' => array( 'theme' => $palette ) ),
+						'typography' => array( 'fontFamilies' => array( 'theme' => $fonts ) ),
+					),
+				)
+			),
+		);
+		$theme  = array(
+			'color'      => array(
+				'palette' => array(
+					'theme' => array(
+						array(
+							'slug'  => 'base',
+							'name'  => 'Base',
+							'color' => '#ffffff',
+						),
+						array(
+							'slug'  => 'accent',
+							'name'  => 'Accent',
+							'color' => '#0b4f9c',
+						),
+					),
+				),
+			),
+			'typography' => array(
+				'fontFamilies' => array(
+					'theme' => array(
+						array(
+							'slug'       => 'body',
+							'name'       => 'Body',
+							'fontFamily' => 'Inter, sans-serif',
+						),
+					),
+				),
+			),
+		);
+		$after  = $styles(
+			array(
+				array(
+					'slug'  => 'accent',
+					'name'  => 'Accent',
+					'color' => '#b00020',
+				),
+			),
+			array(
+				array(
+					'slug'       => 'body',
+					'name'       => 'Body',
+					'fontFamily' => 'Georgia, serif',
+				),
+			)
+		);
+		$this->assertSame(
+			array(
+				'colors' => array(
+					array(
+						'slug'   => 'accent',
+						'name'   => 'Accent',
+						'before' => '#0b4f9c',
+						'after'  => '#b00020',
+					),
+				),
+				'fonts'  => array(
+					array(
+						'slug'   => 'body',
+						'name'   => 'Body',
+						'before' => 'Inter, sans-serif',
+						'after'  => 'Georgia, serif',
+					),
+				),
+			),
+			Diff::styles( array(), $after, $theme )
+		);
+		$this->assertSame(
+			array(
+				'colors' => array(),
+				'fonts'  => array(),
+			),
+			Diff::styles( $after, $after, $theme )
+		);
+	}
 }

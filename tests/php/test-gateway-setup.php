@@ -244,17 +244,33 @@ class Test_Gateway_Setup extends WP_UnitTestCase {
 
 		$this->assert_rejected( 'leitvia_invalid_input', self::call( 'leitvia/activate-token-set', array( 'set' => self::factory()->post->create() ) ) );
 
+		$doc['color']['accent']['$value']['hex'] = '#b00020';
+		$red                                     = self::call(
+			'leitvia/create-token-set',
+			array(
+				'title'    => 'Red',
+				'document' => $doc,
+			)
+		)['target']['post'];
 		$this->sign_in( 'standard' );
-		$this->assert_mode(
+		$result = $this->assert_mode(
 			'package',
 			self::call(
 				'leitvia/activate-token-set',
 				array(
-					'set'       => $set,
+					'set'       => $red,
 					'base_hash' => Hashes::document( $styles ),
 				)
 			)
 		);
+
+		// The inbox names the set and the colors that change, not only the JSON of the global styles.
+		$summary = Packages::detail( (int) $result['package'] )['items'][0]['styles'];
+		$this->assertSame( 'Red', $summary['token_set'] );
+		$accent = wp_list_filter( $summary['colors'], array( 'slug' => 'accent' ) );
+		$this->assertCount( 1, $accent );
+		$this->assertSame( '#0b4f9c', strtolower( reset( $accent )['before'] ) );
+		$this->assertSame( '#b00020', strtolower( reset( $accent )['after'] ) );
 	}
 
 	/**

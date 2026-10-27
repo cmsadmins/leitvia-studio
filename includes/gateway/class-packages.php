@@ -315,7 +315,8 @@ final class Packages {
 	/**
 	 * A package with its operations: summary() plus per operation id, ability, area, target, level, kinds, findings,
 	 * status, applied (post and hash), conflict, modified_by (who saved the target post last) and, for open ones, the block diff against the
-	 * current state (or diff_error).
+	 * current state (or diff_error) and, for global styles, styles: changed colors and fonts (Diff::styles()) and token_set, the
+	 * title of the token set being activated or ''.
 	 *
 	 * @param int $id Package ID.
 	 * @return array<string, mixed>|\WP_Error
@@ -344,6 +345,12 @@ final class Packages {
 				$item['diff'] = is_wp_error( $diff ) ? array() : $diff;
 				if ( is_wp_error( $diff ) ) {
 					$item['diff_error'] = $diff->get_error_code();
+				}
+				// Global styles: the colors and fonts that change, in words, and the token set being activated.
+				if ( in_array( $entry['state']['post_type'] ?? $entry['target']['post_type'] ?? '', Pipeline::JSON_TYPES, true ) ) {
+					$set            = (int) ( $entry['target']['token_set'] ?? 0 );
+					$item['styles'] = Diff::styles( is_array( $earlier ) ? $earlier : Diff::before( $entry ), (array) $entry['state'], \WP_Theme_JSON_Resolver::get_theme_data()->get_settings() )
+						+ array( 'token_set' => $set ? (string) get_post_field( 'post_title', $set ) : '' );
 				}
 			}
 			$operations[] = $item;

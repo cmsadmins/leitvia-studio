@@ -52,6 +52,16 @@
 	}
 }
 
+// A color next to its hex value; the value is the information, the swatch only helps the eye.
+.leitvia-studio-inbox__swatch {
+	display: inline-block;
+	width: 1em;
+	height: 1em;
+	margin-inline-end: 6px;
+	vertical-align: -0.15em;
+	border: 1px solid #757575;
+}
+
 .leitvia-studio-agents__secret,
 .leitvia-studio-agents__create,
 .leitvia-studio-agents__autonomy {

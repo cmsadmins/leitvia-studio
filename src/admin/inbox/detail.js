@@ -132,6 +132,121 @@ function Diff( { item } ) {
 	);
 }
 
+/**
+ * One side of a preset change: a swatch for colors, always with the value as text.
+ *
+ * @param {Object}  props       Props.
+ * @param {string}  props.value Hex color or font family, '' when missing.
+ * @param {boolean} props.color Whether the value is a color.
+ */
+function Value( { value, color } ) {
+	if ( ! value ) {
+		return __( 'none', 'leitvia-studio' );
+	}
+	return (
+		<>
+			{ color && (
+				<span
+					className="leitvia-studio-inbox__swatch"
+					style={ { background: value } }
+					aria-hidden="true"
+				/>
+			) }
+			<code>{ value }</code>
+		</>
+	);
+}
+
+/**
+ * Global styles in words: what the operation activates and the colors and fonts that change.
+ *
+ * @param {Object} props      Props.
+ * @param {Object} props.item Operation with styles.
+ */
+function StylesSummary( { item } ) {
+	const { token_set: set, colors = [], fonts = [] } = item.styles;
+	const tables = [
+		[
+			colors,
+			true,
+			/* translators: %d: operation number. */
+			__( 'Colors that change with operation %d', 'leitvia-studio' ),
+			__( 'Color', 'leitvia-studio' ),
+		],
+		[
+			fonts,
+			false,
+			/* translators: %d: operation number. */
+			__( 'Fonts that change with operation %d', 'leitvia-studio' ),
+			__( 'Font', 'leitvia-studio' ),
+		],
+	];
+	return (
+		<>
+			<p>
+				{ set
+					? sprintf(
+							/* translators: %s: title of a token set. */
+							__(
+								'Activates the token set %s. Colors, fonts and spacing of the whole site change; check the preview before you apply.',
+								'leitvia-studio'
+							),
+							set
+						)
+					: __(
+							'Changes the global styles. Colors, fonts and spacing of the whole site can change; check the preview before you apply.',
+							'leitvia-studio'
+						) }
+			</p>
+			{ tables.map(
+				( [ rows, color, caption, label ] ) =>
+					rows.length > 0 && (
+						<div
+							className="leitvia-studio-inbox__diff"
+							key={ label }
+						>
+							<table className="widefat striped">
+								<caption>
+									{ sprintf( caption, item.id ) }
+								</caption>
+								<thead>
+									<tr>
+										<th scope="col">{ label }</th>
+										<th scope="col">
+											{ __( 'Before', 'leitvia-studio' ) }
+										</th>
+										<th scope="col">
+											{ __( 'After', 'leitvia-studio' ) }
+										</th>
+									</tr>
+								</thead>
+								<tbody>
+									{ rows.map( ( row ) => (
+										<tr key={ row.slug }>
+											<th scope="row">{ row.name }</th>
+											<td>
+												<Value
+													value={ row.before }
+													color={ color }
+												/>
+											</td>
+											<td>
+												<Value
+													value={ row.after }
+													color={ color }
+												/>
+											</td>
+										</tr>
+									) ) }
+								</tbody>
+							</table>
+						</div>
+					)
+			) }
+		</>
+	);
+}
+
 function Operation( { item, checked, onToggle } ) {
 	const heading = `leitvia-studio-op-${ item.id }`;
 	const facts = [
@@ -211,7 +326,22 @@ function Operation( { item, checked, onToggle } ) {
 					</ul>
 				</>
 			) }
-			<Diff item={ item } />
+			{ item.styles ? (
+				<>
+					<StylesSummary item={ item } />
+					<details>
+						<summary>
+							{ __(
+								'Technical changes (global styles JSON)',
+								'leitvia-studio'
+							) }
+						</summary>
+						<Diff item={ item } />
+					</details>
+				</>
+			) : (
+				<Diff item={ item } />
+			) }
 		</section>
 	);
 }
