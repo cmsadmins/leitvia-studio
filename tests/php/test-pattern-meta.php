@@ -494,4 +494,26 @@ class Test_Pattern_Meta extends WP_UnitTestCase {
 		$this->assertGreaterThan( max( $theme ), $own );
 		$this->assertGreaterThan( $own, (int) array_search( 'pattern:lab-test/other', $refs, true ) );
 	}
+
+	/**
+	 * Lab drafts and patterns in review stay out of the inserter; approved patterns and patterns made outside the Lab
+	 * stay in it.
+	 */
+	public function test_drafts_stay_out_of_the_inserter(): void {
+		$plain    = $this->block();
+		$draft    = $this->block();
+		$review   = $this->block();
+		$approved = $this->block();
+		update_post_meta( $draft, '_leitvia_lab_status', 'draft' );
+		update_post_meta( $review, '_leitvia_lab_status', 'review' );
+		update_post_meta( $approved, '_leitvia_lab_status', 'approved' );
+
+		wp_set_current_user( self::$editor );
+		$ids = wp_list_pluck( $this->request( 'GET', '/wp/v2/blocks', array( 'per_page' => 100 ) )->get_data(), 'id' );
+		$this->assertContains( $plain, $ids );
+		$this->assertContains( $approved, $ids );
+		$this->assertNotContains( $draft, $ids );
+		$this->assertNotContains( $review, $ids );
+		$this->assertSame( 200, $this->request( 'GET', '/wp/v2/blocks/' . $draft )->get_status(), 'a page that uses a draft still loads it' );
+	}
 }

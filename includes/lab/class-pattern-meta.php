@@ -511,13 +511,29 @@ final class Pattern_Meta {
 	}
 
 	/**
-	 * Hides variants from the core pattern lists of the editor. Runs on rest_wp_block_query.
+	 * Hides variants, and patterns the Lab holds as draft or in review, from the core pattern lists of the editor:
+	 * the inserter offers only patterns that are approved, deprecated or never went through the Lab. The Lab lists all
+	 * of them through its own route. Runs on rest_wp_block_query.
 	 *
 	 * @param array<string, mixed> $args WP_Query arguments.
 	 * @return array<string, mixed>
 	 */
 	public static function hide_variants_in_rest( array $args ): array {
-		$args['meta_query'] = isset( $args['meta_query'] ) ? array( $args['meta_query'], self::originals_query() ) : self::originals_query(); // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- Variants are few; core has no other hook.
+		// Without the status meta a pattern was made outside the Lab; it stays in the inserter.
+		$ready              = self::originals_query();
+		$ready[]            = array(
+			'relation' => 'OR',
+			array(
+				'key'     => '_leitvia_lab_status',
+				'compare' => 'NOT EXISTS',
+			),
+			array(
+				'key'     => '_leitvia_lab_status',
+				'value'   => array( 'draft', 'review' ),
+				'compare' => 'NOT IN',
+			),
+		);
+		$args['meta_query'] = isset( $args['meta_query'] ) ? array( $args['meta_query'], $ready ) : $ready; // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- Variants and drafts are few; core has no other hook.
 		return $args;
 	}
 
