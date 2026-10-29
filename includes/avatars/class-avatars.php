@@ -187,13 +187,13 @@ final class Avatars {
 			return null;
 		}
 		// The form names the user it edits; profile_update can also fire for other users during the same request.
-		if ( ! isset( $_POST['user_id'] ) || absint( $_POST['user_id'] ) !== $user_id ) {
+		if ( ! isset( $_POST['user_id'] ) || absint( wp_unslash( $_POST['user_id'] ) ) !== $user_id ) {
 			return null;
 		}
 		if ( ! empty( $_POST['leitvia_avatar_remove'] ) ) {
 			return 0;
 		}
-		$id = isset( $_POST['leitvia_avatar'] ) ? absint( $_POST['leitvia_avatar'] ) : 0;
+		$id = isset( $_POST['leitvia_avatar'] ) ? absint( wp_unslash( $_POST['leitvia_avatar'] ) ) : 0;
 		if ( ! $id || (int) get_user_option( self::OPTION, $user_id ) === $id ) {
 			return null; // Nothing picked, or the picture stays as it is (maybe set by an administrator).
 		}

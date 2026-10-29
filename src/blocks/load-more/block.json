@@ -31,6 +31,5 @@
 		"attributes": { "text": "Load more" }
 	},
 	"editorScript": "file:./index.js",
-	"viewScriptModule": "file:./view.js",
-	"render": "file:./render.php"
+	"viewScriptModule": "file:./view.js"
 }

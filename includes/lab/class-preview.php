@@ -50,10 +50,26 @@ new ResizeObserver(draw).observe(document.documentElement);
 JS;
 
 	/**
-	 * Answers preview requests before any template loads. Runs on template_redirect, priority 0.
+	 * Block markup of the page the preview renders, set by prepare() and handed to the template canvas by canvas().
+	 *
+	 * @var string
+	 */
+	private static string $page = '';
+
+	/**
+	 * Filters prepare() adds for this request, see reset().
+	 *
+	 * @var array<string, callable>
+	 */
+	private static array $filters = array();
+
+	/**
+	 * Answers preview requests before any template loads. Runs on template_redirect, priority 0. A refused request ends
+	 * in wp_die() with the escaped reason; an allowed one renders through the block template canvas of core
+	 * (wp-includes/template-canvas.php), with the pattern as the only content of the page.
 	 */
 	public static function maybe_render(): void {
-		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- respond() checks the nonce.
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- prepare() checks the nonce.
 		if ( ! isset( $_GET['leitvia_studio_preview'] ) ) {
 			return;
 		}
@@ -63,22 +79,40 @@ JS;
 		);
 		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 		show_admin_bar( false );
-		$response = self::respond( $query );
-		status_header( $response['status'] );
+		$response = self::prepare( $query );
 		foreach ( $response['headers'] as $name => $value ) {
 			header( "{$name}: {$value}" );
 		}
-		echo $response['body']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- The preview document respond() builds for a user with edit_posts and a valid nonce: escaped head and rendered blocks.
-		exit;
+		if ( 200 !== $response['status'] ) {
+			wp_die( esc_html( $response['message'] ), '', array( 'response' => (int) $response['status'] ) );
+		}
+		add_filter( 'template_include', array( self::class, 'canvas' ), PHP_INT_MAX );
 	}
 
 	/**
-	 * Status, headers and body of a preview request.
+	 * Filter template_include: the block template canvas of core, with the prepared page as the current template.
+	 * Runs after locate_block_template(), which would otherwise set a template of the theme.
+	 *
+	 * @return string Path of the template canvas.
+	 */
+	public static function canvas(): string {
+		global $_wp_current_template_id, $_wp_current_template_content;
+		// Not an ID of the theme, so core renders the content as it is, without entering the main query loop. Both are
+		// the globals of core that get_the_block_template_html() reads.
+		$_wp_current_template_id      = 'leitvia-studio//preview'; // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- Global of core.
+		$_wp_current_template_content = self::$page; // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- Global of core.
+		return ABSPATH . 'wp-includes/template-canvas.php';
+	}
+
+	/**
+	 * Checks a preview request and, when it may be shown, prepares this request for it: the style variation or token
+	 * set for this request only, axe, the annotation marks, the scripts for the Lab, the title and the page markup for
+	 * canvas(). Returns the status, the headers and, for a refused request, the reason.
 	 *
 	 * @param array<string, string> $query Query parameters ref, style, set, axe, annotations and _wpnonce.
-	 * @return array{status: int, headers: array<string, string>, body: string}
+	 * @return array{status: int, headers: array<string, string>, message: string}
 	 */
-	public static function respond( array $query ): array {
+	public static function prepare( array $query ): array {
 		// Shown only in frames of the Lab on the same site, never cached, never indexed.
 		$headers = array(
 			'X-Robots-Tag'            => 'noindex',
@@ -87,8 +121,8 @@ JS;
 		) + array_filter( wp_get_nocache_headers() );
 		$error   = static fn( int $status, string $message ): array => array(
 			'status'  => $status,
-			'headers' => $headers + array( 'Content-Type' => 'text/plain; charset=utf-8' ),
-			'body'    => $message,
+			'headers' => $headers,
+			'message' => $message,
 		);
 
 		if ( ! current_user_can( 'edit_posts' ) || ! wp_verify_nonce( $query['_wpnonce'] ?? '', 'leitvia_studio_preview' ) ) {
@@ -103,7 +137,7 @@ JS;
 			return $error( (int) ( $config->get_error_data()['status'] ?? 422 ), $config->get_error_message() );
 		}
 
-		$filter = static function ( \WP_Theme_JSON_Data $theme_json ) use ( $config ): \WP_Theme_JSON_Data {
+		self::$filters['wp_theme_json_data_user'] = static function ( \WP_Theme_JSON_Data $theme_json ) use ( $config ): \WP_Theme_JSON_Data {
 			if ( isset( $config['style'] ) ) {
 				$theme_json = $theme_json->update_with( $config['style'] + array( 'version' => \WP_Theme_JSON::LATEST_SCHEMA ) );
 			}
@@ -116,9 +150,6 @@ JS;
 		if ( '1' === ( $query['axe'] ?? '' ) ) {
 			self::enqueue_axe();
 		}
-		add_filter( 'wp_theme_json_data_user', $filter );
-		\WP_Theme_JSON_Resolver::clean_cached_data();
-		wp_clean_theme_json_cache();
 
 		$numbers = array();
 		$id      = preg_match( '/^block:([1-9]\d*)$/D', $query['ref'] ?? '', $match ) ? (int) $match[1] : 0;
@@ -131,44 +162,45 @@ JS;
 				$numbers[ $annotation['target'] ][] = $annotation['number'];
 			}
 		}
-		$mark = static function ( string $html, array $block ) use ( $numbers ): string {
-			$name = (string) ( $block['attrs']['metadata']['name'] ?? '' );
-			if ( ! isset( $numbers[ $name ] ) ) {
-				return $html;
-			}
-			$tags = new \WP_HTML_Tag_Processor( $html );
-			if ( $tags->next_tag() ) {
-				$tags->set_attribute( 'data-leitvia-annotation', implode( ' ', $numbers[ $name ] ) );
-			}
-			return $tags->get_updated_html();
-		};
 		if ( $numbers ) {
-			add_filter( 'render_block', $mark, 10, 2 );
+			self::$filters['render_block'] = static function ( string $html, array $block ) use ( $numbers ): string {
+				$name = (string) ( $block['attrs']['metadata']['name'] ?? '' );
+				if ( ! isset( $numbers[ $name ] ) ) {
+					return $html;
+				}
+				$tags = new \WP_HTML_Tag_Processor( $html );
+				if ( $tags->next_tag() ) {
+					$tags->set_attribute( 'data-leitvia-annotation', implode( ' ', $numbers[ $name ] ) );
+				}
+				return $tags->get_updated_html();
+			};
 		}
-		// Rendered before wp_head(), as the block template canvas does, so block styles and script modules land in head.
-		$blocks = do_blocks( $content );
-		remove_filter( 'render_block', $mark );
-		ob_start();
-		?>
-<!DOCTYPE html>
-<html <?php language_attributes(); ?>>
-<head>
-<meta charset="<?php bloginfo( 'charset' ); ?>">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title><?php echo esc_html( __( 'Pattern preview', 'leitvia-studio' ) ); ?></title>
-		<?php
-		// The page has its own title (WCAG 2.4.2); core prints one only for themes with title-tag support.
-		remove_action( 'wp_head', '_wp_render_title_tag', 1 );
-		wp_head();
-		?>
-</head>
-<body class="leitvia-studio-preview">
-<main id="main">
-		<?php echo $blocks; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Output of do_blocks(), as core prints the_content; kses would strip forms and inline SVG the pattern shows. ?>
-</main>
-		<?php
-		// Reports the page height to the Lab so the frame can grow with the pattern; links and forms stay inert.
-		wp_print_inline_script_tag(
+		// The page has its own title (WCAG 2.4.2) and the body class the Lab styles rely on.
+		self::$filters['pre_get_document_title'] = static fn(): string => __( 'Pattern preview', 'leitvia-studio' );
+		self::$filters['body_class']             = static fn( array $classes ): array => array_merge( $classes, array( 'leitvia-studio-preview' ) );
+		foreach ( self::$filters as $hook => $callback ) {
+			add_filter( $hook, $callback, 10, 2 );
+		}
+		// Themes without title-tag support get the title from here.
+		if ( ! current_theme_supports( 'title-tag' ) ) {
+			add_action(
+				'wp_head',
+				static function (): void {
+					printf( "<title>%s</title>\n", esc_html( wp_get_document_title() ) );
+				},
+				1
+			);
+		}
+		// Core adds the viewport meta tag only for templates it located itself.
+		add_action( 'wp_head', '_block_template_viewport_meta_tag', 0 );
+		\WP_Theme_JSON_Resolver::clean_cached_data();
+		wp_clean_theme_json_cache();
+
+		// Inline scripts of a handle without a file, printed by wp_footer(). Reports the page height to the Lab so the
+		// frame can grow with the pattern; links and forms stay inert.
+		wp_register_script( 'leitvia-studio-preview', false, array(), LEITVIA_STUDIO_VERSION, true );
+		wp_add_inline_script(
+			'leitvia-studio-preview',
 			'new ResizeObserver(function(){window.parent.postMessage({type:"leitvia-studio:height",height:document.documentElement.scrollHeight},window.location.origin);}).observe(document.documentElement);'
 			. 'document.addEventListener("click",function(e){if(e.target.closest&&e.target.closest("a[href]")){e.preventDefault();}},true);'
 			. 'document.addEventListener("submit",function(e){e.preventDefault();},true);'
@@ -176,24 +208,32 @@ JS;
 		if ( $numbers ) {
 			// Numbered marks over the annotated blocks, drawn in the focus colour of the theme. The Lab lists the same
 			// annotations as text, so the marks are hidden from assistive technology.
-			wp_print_inline_script_tag( self::MARKS_SCRIPT );
+			wp_add_inline_script( 'leitvia-studio-preview', self::MARKS_SCRIPT );
 		}
-		wp_footer();
-		?>
-</body>
-</html>
-		<?php
-		$body = (string) ob_get_clean();
+		wp_enqueue_script( 'leitvia-studio-preview' );
 
-		remove_filter( 'wp_theme_json_data_user', $filter );
-		\WP_Theme_JSON_Resolver::clean_cached_data();
-		wp_clean_theme_json_cache();
+		// The pattern is the main content of the page, in a group that renders as <main id="main">.
+		self::$page = '<!-- wp:group {"tagName":"main","anchor":"main"} --><main id="main" class="wp-block-group">' . $content . '</main><!-- /wp:group -->';
 
 		return array(
 			'status'  => 200,
-			'headers' => $headers + array( 'Content-Type' => 'text/html; charset=' . get_bloginfo( 'charset' ) ),
-			'body'    => $body,
+			'headers' => $headers,
+			'message' => '',
 		);
+	}
+
+	/**
+	 * Takes back what prepare() changed for its request: filters, the theme.json caches and the page markup. A preview
+	 * request ends after the canvas, so only tests that render several previews in one process need this.
+	 */
+	public static function reset(): void {
+		foreach ( self::$filters as $hook => $callback ) {
+			remove_filter( $hook, $callback, 10 );
+		}
+		self::$filters = array();
+		self::$page    = '';
+		\WP_Theme_JSON_Resolver::clean_cached_data();
+		wp_clean_theme_json_cache();
 	}
 
 	/**

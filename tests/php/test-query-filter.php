@@ -241,6 +241,40 @@ class Test_Query_Filter extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Parameters of other blocks are carried over only with a clean key and as plain text.
+	 */
+	public function test_carries_over_only_clean_parameters(): void {
+		$_GET = array(
+			'qf-1-category' => array( 'alpha' ),
+			's'             => '<b>news</b> today',
+			'Bad Key"><x'   => 'gone',
+			'UPPER'         => 'gone',
+			'query-2-page'  => array( '2', array( 'nested' ) ),
+		);
+		$html = self::render(
+			'leitvia/query-filter',
+			array(
+				'facets' => array(
+					array(
+						'key'     => 'category',
+						'control' => 'checkbox',
+					),
+				),
+			)
+		);
+		// The reset link repeats the URL through esc_url(); only the hidden inputs carry parameters over.
+		preg_match_all( '#<input type="hidden"[^>]*>#', $html, $hidden );
+		$this->assertSame(
+			array(
+				'<input type="hidden" name="s" value="news today">',
+				'<input type="hidden" name="query-2-page[]" value="2">',
+			),
+			$hidden[0]
+		);
+		$this->assertStringNotContainsString( '<x', $html );
+	}
+
+	/**
 	 * Load more links to the next page until the last.
 	 */
 	public function test_load_more_links_to_the_next_page_until_the_last(): void {

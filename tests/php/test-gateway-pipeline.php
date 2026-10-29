@@ -217,8 +217,9 @@ class Test_Gateway_Pipeline extends WP_UnitTestCase {
 	}
 
 	/**
-	 * 4. Scripts, Custom HTML, Base64 and event attributes are rejected with the block; allowed markup arrives
-	 * byte for byte, special characters in attributes included.
+	 * 4. Scripts, Custom HTML, Base64 and event attributes are rejected with the block; allowed markup arrives as the
+	 * KSES of core leaves it, with the same meaning: entities and self-closing tags in its spelling, special characters
+	 * in attributes as entities, backslashes and quotes intact.
 	 */
 	public function test_content_safety(): void {
 		$page  = $this->page();
@@ -265,9 +266,40 @@ class Test_Gateway_Pipeline extends WP_UnitTestCase {
 		$result = Pipeline::run( self::op( array( 'post' => $page ), self::set( array( 'post_content' => $safe ) ), 'corrections' ) );
 		$this->assertNotWPError( $result );
 		$this->assertSame( 'live', $result['mode'] );
-		$this->assertSame( $safe, get_post_field( 'post_content', $page, 'raw' ), 'wp_slash round trip' );
-		$this->assertSame( 'a < b "quoted" -- back\\slash \\" & more', parse_blocks( get_post_field( 'post_content', $page, 'raw' ) )[0]['attrs']['metadata']['name'] );
+		$this->assertSame( wp_unslash( wp_filter_post_kses( wp_slash( $safe ) ) ), get_post_field( 'post_content', $page, 'raw' ), 'what core stores for a user without unfiltered_html, wp_slash round trip' );
+		$this->assertSame( 'a < b "quoted" -- back\\slash \\" & more', html_entity_decode( parse_blocks( get_post_field( 'post_content', $page, 'raw' ) )[0]['attrs']['metadata']['name'], ENT_QUOTES | ENT_HTML5 ) );
+		$this->assertSame( Hashes::document( $page ), $result['hash'] );
 		$this->assertSame( 10, has_filter( 'content_save_pre', 'wp_filter_post_kses' ), 'KSES is back after the write' );
+	}
+
+	/**
+	 * New content of an agent goes through the KSES of core and the hash is the one of what was stored; a rollback puts
+	 * a snapshot back past KSES, so markup a person with unfiltered_html wrote survives it.
+	 */
+	public function test_kses_on_new_content_and_off_for_snapshots(): void {
+		$this->assertNotFalse( has_filter( 'content_save_pre', 'wp_filter_post_kses' ), 'agents have no unfiltered_html' );
+		$page = $this->page();
+		// What a person with unfiltered_html may store: a Custom HTML block with an event attribute, past KSES.
+		global $wpdb;
+		$wpdb->update( $wpdb->posts, array( 'post_content' => '<!-- wp:html --><div onclick="x()">Kept</div><!-- /wp:html -->' ), array( 'ID' => $page ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Content written as by a user with unfiltered_html.
+		clean_post_cache( $page );
+
+		$written = Pipeline::run( self::op( array( 'post' => $page ), self::set( array( 'post_content' => '<!-- wp:paragraph --><p>Line<br/>break</p><!-- /wp:paragraph -->' ) ), 'corrections' ) );
+		$this->assertIsArray( $written, $written instanceof WP_Error ? $written->get_error_message() : '' );
+		$this->assertSame( 'live', $written['mode'] );
+		$stored = (string) get_post_field( 'post_content', $page, 'raw' );
+		$this->assertStringContainsString( '<p>Line<br />break</p>', $stored, 'KSES ran and normalized the tag' );
+		$this->assertSame( Hashes::document( $page ), $written['hash'], 'the hash is the one of the stored content' );
+		$this->assertNotFalse( has_filter( 'content_save_pre', 'wp_filter_post_kses' ) );
+		$this->assertFalse( has_filter( 'safecss_filter_attr_allow_css', array( Pipeline::class, 'allow_colors' ) ) );
+
+		// The rollback puts the snapshot back as it was stored, the block of the person included.
+		$state = (array) Store::get_snapshot( (int) $written['snapshot'] )['state'];
+		$undo  = new Operation( 'leitvia/rollback', 'corrections', array( 'post' => $page ), $written['hash'], static fn(): array => $state );
+		$back  = Pipeline::run( $undo, 0, true );
+		$this->assertIsArray( $back, $back instanceof WP_Error ? $back->get_error_message() : '' );
+		$this->assertStringContainsString( '<div onclick="x()">Kept</div>', (string) get_post_field( 'post_content', $page, 'raw' ) );
+		$this->assertNotFalse( has_filter( 'content_save_pre', 'wp_filter_post_kses' ), 'KSES is back after the rollback' );
 	}
 
 	/**

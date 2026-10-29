@@ -116,6 +116,11 @@ final class Gateway {
 		// Agents write through the abilities only, see rest_guard() and xmlrpc_guard().
 		add_filter( 'rest_pre_dispatch', array( self::class, 'rest_guard' ), 10, 3 );
 		add_action( 'xmlrpc_call', array( self::class, 'xmlrpc_guard' ) );
+		// Agents never sign in with a password and never open the admin, see login_guard() and admin_guard().
+		add_filter( 'wp_authenticate_user', array( self::class, 'login_guard' ) );
+		add_action( 'admin_init', array( self::class, 'admin_guard' ) );
+		add_action( 'set_user_role', array( self::class, 'end_sessions' ), 10, 2 );
+		add_action( 'add_user_role', array( self::class, 'end_sessions' ), 10, 2 );
 		Preview::boot();
 		// Cron hook Verify::CRON (leitvia_studio_verify) checks the front end after each live write.
 		Verify::boot();
@@ -167,6 +172,47 @@ final class Gateway {
 	}
 
 	/**
+	 * Filter wp_authenticate_user: a user with the agent role cannot sign in with the account password, on the login
+	 * form or anywhere else core checks it. Core applies the filter only to that password; application passwords
+	 * (wp_authenticate_application_password) skip it, so agents keep their access to the REST API and the MCP server.
+	 *
+	 * @param \WP_User|\WP_Error $user User found for the login name, or an earlier error.
+	 * @return \WP_User|\WP_Error
+	 */
+	public static function login_guard( $user ) {
+		if ( $user instanceof \WP_User && in_array( self::ROLE, (array) $user->roles, true ) ) {
+			/* translators: %s: short product name */
+			return new \WP_Error( 'leitvia_agent_login', sprintf( __( '%s agents connect with an application password only and cannot sign in here.', 'leitvia-studio' ), leitvia_studio_brand_short() ) );
+		}
+		return $user;
+	}
+
+	/**
+	 * Action admin_init: a request of an agent to the admin ends with 403, admin-ajax.php and admin-post.php included,
+	 * for example with a session cookie made before the user got the role. The gateway answers agents over REST only,
+	 * where admin_init does not run, and rest_guard() limits what they may write there.
+	 */
+	public static function admin_guard(): void {
+		if ( self::is_agent() ) {
+			/* translators: %s: short product name */
+			wp_die( esc_html( sprintf( __( 'Agents change the site through the %s abilities only.', 'leitvia-studio' ), leitvia_studio_brand_short() ) ), '', array( 'response' => 403 ) );
+		}
+	}
+
+	/**
+	 * Actions set_user_role and add_user_role: a user who gets the agent role is signed out everywhere, so no session
+	 * of the person the account belonged to outlives the change. Application passwords stay.
+	 *
+	 * @param int    $user_id User.
+	 * @param string $role    Role set or added.
+	 */
+	public static function end_sessions( $user_id, $role ): void {
+		if ( self::ROLE === $role ) {
+			\WP_Session_Tokens::get_instance( (int) $user_id )->destroy_all();
+		}
+	}
+
+	/**
 	 * Whether the current user is a person who decides on change packages: manage_options and not the agent role. The
 	 * autonomy level binds agents only; such a person may apply and roll back any operation, also over WP-CLI.
 	 */
@@ -186,10 +232,11 @@ final class Gateway {
 	}
 
 	/**
-	 * Tables, role and cron event of the current site.
+	 * Tables, role, cron event and the folder of waiting files of the current site.
 	 */
 	public static function install(): void {
 		Store::install();
+		Packages::migrate_private_dir();
 		// Removing first keeps the capabilities current after an update; users keep the role name.
 		remove_role( self::ROLE );
 		add_role( self::ROLE, __( 'Leitvia Agent', 'leitvia-studio' ), array_fill_keys( self::CAPS, true ) );

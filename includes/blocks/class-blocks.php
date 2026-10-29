@@ -139,6 +139,78 @@ final class Blocks {
 	}
 
 	/**
+	 * Gives the server-rendered blocks their render callback, which returns the markup instead of printing it from a
+	 * render.php file. Runs on register_block_type_args.
+	 *
+	 * @param array<string, mixed> $args Block type arguments.
+	 * @param string               $name Block name.
+	 * @return array<string, mixed>
+	 */
+	public static function render_callbacks( array $args, string $name ): array {
+		$callback = match ( $name ) {
+			'leitvia/query-filter'      => static fn( array $attributes, string $content, \WP_Block $block ): string => Query_Filter::render( $attributes, $block ),
+			'leitvia/load-more'         => static fn( array $attributes, string $content, \WP_Block $block ): string => Query_Filter::render_load_more( $attributes, $block ),
+			'leitvia/table-of-contents' => static fn( array $attributes, string $content, \WP_Block $block ): string => Table_Of_Contents::render( $attributes, $block ),
+			'leitvia/language-switch'   => static fn( array $attributes, string $content, \WP_Block $block ): string => \LeitviaStudio\Easy_Language\Easy_Language::render_switch( $block ),
+			default                     => null,
+		};
+		if ( $callback ) {
+			$args['render_callback'] = $callback;
+		}
+		return $args;
+	}
+
+	/**
+	 * Queues a small script that must run before the first paint, as the inline script of a registered handle without
+	 * a file. Block themes render the template before wp_head(), so a block that calls this while it renders gets the
+	 * script printed in the head; a block rendered after wp_head() (classic themes) gets it in the footer. The same
+	 * script is added once, however often a block renders.
+	 *
+	 * @param non-empty-string $handle Script handle.
+	 * @param string           $script JavaScript.
+	 */
+	public static function head_script( string $handle, string $script ): void {
+		if ( ! wp_script_is( $handle, 'registered' ) ) {
+			wp_register_script( $handle, false, array(), LEITVIA_STUDIO_VERSION, false );
+		}
+		if ( ! in_array( $script, (array) wp_scripts()->get_data( $handle, 'after' ), true ) ) {
+			wp_add_inline_script( $handle, $script );
+		}
+		wp_enqueue_script( $handle );
+	}
+
+	/**
+	 * Width and height for the illustrations of Studio patterns (assets/images/ of the plugin), as the Leitvia theme does
+	 * for its own pattern images: the markup of core/image carries none, so without them the page shifts while the file
+	 * loads (CLS). Images that have a width and images from anywhere else stay as they are. Runs on
+	 * render_block_core/image.
+	 *
+	 * @param string $html Block HTML.
+	 */
+	public static function pattern_image_size( string $html ): string {
+		$base = plugins_url( 'assets/images/', LEITVIA_STUDIO_FILE );
+		// Content saved with a path from the site root (/wp-content/plugins/...) counts as well.
+		$path = (string) wp_parse_url( $base, PHP_URL_PATH );
+		if ( ! str_contains( $html, $path ) ) {
+			return $html;
+		}
+		$tags = new \WP_HTML_Tag_Processor( $html );
+		while ( $tags->next_tag( array( 'tag_name' => 'img' ) ) ) {
+			$src = (string) $tags->get_attribute( 'src' );
+			if ( null !== $tags->get_attribute( 'width' ) || ! ( str_starts_with( $src, $base ) || str_starts_with( $src, $path ) ) ) {
+				continue;
+			}
+			$file = dirname( LEITVIA_STUDIO_FILE ) . '/assets/images/' . basename( (string) wp_parse_url( $src, PHP_URL_PATH ) );
+			$size = is_readable( $file ) ? wp_getimagesize( $file ) : false;
+			if ( $size ) {
+				$tags->set_attribute( 'width', (string) $size[0] );
+				$tags->set_attribute( 'height', (string) $size[1] );
+			}
+		}
+		return $tags->get_updated_html();
+	}
+
+	/**
 	 * Lets users without unfiltered_html save the radios and checkboxes of the pricing switch, the feature filter and
 	 * the wizard steps. Only type, name, value, checked and required, and type only as radio or checkbox: an input
 	 * without one of these types is removed. Text and password fields would let such a user build a login form that

@@ -148,6 +148,9 @@ class Test_Uninstall extends WP_UnitTestCase {
 				)
 			);
 			$files[ $site ]    = \LeitviaStudio\Gateway\Packages::stash_file( 'waiting.png', (string) file_get_contents( dirname( __DIR__ ) . '/fixtures/avatar.png' ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Test fixture.
+			// A file in the folder before 1.3.10, on a site that was not loaded since the update.
+			wp_mkdir_p( wp_upload_dir()['basedir'] . '/leitvia-private/old' );
+			file_put_contents( wp_upload_dir()['basedir'] . '/leitvia-private/old/waiting.png', 'x' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Test.
 			// A check after writing that has not run yet, and the token of one that is running.
 			wp_schedule_single_event( time() + MINUTE_IN_SECONDS, 'leitvia_studio_verify', array( array( 'post' => $packages[ $site ] ) ) );
 			set_transient( 'leitvia_verify_' . $site, 'pending', 5 * MINUTE_IN_SECONDS );
@@ -166,7 +169,8 @@ class Test_Uninstall extends WP_UnitTestCase {
 			$this->assertNull( get_role( 'leitvia_agent' ) );
 			$this->assertNull( get_post( $packages[ $site ] ), 'change packages go' );
 			$this->assertNotSame( '', $files[ $site ] );
-			$this->assertDirectoryDoesNotExist( dirname( $files[ $site ], 2 ), 'files of open packages go' );
+			$this->assertDirectoryDoesNotExist( dirname( $files[ $site ], 3 ), 'files of open packages go, with the folder of the plugin' );
+			$this->assertDirectoryDoesNotExist( wp_upload_dir()['basedir'] . '/leitvia-private', 'and the folder before 1.3.10' );
 			self::switch_to( 0 );
 		}
 		$this->assertInstanceOf( WP_User::class, get_user_by( 'id', $agent ), 'agent users stay' );

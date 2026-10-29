@@ -211,7 +211,7 @@ final class Pipeline {
 	 */
 	private static function decide( Operation $op, array $before, array $after, int $package, bool $rollback, int $follows = 0 ) {
 		$target = self::target( $op );
-		// 4. Content safety. The pipeline is the sanitizer: unsafe content is rejected, safe content is written as is.
+		// 4. Content safety. Unsafe content is rejected; safe content is written through the KSES of core, see execute().
 		$unsafe = match ( true ) {
 			$rollback                  => null,
 			self::json( $after )       => self::unsafe_json( (string) $after['post_content'] ),
@@ -310,7 +310,7 @@ final class Pipeline {
 			return $denied;
 		}
 		// 8. Snapshot, write; on any failure the previous state comes back.
-		return self::execute( $op, $before, $after, $result, $rollback && ! empty( $op->target['delete'] ) );
+		return self::execute( $op, $before, $after, $result, $rollback && ! empty( $op->target['delete'] ), $rollback );
 	}
 
 	/**
@@ -616,7 +616,8 @@ final class Pipeline {
 	/**
 	 * Lets a style declaration with rgb(), rgba(), hsl() or hsla() colors pass safecss_filter_attr(), which allows var()
 	 * and calc() but no other parentheses. Only numbers, units, separators and none count as color arguments; the rest
-	 * of the declaration meets the core check unchanged. Runs on safecss_filter_attr_allow_css during kses_safe() only.
+	 * of the declaration meets the core check unchanged. Runs on safecss_filter_attr_allow_css during kses_safe() and the
+	 * write in execute() only.
 	 *
 	 * @param bool   $allow Whether core allows the declaration.
 	 * @param string $css   Declaration with url(), gradients, var() and calc() already removed.
@@ -703,17 +704,18 @@ final class Pipeline {
 	}
 
 	/**
-	 * Writes the new state with a snapshot of the old one. Content goes in unchanged (it passed unsafe()), so core's
-	 * KSES on post content is off for this one write. Any error or exception restores the previous state.
+	 * Writes the new state with a snapshot of the old one. Any error or exception restores the previous state. The hash
+	 * of the result is read from what was stored, after core's filters ran.
 	 *
-	 * @param Operation            $op     Operation.
-	 * @param array<string, mixed> $before State before.
-	 * @param array<string, mixed> $after  State after.
-	 * @param array<string, mixed> $result Result so far.
-	 * @param bool                 $delete Whether to delete the target post, the rollback of a post a package created.
+	 * @param Operation            $op       Operation.
+	 * @param array<string, mixed> $before   State before.
+	 * @param array<string, mixed> $after    State after.
+	 * @param array<string, mixed> $result   Result so far.
+	 * @param bool                 $delete   Whether to delete the target post, the rollback of a post a package created.
+	 * @param bool                 $snapshot Whether the write restores a snapshot (rollback).
 	 * @return array<string, mixed>|\WP_Error
 	 */
-	private static function execute( Operation $op, array $before, array $after, array $result, bool $delete = false ) {
+	private static function execute( Operation $op, array $before, array $after, array $result, bool $delete = false, bool $snapshot = false ) {
 		$option = $op->option();
 		$type   = match ( true ) {
 			'' !== $option  => 'option',
@@ -743,9 +745,22 @@ final class Pipeline {
 		$capture = static function ( $post_id ) use ( &$created ): void {
 			$created = $created ? $created : (int) $post_id;
 		};
-		$kses    = has_filter( 'content_save_pre', 'wp_filter_post_kses' );
+		// New content goes through core's KSES like any write of a user without unfiltered_html; unsafe() rejected
+		// before what KSES would change beyond entity and self-closing-tag spelling, with the same allow list, so KSES
+		// keeps the content. The rgb(), rgba(), hsl() and hsla() colors that unsafe() accepts (allow_colors()) stay
+		// allowed for this write as well. Whatever KSES still normalizes is what gets stored: the hash of the result is
+		// read back from the post (hash() below), and later diffs, conflicts and snapshots start from that stored state.
+		// A rollback and the restore after a failed write put back a snapshot of what was stored before, which may hold
+		// markup a person with unfiltered_html wrote (a Custom HTML block on a page an agent replaced whole); KSES would
+		// cut it, so only these writes pass by the KSES filter of post content. So do JSON documents (token sets, global
+		// styles), which are no HTML: KSES would encode their strings, and unsafe_json() checked them instead.
+		$html = ! $snapshot && ! self::json( $after );
+		$kses = $html ? false : has_filter( 'content_save_pre', 'wp_filter_post_kses' );
 		if ( false !== $kses ) {
 			remove_filter( 'content_save_pre', 'wp_filter_post_kses', $kses );
+		}
+		if ( $html ) {
+			add_filter( 'safecss_filter_attr_allow_css', array( self::class, 'allow_colors' ), 10, 2 );
 		}
 		add_action( 'clean_post_cache', $capture, 1 );
 		try {
@@ -774,8 +789,9 @@ final class Pipeline {
 			$failed = true;
 		}
 		remove_action( 'clean_post_cache', $capture, 1 );
+		remove_filter( 'safecss_filter_attr_allow_css', array( self::class, 'allow_colors' ), 10 );
 		if ( $failed ) {
-			self::restore( $op, $before, $created );
+			self::without_kses( static fn() => self::restore( $op, $before, $created ) );
 			if ( '' !== $private ) {
 				wp_delete_file( (string) $after['file'] );
 			}
@@ -799,6 +815,25 @@ final class Pipeline {
 		}
 		$result['hash'] = self::hash( $op, $id );
 		return $result;
+	}
+
+	/**
+	 * Runs a write that puts back stored content, with the KSES filter of post content off for its duration.
+	 *
+	 * @param callable $write Write.
+	 */
+	private static function without_kses( callable $write ): void {
+		$kses = has_filter( 'content_save_pre', 'wp_filter_post_kses' );
+		if ( false !== $kses ) {
+			remove_filter( 'content_save_pre', 'wp_filter_post_kses', $kses );
+		}
+		try {
+			$write();
+		} finally {
+			if ( false !== $kses ) {
+				add_filter( 'content_save_pre', 'wp_filter_post_kses', $kses );
+			}
+		}
 	}
 
 	/**

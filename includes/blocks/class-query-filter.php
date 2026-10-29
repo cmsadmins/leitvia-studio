@@ -72,7 +72,8 @@ final class Query_Filter {
 		$prefix = 'qf-' . $query_id . '-';
 		$found  = array();
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- public, read-only filter parameters.
-		foreach ( wp_unslash( $_GET ) as $name => $raw ) {
+		$params = (array) map_deep( wp_unslash( $_GET ), 'sanitize_text_field' );
+		foreach ( $params as $name => $raw ) {
 			if ( ! is_string( $name ) || ! str_starts_with( $name, $prefix ) ) {
 				continue;
 			}
@@ -261,17 +262,20 @@ final class Query_Filter {
 			$groups .= sprintf( '<fieldset><legend>%1$s</legend>%2$s</fieldset>', esc_html( self::legend( $key, $post_type ) ), $boxes );
 		}
 
-		// Parameters of other blocks on the page (another query, its page) survive a submit of this form.
+		// Parameters of other blocks on the page (another query, its page) survive a submit of this form. Only keys of lowercase
+		// letters, digits, "-" and "_" (as core and Leitvia blocks use them) and plain text values are carried over.
 		$own    = array( $found[2] );
 		$hidden = '';
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- public, read-only parameters.
-		foreach ( wp_unslash( $_GET ) as $name => $value ) {
-			if ( ! is_string( $name ) || str_starts_with( $name, $prefix ) || in_array( $name, $own, true ) ) {
+		$params = (array) map_deep( wp_unslash( $_GET ), 'sanitize_text_field' );
+		foreach ( $params as $name => $value ) {
+			$key = is_string( $name ) ? sanitize_key( $name ) : '';
+			if ( '' === $key || $key !== $name || str_starts_with( $key, $prefix ) || in_array( $key, $own, true ) ) {
 				continue;
 			}
 			foreach ( is_array( $value ) ? $value : array( $value ) as $item ) {
 				if ( is_scalar( $item ) ) {
-					$hidden .= sprintf( '<input type="hidden" name="%1$s" value="%2$s">', esc_attr( $name . ( is_array( $value ) ? '[]' : '' ) ), esc_attr( (string) $item ) );
+					$hidden .= sprintf( '<input type="hidden" name="%1$s" value="%2$s">', esc_attr( $key . ( is_array( $value ) ? '[]' : '' ) ), esc_attr( sanitize_text_field( (string) $item ) ) );
 				}
 			}
 		}

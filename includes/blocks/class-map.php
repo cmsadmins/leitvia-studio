@@ -67,6 +67,10 @@ final class Map {
 				);
 			}
 		}
+		// The tile URL is a template with the placeholders {z}, {x}, {y} and {s}. esc_url() strips curly braces, so the
+		// view script could no longer fill them in; it is escaped as an attribute value instead. Settings::tile_url()
+		// validated it before: https only, {z}, {x} and {y} present, no whitespace, quotes or angle brackets
+		// (TILE_URL_PATTERN) and a valid URL once the placeholders are filled; anything else gives the default server.
 		$tiles   = \LeitviaStudio\Admin\Settings::tile_url( leitvia_studio_setting( 'map_tile_url' ) );
 		$canvas  = sprintf(
 			'<div class="wp-block-leitvia-map__canvas" role="region" aria-label="%1$s" data-tiles="%2$s" data-attribution="%3$s" data-view="%4$s" data-markers="%5$s"></div>',

@@ -125,6 +125,10 @@ class Test_Blocks extends WP_UnitTestCase {
 		$html = do_blocks( $pattern['content'] );
 		$this->assertSame( 1, substr_count( $html, '<h2' ) );
 		$this->assertMatchesRegularExpression( '/<img [^>]*alt="[^"]+"/', $html );
+		// The illustration ships with the plugin, so the pattern works with any theme, and gets its size on render.
+		$this->assertStringContainsString( 'src="' . plugins_url( 'assets/images/landscape.webp', LEITVIA_STUDIO_FILE ) . '"', $html );
+		$this->assertMatchesRegularExpression( '/<img [^>]*\bwidth="1600"/', $html );
+		$this->assertMatchesRegularExpression( '/<img [^>]*\bheight="1067"/', $html );
 		$this->assertSame( 3, preg_match_all( '#<details [^>]*class="wp-block-leitvia-spotlight-hotspot"#', $html ) );
 		$this->assertSame( 3, preg_match_all( '#<span class="wp-block-leitvia-spotlight-hotspot__label">[^<]+</span>#', $html ) );
 		$this->assertStringContainsString( 'data-wp-interactive="leitvia/spotlight"', $html );
@@ -139,6 +143,8 @@ class Test_Blocks extends WP_UnitTestCase {
 			unregister_block_type( $name );
 			register_block_type( $entry['path'] );
 		}
+		// The script of the Lab preview, queued by earlier tests, stays in the shared queue.
+		wp_dequeue_script( 'leitvia-studio-preview' );
 		$this->go_to( get_permalink( self::factory()->post->create( array( 'post_type' => 'page' ) ) ) );
 		do_blocks( '<!-- wp:paragraph --><p>Plain</p><!-- /wp:paragraph -->' );
 		do_action( 'wp_enqueue_scripts' );

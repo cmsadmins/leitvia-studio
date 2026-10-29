@@ -16,9 +16,10 @@ defined( 'ABSPATH' ) || exit;
 final class Store {
 
 	/**
-	 * Schema version, stored in the option leitvia_studio_db. Raise it when a table changes.
+	 * Schema version, stored in the option leitvia_studio_db. Raise it when a table or other stored data of the gateway
+	 * changes: Gateway::maybe_install() then installs again. 2: waiting files moved to Packages::PRIVATE_DIR (1.3.10).
 	 */
-	public const VERSION = 1;
+	public const VERSION = 2;
 
 	public const VERSION_OPTION = 'leitvia_studio_db';
 
@@ -204,32 +205,34 @@ final class Store {
 		$settings = Gateway::settings();
 		$cutoff   = gmdate( 'Y-m-d H:i:s', time() - (int) $settings['retention_days'] * DAY_IN_SECONDS );
 		$max      = (int) $settings['max_table_mb'] * MB_IN_BYTES;
-		foreach ( array(
-			'audit'     => 'LENGTH(ability) + LENGTH(object_type) + LENGTH(code) + LENGTH(details)',
-			'snapshots' => 'LENGTH(object_type) + LENGTH(base_hash) + LENGTH(state)',
-		) as $name => $bytes ) {
-			$table = self::table( $name );
-			$wpdb->query( $wpdb->prepare( "DELETE FROM {$table} WHERE created_at < %s", $cutoff ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Own table.
-			self::trim( $table, $bytes, $max );
+		foreach ( array( 'audit', 'snapshots' ) as $name ) {
+			$wpdb->query( $wpdb->prepare( 'DELETE FROM %i WHERE created_at < %s', self::table( $name ), $cutoff ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Own table.
+			self::trim( $name, $max );
 		}
 	}
 
 	/**
 	 * Deletes the oldest rows until the table is under the size limit. The size is the sum of the variable columns plus
-	 * ROW_BYTES per row, independent of stale table statistics.
+	 * ROW_BYTES per row, independent of stale table statistics. Every query is a literal with placeholders, the table
+	 * name included (%i).
 	 *
-	 * @param string $table Table name.
-	 * @param string $bytes SQL expression for the variable bytes of a row.
-	 * @param int    $max   Limit in bytes.
+	 * @param string $name 'audit' or 'snapshots'.
+	 * @param int    $max  Limit in bytes.
 	 */
-	private static function trim( string $table, string $bytes, int $max ): void {
+	private static function trim( string $name, int $max ): void {
 		global $wpdb;
-		$row_bytes = self::ROW_BYTES;
-		// phpcs:disable WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Own table, constant SQL expressions.
-		$excess = (int) $wpdb->get_var( "SELECT COUNT(*) * {$row_bytes} + COALESCE(SUM({$bytes}), 0) FROM {$table}" ) - $max;
+		$table = self::table( $name );
+		$audit = 'audit' === $name;
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery -- Own table, pruned by the daily cron event.
+		$size   = $audit
+			? $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) * %d + COALESCE(SUM(LENGTH(ability) + LENGTH(object_type) + LENGTH(code) + LENGTH(details)), 0) FROM %i', self::ROW_BYTES, $table ) )
+			: $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) * %d + COALESCE(SUM(LENGTH(object_type) + LENGTH(base_hash) + LENGTH(state)), 0) FROM %i', self::ROW_BYTES, $table ) );
+		$excess = (int) $size - $max;
 		$last   = 0;
 		while ( $excess > 0 ) {
-			$rows = $wpdb->get_results( $wpdb->prepare( "SELECT id, {$row_bytes} + {$bytes} AS bytes FROM {$table} WHERE id > %d ORDER BY id LIMIT 500", $last ) );
+			$rows = $audit
+				? $wpdb->get_results( $wpdb->prepare( 'SELECT id, %d + LENGTH(ability) + LENGTH(object_type) + LENGTH(code) + LENGTH(details) AS bytes FROM %i WHERE id > %d ORDER BY id LIMIT 500', self::ROW_BYTES, $table, $last ) )
+				: $wpdb->get_results( $wpdb->prepare( 'SELECT id, %d + LENGTH(object_type) + LENGTH(base_hash) + LENGTH(state) AS bytes FROM %i WHERE id > %d ORDER BY id LIMIT 500', self::ROW_BYTES, $table, $last ) );
 			if ( ! $rows ) {
 				break;
 			}
@@ -242,7 +245,7 @@ final class Store {
 			}
 		}
 		if ( $last ) {
-			$wpdb->query( $wpdb->prepare( "DELETE FROM {$table} WHERE id <= %d", $last ) );
+			$wpdb->query( $wpdb->prepare( 'DELETE FROM %i WHERE id <= %d', $table, $last ) );
 		}
 		// phpcs:enable
 	}

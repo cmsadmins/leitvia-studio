@@ -53,7 +53,7 @@ ob_start();
 		<!-- /wp:column -->
 		<!-- wp:column {"width":"66.67%"} -->
 		<div class="wp-block-column" style="flex-basis:66.67%">
-			<!-- wp:leitvia/feature-group <?php echo serialize_block_attributes( $leitvia_studio_group ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- block comment JSON, escaped by core. ?> -->
+			<!-- wp:leitvia/feature-group <?php echo wp_kses( serialize_block_attributes( $leitvia_studio_group ), array() ); ?> -->
 			<section class="wp-block-leitvia-feature-group"><h2 class="wp-block-leitvia-feature-group__heading"><span class="wp-block-leitvia-feature-group__title"><?php echo esc_html__( 'Features by plan', 'leitvia-studio' ); ?></span> <span class="wp-block-leitvia-feature-group__count"><?php echo esc_html__( '6 features', 'leitvia-studio' ); ?></span></h2><fieldset class="wp-block-leitvia-feature-group__filter"><legend><?php echo esc_html( $leitvia_studio_legend ); ?></legend>
 			<?php foreach ( $leitvia_studio_plans as $leitvia_studio_index => $leitvia_studio_name ) : ?>
 				<label><input type="checkbox" value="<?php echo (int) $leitvia_studio_index + 1; ?>" checked/><?php echo esc_html( $leitvia_studio_name ); ?></label>

@@ -7,6 +7,11 @@
 
 defined( 'WP_UNINSTALL_PLUGIN' ) || exit;
 
+// WordPress loads this file without the plugin; the file system helper comes from the class of change packages.
+if ( ! class_exists( \LeitviaStudio\Gateway\Packages::class ) ) {
+	require __DIR__ . '/includes/gateway/class-packages.php';
+}
+
 /**
  * Cleans one site: Studio options always; token sets, Lab metadata, the usage index, the content model declaration,
  * the easy language relation and profile picture assignments only with the setting delete_data_on_uninstall. Images in
@@ -34,14 +39,17 @@ $leitvia_studio_uninstall_site = static function (): void {
 	$settings     = get_option( 'leitvia_studio_settings', array() );
 	if ( is_array( $settings ) && ! empty( $settings['delete_data_on_uninstall'] ) ) {
 		$delete_posts( 'leitvia_tokens' );
-		// Lab metadata of patterns; the wp_block posts themselves stay.
+		// Lab metadata of patterns; the wp_block posts themselves stay. The meta cache of exactly these posts goes too.
 		global $wpdb;
+		$lab = $wpdb->get_col( $wpdb->prepare( "SELECT DISTINCT post_id FROM {$wpdb->postmeta} WHERE meta_key LIKE %s", $wpdb->esc_like( '_leitvia_lab_' ) . '%' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- One-time cleanup on uninstall, no API lists meta by key prefix.
 		$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->postmeta} WHERE meta_key LIKE %s", $wpdb->esc_like( '_leitvia_lab_' ) . '%' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- One-time cleanup on uninstall, no API deletes by key prefix.
+		foreach ( $lab as $post_id ) {
+			wp_cache_delete( (int) $post_id, 'post_meta' );
+		}
 		// Pattern usage index of every post.
 		delete_metadata( 'post', 0, '_leitvia_uses', '', true );
 		// Profile picture assignments of this site (user option, key with the site's table prefix).
 		delete_metadata( 'user', 0, $wpdb->get_blog_prefix() . 'leitvia_avatar', '', true );
-		wp_cache_flush();
 		// The declaration of the Model screen; posts, terms, meta and leitvia_site_* options created with it stay.
 		delete_option( 'leitvia_studio_model' );
 		delete_post_meta_by_key( '_leitvia_model_trashed_with_entry' );
@@ -53,14 +61,17 @@ $leitvia_studio_uninstall_site = static function (): void {
 	// Gateway: change packages, audit log, snapshots, schema version, settings, the prune event, pending checks after
 	// writing with their tokens, and the role; agent users stay.
 	$delete_posts( 'leitvia_package' );
-	// Files of package operations that were never applied wait in uploads/leitvia-private/<random>/.
-	$private = wp_upload_dir( null, false )['basedir'] . '/leitvia-private';
-	foreach ( array_merge( (array) glob( $private . '/*/*' ), array( $private . '/.htaccess', $private . '/index.php' ) ) as $file ) {
-		wp_delete_file( (string) $file );
-	}
-	foreach ( array_merge( (array) glob( $private . '/*', GLOB_ONLYDIR ), array( $private ) ) as $dir ) {
-		if ( is_dir( (string) $dir ) ) {
-			rmdir( (string) $dir ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir -- Empty folders of the plugin.
+	// Files of package operations that were never applied wait in uploads/leitvia-studio/private/<random>/; before
+	// 1.3.10 they waited in uploads/leitvia-private/, which stays on sites that never loaded 1.3.10.
+	// Without a usable file system (see Packages::filesystem()) the folders stay; the rest of the cleanup still runs.
+	$uploads = wp_upload_dir( null, false )['basedir'];
+	$files   = \LeitviaStudio\Gateway\Packages::filesystem();
+	if ( $files ) {
+		$files->delete( $uploads . '/leitvia-studio/private', true );
+		$files->delete( $uploads . '/leitvia-private', true );
+		// The folder of the plugin below uploads, when nothing else is left in it.
+		if ( is_dir( $uploads . '/leitvia-studio' ) && ! glob( $uploads . '/leitvia-studio/*' ) ) {
+			$files->rmdir( $uploads . '/leitvia-studio' );
 		}
 	}
 	global $wpdb;

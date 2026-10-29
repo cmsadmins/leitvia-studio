@@ -253,7 +253,7 @@ class Test_Cli extends WP_UnitTestCase {
 		$this->assertSame( LEITVIA_STUDIO_VERSION, $export['studio_version'] );
 		$this->assertArrayNotHasKey( 'file', $export['operations'][1]['state'] );
 		$this->assertSame( 'portrait.png', $export['operations'][1]['media']['name'] );
-		$this->assertStringNotContainsString( Packages::PRIVATE_DIR, (string) wp_json_encode( $export ) );
+		$this->assertStringNotContainsString( Packages::PRIVATE_DIR, (string) wp_json_encode( $export, JSON_UNESCAPED_SLASHES ) );
 
 		[ $code, $out ] = self::cli( 'package_import', array( $file ), array( 'format' => 'json' ) );
 		$this->assertSame( 0, $code, implode( "\n", $out ) );

@@ -38,3 +38,29 @@ if ( getenv( 'LEITVIA_TESTS_WOOCOMMERCE' ) ) {
 	$GLOBALS['wp_roles'] = null; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Reload the roles WooCommerce just added.
 	wp_roles();
 }
+
+/**
+ * One preview request of the Lab as a request of its own: Preview::prepare(), then the block template canvas of core
+ * for an allowed request, then Preview::reset(). Status, headers and body; a refused request has the reason as body.
+ *
+ * @param array<string, string> $query Query parameters ref, style, set, axe, annotations and _wpnonce.
+ * @return array{status: int, headers: array<string, string>, body: string}
+ */
+function leitvia_studio_tests_preview( array $query ): array {
+	// Styles and scripts printed by an earlier preview would be left out.
+	$GLOBALS['wp_styles']  = null; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- A fresh request.
+	$GLOBALS['wp_scripts'] = null; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- A fresh request.
+	$response              = \LeitviaStudio\Lab\Preview::prepare( $query );
+	$body                  = $response['message'];
+	if ( 200 === $response['status'] ) {
+		ob_start();
+		require \LeitviaStudio\Lab\Preview::canvas();
+		$body = (string) ob_get_clean();
+	}
+	\LeitviaStudio\Lab\Preview::reset();
+	return array(
+		'status'  => $response['status'],
+		'headers' => $response['headers'],
+		'body'    => $body,
+	);
+}

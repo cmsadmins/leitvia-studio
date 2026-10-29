@@ -10,6 +10,7 @@ namespace LeitviaStudio\Gateway\Abilities;
 use LeitviaStudio\Gateway\Abilities;
 use LeitviaStudio\Gateway\Block_Edit;
 use LeitviaStudio\Gateway\Content_Checks;
+use LeitviaStudio\Gateway\Gateway;
 use LeitviaStudio\Gateway\Hashes;
 use LeitviaStudio\Gateway\Packages;
 use LeitviaStudio\Gateway\Rejection;
@@ -210,7 +211,7 @@ final class Content {
 		Abilities::read(
 			'leitvia/get-site-health',
 			__( 'Get site health', 'leitvia-studio' ),
-			__( 'Returns the versions of WordPress, PHP, the theme and the plugins and the updates WordPress knows of, read from its last update check; nothing is requested. Needs a user who may edit the theme options, such as the agent role.', 'leitvia-studio' ),
+			__( 'Returns the versions of WordPress, PHP, the theme and the plugins and the updates WordPress knows of, read from its last update check; nothing is requested. Needs a user who may view the Site Health checks, usually an administrator, or the agent role.', 'leitvia-studio' ),
 			array(),
 			array( 'type' => 'object' ),
 			static fn() => self::health()
@@ -859,12 +860,15 @@ final class Content {
 	}
 
 	/**
-	 * Output of get-site-health, or leitvia_forbidden for a user who may not edit the theme options.
+	 * Output of get-site-health, or leitvia_forbidden for a user who may not view the Site Health checks of core
+	 * (install_plugins, a super admin in a network) and has not the agent role. Versions and pending updates show
+	 * where a site is open to attack, so editors and other roles with edit_theme_options do not get them; an agent
+	 * user exists only because an administrator made one to look after the site.
 	 *
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	public static function health() {
-		if ( ! current_user_can( 'edit_theme_options' ) ) {
+		if ( ! current_user_can( 'view_site_health_checks' ) && ! Gateway::is_agent() ) {
 			return Rejection::make( 'leitvia_forbidden', __( 'Your user may not read the versions of this site.', 'leitvia-studio' ), 403, 'capability', array(), '', 'never' );
 		}
 		require_once ABSPATH . 'wp-admin/includes/plugin.php';

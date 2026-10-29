@@ -106,8 +106,8 @@ final class Easy_Language {
 	/**
 	 * Adds to the saved accessibility bar what only works with JavaScript: text size, high contrast and read aloud,
 	 * hidden until the view module shows them. On a narrow screen they sit behind a disclosure button, so the bar
-	 * stays one or two lines above the header. An inline script before the bar applies the stored settings before the
-	 * first paint, so a reload does not shift the layout. Runs on render_block_leitvia/a11y-bar.
+	 * stays one or two lines above the header. An inline script in the head applies the stored settings before the
+	 * first paint (Blocks::head_script()), so a reload does not shift the layout. Runs on render_block_leitvia/a11y-bar.
 	 *
 	 * @param string $html Saved block markup.
 	 */
@@ -133,9 +133,9 @@ final class Easy_Language {
 			. $button( 'read', esc_html__( 'Read aloud', 'leitvia-studio' ), sprintf( ' hidden data-stop="%s"', esc_attr__( 'Stop reading', 'leitvia-studio' ) ) )
 			. '</div>';
 		$html     = substr_replace( $html, $controls, $end, 0 );
-		// No & or < in the script: the content filters of a post would turn them into entities.
-		$script = 'try{var s=JSON.parse(localStorage.getItem("leitvia-a11y"))||{},d=document.documentElement,z=Math.max(100,Math.min(200,+s.size||100));d.classList.add("leitvia-a11y-js");if(z-100)d.style.fontSize=z+"%";if(s.contrast)d.classList.add("leitvia-high-contrast")}catch(e){}';
-		return wp_get_inline_script_tag( $script ) . $html;
+		$script   = 'try{var s=JSON.parse(localStorage.getItem("leitvia-a11y"))||{},d=document.documentElement,z=Math.max(100,Math.min(200,+s.size||100));d.classList.add("leitvia-a11y-js");if(z-100)d.style.fontSize=z+"%";if(s.contrast)d.classList.add("leitvia-high-contrast")}catch(e){}';
+		\LeitviaStudio\Blocks\Blocks::head_script( 'leitvia-a11y-bar-state', $script );
+		return $html;
 	}
 
 	/**

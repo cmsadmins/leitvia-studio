@@ -644,9 +644,9 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 	}
 
 	/**
-	 * 2. Slashes: attribute values with <, ", --, backslashes and Unicode escapes arrive unchanged through a pattern, a
-	 * template part, a navigation, a package a person applies and its rollback; texts with backslashes through
-	 * update-block.
+	 * 2. Slashes: attribute values with <, ", --, backslashes and Unicode escapes keep their value through a pattern, a
+	 * template part, a navigation, a package a person applies and its rollback (the KSES of core writes <, " and & in
+	 * attributes as entities for users without unfiltered_html); texts with backslashes through update-block.
 	 */
 	public function test_slashes_round_trip(): void {
 		$safe  = self::fixture( 'safe' );
@@ -664,7 +664,7 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 				'innerContent' => '' === $html ? array() : array( $html ),
 			)
 		);
-		$name  = static fn( string $markup ): string => (string) ( self::first_block( $markup )['attrs']['metadata']['name'] ?? '' );
+		$name  = static fn( string $markup ): string => html_entity_decode( (string) ( self::first_block( $markup )['attrs']['metadata']['name'] ?? '' ), ENT_QUOTES | ENT_HTML5 );
 		foreach ( $safe['attributes'] as $value ) {
 			$markup = $block( 'core/paragraph', $value, '<p>' . $safe['text'] . '</p>' );
 			$this->assertNull( Pipeline::unsafe( $markup ), $value );
@@ -1094,8 +1094,12 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 		require_once ABSPATH . WPINC . '/class-IXR.php';
 		require_once ABSPATH . WPINC . '/class-wp-xmlrpc-server.php';
 		$server = new wp_xmlrpc_server();
+		// The account password of an agent signs in nowhere (Gateway::login_guard()), XML-RPC included.
+		$this->assertInstanceOf( IXR_Error::class, $server->wp_editPost( array( 1, get_userdata( $this->agent )->user_login, 'password', $page, array( 'post_title' => 'Via XML-RPC' ) ) ) );
+		// An agent signed in some other way still gets no XML-RPC method.
+		wp_set_current_user( $this->agent );
 		try {
-			$server->wp_editPost( array( 1, get_userdata( $this->agent )->user_login, 'password', $page, array( 'post_title' => 'Via XML-RPC' ) ) );
+			Gateway::xmlrpc_guard();
 			$this->fail( 'XML-RPC refuses agents.' );
 		} catch ( WPDieException $e ) {
 			$this->assertStringContainsString( 'abilities', $e->getMessage() );
@@ -1158,7 +1162,7 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A pending image lies in a folder with a 32 character random name below uploads/leitvia-private, which holds a
+	 * A pending image lies in a folder with a 32 character random name below uploads/leitvia-studio/private, which holds a
 	 * deny rule for Apache; rejecting deletes it; nothing outside the private area is ever deleted.
 	 */
 	public function test_pending_media_stays_private(): void {
@@ -1191,6 +1195,65 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 		Packages::discard_file( array( 'file' => $root . '/../leitvia-security-outside.txt' ) );
 		$this->assertFileExists( $outside );
 		wp_delete_file( $outside );
+	}
+
+	/**
+	 * Files of the private area go through WP_Filesystem. With FS_METHOD set to another method (FTP, no credentials in
+	 * the request) the area uses a direct file system on the uploads folder, as core does for uploads; images still
+	 * wait and go away again.
+	 */
+	public function test_private_area_uses_wp_filesystem(): void {
+		global $wp_filesystem;
+		$saved         = $wp_filesystem;
+		$wp_filesystem = null; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Set up again below.
+		$this->assertInstanceOf( WP_Filesystem_Direct::class, Packages::filesystem() );
+
+		$wp_filesystem = null; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Set up again with another method.
+		$ftp           = static fn(): string => 'ftpext';
+
+		add_filter( 'filesystem_method', $ftp );
+		$this->assertInstanceOf( WP_Filesystem_Direct::class, Packages::filesystem() );
+		$path = Packages::stash_file( 'portrait.png', (string) file_get_contents( dirname( __DIR__ ) . '/fixtures/avatar.png' ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Test fixture.
+		$this->assertFileExists( $path );
+		Packages::discard_file( array( 'file' => $path ) );
+		$this->assertDirectoryDoesNotExist( dirname( $path ) );
+		remove_filter( 'filesystem_method', $ftp );
+		$wp_filesystem = $saved; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Restore.
+	}
+
+	/**
+	 * Update from before 1.3.10: the first load installs again (schema version 1), moves the waiting files from
+	 * uploads/leitvia-private to uploads/leitvia-studio/private and removes the old folder; a package that still names
+	 * the old path applies and rejects with the moved file.
+	 */
+	public function test_pending_media_moves_out_of_the_old_folder(): void {
+		$base   = wp_upload_dir()['basedir'];
+		$legacy = $base . '/' . Packages::LEGACY_PRIVATE_DIR;
+		$folder = wp_generate_password( 32, false );
+		$old    = array();
+		foreach ( array( 'portrait.png', 'other.png' ) as $name ) {
+			wp_mkdir_p( $legacy . '/' . $folder . $name );
+			copy( dirname( __DIR__ ) . '/fixtures/avatar.png', $legacy . '/' . $folder . $name . '/' . $name );
+			$old[ $name ] = $legacy . '/' . $folder . $name . '/' . $name;
+		}
+		file_put_contents( $legacy . '/.htaccess', "Require all denied\n" ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Test.
+
+		update_option( Store::VERSION_OPTION, 1 );
+		Gateway::maybe_install();
+		$this->assertSame( Store::VERSION, (int) get_option( Store::VERSION_OPTION ) );
+		$this->assertDirectoryDoesNotExist( $legacy );
+		$root = $base . '/' . Packages::PRIVATE_DIR;
+		$this->assertFileExists( $root . '/' . $folder . 'portrait.png/portrait.png' );
+		$this->assertStringContainsString( 'Require all denied', (string) file_get_contents( $root . '/.htaccess' ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Test.
+
+		$promoted = Packages::promote_file( array( 'file' => $old['portrait.png'] ) );
+		$this->assertIsArray( $promoted, 'the old path finds the moved file' );
+		$this->assertFileExists( $promoted['file'] );
+		wp_delete_file( $promoted['file'] );
+		Packages::discard_file( array( 'file' => $old['portrait.png'] ) );
+		Packages::discard_file( array( 'file' => $old['other.png'] ) );
+		$this->assertDirectoryDoesNotExist( $root . '/' . $folder . 'portrait.png' );
+		$this->assertDirectoryDoesNotExist( $root . '/' . $folder . 'other.png' );
 	}
 
 	/**

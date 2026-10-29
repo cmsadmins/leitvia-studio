@@ -140,6 +140,7 @@ final class Plugin {
 		add_filter( 'wp_kses_allowed_html', array( Blocks\Blocks::class, 'allow_inputs' ), 10, 2 );
 		add_filter( 'render_block_leitvia/pricing', array( Blocks\Blocks::class, 'unique_pricing_group' ) );
 		add_filter( 'render_block_leitvia/spotlight', array( Blocks\Blocks::class, 'spotlight_group' ) );
+		add_filter( 'render_block_core/image', array( Blocks\Blocks::class, 'pattern_image_size' ) );
 		add_filter( 'render_block_leitvia/announcement-bar', array( Blocks\Announcement_Bar::class, 'render' ) );
 		add_filter( 'register_block_type_args', array( Blocks\Product_Compare::class, 'block_args' ), 10, 2 );
 		add_action( 'init', array( Blocks\Blocks::class, 'patterns' ) );
@@ -156,6 +157,7 @@ final class Plugin {
 		add_action( 'init', array( Blocks\Blocks::class, 'patterns' ) );
 		add_filter( 'default_wp_template_part_areas', array( Blocks\Mega_Menu::class, 'areas' ) );
 		add_filter( 'register_block_type_args', array( Blocks\Mega_Menu::class, 'block_args' ), 10, 2 );
+		add_filter( 'register_block_type_args', array( Blocks\Blocks::class, 'render_callbacks' ), 10, 2 );
 		add_filter( 'render_block_core/navigation', array( Blocks\Mega_Menu::class, 'collapsible_overlay' ), 10, 2 );
 		add_filter( 'query_loop_block_query_vars', array( Blocks\Query_Filter::class, 'query_vars' ), 10, 2 );
 		add_filter( 'leitvia_studio_consent_services', array( Blocks\Map::class, 'service' ) );

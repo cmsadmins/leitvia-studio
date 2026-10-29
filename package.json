@@ -1,11 +1,11 @@
 {
 	"name": "leitvia-studio",
-	"version": "1.3.9",
+	"version": "1.3.10",
 	"private": true,
 	"license": "GPL-2.0-or-later",
 	"author": "Patrick Schlesinger <ps@cms-admins.de> (https://cms-admins.de)",
 	"scripts": {
-		"build": "wp-scripts build --blocks-manifest --experimental-modules && node ../../scripts/guard-blocks-manifest.mjs",
+		"build": "wp-scripts build --blocks-manifest --experimental-modules && node bin/guard-blocks-manifest.mjs",
 		"start": "wp-scripts start --blocks-manifest --experimental-modules",
 		"lint:js": "wp-scripts lint-js src",
 		"lint:php": "cd ../.. && php vendor/bin/phpcs --standard=packages/leitvia-studio/phpcs.xml.dist && php vendor/bin/phpstan analyse -c packages/leitvia-studio/phpstan.neon.dist --no-progress --memory-limit=1G",

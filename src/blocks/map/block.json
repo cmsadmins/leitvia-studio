@@ -64,5 +64,6 @@
 	},
 	"editorScript": "file:./index.js",
 	"style": "file:./style-index.css",
+	"viewStyle": "file:./leaflet.css",
 	"viewScriptModule": "file:./view.js"
 }

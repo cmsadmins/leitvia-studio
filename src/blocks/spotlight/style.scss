@@ -1,12 +1,20 @@
-// Below 782 px the points follow the image as a numbered list in the flow. From 782 px each point sits on the image
-// at its position (--x, --y in percent of the image), the text opens below the marker. The image does not mirror in
-// right-to-left languages: there the inline start is the right edge, so --x counts from the other side (100% - --x)
-// and the centring translate turns round. Logical properties, so the generated -rtl stylesheet leaves them alone.
+// In a narrow spotlight the points follow the image as a numbered list in the flow. From 30em of spotlight width (a
+// container query, so text zoom and narrow columns switch back to the list; 30em keeps a spotlight in the 37rem
+// content column on the image at any zoom, as the column grows with the text) each point sits on the image at its
+// position (--x, --y in percent of the image), the text opens below the marker. The point spans the whole width of
+// the image, so the percentages of marker and text count from the image edges; the text is centred on the marker and
+// clamped between the edges, it never leaves the image. The image does not mirror in right-to-left languages: there
+// the inline start is the right edge, so --x counts from the other side (100% - --x) and the marker translate turns
+// round. Logical properties, so the generated -rtl stylesheet leaves them alone.
 .wp-block-leitvia-spotlight {
-	counter-reset: leitvia-spotlight;
+	position: relative;
+	container-type: inline-size;
 
+	// The container query scopes counters to the spotlight (style containment), so a reset on the spotlight itself
+	// would not reach the points; the image before them starts the count.
 	> .wp-block-image {
 		margin-block: 0;
+		counter-reset: leitvia-spotlight;
 
 		img {
 			display: block;
@@ -16,47 +24,61 @@
 	}
 }
 
-@media (min-width: 782px) {
-	.wp-block-leitvia-spotlight {
-		position: relative;
+@container (min-width: 30em) {
+	.wp-block-leitvia-spotlight > .wp-block-leitvia-spotlight-hotspot {
+		--leitvia-x: var(--x, 50%);
+		position: absolute;
+		inset-block-start: var(--y, 50%);
+		inset-inline: 0;
+		z-index: 1;
+		margin: 0;
+		translate: 0 -50%;
+		// The point covers the width of the image; only marker and text take clicks.
+		pointer-events: none;
 
-		> .wp-block-leitvia-spotlight-hotspot {
+		> * {
+			pointer-events: auto;
+		}
+
+		> .wp-block-leitvia-spotlight-hotspot__summary {
+			inline-size: fit-content;
+			margin-inline-start: var(--leitvia-x);
+			translate: -50% 0;
+		}
+
+		> summary .wp-block-leitvia-spotlight-hotspot__label {
 			position: absolute;
-			inset-block-start: var(--y, 50%);
-			inset-inline-start: var(--x, 50%);
-			z-index: 1;
-			margin: 0;
-			translate: -50% -50%;
+			inline-size: 1px;
+			block-size: 1px;
+			overflow: hidden;
+			clip-path: inset(50%);
+			white-space: nowrap;
+		}
 
-			> summary .wp-block-leitvia-spotlight-hotspot__label {
-				position: absolute;
-				inline-size: 1px;
-				block-size: 1px;
-				overflow: hidden;
-				clip-path: inset(50%);
-				white-space: nowrap;
-			}
-
-			> .wp-block-leitvia-spotlight-hotspot__content {
-				position: absolute;
-				inset-block-start: calc(100% + 0.5rem);
-				inset-inline-start: 50%;
-				translate: -50% 0;
-				inline-size: min(20rem, 60vw);
-				padding: var(--wp--preset--spacing--s, 1rem);
-				background: var(--wp--preset--color--surface, Canvas);
-				color: var(--wp--preset--color--ink, CanvasText);
-				border: 1px solid var(--wp--preset--color--stroke, currentcolor);
-				box-shadow: var(--wp--preset--shadow--raised, none);
-			}
+		> .wp-block-leitvia-spotlight-hotspot__content {
+			--leitvia-w: min(20rem, 100%);
+			position: absolute;
+			inset-block-start: calc(100% + 0.5rem);
+			inset-inline-start: clamp(0px, var(--leitvia-x) - var(--leitvia-w) / 2, 100% - var(--leitvia-w));
+			box-sizing: border-box;
+			inline-size: var(--leitvia-w);
+			padding: var(--wp--preset--spacing--s, 1rem);
+			background: var(--wp--preset--color--surface, Canvas);
+			color: var(--wp--preset--color--ink, CanvasText);
+			border: 1px solid var(--wp--preset--color--stroke, currentcolor);
+			box-shadow: var(--wp--preset--shadow--raised, none);
 		}
 	}
 
-	:dir(rtl) .wp-block-leitvia-spotlight > .wp-block-leitvia-spotlight-hotspot {
-		inset-inline-start: calc(100% - var(--x, 50%));
-		translate: 50% -50%;
+	// The open point lies above the others, so its text is not covered by a later marker.
+	.wp-block-leitvia-spotlight > :is([open], .is-open) {
+		z-index: 2;
+	}
 
-		> .wp-block-leitvia-spotlight-hotspot__content {
+	:dir(rtl) .wp-block-leitvia-spotlight > .wp-block-leitvia-spotlight-hotspot {
+		--leitvia-x: calc(100% - var(--x, 50%));
+
+		> .wp-block-leitvia-spotlight-hotspot__summary {
 			translate: 50% 0;
 		}
 	}

@@ -9,7 +9,7 @@ use LeitviaStudio\Lab\Preview;
 use LeitviaStudio\Tokens\Token_Sets;
 
 /**
- * Access, rendering, style variations and token sets of Preview::respond().
+ * Access, rendering, style variations and token sets of Preview::prepare() and the template canvas.
  *
  * @group multisite
  */
@@ -55,10 +55,7 @@ class Test_Preview extends WP_UnitTestCase {
 	 * @return array{status: int, headers: array<string, string>, body: string}
 	 */
 	private function preview( array $query ): array {
-		// Each preview is a request of its own; styles printed by an earlier preview would be left out.
-		$GLOBALS['wp_styles']  = null;
-		$GLOBALS['wp_scripts'] = null;
-		return Preview::respond( $query + array( '_wpnonce' => wp_create_nonce( 'leitvia_studio_preview' ) ) );
+		return leitvia_studio_tests_preview( $query + array( '_wpnonce' => wp_create_nonce( 'leitvia_studio_preview' ) ) );
 	}
 
 	/**
@@ -74,7 +71,7 @@ class Test_Preview extends WP_UnitTestCase {
 
 		wp_set_current_user( self::$editor );
 		foreach ( array( '', 'invalid' ) as $nonce ) {
-			$response = Preview::respond( $ref + array( '_wpnonce' => $nonce ) );
+			$response = leitvia_studio_tests_preview( $ref + array( '_wpnonce' => $nonce ) );
 			$this->assertSame( 403, $response['status'] );
 			$this->assertStringNotContainsString( '<main', $response['body'] );
 		}
@@ -96,7 +93,11 @@ class Test_Preview extends WP_UnitTestCase {
 		$head = strstr( $response['body'], '</head>', true );
 		$this->assertMatchesRegularExpression( '/id="core-block-supports-inline-css">[^<]*.wp-container-core-columns-/', (string) $head );
 		$this->assertStringStartsWith( '<!DOCTYPE html>', ltrim( $response['body'] ) );
-		$this->assertStringContainsString( '<main id="main">', $response['body'] );
+		$this->assertMatchesRegularExpression( '/<main id="main" class="wp-block-group[^"]*">/', $response['body'] );
+		$this->assertSame( 1, substr_count( $response['body'], '<title' ) );
+		$this->assertStringContainsString( '<title>Pattern preview</title>', $response['body'] );
+		$this->assertStringContainsString( 'name="viewport"', $response['body'] );
+		$this->assertMatchesRegularExpression( '/<body class="[^"]*leitvia-studio-preview[ "]/', $response['body'] );
 		$this->assertStringContainsString( 'Websites built to stay useful for years.', $response['body'] );
 		$this->assertStringContainsString( 'leitvia-studio:height', $response['body'] );
 

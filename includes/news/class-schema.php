@@ -37,7 +37,7 @@ final class Schema {
 		$data = self::current();
 		if ( $data ) {
 			// JSON_HEX_TAG writes < and > as unicode escapes, so no title can close the script element.
-			wp_print_inline_script_tag( (string) wp_json_encode( $data, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG ), array( 'type' => 'application/ld+json' ) );
+			wp_print_inline_script_tag( (string) wp_json_encode( $data, JSON_HEX_TAG ), array( 'type' => 'application/ld+json' ) );
 		}
 	}
 

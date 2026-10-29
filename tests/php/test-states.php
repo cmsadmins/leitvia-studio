@@ -298,9 +298,7 @@ class Test_States extends WP_UnitTestCase {
 			''  => false,
 			'1' => true,
 		) as $axe => $loaded ) {
-			$GLOBALS['wp_scripts'] = null;
-			$GLOBALS['wp_styles']  = null;
-			$body                  = \LeitviaStudio\Lab\Preview::respond( $query + array( 'axe' => (string) $axe ) )['body'];
+			$body = leitvia_studio_tests_preview( $query + array( 'axe' => (string) $axe ) )['body'];
 			$this->assertSame( $loaded, str_contains( $body, 'build/axe-runner.js' ), "axe={$axe}" );
 			// axe checks the document title too; the preview has exactly one.
 			$this->assertSame( 1, substr_count( $body, '<title' ), "axe={$axe}" );

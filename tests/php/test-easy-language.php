@@ -140,19 +140,21 @@ class Test_Easy_Language extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The bar gets the hidden controls and the inline script that applies stored settings before the first paint;
-	 * the theme's palettes give the high contrast colors.
+	 * The bar gets the hidden controls, and the script that applies stored settings before the first paint is queued
+	 * for the head (no script inside the block markup); the theme's palettes give the high contrast colors.
 	 */
 	public function test_bar_adds_hidden_controls_and_script(): void {
+		wp_deregister_script( 'leitvia-a11y-bar-state' );
 		$html = do_blocks( '<!-- wp:leitvia/a11y-bar --><nav class="wp-block-leitvia-a11y-bar" aria-label="Accessibility"><a class="wp-block-leitvia-a11y-bar__statement" href="/accessibility/">Accessibility statement</a></nav><!-- /wp:leitvia/a11y-bar -->' );
-		$this->assertMatchesRegularExpression( '#^<script>\s*try\{var s=JSON.parse\(localStorage.getItem\("leitvia-a11y"\)\).*?</script>\s*<nav #s', $html );
+		$this->assertMatchesRegularExpression( '#^<nav #', $html );
+		$this->assertTrue( wp_script_is( 'leitvia-a11y-bar-state', 'enqueued' ) );
+		$this->assertFalse( (bool) wp_scripts()->get_data( 'leitvia-a11y-bar-state', 'group' ), 'printed in the head, before the first paint' );
+		$script = implode( "\n", array_filter( (array) wp_scripts()->get_data( 'leitvia-a11y-bar-state', 'after' ) ) );
+		$this->assertStringStartsWith( 'try{var s=JSON.parse(localStorage.getItem("leitvia-a11y"))', $script );
 		$this->assertStringContainsString( '<a class="wp-block-leitvia-a11y-bar__statement" href="/accessibility/">Accessibility statement</a><button type="button" class="wp-block-leitvia-a11y-bar__toggle" aria-expanded="false" aria-controls="leitvia-a11y-controls" hidden>Display settings</button><div class="wp-block-leitvia-a11y-bar__controls" id="leitvia-a11y-controls" hidden>', $html );
 		$this->assertStringContainsString( '<button type="button" data-action="contrast" aria-pressed="false">High contrast</button>', $html );
 		$this->assertMatchesRegularExpression( '#<button type="button" data-action="read" hidden data-stop="Stop reading">Read aloud</button></div></nav>$#', $html );
-		preg_match( '#<script[^>]*>(.*?)</script>#s', $html, $m );
-		$this->assertLessThan( 300, strlen( $m[1] ) );
-		$this->assertStringNotContainsString( '&', $m[1], 'the content filters of a post would turn & into an entity' );
-		$this->assertStringNotContainsString( '<', $m[1] );
+		$this->assertLessThan( 300, strlen( $script ) );
 	}
 
 	/**

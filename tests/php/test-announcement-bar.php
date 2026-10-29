@@ -20,12 +20,24 @@ class Test_Announcement_Bar extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The bar gets a hidden dismiss button named by its label, its hash and the inline script with that hash right
-	 * before it.
+	 * The inline script of the bar, queued on a handle without a file, '' when none is queued.
+	 */
+	private static function state_script(): string {
+		return wp_script_is( 'leitvia-announcement-bar-state', 'enqueued' ) ? implode( "\n", array_filter( (array) wp_scripts()->get_data( 'leitvia-announcement-bar-state', 'after' ) ) ) : '';
+	}
+
+	/**
+	 * The bar gets a hidden dismiss button named by its label and its hash; the script with that hash is queued for
+	 * the head (no script inside the block markup), once however often the bar renders.
 	 */
 	public function test_render_adds_button_hash_and_script(): void {
+		wp_deregister_script( 'leitvia-announcement-bar-state' );
 		$html = do_blocks( self::bar( 'New plans' ) );
-		$this->assertMatchesRegularExpression( '#^<script>\s*try\{localStorage.getItem\("leitvia-announcement"\)==="([0-9a-f]{12})".*?</script>\s*<section[^>]*\bdata-hash="\1"#s', $html );
+		do_blocks( self::bar( 'New plans' ) );
+		$this->assertStringNotContainsString( '<script', $html );
+		$this->assertSame( 1, preg_match( '#^<section[^>]*\bdata-hash="([0-9a-f]{12})"#', $html, $hash ) );
+		$this->assertSame( 1, substr_count( self::state_script(), 'try{localStorage.getItem("leitvia-announcement")==="' . $hash[1] . '"' ) );
+		$this->assertFalse( (bool) wp_scripts()->get_data( 'leitvia-announcement-bar-state', 'group' ), 'printed in the head, before the first paint' );
 		$this->assertMatchesRegularExpression( '#<button type="button" class="wp-block-leitvia-announcement-bar__dismiss" aria-label="Dismiss announcement" hidden><svg [^>]*aria-hidden="true"[^>]*>.*?</svg></button></section>#', $html );
 		$this->assertStringContainsString( 'aria-label="Announcement"', $html );
 	}
@@ -64,9 +76,10 @@ class Test_Announcement_Bar extends WP_UnitTestCase {
 	 * The inline script stays below 300 bytes.
 	 */
 	public function test_inline_script_is_small(): void {
-		preg_match( '#<script[^>]*>(.*?)</script>#s', do_blocks( self::bar( 'New plans' ) ), $m );
-		$this->assertNotEmpty( $m[1] );
-		$this->assertLessThan( 300, strlen( $m[1] ) );
+		wp_deregister_script( 'leitvia-announcement-bar-state' );
+		do_blocks( self::bar( 'New plans' ) );
+		$this->assertNotEmpty( self::state_script() );
+		$this->assertLessThan( 300, strlen( self::state_script() ) );
 	}
 
 	/**

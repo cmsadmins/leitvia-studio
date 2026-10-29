@@ -311,7 +311,8 @@ class Test_News_Schema extends WP_UnitTestCase {
 	 */
 	private function assertMatchesFixture( string $name, string $head ): void { // phpcs:ignore WordPress.NamingConventions.ValidFunctionName.MethodNameInvalid -- PHPUnit naming.
 		$this->assertSame( 1, preg_match( '#<script type="application/ld\+json">(.*?)</script>#s', $head, $match ) );
-		$json     = str_replace( untrailingslashit( home_url() ), self::HOST, $match[1] );
+		// Core escapes slashes in the printed JSON; the fixture compares it decoded, with plain slashes.
+		$json     = str_replace( untrailingslashit( home_url() ), self::HOST, (string) wp_json_encode( json_decode( $match[1] ), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) );
 		$json     = (string) preg_replace( '#/uploads/\d{4}/\d{2}/#', '/uploads/', $json );
 		$pretty   = wp_json_encode( json_decode( $json ), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) . "\n";
 		$pretty   = (string) preg_replace_callback( '/^( {4})+/m', static fn( array $m ): string => str_repeat( "\t", strlen( $m[0] ) / 4 ), $pretty );

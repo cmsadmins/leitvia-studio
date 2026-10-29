@@ -4,7 +4,7 @@ Tags: ai, mcp, block theme, accessibility, design tokens
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.9
+Stable tag: 1.3.10
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -113,9 +113,15 @@ Users with the role "Leitvia Agent" read through any REST route, but they change
 
 = How are images protected that wait in a change package? =
 
-An image an agent adds while a change package waits for a decision lies in a folder with a random name below `wp-content/uploads/leitvia-private/` until a person applies the package; rejecting the package deletes it. Apache reads the `.htaccess` file there and denies access. nginx ignores it, so add this rule to the server block of the site (adjust the path if your uploads folder lives elsewhere):
+An image an agent adds while a change package waits for a decision lies in a folder with a random name below `wp-content/uploads/leitvia-studio/private/` until a person applies the package; rejecting the package deletes it. Apache reads the `.htaccess` file there and denies access. nginx ignores it, so add this rule to the server block of the site (adjust the path if your uploads folder lives elsewhere):
 
-`location ^~ /wp-content/uploads/leitvia-private/ { deny all; }`
+`location ^~ /wp-content/uploads/leitvia-studio/private/ { deny all; }`
+
+Versions before 1.3.10 used `wp-content/uploads/leitvia-private/`. The first page load after the update moves the waiting images to the new folder and removes the old one, and waiting packages keep working; an nginx rule for the old folder can go after that.
+
+= Which HTML may users without unfiltered_html save? =
+
+WordPress filters the posts of users without the capability unfiltered_html (authors, editors on a network, agents) through its list of allowed HTML. The pricing switch, the feature filter and the wizard steps of Leitvia Studio are radio buttons and checkboxes, which that list does not contain, so Leitvia Studio adds the element `input` for post content, with the attributes type, name, value, checked and required only. The type must be radio or checkbox; an input of any other type is removed, so these users cannot build text or password fields, and event handlers, style, formaction and src stay out. Nothing else changes, and users with unfiltered_html are not affected.
 
 = Does Leitvia Studio work in a multisite network? =
 
@@ -165,19 +171,21 @@ The other exception is Gravatar, a service of Automattic Inc., and only if an ad
 
 == Third-party libraries ==
 
-The accessibility check bundles [axe-core](https://github.com/dequelabs/axe-core) 4.13.0 by Deque Systems, Inc. into `build/axe-runner.js`. axe-core is licensed under the Mozilla Public License 2.0 (MPL-2.0); the license text is in `licenses/AXE-CORE` and the notices of the libraries it includes are in `licenses/AXE-CORE-THIRD-PARTY`. MPL-2.0 is compatible with the GPL: its section 3.3 allows combining the covered code with GPL-licensed code, and axe-core does not use the "Incompatible With Secondary Licenses" notice. The unmodified source code is available from the axe-core repository and the npm package `axe-core`. The file is served from your own site and makes no external requests.
+The accessibility check bundles [axe-core](https://github.com/dequelabs/axe-core) 4.13.0 by Deque Systems, Inc. into `build/axe-runner.js`. axe-core is licensed under the Mozilla Public License 2.0 (MPL-2.0); the license text is in `licenses/AXE-CORE.txt` and the notices of the libraries it includes are in `licenses/AXE-CORE-THIRD-PARTY.txt`. MPL-2.0 is compatible with the GPL: its section 3.3 allows combining the covered code with GPL-licensed code, and axe-core does not use the "Incompatible With Secondary Licenses" notice. The unmodified source code is available from the axe-core repository and the npm package `axe-core`. The file is served from your own site and makes no external requests.
 
-The headings of the Studio admin screens use [Open Sans](https://github.com/googlefonts/opensans) by The Open Sans Project Authors, weights 600 and 700, reduced to the Latin characters and stored as WOFF2 in `assets/fonts/open-sans/`. Open Sans is licensed under the SIL Open Font License 1.1; the license text is in `licenses/OPEN-SANS`. The fonts are served from your own site.
+The headings of the Studio admin screens use [Open Sans](https://github.com/googlefonts/opensans) by The Open Sans Project Authors, weights 600 and 700, reduced to the Latin characters and stored as WOFF2 in `assets/fonts/open-sans/`. Open Sans is licensed under the SIL Open Font License 1.1; the license text is in `licenses/OPEN-SANS.txt`. The fonts are served from your own site.
 
-Token sets can name [Libre Franklin](https://github.com/googlefonts/Libre-Franklin) by The Libre Franklin Project Authors, one variable file for the weights 100 to 900, reduced to the Latin characters and stored as WOFF2 in `assets/fonts/libre-franklin/`. Libre Franklin is licensed under the SIL Open Font License 1.1; the license text is in `licenses/LIBRE-FRANKLIN`. The font is served from your own site and loads only on sites whose active token set uses it.
+Token sets can name [Libre Franklin](https://github.com/googlefonts/Libre-Franklin) by The Libre Franklin Project Authors, one variable file for the weights 100 to 900, reduced to the Latin characters and stored as WOFF2 in `assets/fonts/libre-franklin/`. Libre Franklin is licensed under the SIL Open Font License 1.1; the license text is in `licenses/LIBRE-FRANKLIN.txt`. The font is served from your own site and loads only on sites whose active token set uses it.
 
-Token sets can name [Young Serif](https://github.com/noirblancrouge/YoungSerif) by The Young Serif Project Authors, regular weight, reduced to the Latin characters and stored as WOFF2 in `assets/fonts/young-serif/`. Young Serif is licensed under the SIL Open Font License 1.1; the license text is in `licenses/YOUNG-SERIF`. The font is served from your own site and loads only on sites whose active token set uses it.
+Token sets can name [Young Serif](https://github.com/noirblancrouge/YoungSerif) by The Young Serif Project Authors, regular weight, reduced to the Latin characters and stored as WOFF2 in `assets/fonts/young-serif/`. Young Serif is licensed under the SIL Open Font License 1.1; the license text is in `licenses/YOUNG-SERIF.txt`. The font is served from your own site and loads only on sites whose active token set uses it.
 
-The Map block bundles [Leaflet](https://leafletjs.com/) 1.9.4 by Volodymyr Agafonkin and contributors into `build/blocks/map/leaflet.js` and `build/blocks/map/leaflet.css`, loaded only after the visitor agrees to load the map. Leaflet is licensed under the BSD 2-Clause License, which is compatible with the GPL; the license text is in `licenses/LEAFLET`. The source code is available from the Leaflet repository and the npm package `leaflet`.
+The Map block bundles [Leaflet](https://leafletjs.com/) 1.9.4 by Volodymyr Agafonkin and contributors into `build/blocks/map/leaflet.js`, loaded only after the visitor agrees to load the map, and ships its stylesheet as `build/blocks/map/leaflet.css`, which loads with the block. Leaflet is licensed under the BSD 2-Clause License, which is compatible with the GPL; the license text is in `licenses/LEAFLET.txt`. The source code is available from the Leaflet repository and the npm package `leaflet`.
+
+The pattern illustration `assets/images/landscape.webp` was drawn for Leitvia by CMS ADMINS and is licensed under the GPL, version 2 or later, like the plugin.
 
 == Source code ==
 
-The `src/` folder contains the source code of the files in `build/`. Run `npm install` and `npm run build` in the plugin folder to create them.
+The `src/` folder contains the source code of the files in `build/`, and `webpack.config.js` and `bin/guard-blocks-manifest.mjs` are the build configuration. To create `build/` yourself, run `npm ci` and then `npm run build` in the plugin folder with Node.js 24 (or 22.22.2 and later). `package-lock.json` holds the exact versions of all build tools and libraries, so the result matches the files in `build/` of this release.
 
 == Screenshots ==
 
@@ -199,6 +207,23 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * Privacy policy: https://leitvia.com/privacy-policy/
 
 == Changelog ==
+
+= 1.3.10 =
+* Query filter: parameters of other blocks on the page are carried over only with a clean key and as plain text.
+* The notices of bundled third-party libraries end in .txt, as WordPress.org requires.
+* Source code: the plugin ships its package-lock.json, and `npm ci` and `npm run build` in the plugin folder alone recreate `build/` exactly.
+* Images waiting in a change package live in `wp-content/uploads/leitvia-studio/private/`; the update moves them from `uploads/leitvia-private/`. Adjust an nginx rule (see the FAQ).
+* Agent users cannot sign in with a password, open the admin or call admin-ajax.php; they connect with their application password only. A user who gets the agent role is signed out everywhere.
+* The ability "Get site health" needs a user who may view the Site Health checks, or the agent role; editors no longer get versions and updates.
+* The patterns "Annotated image" and "Scene with points" bring their illustration along and show it with any block theme.
+* Uninstalling no longer empties the whole object cache, only the cached data of the patterns it changes.
+* The small scripts of the announcement bar and the accessibility bar that apply a stored choice before the first paint, and the scripts of the Lab preview, are queued through WordPress instead of being printed into the block markup.
+* The blocks Query filter, Load more, Table of contents and Language switch render through a callback that returns their markup.
+* Structured data of posts keeps the JSON escaping of WordPress.
+* The Lab preview renders through the block template canvas of WordPress; a refused preview shows the reason on the error page of WordPress.
+* Content that agents write goes through the HTML filter of WordPress (KSES) like any write of a user without unfiltered_html; only a rollback puts a snapshot back as it was stored.
+* Map block: the stylesheet of Leaflet is a style of the block that WordPress loads with it.
+* Spotlight: the text of a point stays inside the image, also near the edges and in right-to-left languages, and the open point lies above the others. Whether the points sit on the image or follow it as a list depends on the width of the spotlight in em (a container query, from 30em) instead of the screen width, so it answers to text zoom and narrow columns (WCAG 1.4.4, 1.4.10).
 
 = 1.3.9 =
 * Pattern Lab: patterns in draft or review no longer appear in the block inserter and the pattern list of the site editor; the Lab still shows them.

@@ -11,7 +11,7 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Adds to the saved bar what only works with Studio: the dismiss button (hidden until the view module shows it, named
- * by its label, a drawn cross inside) and a hash of the saved markup. An inline script right before the bar sets data-leitvia-announcement on <html> when the
+ * by its label, a drawn cross inside) and a hash of the saved markup. An inline script in the head (Blocks::head_script()) sets data-leitvia-announcement on <html> when the
  * visitor dismissed this content before, so the CSS hides the bar before the first paint. New content, new hash.
  */
 final class Announcement_Bar {
@@ -42,6 +42,7 @@ final class Announcement_Bar {
 			'try{localStorage.getItem("leitvia-announcement")==="%s"&&document.documentElement.setAttribute("data-leitvia-announcement","dismissed")}catch(e){}',
 			$hash
 		);
-		return wp_get_inline_script_tag( $script ) . $html;
+		Blocks::head_script( 'leitvia-announcement-bar-state', $script );
+		return $html;
 	}
 }

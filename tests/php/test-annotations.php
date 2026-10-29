@@ -73,13 +73,11 @@ class Test_Annotations extends WP_UnitTestCase {
 	 * @param bool $annotations Whether to ask for annotations.
 	 */
 	private static function preview( int $id, bool $annotations ): string {
-		$GLOBALS['wp_styles']  = null;
-		$GLOBALS['wp_scripts'] = null;
-		$query                 = array(
+		$query = array(
 			'ref'      => 'block:' . $id,
 			'_wpnonce' => wp_create_nonce( 'leitvia_studio_preview' ),
 		);
-		return Preview::respond( $annotations ? $query + array( 'annotations' => '1' ) : $query )['body'];
+		return leitvia_studio_tests_preview( $annotations ? $query + array( 'annotations' => '1' ) : $query )['body'];
 	}
 
 	/**

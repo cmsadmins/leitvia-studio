@@ -132,6 +132,52 @@ class Test_Gateway_Access extends WP_UnitTestCase {
 	}
 
 	/**
+	 * An agent never signs in with the account password and never opens the admin, admin-ajax.php included; the
+	 * application password still authenticates over the whole core chain of an API request. People sign in as before.
+	 * Getting the role ends every session of the user.
+	 */
+	public function test_agent_signs_in_with_application_password_only(): void {
+		$data  = self::rest( 'POST', '/gateway/access', array( 'name' => 'Login test' ) )->get_data();
+		$agent = get_userdata( $data['agent']['id'] );
+		wp_set_password( 'account-password-1', $agent->ID );
+		$editor = self::factory()->user->create(
+			array(
+				'role'      => 'editor',
+				'user_pass' => 'account-password-2',
+			)
+		);
+
+		$denied = wp_authenticate( $agent->user_login, 'account-password-1' );
+		$this->assertWPError( $denied );
+		$this->assertSame( 'leitvia_agent_login', $denied->get_error_code() );
+		$this->assertWPError( wp_authenticate( $agent->user_email, 'account-password-1' ), 'also with the email address' );
+		$this->assertSame( $editor, wp_authenticate( get_userdata( $editor )->user_login, 'account-password-2' )->ID );
+
+		add_filter( 'application_password_is_api_request', '__return_true' );
+		$api = wp_authenticate( $agent->user_login, $data['password'] );
+		$this->assertInstanceOf( WP_User::class, $api, $api instanceof WP_Error ? $api->get_error_message() : '' );
+		$this->assertSame( $agent->ID, $api->ID );
+
+		$sessions = WP_Session_Tokens::get_instance( $editor );
+		$sessions->create( time() + HOUR_IN_SECONDS );
+		$this->assertCount( 1, $sessions->get_all() );
+		get_userdata( $editor )->add_role( Gateway::ROLE );
+		$this->assertSame( array(), $sessions->get_all(), 'adding the role ends the sessions' );
+		get_userdata( $editor )->remove_role( Gateway::ROLE );
+		$sessions->create( time() + HOUR_IN_SECONDS );
+		get_userdata( $editor )->set_role( Gateway::ROLE );
+		$this->assertSame( array(), $sessions->get_all(), 'setting the role ends the sessions' );
+		get_userdata( $editor )->set_role( 'editor' );
+
+		wp_set_current_user( $editor );
+		Gateway::admin_guard();
+		// No exception for admin-ajax.php: the guard asks for the role only.
+		wp_set_current_user( $agent->ID );
+		$this->expectException( WPDieException::class );
+		Gateway::admin_guard();
+	}
+
+	/**
 	 * Revoking deletes every application password of the agent and writes an audit entry; users who are no agent are
 	 * never touched.
 	 */

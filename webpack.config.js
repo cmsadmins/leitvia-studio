@@ -55,7 +55,17 @@ const scriptConfig = {
 		new MiniCSSExtractPlugin( { filename: '[name].css', chunkFilename: '[id].[contenthash:8].css' } ),
 		new RtlCssPlugin(),
 		new CopyWebpackPlugin( {
-			patterns: [ { from: 'blocks/*/catalog.json', context: join( __dirname, 'src' ) } ],
+			patterns: [
+				{ from: 'blocks/*/catalog.json', context: join( __dirname, 'src' ) },
+				// The styles of Leaflet as the viewStyle of the map block: WordPress enqueues them with the block instead
+				// of the webpack runtime adding a link element when the map loads.
+				{
+					from: require.resolve( 'leaflet/dist/leaflet.css' ),
+					to: 'blocks/map/leaflet.css',
+					// The npm package has CRLF line endings; the release ships LF only.
+					transform: ( content ) => content.toString().replace( /\r\n?/g, '\n' ),
+				},
+			],
 		} ),
 	],
 	optimization: {

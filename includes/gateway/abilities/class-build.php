@@ -651,7 +651,7 @@ final class Build {
 		$path    = rawurldecode( (string) wp_parse_url( $url, PHP_URL_PATH ) );
 		$uploads = wp_upload_dir( null, false );
 		// The main site of a network keeps the uploads of the other sites below its own, in sites/<ID>.
-		$closed = array_filter( array( realpath( $uploads['basedir'] . '/' . Packages::PRIVATE_DIR ), is_multisite() ? realpath( $uploads['basedir'] . '/sites' ) : false ) );
+		$closed = array_filter( array( realpath( $uploads['basedir'] . '/' . Packages::PRIVATE_DIR ), realpath( $uploads['basedir'] . '/' . Packages::LEGACY_PRIVATE_DIR ), is_multisite() ? realpath( $uploads['basedir'] . '/sites' ) : false ) );
 		foreach ( array(
 			$uploads['basedir']     => $uploads['baseurl'],
 			get_theme_root()        => get_theme_root_uri(),

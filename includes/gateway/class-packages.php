@@ -40,7 +40,12 @@ final class Packages {
 	/**
 	 * Folder below uploads for files of operations that are not applied yet, see stash_file().
 	 */
-	public const PRIVATE_DIR = 'leitvia-private';
+	public const PRIVATE_DIR = 'leitvia-studio/private';
+
+	/**
+	 * The folder of PRIVATE_DIR before 1.3.10; migrate_private_dir() moves its content.
+	 */
+	public const LEGACY_PRIVATE_DIR = 'leitvia-private';
 
 	/**
 	 * Registers the post type: not public, not in REST, edit_theme_options for every capability. Runs on init.
@@ -609,9 +614,12 @@ final class Packages {
 	 * @return array{type: string, name: non-empty-string}|null
 	 */
 	public static function image_type( string $bytes, string $name ): ?array {
-		require_once ABSPATH . 'wp-admin/includes/file.php';
-		$temp = wp_tempnam( $name );
-		file_put_contents( $temp, $bytes ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Temporary file for the type check.
+		$files = self::filesystem();
+		$temp  = $files ? wp_tempnam( $name ) : '';
+		if ( ! $files || ! $files->put_contents( $temp, $bytes ) ) {
+			wp_delete_file( $temp );
+			return null;
+		}
 		$check = wp_check_filetype_and_ext( $temp, $name );
 		wp_delete_file( $temp );
 		$type = (string) $check['type'];
@@ -626,7 +634,7 @@ final class Packages {
 	}
 
 	/**
-	 * Writes an image of an operation to the private area: a folder with a random name below uploads/leitvia-private,
+	 * Writes an image of an operation to the private area: a folder with a random name below uploads/leitvia-studio/private,
 	 * which denies web access where the server reads .htaccess. The pipeline moves it into the uploads folder when it
 	 * writes the attachment; rejecting the package deletes it.
 	 *
@@ -646,8 +654,9 @@ final class Packages {
 		if ( '' === $dir || ! wp_mkdir_p( $dir ) ) {
 			return '';
 		}
-		$path = $dir . '/' . sanitize_file_name( $name );
-		return false !== file_put_contents( $path, $bytes ) ? $path : ''; // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Private area of the plugin.
+		$path  = $dir . '/' . sanitize_file_name( $name );
+		$files = self::filesystem();
+		return $files && $files->put_contents( $path, $bytes ) ? $path : '';
 	}
 
 	/**
@@ -658,12 +667,14 @@ final class Packages {
 	 * @return array<string, mixed>|null
 	 */
 	public static function promote_file( array $state ): ?array {
-		$file = self::private_file( (string) ( $state['file'] ?? '' ) );
-		$name = wp_basename( $file );
-		if ( '' === $name ) {
+		$file  = self::private_file( (string) ( $state['file'] ?? '' ) );
+		$name  = wp_basename( $file );
+		$files = self::filesystem();
+		$bytes = '' !== $name && $files ? $files->get_contents( $file ) : false;
+		if ( false === $bytes ) {
 			return null;
 		}
-		$upload = wp_upload_bits( $name, null, (string) file_get_contents( $file ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Private area of the plugin.
+		$upload = wp_upload_bits( $name, null, $bytes );
 		if ( ! empty( $upload['error'] ) ) {
 			return null;
 		}
@@ -680,11 +691,37 @@ final class Packages {
 	 * @param array<string, mixed> $state State.
 	 */
 	public static function discard_file( array $state ): void {
-		$file = self::private_file( (string) ( $state['file'] ?? '' ) );
-		if ( '' !== $file ) {
-			wp_delete_file( $file );
-			rmdir( dirname( $file ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir -- Empty folder of the private area.
+		$file  = self::private_file( (string) ( $state['file'] ?? '' ) );
+		$files = '' !== $file ? self::filesystem() : null;
+		if ( $files ) {
+			$files->delete( $file );
+			// Not recursive: only the empty folder of this one file goes.
+			$files->rmdir( dirname( $file ) );
 		}
+	}
+
+	/**
+	 * The file system for the private area and its temporary files: the one WP_Filesystem() sets up when it works
+	 * directly, else a direct one when PHP may write the uploads folder, as core writes uploads with PHP whatever
+	 * FS_METHOD says (wp_upload_bits()). Null when neither works; callers then fail as one step (no image waits, the
+	 * old folder stays) instead of stopping the request.
+	 */
+	public static function filesystem(): ?\WP_Filesystem_Base {
+		global $wp_filesystem;
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+		if ( ! $wp_filesystem instanceof \WP_Filesystem_Base ) {
+			WP_Filesystem();
+		}
+		if ( $wp_filesystem instanceof \WP_Filesystem_Base && 'direct' === $wp_filesystem->method ) {
+			return $wp_filesystem;
+		}
+		$uploads = wp_upload_dir( null, false );
+		if ( ! empty( $uploads['error'] ) || ! wp_is_writable( $uploads['basedir'] ) ) {
+			return null;
+		}
+		require_once ABSPATH . 'wp-admin/includes/class-wp-filesystem-base.php';
+		require_once ABSPATH . 'wp-admin/includes/class-wp-filesystem-direct.php';
+		return new \WP_Filesystem_Direct( null );
 	}
 
 	/**
@@ -700,20 +737,60 @@ final class Packages {
 			if ( ! wp_mkdir_p( $root ) ) {
 				return '';
 			}
-			// Apache honours the file; elsewhere the random folder names keep the files unguessable.
-			file_put_contents( $root . '/.htaccess', "Require all denied\n" ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Private area of the plugin.
-			file_put_contents( $root . '/index.php', "<?php\n// Silence is golden.\n" ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Same.
+			// Apache honours the file; elsewhere the random folder names keep the files unguessable. Without both files
+			// the area stays unused: no image waits where the server might serve it.
+			$files = self::filesystem();
+			if ( ! $files || ! $files->put_contents( $root . '/.htaccess', "Require all denied\n" ) || ! $files->put_contents( $root . '/index.php', "<?php\n// Silence is golden.\n" ) ) {
+				if ( $files ) {
+					$files->delete( $root, true );
+				}
+				return '';
+			}
 		}
 		return $root;
 	}
 
 	/**
+	 * Moves the folders of waiting files from uploads/leitvia-private (before 1.3.10) to PRIVATE_DIR and removes the
+	 * old folder. Runs once per site with the installation after an update (Gateway::install()); the packages keep the
+	 * old paths, private_file() maps them to the new folder.
+	 */
+	public static function migrate_private_dir(): void {
+		$uploads = wp_upload_dir( null, false );
+		$legacy  = $uploads['basedir'] . '/' . self::LEGACY_PRIVATE_DIR;
+		if ( ! empty( $uploads['error'] ) || ! is_dir( $legacy ) ) {
+			return;
+		}
+		$root  = self::private_root();
+		$files = self::filesystem();
+		if ( '' === $root || ! $files ) {
+			return;
+		}
+		foreach ( (array) glob( $legacy . '/*', GLOB_ONLYDIR ) as $dir ) {
+			$target = $root . '/' . wp_basename( (string) $dir );
+			if ( ! file_exists( $target ) ) {
+				$files->move( (string) $dir, $target );
+			}
+		}
+		// A folder that could not be moved stays, and with it the old folder and its .htaccess.
+		if ( glob( $legacy . '/*', GLOB_ONLYDIR ) ) {
+			return;
+		}
+		$files->delete( $legacy, true );
+	}
+
+	/**
 	 * The real path of a file inside the private area, '' for any other path. A stored or imported package can name
-	 * any path; only these files are ever moved or deleted.
+	 * any path; only these files are ever moved or deleted. A path in the folder before 1.3.10 counts as the same
+	 * path in the current one, where migrate_private_dir() put the file.
 	 *
 	 * @param string $path Path.
 	 */
 	private static function private_file( string $path ): string {
+		$legacy = wp_upload_dir( null, false )['basedir'] . '/' . self::LEGACY_PRIVATE_DIR . '/';
+		if ( str_starts_with( $path, $legacy ) ) {
+			$path = wp_upload_dir( null, false )['basedir'] . '/' . self::PRIVATE_DIR . '/' . substr( $path, strlen( $legacy ) );
+		}
 		$root = '' !== $path ? realpath( self::private_root() ) : false;
 		$file = $root ? realpath( $path ) : false;
 		return $root && $file && str_starts_with( $file, trailingslashit( $root ) ) && is_file( $file ) ? $file : '';

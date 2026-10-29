@@ -31,7 +31,7 @@ ob_start();
 	<!-- /wp:group -->
 	<!-- wp:leitvia/spotlight {"align":"wide","style":{"spacing":{"margin":{"top":"var:preset|spacing|l"}}}} -->
 	<div data-wp-interactive="leitvia/spotlight" data-wp-on--keydown="actions.keydown" class="wp-block-leitvia-spotlight alignwide" style="margin-top:var(--wp--preset--spacing--l)"><!-- wp:image {"sizeSlug":"full","linkDestination":"none"} -->
-	<figure class="wp-block-image size-full"><img src="<?php echo esc_url( get_theme_file_uri( 'assets/images/landscape.webp' ) ); ?>" alt="<?php echo esc_attr__( 'Illustration of layered green hills below a terracotta sun', 'leitvia-studio' ); ?>"/></figure>
+	<figure class="wp-block-image size-full"><img src="<?php echo esc_url( plugins_url( 'assets/images/landscape.webp', LEITVIA_STUDIO_FILE ) ); ?>" alt="<?php echo esc_attr__( 'Illustration of layered green hills below a terracotta sun', 'leitvia-studio' ); ?>"/></figure>
 	<!-- /wp:image -->
 	<?php foreach ( $leitvia_studio_points as list( $leitvia_studio_x, $leitvia_studio_y, $leitvia_studio_label, $leitvia_studio_text, $leitvia_studio_link ) ) : ?>
 	<!-- wp:leitvia/spotlight-hotspot {"x":<?php echo (int) $leitvia_studio_x; ?>,"y":<?php echo (int) $leitvia_studio_y; ?>} -->

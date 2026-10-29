@@ -8,6 +8,7 @@
 use LeitviaStudio\Consent\Consent;
 use LeitviaStudio\Gateway\Block_Edit;
 use LeitviaStudio\Gateway\Gateway;
+use LeitviaStudio\Gateway\Packages;
 use LeitviaStudio\Gateway\Store;
 use LeitviaStudio\Model\Model;
 use LeitviaStudio\Rest\Gateway_Access_Controller;
@@ -194,9 +195,9 @@ class Test_Multisite extends WP_UnitTestCase {
 		restore_current_blog();
 		$ours = wp_upload_dir();
 		wp_mkdir_p( $theirs['path'] );
-		wp_mkdir_p( $ours['basedir'] . '/leitvia-private/x' );
+		wp_mkdir_p( $ours['basedir'] . '/' . Packages::PRIVATE_DIR . '/x' );
 		copy( $fixture, $theirs['path'] . '/secret.png' );
-		copy( $fixture, $ours['basedir'] . '/leitvia-private/x/secret.png' );
+		copy( $fixture, $ours['basedir'] . '/' . Packages::PRIVATE_DIR . '/x/secret.png' );
 		copy( $fixture, $ours['path'] . '/mine.png' );
 
 		wp_set_current_user( self::factory()->user->create( array( 'role' => Gateway::ROLE ) ) );
@@ -214,7 +215,7 @@ class Test_Multisite extends WP_UnitTestCase {
 		);
 		// On the host of this site: in a subdomain network the other site has a host of its own.
 		$other = $ours['baseurl'] . '/sites/' . $this->other . substr( $theirs['url'], strlen( $theirs['baseurl'] ) ) . '/secret.png';
-		foreach ( array( $other, $ours['baseurl'] . '/leitvia-private/x/secret.png' ) as $url ) {
+		foreach ( array( $other, $ours['baseurl'] . '/' . Packages::PRIVATE_DIR . '/x/secret.png' ) as $url ) {
 			$result = $add( $url );
 			$this->assertWPError( $result, $url );
 			$this->assertSame( 'leitvia_invalid_input', $result->get_error_code(), $url );
@@ -229,7 +230,7 @@ class Test_Multisite extends WP_UnitTestCase {
 		wp_unregister_ability_category( 'leitvia' );
 		leitvia_studio()->reset_for_tests();
 		wp_delete_file( $theirs['path'] . '/secret.png' );
-		wp_delete_file( $ours['basedir'] . '/leitvia-private/x/secret.png' );
+		wp_delete_file( $ours['basedir'] . '/' . Packages::PRIVATE_DIR . '/x/secret.png' );
 		wp_delete_file( $ours['path'] . '/mine.png' );
 	}
 

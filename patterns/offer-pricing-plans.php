@@ -44,6 +44,7 @@ $leitvia_studio_cell   = static function ( string $label, string $value ): strin
 	return '<span class="wp-block-leitvia-comparison-table__label">' . esc_html( $label ) . ': </span>' . esc_html( $value );
 };
 $leitvia_studio_labels = array( $leitvia_studio_plan, $leitvia_studio_year, $leitvia_studio_seats, $leitvia_studio_seat );
+$leitvia_studio_span   = array( 'span' => array( 'class' => true ) );
 
 ob_start();
 ?>
@@ -142,7 +143,7 @@ ob_start();
 	<!-- /wp:leitvia/pricing -->
 	<!-- wp:details {"align":"wide","style":{"spacing":{"margin":{"top":"var:preset|spacing|m"}}}} -->
 	<details class="wp-block-details alignwide" style="margin-top:var(--wp--preset--spacing--m)"><summary><?php echo esc_html__( 'Compare all plans', 'leitvia-studio' ); ?></summary>
-		<!-- wp:leitvia/comparison-table <?php echo serialize_block_attributes( $leitvia_studio_table ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- block comment JSON, escaped by core. ?> -->
+		<!-- wp:leitvia/comparison-table <?php echo wp_kses( serialize_block_attributes( $leitvia_studio_table ), array() ); ?> -->
 		<figure class="wp-block-leitvia-comparison-table" tabindex="0" role="region" aria-label="<?php echo esc_attr( $leitvia_studio_caption ); ?>"><table><caption><?php echo esc_html( $leitvia_studio_caption ); ?></caption><thead><tr>
 		<?php foreach ( $leitvia_studio_labels as $leitvia_studio_label ) : ?>
 			<th scope="col"><?php echo esc_html( $leitvia_studio_label ); ?></th>
@@ -152,9 +153,9 @@ ob_start();
 			<tr<?php echo 1 === $leitvia_studio_index ? ' class="is-highlighted"' : ''; ?>>
 			<?php foreach ( $leitvia_studio_row as $leitvia_studio_col => $leitvia_studio_value ) : ?>
 				<?php if ( 0 === $leitvia_studio_col ) : ?>
-				<th scope="row" data-label="<?php echo esc_attr( $leitvia_studio_labels[0] ); ?>"><?php echo $leitvia_studio_cell( $leitvia_studio_labels[0], $leitvia_studio_value ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in the closure. ?></th>
+				<th scope="row" data-label="<?php echo esc_attr( $leitvia_studio_labels[0] ); ?>"><?php echo wp_kses( $leitvia_studio_cell( $leitvia_studio_labels[0], $leitvia_studio_value ), $leitvia_studio_span ); ?></th>
 				<?php else : ?>
-				<td data-label="<?php echo esc_attr( $leitvia_studio_labels[ $leitvia_studio_col ] ); ?>"><?php echo $leitvia_studio_cell( $leitvia_studio_labels[ $leitvia_studio_col ], $leitvia_studio_value ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in the closure. ?></td>
+				<td data-label="<?php echo esc_attr( $leitvia_studio_labels[ $leitvia_studio_col ] ); ?>"><?php echo wp_kses( $leitvia_studio_cell( $leitvia_studio_labels[ $leitvia_studio_col ], $leitvia_studio_value ), $leitvia_studio_span ); ?></td>
 				<?php endif; ?>
 			<?php endforeach; ?>
 			</tr>

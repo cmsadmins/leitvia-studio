@@ -272,8 +272,17 @@ class Test_Gateway_Content extends WP_UnitTestCase {
 		$this->assertWPError( self::call( 'leitvia/create-content', $input ) );
 		$this->assertWPError( self::call( 'leitvia/list-content' ) );
 
-		wp_set_current_user( self::factory()->user->create( array( 'role' => 'editor' ) ) );
+		// Versions and updates: not for editors, also not with edit_theme_options; for whoever may view Site Health.
+		$editor = self::factory()->user->create( array( 'role' => 'editor' ) );
+		get_userdata( $editor )->add_cap( 'edit_theme_options' );
+		wp_set_current_user( $editor );
 		$this->assert_rejected( 'leitvia_forbidden', self::call( 'leitvia/get-site-health' ) );
+		$admin = self::factory()->user->create( array( 'role' => 'administrator' ) );
+		if ( is_multisite() ) {
+			grant_super_admin( $admin );
+		}
+		wp_set_current_user( $admin );
+		$this->assertArrayHasKey( 'plugins', self::call( 'leitvia/get-site-health' ) );
 	}
 
 	/**
