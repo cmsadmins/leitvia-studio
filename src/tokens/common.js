@@ -1,9 +1,12 @@
-// Shared parts of the Tokens screen: URLs, role groups, the findings list and the file download.
-import { __ } from '@wordpress/i18n';
-import { useEffect, useRef } from '@wordpress/element';
+// Shared parts of the Tokens screen: URLs, role groups, the findings list, the activation dialog and the file
+// download.
+import { __, _n, sprintf } from '@wordpress/i18n';
+import { useEffect, useRef, useState } from '@wordpress/element';
 import apiFetch from '@wordpress/api-fetch';
-import { addQueryArgs } from '@wordpress/url';
 import { Notice } from '@wordpress/components';
+import { screenUrl } from '../admin/common';
+import ConfirmDialog from '../admin/confirm-dialog';
+import { notify } from '../admin/notify';
 
 /**
  * Role groups of the contract with the theme.json preset list and value key each one compiles to (Dtcg::GROUPS).
@@ -56,12 +59,7 @@ export const META = '_leitvia_tokens_dtcg';
  * @return {string} URL.
  */
 export const tokensUrl = ( id ) =>
-	addQueryArgs(
-		'admin.php',
-		id
-			? { page: 'leitvia-studio-tokens', set: id }
-			: { page: 'leitvia-studio-tokens' }
-	);
+	screenUrl( 'leitvia-studio-tokens', { set: id } );
 
 /**
  * Findings of a failed request: data.findings of a 422, otherwise the message of the error as one finding.
@@ -120,6 +118,143 @@ export function Findings( { heading, findings, linkTo } ) {
 				} ) }
 			</ul>
 		</Notice>
+	);
+}
+
+/**
+ * Activates a set; the response findings with severity warning are announced, errors come back as findings.
+ *
+ * @param {number} id Token set ID.
+ * @return {Promise<Array|null>} Findings of a refused activation, or null.
+ */
+async function activate( id ) {
+	try {
+		const response = await apiFetch( {
+			path: `/leitvia-studio/v1/token-sets/${ id }/activate`,
+			method: 'POST',
+		} );
+		notify( 'success', __( 'Token set activated.', 'leitvia-studio' ) );
+		const warnings = ( response.findings ?? [] ).filter(
+			( finding ) => 'warning' === finding.severity
+		);
+		if ( warnings.length ) {
+			notify(
+				'warning',
+				warnings.map( ( finding ) => finding.message ).join( ' ' )
+			);
+		}
+		return null;
+	} catch ( error ) {
+		return errorFindings( error );
+	}
+}
+
+/**
+ * Activation confirmation: what the set replaces, findings of a refused activation. Inside the modal of the DataViews
+ * action by default, in its own modal with `modal`.
+ *
+ * @param {Object}     props
+ * @param {Array}      props.items      The set, as DataViews hands it over.
+ * @param {() => void} props.closeModal Closes the dialog.
+ * @param {Object}     props.roles      Contract roles.
+ * @param {() => void} props.onDone     Called after the activation.
+ * @param {boolean}    props.modal      Whether the dialog opens its own modal.
+ */
+export function ActivateModal( {
+	items,
+	closeModal,
+	roles,
+	onDone,
+	modal = false,
+} ) {
+	const [ item ] = items;
+	const [ findings, setFindings ] = useState( null );
+	const [ isBusy, setIsBusy ] = useState( false );
+	const lists = GROUPS.filter( ( group ) => roles[ group.id ]?.length );
+	const confirm = async () => {
+		setIsBusy( true );
+		const result = await activate( item.id );
+		setIsBusy( false );
+		if ( result ) {
+			setFindings( result );
+			return;
+		}
+		closeModal();
+		onDone();
+	};
+	return (
+		<ConfirmDialog
+			modal={ modal }
+			title={ __( 'Activate token set', 'leitvia-studio' ) }
+			confirmLabel={ __( 'Activate', 'leitvia-studio' ) }
+			isBusy={ isBusy }
+			onCancel={ closeModal }
+			onConfirm={ confirm }
+		>
+			{ findings && (
+				<Findings
+					heading={ __(
+						'The token set was not activated',
+						'leitvia-studio'
+					) }
+					findings={ findings }
+				/>
+			) }
+			<p>
+				{ sprintf(
+					/* translators: %s: token set title. */
+					__(
+						'Activating “%s” replaces these values on the whole site:',
+						'leitvia-studio'
+					),
+					item.title
+				) }
+			</p>
+			<ul className="leitvia-studio-tokens__list">
+				{ lists.map( ( group ) => (
+					<li key={ group.id }>
+						{ sprintf(
+							/* translators: 1: preset list, 2: number of values. */
+							_n(
+								'%1$s: %2$d value',
+								'%1$s: %2$d values',
+								roles[ group.id ].length,
+								'leitvia-studio'
+							),
+							group.label,
+							roles[ group.id ].length
+						) }
+					</li>
+				) ) }
+			</ul>
+			<p>
+				{ __(
+					'Everything else stays as it is, and the earlier values stay in the style revisions.',
+					'leitvia-studio'
+				) }
+			</p>
+		</ConfirmDialog>
+	);
+}
+
+/**
+ * Activation confirmation outside the DataViews actions, for Apply again in the list and for the editor.
+ *
+ * @param {Object}     props
+ * @param {Object}     props.item    Set with id and title.
+ * @param {Object}     props.roles   Contract roles.
+ * @param {() => void} props.onClose Closes the dialog.
+ * @param {() => void} props.onDone  Called after the activation.
+ */
+export function ActivateDialog( { item, roles, onClose, onDone } ) {
+	return (
+		<ActivateModal
+			modal
+			items={ [ item ] }
+			closeModal={ onClose }
+			roles={ roles }
+			onDone={ onDone }
+		/>
 	);
 }
 

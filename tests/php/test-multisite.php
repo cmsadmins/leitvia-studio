@@ -57,6 +57,8 @@ class Test_Multisite extends WP_UnitTestCase {
 	 */
 	public function tear_down(): void {
 		$this->remove_added_uploads();
+		// wp_authenticate_application_password() leaves it set; later runs would count as signed in with a password.
+		unset( $GLOBALS['wp_rest_application_password_uuid'] );
 		parent::tear_down();
 	}
 

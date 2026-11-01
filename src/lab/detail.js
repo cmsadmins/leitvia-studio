@@ -14,10 +14,20 @@ import {
 	__experimentalToggleGroupControlOption as ToggleGroupControlOption,
 } from '@wordpress/components';
 import Loading from '../admin/loading';
+import Breadcrumbs from '../admin/breadcrumbs';
 import PreviewFrame from './preview-frame';
 import MetaForm from './meta-form';
-import { VIEWPORTS, labUrl, settings, statusLabel } from './common';
+import {
+	STATUS_RANK,
+	VIEWPORTS,
+	labUrl,
+	settings,
+	statusLabel,
+} from './common';
 import { notify } from '../admin/notify';
+
+// Panels that work on the post of a wp_block pattern only; theme and add-on patterns have none.
+const OWN_ONLY = [ 'leitvia/annotations' ];
 
 /**
  * Lab item of a reference and, for wp_block patterns, the post with its lab meta.
@@ -76,7 +86,11 @@ function usePattern( ref ) {
 function Panels( { item, block, reload } ) {
 	const components = window.leitviaStudio.getLabPanels();
 	const tabs = settings.labPanels
-		.filter( ( panel ) => components.has( panel.name ) )
+		.filter(
+			( panel ) =>
+				components.has( panel.name ) &&
+				( block || ! OWN_ONLY.includes( panel.name ) )
+		)
 		.map( ( panel ) => ( { name: panel.name, title: panel.label } ) );
 	if ( ! tabs.length ) {
 		return null;
@@ -96,6 +110,42 @@ function Panels( { item, block, reload } ) {
 				);
 			} }
 		</TabPanel>
+	);
+}
+
+// Own status in one sentence; a second one only when a part lowers it. Drafts and patterns in review stay out of the
+// inserter (Pattern_Meta::hide_variants_in_rest()), which the third sentence tells.
+function StatusLine( { item } ) {
+	const lowered =
+		( STATUS_RANK[ item.effective_status ] ?? 0 ) <
+		( STATUS_RANK[ item.status ] ?? 0 );
+	return (
+		<p className="leitvia-studio-detail__status">
+			{ sprintf(
+				/* translators: %s: status such as Approved. */
+				__( 'Status: %s.', 'leitvia-studio' ),
+				statusLabel( item.status, item.status_label )
+			) }
+			{ lowered &&
+				' ' +
+					sprintf(
+						/* translators: %s: effective status such as In review. */
+						__(
+							'Shown as %s, because it contains patterns that are not approved yet.',
+							'leitvia-studio'
+						),
+						statusLabel(
+							item.effective_status,
+							item.effective_status_label
+						)
+					) }
+			{ [ 'draft', 'review' ].includes( item.status ) &&
+				' ' +
+					__(
+						'Patterns in Draft or In review do not appear in the inserter of the editor.',
+						'leitvia-studio'
+					) }
+		</p>
 	);
 }
 
@@ -165,21 +215,17 @@ export default function Detail( { patternRef } ) {
 				gap={ 2 }
 				align="stretch"
 			>
-				{ back }
+				<Breadcrumbs
+					parent={ [
+						__( 'Pattern Lab', 'leitvia-studio' ),
+						labUrl(),
+					] }
+					current={ item.title || item.ref }
+				/>
 				<h2 className="leitvia-studio-detail__title">
 					{ item.title || item.ref }
 				</h2>
-				<p className="leitvia-studio-detail__status">
-					{ sprintf(
-						/* translators: 1: own status, 2: effective status. */
-						__(
-							'Status: %1$s. Effective status: %2$s.',
-							'leitvia-studio'
-						),
-						statusLabel( item.status ),
-						statusLabel( item.effective_status )
-					) }
-				</p>
+				<StatusLine item={ item } />
 			</Flex>
 			<div className="leitvia-studio-detail__layout">
 				<Flex

@@ -101,7 +101,7 @@ JS;
 		// the globals of core that get_the_block_template_html() reads.
 		$_wp_current_template_id      = 'leitvia-studio//preview'; // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- Global of core.
 		$_wp_current_template_content = self::$page; // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- Global of core.
-		return ABSPATH . 'wp-includes/template-canvas.php';
+		return ABSPATH . WPINC . '/template-canvas.php';
 	}
 
 	/**

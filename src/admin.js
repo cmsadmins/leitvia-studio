@@ -9,7 +9,6 @@ import { notify } from './admin/notify';
 import VariantsPanel from './lab/variants-panel';
 import AnnotationsPanel from './lab/annotations-panel';
 import UsagePanel from './lab/usage-panel';
-import StatesPanel from './lab/states-panel';
 import ChecksPanel from './lab/checks-panel';
 import './admin/style.scss';
 
@@ -30,7 +29,6 @@ window.leitviaStudio.registerLabPanel(
 	AnnotationsPanel
 );
 window.leitviaStudio.registerLabPanel( 'leitvia/usage', UsagePanel );
-window.leitviaStudio.registerLabPanel( 'leitvia/states', StatesPanel );
 window.leitviaStudio.registerLabPanel( 'leitvia/checks', ChecksPanel );
 
 // Panel scripts of add-ons load in the footer as well; they have all run before the DOM is ready.

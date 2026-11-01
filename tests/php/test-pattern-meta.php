@@ -5,6 +5,7 @@
  * @package LeitviaStudio
  */
 
+use LeitviaStudio\Lab\Pattern_Dates;
 use LeitviaStudio\Lab\Pattern_Meta;
 
 /**
@@ -458,7 +459,7 @@ class Test_Pattern_Meta extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Patterns of the active theme come first, own patterns next, patterns of core and plugins last.
+	 * Newest change first, ties by title; sources theme, addon and user.
 	 */
 	public function test_pattern_list_order(): void {
 		$block = $this->block( array( 'post_title' => 'Lab test order pattern' ) );
@@ -471,7 +472,98 @@ class Test_Pattern_Meta extends WP_UnitTestCase {
 		);
 		wp_set_current_user( self::$editor );
 
-		$refs = array();
+		$items = $this->all_items();
+		unregister_block_pattern( 'lab-test/other' );
+		$refs  = array_column( $items, 'ref' );
+		$theme = array_keys( array_intersect( $refs, array_map( static fn( array $pattern ): string => 'pattern:' . $pattern['slug'], leitvia_studio_contract()->patterns() ) ) );
+		// Every contract pattern is listed, also when its content was loaded earlier in the request.
+		$this->assertCount( count( leitvia_studio_contract()->patterns() ), $theme );
+		$by_ref = array_column( $items, null, 'ref' );
+		$this->assertSame( 'theme', $by_ref[ $refs[ $theme[0] ] ]['source'] );
+		$this->assertSame( 'user', $by_ref[ 'block:' . $block ]['source'] );
+		$this->assertSame( 'addon', $by_ref['pattern:lab-test/other']['source'] );
+		$this->assertSame( 'Approved', $by_ref[ $refs[ $theme[0] ] ]['status_label'] );
+		// Newest change first, equal changes by title; the new own pattern changed last.
+		$this->assertSame( 'block:' . $block, $refs[0] );
+		foreach ( array_slice( $items, 1 ) as $index => $item ) {
+			$before = $items[ $index ];
+			$this->assertGreaterThanOrEqual( $item['modified'], $before['modified'], $item['ref'] );
+			if ( $item['modified'] === $before['modified'] ) {
+				$this->assertLessThanOrEqual( 0, strcmp( strtolower( $before['title'] ), strtolower( $item['title'] ) ), $item['ref'] );
+			}
+		}
+
+		$add_on = $this->request(
+			'GET',
+			'/leitvia-studio/v1/patterns',
+			array(
+				'source'   => 'addon',
+				'per_page' => 100,
+			)
+		)->get_data();
+		$this->assertSame( array( 'addon' ), array_values( array_unique( array_column( $add_on, 'source' ) ) ) );
+	}
+
+	/**
+	 * Sorting by title works in both directions.
+	 */
+	public function test_pattern_list_by_title(): void {
+		$this->block( array( 'post_title' => 'AAA lab test first' ) );
+		$this->block( array( 'post_title' => 'zzz lab test last' ) );
+		wp_set_current_user( self::$editor );
+
+		$titles = array_column( $this->all_items( array( 'orderby' => 'title', 'order' => 'asc' ) ), 'title' ); // phpcs:ignore WordPress.Arrays.ArrayDeclarationSpacing.AssociativeArrayFound -- Short query.
+		$sorted = $titles;
+		usort( $sorted, static fn( string $a, string $b ): int => strcmp( strtolower( $a ), strtolower( $b ) ) );
+		$this->assertSame( $sorted, $titles );
+		$this->assertSame( 'AAA lab test first', $titles[0] );
+
+		$desc = $this->request( 'GET', '/leitvia-studio/v1/patterns', array( 'orderby' => 'title', 'order' => 'desc', 'per_page' => 1 ) )->get_data(); // phpcs:ignore WordPress.Arrays.ArrayDeclarationSpacing.AssociativeArrayFound -- Short query.
+		$this->assertSame( 'zzz lab test last', $desc[0]['title'] );
+		$this->assertSame( 400, $this->request( 'GET', '/leitvia-studio/v1/patterns', array( 'orderby' => 'status' ) )->get_status() );
+	}
+
+	/**
+	 * Registered patterns take added and updated from leitvia_studio_pattern_dates; a newer state wins over the file.
+	 */
+	public function test_pattern_dates_from_filter(): void {
+		register_block_pattern(
+			'lab-test/dated',
+			array(
+				'title'   => 'Lab test dated',
+				'content' => '<!-- wp:paragraph --><p>x</p><!-- /wp:paragraph -->',
+			)
+		);
+		$filter = static fn( array $dates ): array => $dates + array(
+			'lab-test/dated' => array(
+				'added'   => '2099-01-02',
+				'updated' => '2099-02-03',
+			),
+		);
+		add_filter( 'leitvia_studio_pattern_dates', $filter );
+		Pattern_Dates::reset();
+		wp_set_current_user( self::$editor );
+
+		$items = $this->request( 'GET', '/leitvia-studio/v1/patterns', array( 'per_page' => 1 ) )->get_data();
+		$this->assertSame( 'pattern:lab-test/dated', $items[0]['ref'], 'the newest pattern comes first' );
+		$this->assertSame( '2099-01-02T00:00:00+00:00', $items[0]['added'] );
+		$this->assertSame( '2099-02-03T00:00:00+00:00', $items[0]['modified'] );
+		// The theme ships its dates.
+		$this->assertMatchesRegularExpression( '/^\d{4}-\d{2}-\d{2}$/', Pattern_Dates::get( 'leitvia/hero-centered' )['added'] );
+
+		remove_filter( 'leitvia_studio_pattern_dates', $filter );
+		Pattern_Dates::reset();
+		unregister_block_pattern( 'lab-test/dated' );
+	}
+
+	/**
+	 * Every page of GET /leitvia-studio/v1/patterns.
+	 *
+	 * @param array<string, string> $query More query arguments.
+	 * @return list<array<string, mixed>>
+	 */
+	private function all_items( array $query = array() ): array {
+		$items = array();
 		for ( $page = 1; $page < 20; $page++ ) {
 			$data = $this->request(
 				'GET',
@@ -479,20 +571,14 @@ class Test_Pattern_Meta extends WP_UnitTestCase {
 				array(
 					'per_page' => 100,
 					'page'     => $page,
-				)
+				) + $query
 			)->get_data();
 			if ( ! $data ) {
 				break;
 			}
-			$refs = array_merge( $refs, array_column( $data, 'ref' ) );
+			$items = array_merge( $items, $data );
 		}
-		unregister_block_pattern( 'lab-test/other' );
-		$theme = array_keys( array_intersect( $refs, array_map( static fn( array $pattern ): string => 'pattern:' . $pattern['slug'], leitvia_studio_contract()->patterns() ) ) );
-		$own   = (int) array_search( 'block:' . $block, $refs, true );
-		// Every contract pattern is listed, also when its content was loaded earlier in the request.
-		$this->assertCount( count( leitvia_studio_contract()->patterns() ), $theme );
-		$this->assertGreaterThan( max( $theme ), $own );
-		$this->assertGreaterThan( $own, (int) array_search( 'pattern:lab-test/other', $refs, true ) );
+		return $items;
 	}
 
 	/**

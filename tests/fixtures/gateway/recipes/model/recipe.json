@@ -1,0 +1,14 @@
+{
+	"name": "model",
+	"title": "Model",
+	"description": "A recipe of a test with a content model and one page.",
+	"contentModel": "model.json",
+	"pages": [
+		{
+			"slug": "model-page",
+			"title": "Model page",
+			"frame": "contact",
+			"sections": [ "leitvia/content-faq" ]
+		}
+	]
+}

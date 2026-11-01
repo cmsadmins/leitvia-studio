@@ -8,6 +8,7 @@
 namespace LeitviaStudio\Gateway;
 
 use LeitviaStudio\Tokens\Compiler;
+use LeitviaStudio\Tokens\Token_Sets;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -25,6 +26,18 @@ defined( 'ABSPATH' ) || exit;
  * links to "#": the footer gets the pages of footerNavigation instead, a part with edits gets them as a page section
  * does), pages (leitvia/compose-page), navigation (leitvia/update-navigation with items of label and url), reading,
  * connect (settings that point to recipe pages) and options. A step whose ability is not registered is reported as unavailable.
+ * The building blocks a recipe lists (buildingBlocks) are added after the content model, see Building_Blocks.
+ *
+ * A run takes a selection of parts (PARTS): buildingBlocks (content model and building blocks), samples (their sample
+ * entries), design (token set and style variation), header, footer, pages (all or some slugs), navigation, frontPage
+ * (reading settings) and options (connect and options). A dry run reports what each selected step would do and writes
+ * nothing. A person who runs a recipe without a package key and asks to settle (input settle, see may_settle()) chose
+ * its parts, so what collects in the package is applied at once, audited and with rollback, as for a building block;
+ * every other run gets the autonomy and the rest waits in the package.
+ *
+ * Add-ons localise a recipe through the filters leitvia_studio_recipe_document (the recipe right after its file is
+ * read, see document()) and leitvia_studio_recipe_model (its content model declaration before it is written, see
+ * model()).
  */
 final class Recipes {
 
@@ -50,11 +63,46 @@ final class Recipes {
 	public const WRITES_OPTION = 'leitvia_studio_recipe_writes';
 
 	/**
+	 * Parts a run can be limited to, see selection().
+	 */
+	public const PARTS = array( 'buildingBlocks', 'samples', 'design', 'header', 'footer', 'pages', 'navigation', 'frontPage', 'options' );
+
+	/**
+	 * Part of the steps of Studio; a template part step belongs to the part it writes (header, footer).
+	 */
+	private const STEP_PARTS = array(
+		'contentModel'  => 'buildingBlocks',
+		'blockSettings' => 'buildingBlocks',
+		'blockEntries'  => 'samples',
+		'tokenSet'      => 'design',
+		'variation'     => 'design',
+		'pages'         => 'pages',
+		'navigation'    => 'navigation',
+		'reading'       => 'frontPage',
+		'connect'       => 'options',
+		'options'       => 'options',
+	);
+
+	/**
 	 * Package key of the recipe run without a key from the caller: it collects what the autonomy puts into a package.
 	 *
 	 * @var string
 	 */
 	private static string $collect = '';
+
+	/**
+	 * Whether the run that collects settles: a person asked for it, see may_settle().
+	 *
+	 * @var bool
+	 */
+	private static bool $settle = false;
+
+	/**
+	 * Reports of Packages::apply() by package ID of the packages the run that collects settled so far.
+	 *
+	 * @var array<int, array<string, mixed>>
+	 */
+	private static array $settled = array();
 
 	/**
 	 * Registers the base recipes in the registry recipes. Runs on leitvia_studio_init.
@@ -83,7 +131,7 @@ final class Recipes {
 	public static function all(): array {
 		$list = array();
 		foreach ( leitvia_studio()->registry( 'recipes' )->all() as $name => $entry ) {
-			$recipe = self::load( (string) $entry['path'] );
+			$recipe = self::document( (string) $name, (string) $entry['path'] );
 			$error  = is_wp_error( $recipe ) ? $recipe->get_error_message() : self::unavailable( $name, $recipe );
 			$list[] = array(
 				'name'        => $name,
@@ -101,6 +149,33 @@ final class Recipes {
 	}
 
 	/**
+	 * Labels of add-on steps and codes for the screens that show recipe steps: steps and codes, each by name. Studio
+	 * names its own steps in the screen.
+	 *
+	 * @return array{steps: array<string, string>, codes: array<string, string>}
+	 */
+	public static function labels(): array {
+		/**
+		 * Filters the labels of recipe steps and their codes, for example the steps an add-on adds through
+		 * leitvia_studio_recipe_steps. Labels are translated, one or a few words for a step, one sentence for a code.
+		 *
+		 * @param array<string, mixed> $labels Labels: steps and codes, each an array of labels by step name or code.
+		 */
+		$labels = (array) apply_filters(
+			'leitvia_studio_recipe_step_labels',
+			array(
+				'steps' => array(),
+				'codes' => array(),
+			)
+		);
+		$clean  = static fn( $labels_of ): array => array_map( 'strval', array_filter( (array) $labels_of, 'is_scalar' ) );
+		return array(
+			'steps' => $clean( $labels['steps'] ?? array() ),
+			'codes' => $clean( $labels['codes'] ?? array() ),
+		);
+	}
+
+	/**
 	 * A recipe file checked against the schema.
 	 *
 	 * @param string $path Path to recipe.json.
@@ -113,6 +188,52 @@ final class Recipes {
 		}
 		$valid = rest_validate_value_from_schema( $recipe, self::schema(), 'recipe' );
 		return is_wp_error( $valid ) ? Block_Edit::invalid( 'recipe', $valid->get_error_message() ) : $recipe;
+	}
+
+	/**
+	 * A registered recipe as runs, dry runs, the plan and the list use it: the file checked against the schema, then
+	 * passed through leitvia_studio_recipe_document.
+	 *
+	 * @param string $name Registry name of the recipe.
+	 * @param string $path Path to recipe.json.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public static function document( string $name, string $path ) {
+		$recipe = self::load( $path );
+		if ( is_wp_error( $recipe ) ) {
+			return $recipe;
+		}
+		/**
+		 * Filters a recipe right after its file is read, for runs, dry runs, the plan of the Recipes screen and the list:
+		 * an add-on localises page titles, section edits, navigation labels, title and description here. The recipe
+		 * keeps the shape of schemas/recipe.schema.json; page slugs stay, since runs find pages by them.
+		 *
+		 * @param array<string, mixed> $recipe Recipe.
+		 * @param string               $name   Registry name of the recipe.
+		 */
+		return (array) apply_filters( 'leitvia_studio_recipe_document', $recipe, $name );
+	}
+
+	/**
+	 * The content model declaration of a recipe (its contentModel file) as it is written, planned and dry run: passed
+	 * through leitvia_studio_recipe_model.
+	 *
+	 * @param string $dir  Recipe folder.
+	 * @param string $path Path of the declaration, relative to the folder.
+	 * @param string $name Registry name of the recipe.
+	 * @return array<mixed>
+	 */
+	public static function model( string $dir, string $path, string $name ): array {
+		$declaration = self::file( $dir, $path );
+		/**
+		 * Filters the content model declaration of a recipe before leitvia/define-content-type writes it, and in the
+		 * plan and the dry run: an add-on localises the labels of post types, taxonomies, fields, relations and
+		 * settings here. Keys stay as they are.
+		 *
+		 * @param array<mixed> $declaration Declaration.
+		 * @param string       $name        Registry name of the recipe.
+		 */
+		return (array) apply_filters( 'leitvia_studio_recipe_model', $declaration, $name );
 	}
 
 	/**
@@ -162,18 +283,22 @@ final class Recipes {
 	 * skipped, as are the variation, template parts and navigation changed since a recipe wrote them and the variation
 	 * while a token set is active, so a second run adds nothing twice and resets nothing.
 	 *
-	 * @param string $name    Registry name of the recipe.
-	 * @param string $package Package key, '' for recipe-<name>.
+	 * @param string               $name      Registry name of the recipe.
+	 * @param string               $package   Package key, '' for recipe-<name>.
+	 * @param array<string, mixed> $selection Optional parts, pages, buildingBlocks and dryRun, see selection().
+	 * @param bool                 $settle    Apply what collects at once where may_settle() allows it.
 	 * @return array<string, mixed>|\WP_Error Recipe name, package ID (0 when everything went live) and the steps with
-	 *                                        their status: live, draft, package, unchanged, exists, waiting,
-	 *                                        unavailable or rejected.
+	 *                                        their status (live, draft, package, unchanged, exists, waiting,
+	 *                                        unavailable or rejected) and part. A dry run reports new, replace,
+	 *                                        exists, package or waiting, with dryRun and the parts it replaces. A
+	 *                                        settled run adds applied and partial, see outcome().
 	 */
-	public static function apply( string $name, string $package = '' ) {
+	public static function apply( string $name, string $package = '', array $selection = array(), bool $settle = false ) {
 		$entry = leitvia_studio()->registry( 'recipes' )->get( $name );
 		if ( ! $entry ) {
 			return Rejection::make( 'leitvia_unknown_recipe', __( 'There is no recipe with this name. List the recipes and use one of them.', 'leitvia-studio' ), 404, 'recipe', array( 'recipe' => $name ), 'leitvia/list-recipes' );
 		}
-		$recipe = self::load( (string) $entry['path'] );
+		$recipe = self::document( $name, (string) $entry['path'] );
 		if ( is_wp_error( $recipe ) ) {
 			return $recipe;
 		}
@@ -181,13 +306,108 @@ final class Recipes {
 		if ( '' !== $missing ) {
 			return Rejection::make( 'leitvia_recipe_unavailable', $missing, 422, 'requires', array( 'recipe' => $name ), 'leitvia/list-recipes', 'never' );
 		}
-		$key           = '' !== $package ? $package : substr( 'recipe-' . str_replace( '/', '-', $name ), 0, 64 );
-		self::$collect = '' !== $package ? '' : $key;
+		$key = '' !== $package ? $package : substr( 'recipe-' . str_replace( '/', '-', $name ), 0, 64 );
+		$sel = self::selection( $selection, $recipe );
+		$run = static fn() => self::run( $name, $recipe, $key, dirname( (string) $entry['path'] ), $sel );
+		return '' !== $package || $sel['dryRun'] ? $run() : self::collecting( $key, $run, $settle );
+	}
+
+	/**
+	 * Runs writes that collect in the package of the key: the autonomy decides what goes live, the rest waits in that
+	 * one package, see Pipeline. A key from the caller instead puts everything into its package. With settle, and when
+	 * may_settle() allows it, Building_Blocks::settle() applies the package during the run.
+	 *
+	 * @param string   $key    Package key.
+	 * @param callable $run    The writes.
+	 * @param bool     $settle Whether the caller asked to apply what collects at once.
+	 * @return mixed What the writes return.
+	 */
+	public static function collecting( string $key, callable $run, bool $settle = false ) {
+		$previous      = array( self::$collect, self::$settle, self::$settled );
+		self::$collect = $key;
+		self::$settle  = $settle && self::may_settle();
+		self::$settled = array();
 		try {
-			return self::run( $name, $recipe, $key, dirname( (string) $entry['path'] ) );
+			return $run();
 		} finally {
-			self::$collect = '';
+			[ self::$collect, self::$settle, self::$settled ] = $previous;
 		}
+	}
+
+	/**
+	 * Whether a run may apply its package at once: a person (Gateway::is_person()) in the admin, neither signed in with
+	 * an application password nor calling through an MCP server. Agents, scripts and MCP clients of an administrator
+	 * get the autonomy, and what may not go live waits for a person in the Inbox.
+	 */
+	public static function may_settle(): bool {
+		return Gateway::is_person() && ! rest_get_authenticated_app_password() && ! Mcp::serving();
+	}
+
+	/**
+	 * Whether the run that collects in the key settles, see collecting(). Add-on steps of leitvia_studio_recipe_steps
+	 * ask this before they apply the package or rely on what the run applied.
+	 *
+	 * @param string $key Package key.
+	 */
+	public static function settles( string $key ): bool {
+		return self::$settle && self::collects( $key );
+	}
+
+	/**
+	 * Notes the report of Packages::apply() for a package the run settled, see Building_Blocks::settle().
+	 *
+	 * @param int                  $id     Package ID.
+	 * @param array<string, mixed> $report Report.
+	 */
+	public static function settled( int $id, array $report ): void {
+		self::$settled[ $id ] = $report;
+	}
+
+	/**
+	 * The package of the run that settles in the key and was applied only in part, 0 for none: later writes of the run
+	 * join it instead of a second package with the same key, see Packages::find().
+	 *
+	 * @param string $key Package key.
+	 */
+	public static function partial( string $key ): int {
+		if ( ! self::settles( $key ) ) {
+			return 0;
+		}
+		foreach ( array_keys( self::$settled ) as $id ) {
+			if ( 'partial' === Packages::state( $id ) ) {
+				return $id;
+			}
+		}
+		return 0;
+	}
+
+	/**
+	 * What the run settled so far: applied (IDs of the packages applied in full) and partial (package and errors of
+	 * each package that was applied in part or not at all; it is not in applied), each only when not empty.
+	 *
+	 * @return array{applied?: list<int>, partial?: list<array{package: int, errors: list<array<string, mixed>>}>}
+	 */
+	public static function outcome(): array {
+		$out = array();
+		foreach ( self::$settled as $id => $report ) {
+			if ( 'applied' === $report['state'] ) {
+				$out['applied'][] = $id;
+				continue;
+			}
+			$conflicts        = array_map(
+				static fn( $conflict ): array => array(
+					'op'      => (int) ( $conflict['op'] ?? 0 ),
+					'code'    => 'leitvia_stale_hash',
+					'message' => __( 'The target changed since it was read. Read it again and repeat the change on the current state.', 'leitvia-studio' ),
+				),
+				(array) $report['conflicts']
+			);
+			$out['partial'][] = array(
+				'package' => $id,
+				'errors'  => array_values( array_merge( (array) $report['errors'], $conflicts ) ),
+			);
+		}
+		return $out;
 	}
 
 	/**
@@ -200,42 +420,68 @@ final class Recipes {
 	}
 
 	/**
-	 * The steps of apply().
+	 * The steps of apply(): the parts of the selection, each written through its ability, or in a dry run reported with
+	 * what it would do: new, replace (something on the site is overwritten), exists (kept), package or waiting.
 	 *
 	 * @param string               $name   Registry name of the recipe.
 	 * @param array<string, mixed> $recipe Recipe.
 	 * @param string               $key    Package key.
 	 * @param string               $dir    Recipe folder.
+	 * @param array<string, mixed> $sel    Selection, see selection().
 	 * @return array<string, mixed>
 	 */
-	private static function run( string $name, array $recipe, string $key, string $dir ): array {
+	private static function run( string $name, array $recipe, string $key, string $dir, array $sel ): array {
+		$dry   = (bool) $sel['dryRun'];
+		$has   = static fn( string $part ): bool => in_array( $part, (array) $sel['parts'], true );
 		$steps = array();
-		$call  = static function ( string $step, string $ability, array $input ) use ( &$steps, $key ): array {
-			$steps[] = self::call( $step, $ability, $input + array( 'package' => $key ) );
+		// A person who asked to settle chose the parts and decides on packages anyway: what collects is applied at once,
+		// after the content model (so the entries find their types) and at the end, as Building_Blocks::add() does.
+		// settle() does nothing in every other run.
+		$settle = static function () use ( &$steps, $key ): void {
+			$steps = Building_Blocks::settle( $steps, $key );
+		};
+		$call   = static function ( string $step, string $ability, array $input, string $plan = 'new' ) use ( &$steps, $key, $dry ): array {
+			$steps[] = $dry ? self::step( $step, $ability, $plan, self::target( $input ) ) : self::call( $step, $ability, $input + array( 'package' => $key ) );
 			return $steps[ count( $steps ) - 1 ];
 		};
-		if ( isset( $recipe['contentModel'] ) ) {
-			$call( 'contentModel', 'leitvia/define-content-type', array( 'declaration' => self::file( $dir, (string) $recipe['contentModel'] ) ) );
+		if ( isset( $recipe['contentModel'] ) && $has( 'buildingBlocks' ) && $sel['contentModel'] ) {
+			$model = self::model( $dir, (string) $recipe['contentModel'], $name );
+			$call( 'contentModel', 'leitvia/define-content-type', array( 'declaration' => $model ), Building_Blocks::installed( array( 'model' => $model ) ) ? 'exists' : 'new' );
+			$settle();
 		}
-		if ( isset( $recipe['tokenSet'] ) ) {
+		foreach ( $has( 'buildingBlocks' ) ? (array) $sel['buildingBlocks'] : array() as $block_name ) {
+			$block = leitvia_studio()->registry( 'building_blocks' )->get( (string) $block_name );
+			if ( ! $block ) {
+				$steps[] = self::step( 'contentModel', Building_Blocks::ABILITY, 'unavailable', array( 'building_block' => (string) $block_name ), 'building_block_missing' );
+				continue;
+			}
+			$steps[] = Building_Blocks::model_step( (string) $block_name, $block, $key, $dry );
+			$settle();
+			$steps = array_merge( $steps, Building_Blocks::content_steps( $block, $has( 'samples' ), $key, $dry ) );
+		}
+		if ( isset( $recipe['tokenSet'] ) && $has( 'design' ) ) {
 			$call(
 				'tokenSet',
 				'leitvia/create-token-set',
 				array(
 					'title'    => (string) $recipe['title'],
 					'document' => self::file( $dir, (string) $recipe['tokenSet'] ),
-				)
+				),
+				self::token_set_exists( (string) $recipe['title'] ) ? 'exists' : 'new'
 			);
 		}
-		if ( isset( $recipe['variation'] ) ) {
+		if ( isset( $recipe['variation'] ) && $has( 'design' ) ) {
 			// An active token set replaces the presets of a variation; setting the variation again would undo the brand.
 			if ( (int) get_option( Compiler::ACTIVE_OPTION ) || self::changed( 'variation' ) ) {
 				$steps[] = self::step( 'variation', 'leitvia/set-variation', 'exists', array( 'variation' => (string) $recipe['variation'] ) );
 			} else {
-				self::remember( 'variation', $call( 'variation', 'leitvia/set-variation', array( 'variation' => (string) $recipe['variation'] ) ) );
+				self::remember( 'variation', $call( 'variation', 'leitvia/set-variation', array( 'variation' => (string) $recipe['variation'] ), self::planned( 'variation' ) ) );
 			}
 		}
 		foreach ( (array) ( $recipe['templateParts'] ?? array() ) as $part => $pattern ) {
+			if ( ! $has( (string) $part ) ) {
+				continue;
+			}
 			// A part names its pattern, or the pattern with edits at block IDs as a page section does: the button and the
 			// service bar of a header pattern link to "#" until the recipe gives them targets.
 			$edits   = is_array( $pattern ) ? (array) ( $pattern['edits'] ?? array() ) : array();
@@ -266,20 +512,29 @@ final class Recipes {
 				$call(
 					'templateParts',
 					'leitvia/update-template-part',
-					array( 'part' => (string) $part ) + ( '' !== $part_content ? array( 'content' => $part_content ) : array( 'pattern' => $pattern ) )
+					array( 'part' => (string) $part ) + ( '' !== $part_content ? array( 'content' => $part_content ) : array( 'pattern' => $pattern ) ),
+					$saved ? self::planned( 'part:' . $part ) : 'new'
 				)
 			);
 		}
-		$pages  = array();
-		$queued = self::queued( $key );
+		$pages   = array();
+		$planned = array();
+		$queued  = self::queued( $key );
 		foreach ( (array) $recipe['pages'] as $page ) {
 			$slug   = (string) $page['slug'];
 			$parent = (string) ( $page['parent'] ?? '' );
-			if ( '' !== $parent && empty( $pages[ $parent ] ) ) {
-				$steps[] = self::step( 'pages', 'leitvia/compose-page', 'waiting', array( 'slug' => $slug ), 'parent_missing' );
+			$wanted = $has( 'pages' ) && in_array( $slug, (array) $sel['pages'], true );
+			// A page left out of the selection is looked up all the same, for its child pages, links and settings.
+			if ( '' !== $parent && empty( $pages[ $parent ] ) && ! isset( $planned[ $parent ] ) ) {
+				if ( $wanted ) {
+					$steps[] = self::step( 'pages', 'leitvia/compose-page', 'waiting', array( 'slug' => $slug ), 'parent_missing' );
+				}
 				continue;
 			}
-			$pages[ $slug ] = self::find( $page, (int) ( $pages[ $parent ] ?? 0 ) );
+			$pages[ $slug ] = isset( $planned[ $parent ] ) ? 0 : self::find( $page, (int) ( $pages[ $parent ] ?? 0 ) );
+			if ( ! $wanted ) {
+				continue;
+			}
 			if ( $pages[ $slug ] || in_array( 'page:' . $slug, $queued, true ) ) {
 				$steps[] = self::step(
 					'pages',
@@ -292,6 +547,11 @@ final class Recipes {
 				);
 				continue;
 			}
+			if ( $dry ) {
+				$steps[]          = self::step( 'pages', 'leitvia/compose-page', 'new', array( 'slug' => $slug ) );
+				$planned[ $slug ] = true;
+				continue;
+			}
 			$input = array_intersect_key( $page, array_flip( array( 'title', 'frame', 'kind', 'slug', 'template' ) ) ) + array(
 				'sections' => array_map( static fn( $section ): array => is_string( $section ) ? array( 'pattern' => $section ) : $section, (array) $page['sections'] ),
 			);
@@ -301,31 +561,126 @@ final class Recipes {
 			$result         = $call( 'pages', 'leitvia/compose-page', $input );
 			$pages[ $slug ] = in_array( $result['status'], array( 'live', 'draft' ), true ) ? (int) $result['target']['post'] : 0;
 		}
-		if ( ! empty( $recipe['navigation'] ) && self::changed( 'navigation' ) ) {
-			$steps[] = self::step( 'navigation', 'leitvia/update-navigation', 'exists', array() );
-		} elseif ( ! empty( $recipe['navigation'] ) ) {
-			self::remember( 'navigation', $call( 'navigation', 'leitvia/update-navigation', array( 'items' => self::links( (array) $recipe['navigation'], $recipe, $pages ) ) ) );
+		if ( ! empty( $recipe['navigation'] ) && $has( 'navigation' ) ) {
+			if ( self::changed( 'navigation' ) ) {
+				$steps[] = self::step( 'navigation', 'leitvia/update-navigation', 'exists', array() );
+			} else {
+				self::remember( 'navigation', $call( 'navigation', 'leitvia/update-navigation', array( 'items' => self::links( (array) $recipe['navigation'], $recipe, $pages ) ), self::planned( 'navigation' ) ) );
+			}
 		}
+		// A static front page waits together with its page: show_on_front alone would show an empty front page.
+		$front = (string) ( $recipe['reading']['page_on_front'] ?? '' );
+		$alone = '' !== $front && empty( $pages[ $front ] ) && ! isset( $planned[ $front ] ) && ! in_array( 'page:' . $front, self::queued( $key ), true );
 		foreach ( (array) ( $recipe['reading'] ?? array() ) + (array) ( $recipe['connect'] ?? array() ) + (array) ( $recipe['options'] ?? array() ) as $option => $value ) {
-			$steps[] = self::option( (string) $option, (string) $value, $pages, $key, in_array( 'option:' . $option, $queued, true ) );
+			if ( ! $has( in_array( $option, self::READING, true ) ? 'frontPage' : 'options' ) ) {
+				continue;
+			}
+			$steps[] = 'show_on_front' === $option && 'page' === (string) $value && $alone
+				? self::step( 'reading', 'leitvia/apply-recipe', 'waiting', array( 'option' => 'show_on_front' ), 'page_missing' )
+				: self::option( (string) $option, (string) $value, $pages, $key, in_array( 'option:' . $option, $queued, true ), $dry ? $planned : null );
 		}
-		/**
-		 * Filters the steps of a recipe run before the report. An add-on adds the steps of its own recipes here, each
-		 * written through an ability or Pipeline::run() with the package key, in the shape of the other steps (step,
-		 * ability, status, target, code, package).
-		 *
-		 * @param list<array<string, mixed>> $steps  Steps so far.
-		 * @param string                     $name   Registry name of the recipe.
-		 * @param array<string, mixed>       $recipe Recipe.
-		 * @param string                     $key    Package key of the run.
-		 * @param array<string, int>         $pages  Page IDs by recipe slug, 0 for a page that is not on the site yet.
-		 */
-		$steps = (array) apply_filters( 'leitvia_studio_recipe_steps', $steps, $name, $recipe, $key, $pages );
+		if ( $dry ) {
+			/**
+			 * Filters the steps of a dry run of a recipe (leitvia/apply-recipe with dryRun) before the report. An add-on
+			 * adds what its own steps would do, in the shape of the other steps with the status new, replace, exists,
+			 * package or waiting, and writes nothing. Add-ons that do not use this filter add nothing to a dry run.
+			 *
+			 * @param list<array<string, mixed>> $steps  Steps so far.
+			 * @param string                     $name   Registry name of the recipe.
+			 * @param array<string, mixed>       $recipe Recipe.
+			 * @param string                     $key    Package key of the run.
+			 * @param array<string, int>         $pages  Page IDs by recipe slug, 0 for a page that is not on the site yet.
+			 * @param array<string, mixed>       $sel    Selection: parts, pages, buildingBlocks, contentModel and dryRun.
+			 */
+			$steps = (array) apply_filters( 'leitvia_studio_recipe_plan_steps', $steps, $name, $recipe, $key, $pages, $sel );
+		} else {
+			// A person's run applies what collected so far, so add-on steps find pages, samples and the model live.
+			$settle();
+			foreach ( self::$settled ? (array) $recipe['pages'] : array() as $page ) {
+				$slug = (string) $page['slug'];
+				if ( isset( $pages[ $slug ] ) && ! $pages[ $slug ] ) {
+					$pages[ $slug ] = self::find( $page, (int) ( $pages[ (string) ( $page['parent'] ?? '' ) ] ?? 0 ) );
+				}
+			}
+			/**
+			 * Filters the steps of a recipe run before the report. An add-on adds the steps of its own recipes here, each
+			 * written through an ability or Pipeline::run() with the package key, in the shape of the other steps (step,
+			 * ability, status, target, code, package), and skips those whose part is not in the selection. In a person's
+			 * run what collected before is applied already, and what the add-on collects is applied after the filter.
+			 *
+			 * @param list<array<string, mixed>> $steps  Steps so far.
+			 * @param string                     $name   Registry name of the recipe.
+			 * @param array<string, mixed>       $recipe Recipe.
+			 * @param string                     $key    Package key of the run.
+			 * @param array<string, int>         $pages  Page IDs by recipe slug, 0 for a page that is not on the site yet.
+			 * @param array<string, mixed>       $sel    Selection: parts, pages, buildingBlocks, contentModel and dryRun.
+			 */
+			$steps = (array) apply_filters( 'leitvia_studio_recipe_steps', $steps, $name, $recipe, $key, $pages, $sel );
+			$settle();
+		}
+		$steps = array_map( static fn( $step ): array => (array) $step + array( 'part' => self::part_of( (array) $step ) ), $steps );
 		$ids   = array_filter( array_column( $steps, 'package' ) );
-		return array(
+		// A settled run lists the packages it applied at once (each rolls back in the Inbox) and those applied in part.
+		$out = array(
 			'recipe'  => $name,
-			'package' => $ids ? (int) max( $ids ) : Packages::find( $key ),
+			'package' => $dry ? 0 : ( $ids && ! self::settles( $key ) ? (int) max( $ids ) : Packages::find( $key ) ),
 			'steps'   => $steps,
+		) + self::outcome();
+		if ( $dry ) {
+			$out['dryRun']   = true;
+			$out['replaces'] = array_values( array_unique( array_filter( array_column( wp_list_filter( $steps, array( 'status' => 'replace' ) ), 'part' ) ) ) );
+		}
+		return $out;
+	}
+
+	/**
+	 * The selection of a run from the input of apply-recipe: parts (PARTS, all by default), pages (slugs of the recipe,
+	 * all by default), buildingBlocks (names the recipe lists, all by default), dryRun, and contentModel: whether the
+	 * content model file of the recipe is written, only while no subset of building blocks was asked for.
+	 *
+	 * @param array<string, mixed> $input  Input with parts, pages, buildingBlocks and dryRun, each optional.
+	 * @param array<string, mixed> $recipe Recipe.
+	 * @return array{parts: list<string>, pages: list<string>, buildingBlocks: list<string>, contentModel: bool, dryRun: bool}
+	 */
+	public static function selection( array $input, array $recipe ): array {
+		$pages  = array_map( 'strval', array_column( (array) $recipe['pages'], 'slug' ) );
+		$blocks = array_values( array_map( 'strval', (array) ( $recipe['buildingBlocks'] ?? array() ) ) );
+		return array(
+			'parts'          => isset( $input['parts'] ) ? array_values( array_intersect( self::PARTS, (array) $input['parts'] ) ) : self::PARTS,
+			'pages'          => isset( $input['pages'] ) ? array_values( array_intersect( $pages, (array) $input['pages'] ) ) : $pages,
+			'buildingBlocks' => isset( $input['buildingBlocks'] ) ? array_values( array_intersect( $blocks, (array) $input['buildingBlocks'] ) ) : $blocks,
+			'contentModel'   => ! isset( $input['buildingBlocks'] ) || ! $blocks,
+			'dryRun'         => ! empty( $input['dryRun'] ),
+		);
+	}
+
+	/**
+	 * Part of a step of the report, '' for a step of an add-on that names none.
+	 *
+	 * @param array<string, mixed> $step Step.
+	 */
+	private static function part_of( array $step ): string {
+		$step_name = (string) ( $step['step'] ?? '' );
+		if ( 'templateParts' === $step_name ) {
+			return (string) ( $step['target']['part'] ?? '' );
+		}
+		return self::STEP_PARTS[ $step_name ] ?? '';
+	}
+
+	/**
+	 * Whether a token set with this title exists, the one a run of the recipe created.
+	 *
+	 * @param string $title Title of the recipe.
+	 */
+	private static function token_set_exists( string $title ): bool {
+		return (bool) get_posts(
+			array(
+				'post_type'   => Token_Sets::POST_TYPE,
+				'post_status' => 'any',
+				'title'       => $title,
+				'fields'      => 'ids',
+				'numberposts' => 1,
+			)
 		);
 	}
 
@@ -460,13 +815,33 @@ final class Recipes {
 	 * @param string $name Part: variation, navigation or part:<name>.
 	 */
 	private static function changed( string $name ): bool {
+		[ $current, $hash ] = self::hashes( $name );
+		return '' !== $current && $hash !== $current;
+	}
+
+	/**
+	 * Plan of a dry run for a part a recipe writes whole: unchanged while it holds what a recipe wrote, else replace.
+	 *
+	 * @param string $name Part: variation, navigation or part:<name>.
+	 */
+	private static function planned( string $name ): string {
+		[ $current, $hash ] = self::hashes( $name );
+		return '' !== $current && $hash === $current ? 'unchanged' : 'replace';
+	}
+
+	/**
+	 * Hash of the post a recipe wrote for a part now and right after the write, '' each when there is none.
+	 *
+	 * @param string $name Part: variation, navigation or part:<name>.
+	 * @return array{0: string, 1: string}
+	 */
+	private static function hashes( string $name ): array {
 		$record = (array) ( ( (array) get_option( self::WRITES_OPTION, array() ) )[ $name ] ?? array() );
 		if ( isset( $record['package'] ) ) {
 			$entry  = array_column( Packages::operations( (int) $record['package'] ), null, 'id' )[ (int) $record['op'] ] ?? array();
 			$record = (array) ( $entry['applied'] ?? array() );
 		}
-		$current = empty( $record['post'] ) ? '' : Hashes::document( (int) $record['post'] );
-		return '' !== $current && (string) ( $record['hash'] ?? '' ) !== $current;
+		return array( empty( $record['post'] ) ? '' : Hashes::document( (int) $record['post'] ), (string) ( $record['hash'] ?? '' ) );
 	}
 
 	/**
@@ -477,8 +852,8 @@ final class Recipes {
 	 * @param array<string, mixed> $input   Input without base_hash.
 	 * @return array<string, mixed>
 	 */
-	private static function call( string $step, string $ability, array $input ): array {
-		$target = array_intersect_key( $input, array_flip( array( 'slug', 'part', 'variation' ) ) );
+	public static function call( string $step, string $ability, array $input ): array {
+		$target = self::target( $input );
 		// wp_get_ability() alone would raise a notice for a missing ability.
 		$handler = wp_has_ability( $ability ) ? wp_get_ability( $ability ) : null;
 		if ( ! $handler ) {
@@ -494,6 +869,16 @@ final class Recipes {
 	}
 
 	/**
+	 * Target of a step for the report: slug, part and variation of the input.
+	 *
+	 * @param array<string, mixed> $input Input of the ability.
+	 * @return array<string, mixed>
+	 */
+	private static function target( array $input ): array {
+		return array_intersect_key( $input, array_flip( array( 'slug', 'part', 'variation' ) ) );
+	}
+
+	/**
 	 * A step from a pipeline result or rejection.
 	 *
 	 * @param string               $step    Step name.
@@ -502,7 +887,7 @@ final class Recipes {
 	 * @param array<string, mixed> $target  Target for the report.
 	 * @return array<string, mixed>
 	 */
-	private static function result( string $step, string $ability, $result, array $target ): array {
+	public static function result( string $step, string $ability, $result, array $target ): array {
 		if ( is_wp_error( $result ) ) {
 			return self::step( $step, $ability, 'rejected', $target, (string) $result->get_error_code() ) + array( 'message' => $result->get_error_message() );
 		}
@@ -520,7 +905,7 @@ final class Recipes {
 	 * @param string               $code    Reason or error code.
 	 * @return array<string, mixed>
 	 */
-	private static function step( string $step, string $ability, string $status, array $target, string $code = '' ): array {
+	public static function step( string $step, string $ability, string $status, array $target, string $code = '' ): array {
 		return array(
 			'step'    => $step,
 			'ability' => $ability,
@@ -534,19 +919,22 @@ final class Recipes {
 	/**
 	 * Sets one reading setting, page connection or data-saving option through the pipeline; page slugs become page IDs.
 	 *
-	 * @param string             $option Option name.
-	 * @param string             $value  Value, a page slug for the page options.
-	 * @param array<string, int> $pages  Page IDs by recipe slug, 0 when not created yet.
-	 * @param string             $key    Package key.
-	 * @param bool               $queued Whether the open package already sets the option.
+	 * @param string                   $option  Option name.
+	 * @param string                   $value   Value, a page slug for the page options.
+	 * @param array<string, int>       $pages   Page IDs by recipe slug, 0 when not created yet.
+	 * @param string                   $key     Package key.
+	 * @param bool                     $queued  Whether the open package already sets the option.
+	 * @param array<string, bool>|null $planned Slugs of the pages a dry run would create, null for a run that writes.
 	 * @return array<string, mixed>
 	 */
-	private static function option( string $option, string $value, array $pages, string $key, bool $queued ): array {
+	private static function option( string $option, string $value, array $pages, string $key, bool $queued, ?array $planned = null ): array {
 		$target = array( 'option' => $option );
 		$step   = in_array( $option, self::READING, true ) ? 'reading' : ( in_array( $option, self::CONNECT, true ) ? 'connect' : 'options' );
 		if ( in_array( $option, array_merge( array( 'page_on_front', 'page_for_posts' ), self::CONNECT ), true ) ) {
 			if ( ! empty( $pages[ $value ] ) ) {
 				$value = (string) $pages[ $value ];
+			} elseif ( isset( $planned[ $value ] ) ) {
+				return self::step( $step, 'leitvia/apply-recipe', 'replace', $target + array( 'page' => $value ) );
 			} elseif ( in_array( 'page:' . $value, self::queued( $key ), true ) ) {
 				// The page waits in the package: the stored value is its slug until applying the package sets its ID.
 				$target['page'] = $value;
@@ -556,6 +944,9 @@ final class Recipes {
 		}
 		if ( $queued || (string) get_option( $option ) === $value ) {
 			return self::step( $step, 'leitvia/apply-recipe', $queued ? 'package' : 'exists', $target );
+		}
+		if ( null !== $planned ) {
+			return self::step( $step, 'leitvia/apply-recipe', 'replace', $target );
 		}
 		$op = new Operation( 'leitvia/apply-recipe', 'structure', $target, Hashes::of( (string) wp_json_encode( get_option( $option ) ) ), static fn(): array => array( 'value' => $value ), array(), $key );
 		return self::result( $step, 'leitvia/apply-recipe', Pipeline::run( $op ), $target );

@@ -1,5 +1,5 @@
 // Token set list: every set with status and revisions, creation from token sources, import, activation and export.
-import { __, _n, sprintf } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
 import { useCallback, useEffect, useMemo, useState } from '@wordpress/element';
 import apiFetch from '@wordpress/api-fetch';
 import { addQueryArgs } from '@wordpress/url';
@@ -13,12 +13,16 @@ import {
 	SelectControl,
 	TextControl,
 } from '@wordpress/components';
+import { errorText } from '../admin/common';
+import ConfirmDialog from '../admin/confirm-dialog';
+import More from '../admin/more';
 import { notify } from '../admin/notify';
 import ImportDialog from './import-dialog';
 import { OVERLAY, overlaySummary } from './overlay-form';
 import {
+	ActivateDialog,
+	ActivateModal,
 	Findings,
-	GROUPS,
 	downloadSet,
 	errorFindings,
 	tokensUrl,
@@ -35,142 +39,6 @@ const DEFAULT_VIEW = {
 	fields: [ 'status', 'overlay', 'modified', 'author', 'revisions' ],
 	layout: {},
 };
-
-/**
- * Activates a set; the response findings with severity warning are announced, errors come back as findings.
- *
- * @param {number} id Token set ID.
- * @return {Promise<Array|null>} Findings of a refused activation, or null.
- */
-async function activate( id ) {
-	try {
-		const response = await apiFetch( {
-			path: `/leitvia-studio/v1/token-sets/${ id }/activate`,
-			method: 'POST',
-		} );
-		notify( 'success', __( 'Token set activated.', 'leitvia-studio' ) );
-		const warnings = ( response.findings ?? [] ).filter(
-			( finding ) => 'warning' === finding.severity
-		);
-		if ( warnings.length ) {
-			notify(
-				'warning',
-				warnings.map( ( finding ) => finding.message ).join( ' ' )
-			);
-		}
-		return null;
-	} catch ( error ) {
-		return errorFindings( error );
-	}
-}
-
-function ActivateModal( { items: [ item ], closeModal, roles, onDone } ) {
-	const [ findings, setFindings ] = useState( null );
-	const [ isBusy, setIsBusy ] = useState( false );
-	const lists = GROUPS.filter( ( group ) => roles[ group.id ]?.length );
-	const confirm = async () => {
-		setIsBusy( true );
-		const result = await activate( item.id );
-		setIsBusy( false );
-		if ( result ) {
-			setFindings( result );
-			return;
-		}
-		closeModal();
-		onDone();
-	};
-	return (
-		<Flex direction="column" justify="flex-start" gap={ 4 } align="stretch">
-			{ findings && (
-				<Findings
-					heading={ __(
-						'The token set was not activated',
-						'leitvia-studio'
-					) }
-					findings={ findings }
-				/>
-			) }
-			<p>
-				{ sprintf(
-					/* translators: %s: token set title. */
-					__(
-						'Activating “%s” replaces these lists in the global styles of the active theme:',
-						'leitvia-studio'
-					),
-					item.title
-				) }
-			</p>
-			<ul className="leitvia-studio-tokens__list">
-				{ lists.map( ( group ) => (
-					<li key={ group.id }>
-						{ sprintf(
-							/* translators: 1: preset list, 2: number of values. */
-							_n(
-								'%1$s: %2$d value',
-								'%1$s: %2$d values',
-								roles[ group.id ].length,
-								'leitvia-studio'
-							),
-							group.label,
-							roles[ group.id ].length
-						) }
-					</li>
-				) ) }
-			</ul>
-			<p>
-				{ __(
-					'Other global styles stay as they are. Earlier values remain in the revisions of the global styles.',
-					'leitvia-studio'
-				) }
-			</p>
-			<Flex justify="flex-end">
-				<Button
-					__next40pxDefaultSize
-					variant="tertiary"
-					onClick={ closeModal }
-				>
-					{ __( 'Cancel', 'leitvia-studio' ) }
-				</Button>
-				<Button
-					__next40pxDefaultSize
-					variant="primary"
-					onClick={ confirm }
-					isBusy={ isBusy }
-					disabled={ isBusy }
-					accessibleWhenDisabled
-				>
-					{ __( 'Activate', 'leitvia-studio' ) }
-				</Button>
-			</Flex>
-		</Flex>
-	);
-}
-
-/**
- * Activation confirmation outside the DataViews actions, for Apply again and the editor.
- *
- * @param {Object}     props
- * @param {Object}     props.item    Set with id and title.
- * @param {Object}     props.roles   Contract roles.
- * @param {() => void} props.onClose Closes the dialog.
- * @param {() => void} props.onDone  Called after the activation.
- */
-export function ActivateDialog( { item, roles, onClose, onDone } ) {
-	return (
-		<Modal
-			title={ __( 'Activate token set', 'leitvia-studio' ) }
-			onRequestClose={ onClose }
-			size="medium"
-		>
-			<ActivateModal
-				items={ [ item ] }
-				closeModal={ onClose }
-				roles={ roles }
-				onDone={ onDone }
-			/>
-		</Modal>
-	);
-}
 
 function DeleteModal( { items: [ item ], closeModal, onDone } ) {
 	const [ isBusy, setIsBusy ] = useState( false );
@@ -190,7 +58,14 @@ function DeleteModal( { items: [ item ], closeModal, onDone } ) {
 		}
 	};
 	return (
-		<Flex direction="column" justify="flex-start" gap={ 4 } align="stretch">
+		<ConfirmDialog
+			modal={ false }
+			confirmLabel={ __( 'Delete', 'leitvia-studio' ) }
+			isDestructive
+			isBusy={ isBusy }
+			onCancel={ closeModal }
+			onConfirm={ confirm }
+		>
 			<p>
 				{ sprintf(
 					/* translators: %s: token set title. */
@@ -201,27 +76,7 @@ function DeleteModal( { items: [ item ], closeModal, onDone } ) {
 					item.title
 				) }
 			</p>
-			<Flex justify="flex-end">
-				<Button
-					__next40pxDefaultSize
-					variant="tertiary"
-					onClick={ closeModal }
-				>
-					{ __( 'Cancel', 'leitvia-studio' ) }
-				</Button>
-				<Button
-					__next40pxDefaultSize
-					variant="primary"
-					isDestructive
-					onClick={ confirm }
-					isBusy={ isBusy }
-					disabled={ isBusy }
-					accessibleWhenDisabled
-				>
-					{ __( 'Delete', 'leitvia-studio' ) }
-				</Button>
-			</Flex>
-		</Flex>
+		</ConfirmDialog>
 	);
 }
 
@@ -468,11 +323,13 @@ export default function List() {
 			setState( { contract: null, items: [], error } );
 			notify(
 				'error',
-				error.message ??
+				errorText(
+					error,
 					__(
 						'The token sets could not be loaded.',
 						'leitvia-studio'
 					)
+				)
 			);
 		}
 	}, [] );
@@ -623,10 +480,20 @@ export default function List() {
 			</Flex>
 			{ state?.contract && ! state.contract.valid && (
 				<Notice status="error" isDismissible={ false }>
-					{ __(
-						'The active theme has no valid contract. Token sets cannot be checked or activated.',
-						'leitvia-studio'
-					) }
+					<p>
+						{ __(
+							'The active theme does not tell Studio its colors and fonts, so token sets cannot be checked or activated.',
+							'leitvia-studio'
+						) }
+					</p>
+					<More>
+						<p>
+							{ __(
+								'The active theme has no valid contract (leitvia-contract.json).',
+								'leitvia-studio'
+							) }
+						</p>
+					</More>
 				</Notice>
 			) }
 			{ state?.contract?.drift && active > 0 && (
@@ -642,7 +509,7 @@ export default function List() {
 					] }
 				>
 					{ __(
-						'Global styles differ from the active set: the set was saved after its activation, or the styles were changed elsewhere, for example in the Site Editor.',
+						'The site no longer looks like the active set: the set was saved again after activation, or someone changed the styles, for example in the Site Editor.',
 						'leitvia-studio'
 					) }
 				</Notice>

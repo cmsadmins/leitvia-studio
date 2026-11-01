@@ -226,7 +226,10 @@ final class Model {
 	}
 
 	/**
-	 * Validates the declaration of the Model screen together with the one from code and stores it.
+	 * Validates the declaration of the Model screen together with the one from code and stores it. After init the
+	 * declaration is registered again in the same request, so a new post type, taxonomy or setting exists right away
+	 * (a recipe or building block adds entries to it next); the rewrite rules still flush on the next init. Not while
+	 * switch_to_blog() is active: the types of another site do not belong to this request.
 	 *
 	 * @param array<string, mixed> $decl    Declaration without the entries from code.
 	 * @param bool                 $dry_run Only validate.
@@ -251,6 +254,9 @@ final class Model {
 		update_option( self::OPTION, $decl, true );
 		update_option( self::FLUSH_OPTION, 1, true );
 		self::forget();
+		if ( did_action( 'init' ) && ! ( is_multisite() && ms_is_switched() ) ) {
+			Registrar::register();
+		}
 		return true;
 	}
 

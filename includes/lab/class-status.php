@@ -33,6 +33,21 @@ final class Status {
 	private static array $cache = array();
 
 	/**
+	 * Label of a status, the value itself when it is unknown. The Lab shows these through its REST items.
+	 *
+	 * @param string $status Status.
+	 */
+	public static function label( string $status ): string {
+		$labels = array(
+			'draft'      => __( 'Draft', 'leitvia-studio' ),
+			'review'     => __( 'In review', 'leitvia-studio' ),
+			'approved'   => __( 'Approved', 'leitvia-studio' ),
+			'deprecated' => __( 'Deprecated', 'leitvia-studio' ),
+		);
+		return $labels[ $status ] ?? $status;
+	}
+
+	/**
 	 * Own status, without the parts. Theme patterns are approved unless the contract names a replacement.
 	 *
 	 * @param string $ref Pattern reference.

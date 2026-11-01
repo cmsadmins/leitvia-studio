@@ -4,7 +4,7 @@ Tags: ai, mcp, block theme, accessibility, design tokens
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.10
+Stable tag: 1.3.14
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -14,23 +14,27 @@ A gateway for AI agents, a pattern lab, design tokens and site recipes for block
 
 Leitvia Studio lets people and AI agents build and maintain sites with block themes without breaking design, accessibility or content. Everything it creates is stored in WordPress core structures, so the site keeps working when the plugin is deactivated. It works with any block theme and fits best with the theme Leitvia.
 
-**Gateway for AI agents.** Agents work through Leitvia abilities of the WordPress Abilities API: read the design contract, tokens, patterns and page outlines, then build pages from patterns, change single blocks, fix links and alt text or set up navigation. Every write runs through one pipeline with identity, scope, a hash check against stale reads, content checks (headings, alt text, link text, contrast, landmarks), a snapshot and an audit entry. An autonomy level per area decides whether a change goes live, lands as a draft or waits as a change package. People review packages in the inbox with a block diff and apply, reject or roll them back. Agents sign in with an application password of the role "Leitvia Agent" and never reach plugins, users or settings.
+**Gateway for AI agents.** Agents work through Leitvia abilities of the WordPress Abilities API: read the design contract, tokens, patterns and page outlines, then build pages from patterns, change single blocks, fix links and alt text or set up navigation. Every write runs through one pipeline with identity, scope, a hash check against stale reads, content checks (headings, alt text, link text, contrast, landmarks), a snapshot and an audit entry. An autonomy level per area decides whether a change goes live, lands as a draft or waits as a change package. People review packages in the inbox with a block diff and apply, reject or roll them back.
+
+**Agents are tools you choose.** An agent is a program you connect with the application password of a "Leitvia Agent" user, created and revoked on the Agents screen. It never touches plugins, themes, users or code, and settings, content model and global styles always wait for a person.
 
 **MCP, REST and WP-CLI.** With the plugin MCP Adapter active, Studio adds its own MCP server "leitvia" with exactly the Leitvia abilities as tools. Without it, every ability is available over the REST API. `wp leitvia` runs the same abilities from the command line: token sets, patterns, content model, site audit, change packages and recipes.
 
-**Site recipes.** One command or one agent call sets up a site from a bundle of style variation, header, footer, pages from patterns, navigation and settings that send less data: Blog, Company, Publication, Documentation and, with WooCommerce, Shop. A second run adds nothing.
+**Site recipes.** One command or one agent call sets up a site from a bundle of style variation, header, footer, pages from patterns, navigation and settings that send less data: Blog, Company, Publication, Documentation and, with WooCommerce, Shop. A second run adds nothing. Take only some parts if you like (content, look, single pages, front page): a summary first shows what is new, replaced or kept, and the Inbox keeps a rollback.
+
+**Building blocks.** One content feature of an add-on, such as events or a team: content types, the sections that show them and sample drafts. Adding one leaves design and pages alone. A section whose building block is missing says so in the editor and sets it up in one click; visitors never see it empty. Developers use the registry building_blocks, agents leitvia/add-building-block.
 
 **Pattern Lab, tokens and content model.** The Pattern Lab under Leitvia Studio shows all theme and own patterns with live previews in every style variation at 390, 782 and 1440 px, state variants (long text, empty, error, disabled) and an axe check per preview. Token sets are imported, exported, checked for contrast and scheduled as overlays. The content model declares post types and fields that blocks can show through block bindings.
 
-Posts and author pages get structured data for search engines (JSON-LD): a BlogPosting, or a NewsArticle for categories you mark as news, with headline, dates, authors, publisher and logo, and a ProfilePage on author pages. Three image sizes at 1200 px width (16:9, 4:3 and 1:1) are made on upload for it. While an SEO plugin such as Yoast SEO, Rank Math, SEOPress, All in One SEO or The SEO Framework is active, Leitvia Studio prints no structured data, so that plugin stays the only source.
+Posts and author pages get structured data for search engines (JSON-LD): a BlogPosting, or a NewsArticle for categories you mark as news, with headline, dates, authors, publisher and logo, and a ProfilePage on author pages, with three image sizes of 1200 px (16:9, 4:3 and 1:1) made on upload. While an SEO plugin such as Yoast SEO, Rank Math, SEOPress, All in One SEO or The SEO Framework is active, Leitvia Studio prints none, so that plugin stays the only source.
 
-Embedded videos, posts and other content from sites such as YouTube, Vimeo or X load nothing from the provider until the visitor agrees. A placeholder names the provider, links to its privacy policy and to the content, and offers a button to load it; visitors can always allow a provider and revoke that with the Consent Settings block, best placed on your privacy policy page.
+Embedded videos, posts and other content from sites such as YouTube, Vimeo or X load nothing from the provider until the visitor agrees. A placeholder names the provider, links to its privacy policy and to the content and offers to load it; the Consent Settings block, best placed on your privacy policy page, lists and revokes what a visitor always allows.
 
-Pages in easy language (Leichte Sprache), which public bodies offer under BITV 2.0, are normal pages: in the page sidebar, "Easy language" marks a page as the easy language version of another page, and the block "Easy language switch" links the two in both directions once both are published. The block "Accessibility bar" for the header collects the links to easy language, the accessibility statement and sign language; with JavaScript it adds text size (100 to 200 %), high contrast and read aloud. The bar is an extra, not a fix: pages must be accessible without it.
+Pages in easy language (Leichte Sprache), which public bodies offer under BITV 2.0, are normal pages: the page sidebar marks one as the easy language version of another, and the block "Easy language switch" links both once they are published. The block "Accessibility bar" for the header collects the links to easy language, the accessibility statement and sign language and, with JavaScript, adds text size (100 to 200 %), high contrast and read aloud. It is an extra, not a fix: pages must be accessible without it.
 
-Profile pictures come from your own media library. Users pick one on their profile screen; everyone without a picture, including people who leave comments, gets a neutral placeholder that ships with the plugin. Gravatar stays off unless an administrator switches it on.
+Profile pictures come from your own media library; everyone without one, people who comment included, gets a neutral placeholder that ships with the plugin. Gravatar stays off unless an administrator switches it on.
 
-For shops built with WooCommerce, Leitvia Studio adds the block "Product comparison", gateway abilities for products and categories, and the site recipe "Shop". All three are available only while WooCommerce is active; WooCommerce is never required (see the questions below).
+For WooCommerce shops Leitvia Studio adds the block "Product comparison", gateway abilities for products and categories and the site recipe "Shop", only while WooCommerce is active; it is never required (see the questions below).
 
 **Leitvia Pro.** Everything above is free and stays free. The paid add-on Leitvia Pro adds the blocks Slider, Scroll story, Before and after and Entry list, and eight industry kits (SaaS, law firm, trades, medical practice, restaurant, public authority, publisher, association) with their own brand, pages and patterns. Plans and prices: https://leitvia.com/pricing/
 
@@ -38,11 +42,10 @@ For shops built with WooCommerce, Leitvia Studio adds the block "Product compari
 
 Leitvia Studio is built to meet WCAG 2.2 level AA and BITV 2.0 in its admin screens and in the blocks it adds to the front end:
 
-* The admin screens Lab, Tokens, Content Model, Inbox, Agents and Settings work with the keyboard, keep a visible focus, label every field and announce results in a status message. Wide tables scroll in their own box at 320 px instead of the page.
+* The admin screens Pattern Lab, Tokens, Content Model, Recipes, Agents with its Inbox tab and Settings work with the keyboard, keep a visible focus, label every field and announce results in a status message. Wide tables scroll in their own box at 320 px instead of the page.
 * The inbox shows each change of an agent as a block diff in plain text with the text before and after, never by color alone. Revoking an agent and the profile "Fully autonomous" ask for a confirmation.
 * Blocks keep their content readable without JavaScript: tabs, table of contents, mega menu links, pricing period switch, comparison tables and the form error summary. Moving blocks (marquee, counter, reveal) stand still when the operating system asks for reduced motion, and the marquee has a Pause button.
 * Before an agent change goes live, the gateway checks heading structure, alt text, link text, color pairs of the active palette and the landmarks of the rendered page, and refuses changes that bring new findings.
-* The Pattern Lab runs axe in every preview, and the block "Accessibility bar" and pages in easy language help with the extra requirements of BITV 2.0.
 
 Automated tests run axe in three widths and keyboard tests on the admin screens, and axe on every block. They do not replace a test by people, and the accessibility of a site also depends on its theme, content and other plugins. Report accessibility problems at https://leitvia.com/accessibility/.
 
@@ -55,7 +58,7 @@ Automated tests run axe in three widths and keyboard tests on the admin screens,
 
 = How do AI agents use Leitvia? =
 
-An agent such as Claude Code, Codex or Cursor connects to your site over MCP or the REST API with the application password of an agent user from Leitvia Studio, Agents. It reads the design contract and the outline of a page first, then calls the Leitvia abilities, and every change runs through the gateway checks and your autonomy levels. No service of ours sits in between: the agent signs in as a user of your site that an administrator created, with the role Leitvia Agent and without administrator rights. It cannot install, activate or remove plugins or themes, manage users or log in to wp-admin. Changes to site settings, such as the front page or the comment defaults, only ever reach the inbox as a suggestion that an administrator applies or rejects. Ready-made agent skills for setup, design, pages, patterns, maintenance, accessibility and migration, with the full reference of all abilities, are described at https://leitvia.com/docs/.
+An agent such as Claude Code, Codex or Cursor connects to your site over MCP or the REST API with the application password of an agent user from Leitvia Studio, Agents. It reads the design contract and the outline of a page first, then calls the Leitvia abilities, and every change runs through the gateway checks and your autonomy levels. No service of ours sits in between: the agent signs in as a user of your site that an administrator created, with the role Leitvia Agent and without administrator rights. It works on content, media, navigation, template parts and token set drafts. It cannot install, activate, update or remove plugins or themes, manage users, log in to wp-admin or edit code. Changes to site settings (such as the front page or the comment defaults), the content model, the active token set or the global styles only ever reach the inbox as a suggestion that a person applies or rejects, whatever the autonomy profile. Ready-made agent skills for setup, design, pages, patterns, maintenance, accessibility and migration, with the full reference of all abilities, are described at https://leitvia.com/docs/.
 
 = Does the plugin change my front end? =
 
@@ -175,9 +178,7 @@ The accessibility check bundles [axe-core](https://github.com/dequelabs/axe-core
 
 The headings of the Studio admin screens use [Open Sans](https://github.com/googlefonts/opensans) by The Open Sans Project Authors, weights 600 and 700, reduced to the Latin characters and stored as WOFF2 in `assets/fonts/open-sans/`. Open Sans is licensed under the SIL Open Font License 1.1; the license text is in `licenses/OPEN-SANS.txt`. The fonts are served from your own site.
 
-Token sets can name [Libre Franklin](https://github.com/googlefonts/Libre-Franklin) by The Libre Franklin Project Authors, one variable file for the weights 100 to 900, reduced to the Latin characters and stored as WOFF2 in `assets/fonts/libre-franklin/`. Libre Franklin is licensed under the SIL Open Font License 1.1; the license text is in `licenses/LIBRE-FRANKLIN.txt`. The font is served from your own site and loads only on sites whose active token set uses it.
-
-Token sets can name [Young Serif](https://github.com/noirblancrouge/YoungSerif) by The Young Serif Project Authors, regular weight, reduced to the Latin characters and stored as WOFF2 in `assets/fonts/young-serif/`. Young Serif is licensed under the SIL Open Font License 1.1; the license text is in `licenses/YOUNG-SERIF.txt`. The font is served from your own site and loads only on sites whose active token set uses it.
+Token sets can name [Libre Franklin](https://github.com/googlefonts/Libre-Franklin) by The Libre Franklin Project Authors (one variable file, weights 100 to 900, in `assets/fonts/libre-franklin/`, license `licenses/LIBRE-FRANKLIN.txt`) and [Young Serif](https://github.com/noirblancrouge/YoungSerif) by The Young Serif Project Authors (regular weight, in `assets/fonts/young-serif/`, license `licenses/YOUNG-SERIF.txt`). Both are reduced to the Latin characters, stored as WOFF2, licensed under the SIL Open Font License 1.1, served from your own site and loaded only on sites whose active token set uses them.
 
 The Map block bundles [Leaflet](https://leafletjs.com/) 1.9.4 by Volodymyr Agafonkin and contributors into `build/blocks/map/leaflet.js`, loaded only after the visitor agrees to load the map, and ships its stylesheet as `build/blocks/map/leaflet.css`, which loads with the block. Leaflet is licensed under the BSD 2-Clause License, which is compatible with the GPL; the license text is in `licenses/LEAFLET.txt`. The source code is available from the Leaflet repository and the npm package `leaflet`.
 
@@ -199,7 +200,7 @@ Leitvia Studio is developed and maintained by CMS ADMINS, https://cms-admins.de.
 
 == Legal ==
 
-Leitvia Studio is a product of CMS ADMINS, a brand of MSRV Hosting und Service GbR, Parkstraße 19, 80339 München, Germany, represented by Patrick Schlesinger and Peter Laschtowitz. Contact: support@cms-admins.de.
+Leitvia Studio is a product of CMS ADMINS, a brand of Patrick Schlesinger, Parkstraße 19, 80339 München, Germany. Contact: support@cms-admins.de.
 
 Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or later. It is provided as is, without any warranty, to the extent permitted by applicable law; see sections 11 and 12 of the GPL. You are responsible for checking that your site meets the legal requirements that apply to it, such as accessibility, privacy and imprint duties; Leitvia Studio helps with these but does not replace that check.
 
@@ -207,6 +208,39 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * Privacy policy: https://leitvia.com/privacy-policy/
 
 == Changelog ==
+
+= 1.3.14 =
+* With the AI plugin 1.5, the rejection of a connector request names Tools, Connector Approvals, where an administrator approves it.
+* The Agents screen says when another plugin also shares Leitvia tools on the default MCP server.
+* The agent handbook lists wpai_connector_not_approved of the AI plugin and asks agents to use the leitvia server.
+
+= 1.3.13 =
+* Agents only propose administrative changes. Settings, the content model, the global styles and activating a token set always wait for a person in the Inbox, in every autonomy profile.
+* The Agents screen and the access routes refuse application passwords and MCP.
+* The head scripts of the announcement and accessibility bars are fixed strings; the block value is passed as JSON.
+* The preview canvas path uses the core constant.
+* Provider information names Patrick Schlesinger (CMS ADMINS).
+
+= 1.3.12 =
+* Building blocks: a registry of the building blocks of a site (a content type with its patterns), the abilities leitvia/list-building-blocks and leitvia/add-building-block and a list in the REST API.
+* Patterns can name the building block they need. The editor then shows a button Set up with the name of the block, and the front end hides a section whose registered block is not set up yet. Sections of blocks that are not registered keep showing.
+* The list screen of a building block's content type shows Show with the name of the block on a page, with a button New page with this section.
+* Each building block gets its own category in the block inserter.
+* Recipes apply in parts (parts, pages, building blocks), with a dry run first.
+* A person in the admin applies a recipe at once; the change settles and can be rolled back in the Inbox. Agents and application passwords still wait for review.
+* New entries of the content model register in the same request, so a recipe needs one run.
+* leitvia/define-content-type keeps fields a person added.
+* Readable names for the steps of a recipe.
+* New filters leitvia_studio_recipe_document and leitvia_studio_recipe_model.
+* German: the admin strings of screens that load later are translated now (613 strings were shown in English).
+
+= 1.3.11 =
+* Pattern Lab: the newest and recently changed patterns come first. Sort by the date of the last change or by title; the list has an Updated column and marks new patterns with New.
+* Pattern Lab: the details of a pattern explain it in plain words and fold the rest away, each pattern shows one status, and test content sits under Variants.
+* Agents: one screen with the tabs Overview, Inbox and Autonomy and checks. Overview shows the state of the connection, the application passwords, the checks and the MCP Adapter. The Inbox is no longer a menu item of its own; old links lead to its tab.
+* Settings in the tabs General, Privacy and Design and search. The declared settings of the Content Model are called Site details.
+* The first menu item is called Pattern Lab instead of Lab.
+* New filters for add-ons: leitvia_studio_pattern_dates adds the dates of their patterns to the Pattern Lab, leitvia_studio_framed_pages gives their screens the frame of Studio screens.
 
 = 1.3.10 =
 * Query filter: parameters of other blocks on the page are carried over only with a clean key and as plain text.

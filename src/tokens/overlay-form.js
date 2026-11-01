@@ -3,7 +3,9 @@ import { __, sprintf } from '@wordpress/i18n';
 import { useState } from '@wordpress/element';
 import apiFetch from '@wordpress/api-fetch';
 import { date, dateI18n, getDate, getSettings } from '@wordpress/date';
-import { Button, Flex, Modal, TextControl } from '@wordpress/components';
+import { Button, Flex, TextControl } from '@wordpress/components';
+import ConfirmDialog from '../admin/confirm-dialog';
+import More from '../admin/more';
 import { notify } from '../admin/notify';
 import { Findings, errorFindings } from './common';
 
@@ -157,7 +159,7 @@ export default function OverlayForm( { id, initial, valid } ) {
 			</h2>
 			<p>
 				{ __(
-					'Between start and end the front end shows this set over the base styles, for a season or a campaign. The global styles stay unchanged, and the overlay ends on its own.',
+					'Between start and end, visitors see this set instead of the active one, for example for a sale; afterwards the site switches back on its own.',
 					'leitvia-studio'
 				) }
 			</p>
@@ -211,7 +213,7 @@ export default function OverlayForm( { id, initial, valid } ) {
 						className="components-base-control__help leitvia-studio-tokens__help"
 					>
 						{ __(
-							'Page caches that follow the s-maxage header switch on time; caches that ignore it switch once their stored copy expires.',
+							'Cached pages can switch a little later than the time you enter.',
 							'leitvia-studio'
 						) }
 						{ twice &&
@@ -258,48 +260,35 @@ export default function OverlayForm( { id, initial, valid } ) {
 							{ reason }
 						</p>
 					</Flex>
-				</Flex>
-			</form>
-			{ isConfirming && (
-				<Modal
-					title={ __( 'Remove schedule', 'leitvia-studio' ) }
-					onRequestClose={ () => setIsConfirming( false ) }
-					size="small"
-				>
-					<Flex
-						direction="column"
-						justify="flex-start"
-						gap={ 4 }
-						align="stretch"
-					>
+					<More>
 						<p>
 							{ __(
-								'Remove the overlay schedule of this set? A running overlay ends at once.',
+								'The overlay is drawn over the global styles, which stay unchanged. Page caches that follow the s-maxage header switch on time; caches that ignore it switch once their stored copy expires.',
 								'leitvia-studio'
 							) }
 						</p>
-						<Flex justify="flex-end">
-							<Button
-								__next40pxDefaultSize
-								variant="tertiary"
-								onClick={ () => setIsConfirming( false ) }
-							>
-								{ __( 'Cancel', 'leitvia-studio' ) }
-							</Button>
-							<Button
-								__next40pxDefaultSize
-								variant="primary"
-								isDestructive
-								onClick={ () => {
-									setIsConfirming( false );
-									save( null );
-								} }
-							>
-								{ __( 'Remove', 'leitvia-studio' ) }
-							</Button>
-						</Flex>
-					</Flex>
-				</Modal>
+					</More>
+				</Flex>
+			</form>
+			{ isConfirming && (
+				<ConfirmDialog
+					title={ __( 'Remove schedule', 'leitvia-studio' ) }
+					confirmLabel={ __( 'Remove', 'leitvia-studio' ) }
+					isDestructive
+					size="small"
+					onCancel={ () => setIsConfirming( false ) }
+					onConfirm={ () => {
+						setIsConfirming( false );
+						save( null );
+					} }
+				>
+					<p>
+						{ __(
+							'Remove the overlay schedule of this set? A running overlay ends at once.',
+							'leitvia-studio'
+						) }
+					</p>
+				</ConfirmDialog>
 			) }
 		</section>
 	);

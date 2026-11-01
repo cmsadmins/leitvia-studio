@@ -1,4 +1,4 @@
-// Content Model screen: tabs for the declared content types, the JSON declaration and the site settings.
+// Content Model screen: tabs for the declared content types, the JSON declaration and the site details.
 import { __, sprintf } from '@wordpress/i18n';
 import {
 	useCallback,
@@ -8,12 +8,14 @@ import {
 	useState,
 } from '@wordpress/element';
 import apiFetch from '@wordpress/api-fetch';
-import { Button, Modal, Notice, TabPanel } from '@wordpress/components';
+import { Button, Modal, Notice } from '@wordpress/components';
 import { DataViews, filterSortAndPaginate } from '@wordpress/dataviews/wp';
 import JsonEditor from './json-editor';
 import SettingsForm from './settings-form';
+import { errorText } from '../admin/common';
 import { notify } from '../admin/notify';
 import Loading from '../admin/loading';
+import Tabs from '../admin/tabs';
 import './style.scss';
 
 const KINDS = [
@@ -77,7 +79,7 @@ const fieldsWith = ( open ) => [
 	},
 	{
 		id: 'abilities',
-		label: __( 'Available to AI abilities', 'leitvia-studio' ),
+		label: __( 'Available to agents', 'leitvia-studio' ),
 		elements: YES_NO,
 		filterBy: false,
 	},
@@ -184,7 +186,7 @@ function FieldList( { item } ) {
 				<dd>{ item.key }</dd>
 				<dt>{ __( 'Kind', 'leitvia-studio' ) }</dt>
 				<dd>{ kind }</dd>
-				<dt>{ __( 'Available to AI abilities', 'leitvia-studio' ) }</dt>
+				<dt>{ __( 'Available to agents', 'leitvia-studio' ) }</dt>
 				<dd>{ abilities }</dd>
 			</dl>
 			{ item.fields.length ? (
@@ -239,7 +241,7 @@ function ContentTypes( { data } ) {
 		<>
 			<p id="leitvia-studio-model-open-hint" className="description">
 				{ __(
-					'Select a label to see its fields and whether it is available to AI abilities.',
+					'Select a name to see its fields and whether agents may use it.',
 					'leitvia-studio'
 				) }
 			</p>
@@ -298,11 +300,13 @@ export default function ModelScreen() {
 				.catch( ( error ) =>
 					notify(
 						'error',
-						error.message ??
+						errorText(
+							error,
 							__(
 								'The content model could not be loaded.',
 								'leitvia-studio'
 							)
+						)
 					)
 				),
 		[]
@@ -333,7 +337,7 @@ export default function ModelScreen() {
 					</ul>
 				</Notice>
 			) }
-			<TabPanel
+			<Tabs
 				className="leitvia-studio-model__tabs"
 				tabs={ [
 					{
@@ -345,8 +349,8 @@ export default function ModelScreen() {
 						title: __( 'Declaration', 'leitvia-studio' ),
 					},
 					{
-						name: 'settings',
-						title: __( 'Site settings', 'leitvia-studio' ),
+						name: 'details',
+						title: __( 'Site details', 'leitvia-studio' ),
 					},
 				] }
 			>
@@ -362,12 +366,12 @@ export default function ModelScreen() {
 								draft={ draft }
 							/>
 						) }
-						{ 'settings' === tab.name && (
+						{ 'details' === tab.name && (
 							<SettingsForm settings={ data.model.settings } />
 						) }
 					</div>
 				) }
-			</TabPanel>
+			</Tabs>
 		</>
 	);
 }

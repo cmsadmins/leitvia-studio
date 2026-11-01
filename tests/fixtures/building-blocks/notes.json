@@ -1,0 +1,26 @@
+{
+	"postType": "lv_note",
+	"terms": {
+		"lv_note_topic": [
+			{ "slug": "garden", "name": "Garden" },
+			{ "slug": "kitchen", "name": "Kitchen" }
+		]
+	},
+	"entries": [
+		{
+			"slug": "first-note",
+			"title": "First note",
+			"excerpt": "A note about the garden.",
+			"terms": { "lv_note_topic": [ "garden" ] },
+			"fields": { "note_mood": "calm" },
+			"content": "<!-- wp:paragraph -->\n<p>The tomatoes are ripe.</p>\n<!-- /wp:paragraph -->"
+		},
+		{
+			"slug": "second-note",
+			"title": "Second note",
+			"terms": { "lv_note_topic": [ "kitchen" ] },
+			"relations": { "note_related": [ "first-note" ] },
+			"content": "<!-- wp:paragraph -->\n<p>Soup on Sunday.</p>\n<!-- /wp:paragraph -->"
+		}
+	]
+}

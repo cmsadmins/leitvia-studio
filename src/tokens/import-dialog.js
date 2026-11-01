@@ -3,6 +3,7 @@ import { __ } from '@wordpress/i18n';
 import { useState } from '@wordpress/element';
 import apiFetch from '@wordpress/api-fetch';
 import { Button, Flex, Modal, TextControl } from '@wordpress/components';
+import More from '../admin/more';
 import { Findings, errorFindings } from './common';
 
 // Same limit as Dtcg::MAX_BYTES; larger files are refused before they are sent.
@@ -80,10 +81,18 @@ export default function ImportDialog( { onClose, onImported } ) {
 					) }
 					<p>
 						{ __(
-							'Design token file in the DTCG format, at most 512 KB. It is checked against the contract of the active theme before it is saved.',
+							'A token file exported from Studio or a design tool, at most 512 KB; it is checked before it is saved.',
 							'leitvia-studio'
 						) }
 					</p>
+					<More>
+						<p>
+							{ __(
+								'The file uses the DTCG format of design tokens and is checked against the contract of the active theme.',
+								'leitvia-studio'
+							) }
+						</p>
+					</More>
 					<div>
 						<label
 							className="leitvia-studio-tokens__label"

@@ -197,6 +197,33 @@ final class Store {
 	}
 
 	/**
+	 * Checks after writing of the last 30 days: the newest one and the count per result (ok, failed, unverifiable).
+	 *
+	 * @return array{last: array{result: string, created_at: string, object_id: int, action: string}|null, counts: array<string, int>}
+	 */
+	public static function verify_summary(): array {
+		global $wpdb;
+		$table  = self::table( 'audit' );
+		$since  = gmdate( 'Y-m-d H:i:s', time() - 30 * DAY_IN_SECONDS );
+		$rows   = $wpdb->get_results( $wpdb->prepare( "SELECT result, COUNT(*) AS calls FROM {$table} WHERE ability = 'leitvia/verify' AND created_at > %s GROUP BY result", $since ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Own table, read for the Agents screen only.
+		$last   = $wpdb->get_row( "SELECT result, created_at, object_id, details FROM {$table} WHERE ability = 'leitvia/verify' ORDER BY id DESC LIMIT 1" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Own table, no input.
+		$counts = array();
+		foreach ( (array) $rows as $row ) {
+			$counts[ (string) $row->result ] = (int) $row->calls;
+		}
+		$details = $last ? json_decode( (string) $last->details, true ) : null;
+		return array(
+			'last'   => $last ? array(
+				'result'     => (string) $last->result,
+				'created_at' => (string) $last->created_at,
+				'object_id'  => (int) $last->object_id,
+				'action'     => (string) ( is_array( $details ) ? ( $details['action'] ?? '' ) : '' ),
+			) : null,
+			'counts' => $counts,
+		);
+	}
+
+	/**
 	 * Deletes entries older than the retention period, then the oldest entries above the size limit. Runs daily on
 	 * the cron event CRON.
 	 */

@@ -256,7 +256,7 @@ export default function JsonEditor( { model, onSaved, draft } ) {
 				</label>
 				<p id={ HELP_ID } className="description">
 					{ __(
-						'Post types, taxonomies, relations and site settings of this site. In the editor, the Tab key inserts a tab; press Escape and then Tab to leave it.',
+						'Post types, taxonomies, relations and site details of this site. In the editor, the Tab key inserts a tab; press Escape and then Tab to leave it.',
 						'leitvia-studio'
 					) }
 				</p>

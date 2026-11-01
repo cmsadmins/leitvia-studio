@@ -1,10 +1,12 @@
-// Lab panel "States": long text, empty, error and disabled copies of a pattern, checked in the Lab like the original.
+// Test content of a pattern, a section of the Lab panel "Variants": long text, empty, error and disabled copies,
+// checked in the Lab like the original. The REST routes still call them states.
 import { __, sprintf } from '@wordpress/i18n';
 import { useCallback, useEffect, useState } from '@wordpress/element';
 import apiFetch from '@wordpress/api-fetch';
 import { addQueryArgs } from '@wordpress/url';
 import { Button, Flex } from '@wordpress/components';
 import Loading from '../admin/loading';
+import More from '../admin/more';
 import { STATES, labUrl, stateLabel } from './common';
 import { notify } from '../admin/notify';
 
@@ -44,36 +46,45 @@ export const originalRef = ( pattern, block ) =>
 		? ''
 		: pattern.ref;
 
-export default function StatesPanel( { pattern, block } ) {
-	const ref = originalRef( pattern, block );
+/**
+ * Where a variant or test content copy comes from, with a link to the original.
+ *
+ * @param {Object} props
+ * @param {Object} props.block wp_block post of the copy.
+ */
+export function OriginalLink( { block } ) {
+	const source = block.meta._leitvia_lab_variant_of
+		? `block:${ block.meta._leitvia_lab_variant_of }`
+		: `pattern:${ block.meta._leitvia_lab_source_pattern }`;
+	return (
+		<p>
+			{ block.meta._leitvia_lab_state
+				? sprintf(
+						/* translators: %s: label of the test content such as Long text. */
+						__(
+							'This pattern is the test content "%s" of another pattern.',
+							'leitvia-studio'
+						),
+						stateLabel( block.meta._leitvia_lab_state )
+					)
+				: __( 'This pattern is a variant.', 'leitvia-studio' ) }{ ' ' }
+			<a href={ labUrl( source ) }>
+				{ __( 'Open the original', 'leitvia-studio' ) }
+			</a>
+		</p>
+	);
+}
+
+/**
+ * Test content of an original pattern and buttons for the missing kinds.
+ *
+ * @param {Object} props
+ * @param {string} props.patternRef Reference of the original.
+ */
+export function TestContent( { patternRef: ref } ) {
 	const [ states, reload ] = useStates( ref );
 	const [ adding, setAdding ] = useState( '' );
 
-	if ( ! ref ) {
-		const source = block.meta._leitvia_lab_variant_of
-			? `block:${ block.meta._leitvia_lab_variant_of }`
-			: `pattern:${ block.meta._leitvia_lab_source_pattern }`;
-		return (
-			<p>
-				{ block.meta._leitvia_lab_state
-					? sprintf(
-							/* translators: %s: state label such as Long text. */
-							__(
-								'This pattern is the state "%s" of another pattern.',
-								'leitvia-studio'
-							),
-							stateLabel( block.meta._leitvia_lab_state )
-						)
-					: __(
-							'This pattern is a variant.',
-							'leitvia-studio'
-						) }{ ' ' }
-				<a href={ labUrl( source ) }>
-					{ __( 'Open the original', 'leitvia-studio' ) }
-				</a>
-			</p>
-		);
-	}
 	if ( null === states ) {
 		return <Loading />;
 	}
@@ -89,8 +100,8 @@ export default function StatesPanel( { pattern, block } ) {
 			notify(
 				'success',
 				sprintf(
-					/* translators: %s: state label such as Long text. */
-					__( 'State "%s" added.', 'leitvia-studio' ),
+					/* translators: %s: label of the test content such as Long text. */
+					__( 'Test content "%s" added.', 'leitvia-studio' ),
 					stateLabel( state )
 				)
 			);
@@ -99,7 +110,10 @@ export default function StatesPanel( { pattern, block } ) {
 			notify(
 				'error',
 				error.message ??
-					__( 'The state could not be added.', 'leitvia-studio' )
+					__(
+						'The test content could not be added.',
+						'leitvia-studio'
+					)
 			);
 		} finally {
 			setAdding( '' );
@@ -110,14 +124,20 @@ export default function StatesPanel( { pattern, block } ) {
 		( state ) => ! states.some( ( item ) => item.state === state.value )
 	);
 	const buttonLabels = {
-		long: __( 'Add long text state', 'leitvia-studio' ),
-		empty: __( 'Add empty state', 'leitvia-studio' ),
-		error: __( 'Add error state', 'leitvia-studio' ),
-		disabled: __( 'Add disabled state', 'leitvia-studio' ),
+		long: __( 'Add long text', 'leitvia-studio' ),
+		empty: __( 'Add empty content', 'leitvia-studio' ),
+		error: __( 'Add error', 'leitvia-studio' ),
+		disabled: __( 'Add disabled controls', 'leitvia-studio' ),
 	};
 
 	return (
 		<Flex direction="column" justify="flex-start" gap={ 4 } align="stretch">
+			<p>
+				{ __(
+					'Test content shows how the pattern copes with long text, missing content, an error and disabled controls. The accessibility check covers it too.',
+					'leitvia-studio'
+				) }
+			</p>
 			{ states.length ? (
 				<ul className="leitvia-studio-states">
 					{ states.map( ( item ) => (
@@ -149,7 +169,7 @@ export default function StatesPanel( { pattern, block } ) {
 			) : (
 				<p>
 					{ __(
-						'This pattern has no states yet.',
+						'This pattern has no test content yet.',
 						'leitvia-studio'
 					) }
 				</p>
@@ -171,12 +191,14 @@ export default function StatesPanel( { pattern, block } ) {
 					) ) }
 				</Flex>
 			) }
-			<p className="description">
-				{ __(
-					'Long text and empty states are made from the content. Error and disabled states start as copies: edit them in the editor, for example with a danger notice or disabled buttons.',
-					'leitvia-studio'
-				) }
-			</p>
+			<More>
+				<p>
+					{ __(
+						'Long text and empty content are made from the pattern. Error and disabled controls start as copies: edit them in the editor, for example with a danger notice or disabled buttons. Each copy is a pattern of its own that stays out of the inserter.',
+						'leitvia-studio'
+					) }
+				</p>
+			</More>
 		</Flex>
 	);
 }

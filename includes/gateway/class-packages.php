@@ -196,11 +196,17 @@ final class Packages {
 	}
 
 	/**
-	 * The open package of the current user with this key, 0 for none.
+	 * The open package of the current user with this key, 0 for none; during a run that settles also the package of
+	 * the run that was applied in part.
 	 *
 	 * @param string $key Package key.
 	 */
 	public static function find( string $key ): int {
+		// A run that settles keeps writing into the package it applied in part, see Recipes::partial().
+		$partial = Recipes::partial( $key );
+		if ( $partial ) {
+			return $partial;
+		}
 		$ids = get_posts(
 			array(
 				'post_type'      => self::POST_TYPE,
@@ -282,6 +288,25 @@ final class Packages {
 		}
 		// ponytail: the newest 100; paging comes with the inbox when a site keeps more.
 		return array_values( array_map( array( self::class, 'summary' ), array_map( 'intval', get_posts( $args ) ) ) );
+	}
+
+	/**
+	 * Number of open packages, for the count next to "Agents" in the menu; at most 100.
+	 */
+	public static function count_open(): int {
+		return count(
+			get_posts(
+				array(
+					'post_type'      => self::POST_TYPE,
+					'post_status'    => 'private',
+					'fields'         => 'ids',
+					'posts_per_page' => 100,
+					'no_found_rows'  => true,
+					'meta_key'       => self::STATE_META, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Few packages.
+					'meta_value'     => 'open', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- Same.
+				)
+			)
+		);
 	}
 
 	/**

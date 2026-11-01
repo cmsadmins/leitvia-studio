@@ -54,6 +54,8 @@ class Test_Gateway_Access extends WP_UnitTestCase {
 		global $wp_rest_auth_cookie;
 		$wp_rest_auth_cookie = false;
 		unset( $_SERVER['HTTP_X_WP_NONCE'] );
+		// wp_authenticate_application_password() leaves it set; later runs would count as signed in with a password.
+		unset( $GLOBALS['wp_rest_application_password_uuid'] );
 		self::unregister();
 		parent::tear_down();
 		leitvia_studio()->reset_for_tests();
@@ -118,6 +120,8 @@ class Test_Gateway_Access extends WP_UnitTestCase {
 		$this->assertCount( 1, $passwords );
 		add_filter( 'application_password_is_api_request', '__return_true' );
 		$this->assertInstanceOf( WP_User::class, wp_authenticate_application_password( null, $user->user_login, $data['password'] ) );
+		// The next request is the admin screen again, signed in with a cookie.
+		unset( $GLOBALS['wp_rest_application_password_uuid'] );
 
 		$list = self::rest( 'GET', '/gateway/access' );
 		$this->assertSame( 200, $list->get_status() );
@@ -125,6 +129,8 @@ class Test_Gateway_Access extends WP_UnitTestCase {
 		$this->assertSame( array( 'Claude Code' ), array_column( $list->get_data()['agents'], 'name' ) );
 		$this->assertSame( 1, $list->get_data()['agents'][0]['passwords'] );
 		$this->assertArrayHasKey( 'compatible', $list->get_data()['mcp'] );
+		// Without the MCP Adapter no other server lists Leitvia abilities.
+		$this->assertFalse( $list->get_data()['mcp']['shared'] );
 
 		$this->assertSame( 'agent-claude-code-2', get_userdata( self::rest( 'POST', '/gateway/access', array( 'name' => 'Claude Code' ) )->get_data()['agent']['id'] )->user_login );
 		$this->assertNotEmpty( self::audit( 'access/create' ) );
@@ -216,6 +222,34 @@ class Test_Gateway_Access extends WP_UnitTestCase {
 			}
 		}
 		$this->assertFalse( Gateway::is_person() );
+	}
+
+	/**
+	 * Agents are created only on the admin screen: a person who calls with an application password or through an MCP
+	 * server gets 403 on every route, so no remote client creates agents, passwords or autonomy settings.
+	 */
+	public function test_no_access_with_an_application_password_or_mcp(): void {
+		$agent  = self::rest( 'POST', '/gateway/access', array( 'name' => 'Remote' ) )->get_data()['agent']['id'];
+		$routes = array( array( 'GET', '/gateway/access' ), array( 'POST', '/gateway/access' ), array( 'DELETE', "/gateway/access/{$agent}" ), array( 'POST', "/gateway/access/{$agent}/password" ), array( 'GET', '/gateway/settings' ), array( 'POST', '/gateway/settings' ) );
+		$this->assertTrue( Gateway::is_person() );
+
+		$GLOBALS['wp_rest_application_password_uuid'] = wp_generate_uuid4();
+		foreach ( $routes as [ $method, $route ] ) {
+			$this->assertSame( 403, self::rest( $method, $route, array( 'name' => 'X' ) )->get_status(), "$method $route with an application password" );
+		}
+		unset( $GLOBALS['wp_rest_application_password_uuid'] );
+
+		$previous                                = $GLOBALS['wp']->query_vars['rest_route'] ?? null;
+		$GLOBALS['wp']->query_vars['rest_route'] = '/leitvia-studio/v1/mcp';
+		try {
+			foreach ( $routes as [ $method, $route ] ) {
+				$this->assertSame( 403, self::rest( $method, $route, array( 'name' => 'X' ) )->get_status(), "$method $route through MCP" );
+			}
+		} finally {
+			$GLOBALS['wp']->query_vars['rest_route'] = $previous;
+		}
+		$this->assertCount( 1, WP_Application_Passwords::get_user_application_passwords( $agent ) );
+		$this->assertFalse( username_exists( 'agent-x' ) );
 	}
 
 	/**

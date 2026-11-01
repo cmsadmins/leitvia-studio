@@ -10,7 +10,7 @@ namespace LeitviaStudio\Extension;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Holds the add-on list and the eight registries. Studio uses the same registries as its add-ons.
+ * Holds the add-on list and the nine registries. Studio uses the same registries as its add-ons.
  */
 final class Studio {
 
@@ -18,39 +18,44 @@ final class Studio {
 	 * Required fields per registry type, see Registry for the spec format.
 	 */
 	public const FIELDS = array(
-		'abilities'     => array(
+		'abilities'       => array(
 			'args'  => 'array',
 			'group' => array( 'read', 'setup', 'build', 'maintain' ),
 		),
-		'blocks'        => array( 'path' => 'string' ),
-		'lab_panels'    => array(
+		'blocks'          => array( 'path' => 'string' ),
+		'lab_panels'      => array(
 			'label'      => 'string',
 			'script'     => 'string',
 			'order'      => 'int',
 			'capability' => 'string',
 		),
-		'token_sources' => array(
+		'token_sources'   => array(
 			'label'    => 'string',
 			'callback' => 'callable',
 		),
-		'sync_targets'  => array(
+		'sync_targets'    => array(
 			'label'  => 'string',
 			'export' => 'callable',
 		),
-		'checks'        => array(
+		'checks'          => array(
 			'label'    => 'string',
 			'scope'    => array( 'token_set', 'pattern', 'content', 'page' ),
 			'callback' => 'callable',
 		),
-		'recipes'       => array(
+		'recipes'         => array(
 			'label' => 'string',
 			'path'  => 'string',
 		),
-		'patterns'      => array(
+		'patterns'        => array(
 			'title'       => 'string',
 			'description' => 'string',
 			'area'        => array( 'hero', 'content', 'teaser', 'proof', 'cta', 'offer' ),
 			'composition' => 'array',
+		),
+		'building_blocks' => array(
+			'title'       => 'string',
+			'description' => 'string',
+			'model'       => 'array',
 		),
 	);
 
@@ -201,7 +206,12 @@ final class Studio {
 				if ( ! $this->extensions->is_compatible( $owner ) ) {
 					return "owner {$owner} is not a registered, compatible add-on";
 				}
-				return 'abilities' === $type ? self::ability_error( $item ) : '';
+				return match ( $type ) {
+					'abilities'       => self::ability_error( $item ),
+					'building_blocks' => \LeitviaStudio\Gateway\Building_Blocks::invalid( $item ),
+					'patterns'        => isset( $item['needs'] ) ? \LeitviaStudio\Gateway\Building_Blocks::invalid_needs( $item['needs'] ) : '',
+					default           => '',
+				};
 			};
 			$this->registries[ $type ] = new Registry( $type, $fields, $guard );
 		}

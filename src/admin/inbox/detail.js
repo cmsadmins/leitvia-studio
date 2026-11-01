@@ -3,18 +3,14 @@
 import { __, _n, sprintf } from '@wordpress/i18n';
 import { useCallback, useEffect, useState } from '@wordpress/element';
 import apiFetch from '@wordpress/api-fetch';
-import {
-	Button,
-	CheckboxControl,
-	Flex,
-	Notice,
-	Spinner,
-} from '@wordpress/components';
+import { Button, CheckboxControl, Flex, Notice } from '@wordpress/components';
+import Breadcrumbs from '../breadcrumbs';
+import { errorText } from '../common';
+import Loading from '../loading';
+import More from '../more';
 import { notify } from '../notify';
+import { AREAS, KINDS, LEVELS } from '../agents/common';
 import {
-	AREAS,
-	KINDS,
-	LEVELS,
 	changeLabel,
 	checksText,
 	findingText,
@@ -32,16 +28,14 @@ const selectable = ( item ) =>
 	'open' === item.status || 'conflict' === item.status;
 
 /**
- * Sentence about a target someone changed: who saved it last and both hashes in plain text.
+ * Sentence about a target someone changed: who saved it last.
  *
- * @param {string} who    Display name of the last editor, may be empty.
- * @param {string} when   What the change came after.
- * @param {string} before Hash the operation expects.
- * @param {string} now    Current hash.
+ * @param {string} who  Display name of the last editor, may be empty.
+ * @param {string} when What the change came after.
  * @return {string} Text.
  */
-function conflictText( who, when, before, now ) {
-	const changed = who
+function conflictText( who, when ) {
+	return who
 		? sprintf(
 				/* translators: 1: name of a person, 2: for example "after the agent read it". */
 				__( 'Changed by %1$s %2$s.', 'leitvia-studio' ),
@@ -53,12 +47,30 @@ function conflictText( who, when, before, now ) {
 				__( 'Changed %s.', 'leitvia-studio' ),
 				when
 			);
-	return sprintf(
-		/* translators: 1: sentence about the change, 2: hash expected, 3: current hash. */
-		__( '%1$s Expected hash: %2$s. Current hash: %3$s.', 'leitvia-studio' ),
-		changed,
-		before,
-		now || __( 'none, the target is gone', 'leitvia-studio' )
+}
+
+/**
+ * Both hashes of a conflict, for experts in a details block.
+ *
+ * @param {Object} props
+ * @param {string} props.before Hash the operation expects.
+ * @param {string} props.now    Current hash.
+ */
+function Hashes( { before, now } ) {
+	return (
+		<More>
+			<p>
+				{ sprintf(
+					/* translators: 1: hash expected, 2: current hash. */
+					__(
+						'Expected hash: %1$s. Current hash: %2$s.',
+						'leitvia-studio'
+					),
+					before,
+					now || __( 'none, the target is gone', 'leitvia-studio' )
+				) }
+			</p>
+		</More>
 	);
 }
 
@@ -282,10 +294,9 @@ function Operation( { item, checked, onToggle } ) {
 		>
 			<h4 id={ heading }>
 				{ sprintf(
-					/* translators: 1: operation number, 2: ability name. */
-					__( 'Operation %1$d: %2$s', 'leitvia-studio' ),
-					item.id,
-					item.ability
+					/* translators: %d: operation number. */
+					__( 'Operation %d', 'leitvia-studio' ),
+					item.id
 				) }
 			</h4>
 			{ selectable( item ) && (
@@ -301,14 +312,27 @@ function Operation( { item, checked, onToggle } ) {
 				/>
 			) }
 			<p>{ facts.join( '. ' ) }.</p>
+			<More>
+				<p>
+					{ sprintf(
+						/* translators: %s: ability name such as leitvia/update-content. */
+						__( 'Ability: %s', 'leitvia-studio' ),
+						item.ability
+					) }
+				</p>
+			</More>
 			{ item.conflict && (
 				<Notice status="warning" isDismissible={ false }>
-					{ conflictText(
-						item.modified_by,
-						__( 'after the agent read it', 'leitvia-studio' ),
-						item.conflict.base_hash,
-						item.conflict.current_hash
-					) }
+					<p>
+						{ conflictText(
+							item.modified_by,
+							__( 'after the agent read it', 'leitvia-studio' )
+						) }
+					</p>
+					<Hashes
+						before={ item.conflict.base_hash }
+						now={ item.conflict.current_hash }
+					/>
 				</Notice>
 			) }
 			{ item.error && (
@@ -329,15 +353,11 @@ function Operation( { item, checked, onToggle } ) {
 			{ item.styles ? (
 				<>
 					<StylesSummary item={ item } />
-					<details>
-						<summary>
-							{ __(
-								'Technical changes (global styles JSON)',
-								'leitvia-studio'
-							) }
-						</summary>
+					<More
+						summary={ __( 'Technical changes', 'leitvia-studio' ) }
+					>
 						<Diff item={ item } />
-					</details>
+					</More>
 				</>
 			) : (
 				<Diff item={ item } />
@@ -367,11 +387,13 @@ export default function InboxDetail( { id } ) {
 					setPackage( false );
 					notify(
 						'error',
-						error.message ??
+						errorText(
+							error,
 							__(
-								'The change package could not be loaded.',
+								'The change could not be loaded.',
 								'leitvia-studio'
 							)
+						)
 					);
 				} ),
 		[ id ]
@@ -382,17 +404,16 @@ export default function InboxDetail( { id } ) {
 	}, [ load ] );
 
 	if ( null === pkg ) {
-		return <Spinner />;
+		return <Loading />;
 	}
-	const back = (
-		<p>
-			<a href={ inboxUrl() }>
-				{ __( 'Back to the inbox', 'leitvia-studio' ) }
-			</a>
-		</p>
-	);
+	const inbox = [ __( 'Inbox', 'leitvia-studio' ), inboxUrl() ];
 	if ( ! pkg ) {
-		return back;
+		return (
+			<Breadcrumbs
+				parent={ inbox }
+				current={ __( 'Unknown change', 'leitvia-studio' ) }
+			/>
+		);
 	}
 
 	const run = async ( action, data, done ) => {
@@ -415,8 +436,10 @@ export default function InboxDetail( { id } ) {
 			setRollbackConflicts( error.data?.conflicts ?? [] );
 			notify(
 				'error',
-				error.message ??
+				errorText(
+					error,
 					__( 'The step could not be completed.', 'leitvia-studio' )
+				)
 			);
 		} finally {
 			setBusy( '' );
@@ -493,9 +516,9 @@ export default function InboxDetail( { id } ) {
 
 	return (
 		<div className="leitvia-studio-inbox">
-			{ back }
+			<Breadcrumbs parent={ inbox } current={ pkg.title } />
 			<h2>{ pkg.title }</h2>
-			<dl className="leitvia-studio-inbox__facts">
+			<dl className="leitvia-studio-facts">
 				{ facts.map( ( [ term, value ] ) => (
 					<div key={ term }>
 						<dt>{ term }</dt>
@@ -546,13 +569,15 @@ export default function InboxDetail( { id } ) {
 											( item ) => item.id === conflict.op
 										)?.modified_by,
 										__(
-											'after the package was applied',
+											'after the change was applied',
 											'leitvia-studio'
-										),
-										conflict.applied_hash,
-										conflict.current_hash
+										)
 									)
 								) }
+								<Hashes
+									before={ conflict.applied_hash }
+									now={ conflict.current_hash }
+								/>
 							</li>
 						) ) }
 					</ul>
@@ -598,10 +623,7 @@ export default function InboxDetail( { id } ) {
 							accessibleWhenDisabled
 							onClick={ () =>
 								run( 'reject', {}, () =>
-									__(
-										'Change package rejected.',
-										'leitvia-studio'
-									)
+									__( 'Change rejected.', 'leitvia-studio' )
 								)
 							}
 						>
@@ -618,7 +640,7 @@ export default function InboxDetail( { id } ) {
 							onClick={ () =>
 								run( 'rollback', {}, () =>
 									__(
-										'Change package rolled back.',
+										'Change rolled back.',
 										'leitvia-studio'
 									)
 								)

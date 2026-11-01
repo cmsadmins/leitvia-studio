@@ -1,0 +1,23 @@
+{
+	"name": "notes",
+	"title": "Notes",
+	"description": "A recipe of a test that brings the building block Notes besides design, header, a page and the front page.",
+	"variation": "corporate-light",
+	"buildingBlocks": [ "leitvia/recipe-notes" ],
+	"templateParts": {
+		"header": "leitvia/header-default"
+	},
+	"pages": [
+		{
+			"slug": "notes-home",
+			"title": "Notes",
+			"frame": "contact",
+			"sections": [ "leitvia/content-faq" ]
+		}
+	],
+	"navigation": [ "notes-home" ],
+	"reading": {
+		"show_on_front": "page",
+		"page_on_front": "notes-home"
+	}
+}

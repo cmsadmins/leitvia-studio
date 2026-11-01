@@ -17,6 +17,16 @@ defined( 'ABSPATH' ) || exit;
 final class Blocks {
 
 	/**
+	 * Scripts that must run before the first paint, by name (head_script()). The announcement bar reads the hash of
+	 * its dismissed message, the accessibility bar restores text size and contrast; both only set classes or
+	 * attributes on the root element.
+	 */
+	public const HEAD_SCRIPTS = array(
+		'announcement' => 'try{localStorage.getItem("leitvia-announcement")==={value}&&document.documentElement.setAttribute("data-leitvia-announcement","dismissed")}catch(e){}',
+		'a11y'         => 'try{var s=JSON.parse(localStorage.getItem("leitvia-a11y"))||{},d=document.documentElement,z=Math.max(100,Math.min(200,+s.size||100));d.classList.add("leitvia-a11y-js");if(z-100)d.style.fontSize=z+"%";if(s.contrast)d.classList.add("leitvia-high-contrast")}catch(e){}',
+	);
+
+	/**
 	 * Registers the manifest of build/blocks/ with core, then one blocks entry leitvia/<folder> per block folder.
 	 * Runs on leitvia_studio_init. The registry only accepts the prefix leitvia/ for the owner leitvia-studio, which
 	 * is also the namespace of the block names. The product comparison needs WooCommerce and is left out without it.
@@ -166,13 +176,20 @@ final class Blocks {
 	 * script printed in the head; a block rendered after wp_head() (classic themes) gets it in the footer. The same
 	 * script is added once, however often a block renders.
 	 *
+	 * The scripts are fixed (HEAD_SCRIPTS); the only variable part, a value of the block, goes in as JSON.
+	 *
 	 * @param non-empty-string $handle Script handle.
-	 * @param string           $script JavaScript.
+	 * @param string           $name   Key of HEAD_SCRIPTS.
+	 * @param string|null      $value  Value for the {value} of the script, JSON encoded; null for a script without one.
 	 */
-	public static function head_script( string $handle, string $script ): void {
+	public static function head_script( string $handle, string $name, ?string $value = null ): void {
+		if ( ! isset( self::HEAD_SCRIPTS[ $name ] ) ) {
+			return;
+		}
 		if ( ! wp_script_is( $handle, 'registered' ) ) {
 			wp_register_script( $handle, false, array(), LEITVIA_STUDIO_VERSION, false );
 		}
+		$script = str_replace( '{value}', (string) wp_json_encode( (string) $value, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT ), self::HEAD_SCRIPTS[ $name ] );
 		if ( ! in_array( $script, (array) wp_scripts()->get_data( $handle, 'after' ), true ) ) {
 			wp_add_inline_script( $handle, $script );
 		}

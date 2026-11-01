@@ -1,46 +1,6 @@
-// Inbox and Agents screens. Tables wrap long hashes and texts instead of scrolling sideways, from 390 px up. Below
-// that the tables of the Agents screen (five columns, buttons) scroll inside their own box, never the page (WCAG 1.4.10
-// allows that for data tables); both tables hold buttons or selects, so keyboard focus scrolls the hidden part into view.
-
-.leitvia-studio-inbox,
-.leitvia-studio-agents {
-	max-width: 1200px;
-
-	table.widefat {
-		max-width: 100%;
-		margin-block: 8px 16px;
-	}
-
-	caption {
-		padding-block: 8px;
-		font-weight: 600;
-		text-align: start;
-	}
-
-	// Words stay whole ("anywhere" let narrow columns break "Change" into "Chan ge"); only code such as hashes and
-	// paths breaks at any point.
-	:is(th, td) {
-		overflow-wrap: break-word;
-	}
-
-	code {
-		overflow-wrap: anywhere;
-	}
-}
-
-.leitvia-studio-inbox__facts {
-	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-	gap: 8px 24px;
-
-	dt {
-		font-weight: 600;
-	}
-
-	dd {
-		margin: 0;
-	}
-}
+// Inbox and Agents screens; the tables follow the shared rules in ../style.scss. Below 390 px the tables of the Agents
+// screen (five columns, buttons) scroll inside their own box, never the page (WCAG 1.4.10 allows that for data
+// tables); both tables hold buttons or selects, so keyboard focus scrolls the hidden part into view.
 
 .leitvia-studio-inbox__operation {
 	margin-block: 16px 24px;
@@ -64,7 +24,7 @@
 
 .leitvia-studio-agents__secret,
 .leitvia-studio-agents__create,
-.leitvia-studio-agents__autonomy {
+.leitvia-studio-agents__panel {
 	display: flex;
 	flex-direction: column;
 	gap: 16px;
@@ -75,23 +35,18 @@
 // The surface DataViews uses, so help texts and labels of @wordpress/components keep their contrast (as on Settings).
 .leitvia-studio-agents__secret,
 .leitvia-studio-agents__create,
-.leitvia-studio-agents__autonomy {
+.leitvia-studio-agents__panel {
 	box-sizing: border-box;
 	padding: 16px;
 	border: 1px solid #ddd;
 	background: var(--wp-components-color-background, #fff);
 }
 
-.leitvia-studio-agents__table {
-	max-width: 100%;
-	overflow-x: auto;
-}
+.leitvia-studio-agents__panel {
+	h3 {
+		margin-block: 0 8px;
+	}
 
-.leitvia-studio-agents__password {
-	font-size: 15px;
-}
-
-.leitvia-studio-agents__autonomy {
 	.leitvia-studio-agents__table,
 	.dataforms-layouts-regular__field,
 	.components-base-control {
@@ -107,4 +62,37 @@
 	legend {
 		font-weight: 600;
 	}
+}
+
+.leitvia-studio-agents__create {
+	margin-block-start: 16px;
+}
+
+.leitvia-studio-agents__checks {
+	margin: 0;
+	padding-inline-start: 20px;
+	list-style: disc;
+	columns: 2 220px;
+}
+
+.leitvia-studio-agents__limits {
+	align-self: stretch;
+
+	summary {
+		cursor: pointer;
+		font-weight: 600;
+	}
+
+	.dataforms-layouts-regular__field {
+		margin-block-start: 16px;
+	}
+}
+
+.leitvia-studio-agents__table {
+	max-width: 100%;
+	overflow-x: auto;
+}
+
+.leitvia-studio-agents__password {
+	font-size: 15px;
 }

@@ -2,6 +2,8 @@
 import { __ } from '@wordpress/i18n';
 import { addQueryArgs } from '@wordpress/url';
 
+// Status labels for filters and forms. Pattern items carry the labels of the server (Status::label() in
+// includes/lab/class-status.php) as status_label and effective_status_label; statusLabel() prefers those.
 export const STATUSES = [
 	{ value: 'draft', label: __( 'Draft', 'leitvia-studio' ) },
 	{ value: 'review', label: __( 'In review', 'leitvia-studio' ) },
@@ -9,10 +11,21 @@ export const STATUSES = [
 	{ value: 'deprecated', label: __( 'Deprecated', 'leitvia-studio' ) },
 ];
 
-export const statusLabel = ( value ) =>
-	STATUSES.find( ( status ) => status.value === value )?.label ?? value;
+/**
+ * Label of a status.
+ *
+ * @param {string} value   Status.
+ * @param {string} [label] Label the server sent with the item.
+ * @return {string} Label.
+ */
+export const statusLabel = ( value, label ) =>
+	label ||
+	( STATUSES.find( ( status ) => status.value === value )?.label ?? value );
 
-// Pattern states in the order the States panel offers them; labels match Pattern_Meta::state_label().
+// Rank of a status, as Status::RANK: a pattern is at most as mature as its least mature part.
+export const STATUS_RANK = { draft: 0, review: 1, approved: 2, deprecated: 0 };
+
+// Kinds of test content (states) in the order the Variants panel offers them; labels match Pattern_Meta::state_label().
 export const STATES = [
 	{ value: 'long', label: __( 'Long text', 'leitvia-studio' ) },
 	{ value: 'empty', label: __( 'Empty', 'leitvia-studio' ) },

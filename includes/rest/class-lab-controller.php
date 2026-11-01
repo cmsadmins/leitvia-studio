@@ -8,6 +8,7 @@
 namespace LeitviaStudio\Rest;
 
 use LeitviaStudio\Admin\Admin;
+use LeitviaStudio\Lab\Pattern_Dates;
 use LeitviaStudio\Lab\Pattern_IO;
 use LeitviaStudio\Lab\Pattern_Meta;
 use LeitviaStudio\Lab\Preview;
@@ -276,12 +277,14 @@ final class Lab_Controller extends \WP_REST_Controller {
 			}
 			$replaced_by = self::replacement( $part );
 			$uses[]      = array(
-				'ref'               => $part,
-				'title'             => self::title( $part ),
-				'status'            => Status::own( $part ),
-				'effective_status'  => Status::effective( $part ),
-				'replaced_by'       => $replaced_by,
-				'replaced_by_title' => '' === $replaced_by ? '' : self::title( $replaced_by ),
+				'ref'                    => $part,
+				'title'                  => self::title( $part ),
+				'status'                 => Status::own( $part ),
+				'effective_status'       => Status::effective( $part ),
+				// The label of the effective status, as the Lab shows it.
+				'effective_status_label' => Status::label( Status::effective( $part ) ),
+				'replaced_by'            => $replaced_by,
+				'replaced_by_title'      => '' === $replaced_by ? '' : self::title( $replaced_by ),
 			);
 		}
 		$used_by = Usage_Index::used_by( $ref, $more );
@@ -451,31 +454,47 @@ final class Lab_Controller extends \WP_REST_Controller {
 	}
 
 	/**
-	 * Theme patterns and wp_block originals, filtered and paged.
+	 * Theme, add-on and own patterns, filtered, sorted and paged.
 	 *
 	 * @param \WP_REST_Request $request Request.
 	 * @phpstan-param \WP_REST_Request<array<string, mixed>> $request
 	 * @return \WP_REST_Response
 	 */
 	public function get_items( $request ) {
-		$search = strtolower( (string) $request['search'] );
-		$status = (array) ( $request['status'] ?? array() );
-		$source = (string) $request['source'];
-		$parent = (int) $request['variant_of'];
-		$theme  = 'user' !== $source;
-		$user   = 'theme' !== $source;
-		// Patterns of the active theme and own patterns come first, patterns of core and plugins last.
-		$groups = $theme && ! $parent ? $this->theme_items() : array( array(), array() );
-		$all    = $parent ? $this->variant_items( $parent ) : array_merge( $groups[0], $user ? $this->user_items() : array(), $groups[1] );
-		$items  = array_filter(
-			$all,
-			static fn( array $item ): bool => ( '' === $search || str_contains( strtolower( $item['title'] . ' ' . $item['ref'] ), $search ) )
-				&& ( ! $status || in_array( $item['status'], $status, true ) )
+		$search  = strtolower( (string) $request['search'] );
+		$status  = (array) ( $request['status'] ?? array() );
+		$source  = (string) $request['source'];
+		$parent  = (int) $request['variant_of'];
+		$groups  = 'user' !== $source && ! $parent ? $this->theme_items() : array( array(), array() );
+		$user    = '' === $source || 'user' === $source ? $this->user_items() : array();
+		$all     = $parent ? $this->variant_items( $parent ) : array_merge( $groups[0], $user, $groups[1] );
+		$items   = array_values(
+			array_filter(
+				$all,
+				static fn( array $item ): bool => ( '' === $search || str_contains( strtolower( $item['title'] . ' ' . $item['ref'] ), $search ) )
+					&& ( ! $status || in_array( $item['status'], $status, true ) )
+					// Variants are listed by their original; the source filter of the gallery does not apply to them.
+					&& ( '' === $source || $parent || $source === $item['source'] )
+			)
+		);
+		$sign    = 'asc' === $request['order'] ? 1 : -1;
+		$orderby = (string) $request['orderby'];
+		// Equal dates sort by title, equal titles by reference, so pages never overlap.
+		usort(
+			$items,
+			static function ( array $a, array $b ) use ( $sign, $orderby ): int {
+				$title = array( strtolower( $a['title'] ), $a['ref'] ) <=> array( strtolower( $b['title'] ), $b['ref'] );
+				if ( 'title' === $orderby ) {
+					return $sign * $title;
+				}
+				$date = $sign * strcmp( $a['modified'], $b['modified'] );
+				return 0 === $date ? $title : $date;
+			}
 		);
 
 		$per_page = (int) $request['per_page'];
 		$total    = count( $items );
-		$response = rest_ensure_response( array_slice( array_values( $items ), ( (int) $request['page'] - 1 ) * $per_page, $per_page ) );
+		$response = rest_ensure_response( array_slice( $items, ( (int) $request['page'] - 1 ) * $per_page, $per_page ) );
 		$response->header( 'X-WP-Total', (string) $total );
 		$response->header( 'X-WP-TotalPages', (string) (int) ceil( $total / $per_page ) );
 		return $response;
@@ -488,7 +507,8 @@ final class Lab_Controller extends \WP_REST_Controller {
 	 * Core drops filePath once a pattern's content is loaded, which may already have happened in this request; a name
 	 * prefixed with the theme slug counts as a theme pattern too.
 	 *
-	 * @return array{0: list<array<string, mixed>>, 1: list<array<string, mixed>>} Patterns of the active theme, then the others.
+	 * @return array{0: list<array<string, mixed>>, 1: list<array<string, mixed>>} Patterns of the active theme, then those
+	 *         of core, plugins and add-ons.
 	 */
 	private function theme_items(): array {
 		$states = $this->theme_states();
@@ -503,23 +523,49 @@ final class Lab_Controller extends \WP_REST_Controller {
 			}
 			$ref                          = 'pattern:' . $pattern['name'];
 			$contract                     = leitvia_studio_contract()->pattern( $pattern['name'] );
-			$items[ $in_theme ? 0 : 1 ][] = array(
-				'ref'              => $ref,
-				'title'            => (string) $pattern['title'],
-				'source'           => 'theme',
-				'categories'       => array_values( (array) ( $pattern['categories'] ?? array() ) ),
-				'status'           => Status::own( $ref ),
-				'effective_status' => Status::effective( $ref ),
-				'version'          => '',
-				'replaced_by'      => (string) ( $contract['docs']['replacedBy'] ?? '' ),
-				'variant_count'    => 0,
-				'state'            => '',
-				'checks'           => array( 'tokens' => Token_Lint::result( (string) ( $pattern['content'] ?? '' ) ) ) + ( $states[ $pattern['name'] ]['checks'] ?? array() ),
-				'modified'         => $states[ $pattern['name'] ]['modified'] ?? '',
-				'edit_url'         => '',
+			$dates                        = Pattern_Dates::get( $pattern['name'] );
+			$items[ $in_theme ? 0 : 1 ][] = self::labelled(
+				array(
+					'ref'              => $ref,
+					'title'            => (string) $pattern['title'],
+					'source'           => $in_theme ? 'theme' : 'addon',
+					'categories'       => array_values( (array) ( $pattern['categories'] ?? array() ) ),
+					'status'           => Status::own( $ref ),
+					'effective_status' => Status::effective( $ref ),
+					'version'          => '',
+					'replaced_by'      => (string) ( $contract['docs']['replacedBy'] ?? '' ),
+					'variant_count'    => 0,
+					'state'            => '',
+					'checks'           => array( 'tokens' => Token_Lint::result( (string) ( $pattern['content'] ?? '' ) ) ) + ( $states[ $pattern['name'] ]['checks'] ?? array() ),
+					'added'            => self::day( $dates['added'] ),
+					'modified'         => max( self::day( $dates['updated'] ), $states[ $pattern['name'] ]['modified'] ?? '' ),
+					'edit_url'         => '',
+				)
 			);
 		}
 		return $items;
+	}
+
+	/**
+	 * A day of dates.json in the format of modified, '' for none.
+	 *
+	 * @param string $day YYYY-MM-DD or ''.
+	 */
+	private static function day( string $day ): string {
+		return '' === $day ? '' : $day . 'T00:00:00+00:00';
+	}
+
+	/**
+	 * Item with the labels of its statuses, so the Lab shows the words of the server.
+	 *
+	 * @param array<string, mixed> $item Lab item.
+	 * @return array<string, mixed>
+	 */
+	private static function labelled( array $item ): array {
+		return $item + array(
+			'status_label'           => Status::label( (string) $item['status'] ),
+			'effective_status_label' => Status::label( (string) $item['effective_status'] ),
+		);
 	}
 
 	/**
@@ -628,20 +674,24 @@ final class Lab_Controller extends \WP_REST_Controller {
 	private function user_item( int $id, int $variant_count = 0, string $modified = '' ): array {
 		$ref   = 'block:' . $id;
 		$terms = wp_get_object_terms( $id, 'wp_pattern_category', array( 'fields' => 'slugs' ) );
-		return array(
-			'ref'              => $ref,
-			'title'            => get_the_title( $id ),
-			'source'           => 'user',
-			'categories'       => is_array( $terms ) ? $terms : array(),
-			'status'           => Status::own( $ref ),
-			'effective_status' => Status::effective( $ref ),
-			'version'          => (string) get_post_meta( $id, '_leitvia_lab_version', true ),
-			'replaced_by'      => (string) get_post_meta( $id, '_leitvia_lab_replaced_by', true ),
-			'variant_count'    => $variant_count,
-			'state'            => (string) get_post_meta( $id, '_leitvia_lab_state', true ),
-			'checks'           => (array) get_post_meta( $id, '_leitvia_lab_checks', true ),
-			'modified'         => max( self::modified( $id ), $modified ),
-			'edit_url'         => (string) get_edit_post_link( $id, 'raw' ),
+		return self::labelled(
+			array(
+				'ref'              => $ref,
+				'title'            => get_the_title( $id ),
+				'source'           => 'user',
+				'categories'       => is_array( $terms ) ? $terms : array(),
+				'status'           => Status::own( $ref ),
+				'effective_status' => Status::effective( $ref ),
+				'version'          => (string) get_post_meta( $id, '_leitvia_lab_version', true ),
+				'replaced_by'      => (string) get_post_meta( $id, '_leitvia_lab_replaced_by', true ),
+				'variant_count'    => $variant_count,
+				'state'            => (string) get_post_meta( $id, '_leitvia_lab_state', true ),
+				'checks'           => (array) get_post_meta( $id, '_leitvia_lab_checks', true ),
+				// Drafts that were never published have no GMT date (0000-00-00).
+				'added'            => str_starts_with( (string) get_post_field( 'post_date_gmt', $id ), '0000' ) ? '' : gmdate( 'c', (int) strtotime( get_post_field( 'post_date_gmt', $id ) . ' UTC' ) ),
+				'modified'         => max( self::modified( $id ), $modified ),
+				'edit_url'         => (string) get_edit_post_link( $id, 'raw' ),
+			)
 		);
 	}
 
@@ -659,10 +709,22 @@ final class Lab_Controller extends \WP_REST_Controller {
 			'default'     => array(),
 		);
 		$params['source']     = array(
-			'description' => __( 'Limit to theme or user patterns.', 'leitvia-studio' ),
+			'description' => __( 'Limit to patterns of the active theme (theme), of core, plugins and add-ons (addon) or to own patterns (user).', 'leitvia-studio' ),
 			'type'        => 'string',
-			'enum'        => array( '', 'theme', 'user' ),
+			'enum'        => array( '', 'theme', 'addon', 'user' ),
 			'default'     => '',
+		);
+		$params['orderby']    = array(
+			'description' => __( 'Sort by the latest change or by title; equal values sort by title.', 'leitvia-studio' ),
+			'type'        => 'string',
+			'enum'        => array( 'modified', 'title' ),
+			'default'     => 'modified',
+		);
+		$params['order']      = array(
+			'description' => __( 'Sort direction.', 'leitvia-studio' ),
+			'type'        => 'string',
+			'enum'        => array( 'asc', 'desc' ),
+			'default'     => 'desc',
 		);
 		$params['variant_of'] = array(
 			'description' => __( 'List the variants of this wp_block instead of the patterns.', 'leitvia-studio' ),
@@ -691,26 +753,32 @@ final class Lab_Controller extends \WP_REST_Controller {
 				'title'      => 'leitvia-studio-pattern',
 				'type'       => 'object',
 				'properties' => array(
-					'ref'              => array( 'description' => __( 'block:<ID> or pattern:<slug>.', 'leitvia-studio' ) ) + $string,
-					'title'            => $string,
-					'source'           => array( 'enum' => array( 'theme', 'user' ) ) + $string,
-					'categories'       => array(
+					'ref'                    => array( 'description' => __( 'block:<ID> or pattern:<slug>.', 'leitvia-studio' ) ) + $string,
+					'title'                  => $string,
+					'source'                 => array(
+						'description' => __( 'theme: active theme, addon: core, plugins and add-ons, user: own wp_block pattern.', 'leitvia-studio' ),
+						'enum'        => array( 'theme', 'addon', 'user' ),
+					) + $string,
+					'categories'             => array(
 						'type'     => 'array',
 						'items'    => array( 'type' => 'string' ),
 						'readonly' => true,
 					),
-					'status'           => array( 'enum' => $meta['_leitvia_lab_status']['enum'] ) + $string,
-					'effective_status' => array( 'enum' => $meta['_leitvia_lab_status']['enum'] ) + $string,
-					'version'          => $string,
-					'replaced_by'      => $string,
-					'variant_count'    => array(
+					'status'                 => array( 'enum' => $meta['_leitvia_lab_status']['enum'] ) + $string,
+					'effective_status'       => array( 'enum' => $meta['_leitvia_lab_status']['enum'] ) + $string,
+					'status_label'           => $string,
+					'effective_status_label' => $string,
+					'version'                => $string,
+					'replaced_by'            => $string,
+					'variant_count'          => array(
 						'type'     => 'integer',
 						'readonly' => true,
 					),
-					'state'            => array( 'enum' => $meta['_leitvia_lab_state']['enum'] ) + $string,
-					'checks'           => array( 'readonly' => true ) + $meta['_leitvia_lab_checks'],
-					'modified'         => array( 'description' => __( 'Latest change of the pattern and its states in UTC, empty when unknown. Accessibility results older than this are outdated.', 'leitvia-studio' ) ) + $string,
-					'edit_url'         => $string,
+					'state'                  => array( 'enum' => $meta['_leitvia_lab_state']['enum'] ) + $string,
+					'checks'                 => array( 'readonly' => true ) + $meta['_leitvia_lab_checks'],
+					'added'                  => array( 'description' => __( 'When the pattern was added, ISO 8601 in UTC, empty when unknown. Registered patterns take the day from patterns/dates.json.', 'leitvia-studio' ) ) + $string,
+					'modified'               => array( 'description' => __( 'Latest change of the pattern file, the pattern and its states, ISO 8601 in UTC, empty when unknown. Accessibility results older than this are outdated.', 'leitvia-studio' ) ) + $string,
+					'edit_url'               => $string,
 				),
 			);
 		}

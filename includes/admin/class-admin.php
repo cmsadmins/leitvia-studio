@@ -30,16 +30,21 @@ final class Admin {
 		'leitvia-studio-recipes'  => array(
 			'capability' => 'edit_theme_options',
 		),
-		'leitvia-studio-inbox'    => array(
-			'capability' => 'edit_theme_options',
-		),
+		// The Inbox is a tab of this screen, so editors who may decide on changes reach it; the other tabs need
+		// manage_options (canManage in enqueue()).
 		'leitvia-studio-agents'   => array(
-			'capability' => 'manage_options',
+			'capability' => 'edit_theme_options',
 		),
 		'leitvia-studio-settings' => array(
 			'capability' => 'manage_options',
 		),
 	);
+
+	/**
+	 * Earlier page slug of the Inbox, now the tab "inbox" of the Agents screen. It stays registered as a hidden page
+	 * that forwards there, so links of add-ons, agents and bookmarks keep working.
+	 */
+	public const INBOX_SLUG = 'leitvia-studio-inbox';
 
 	/**
 	 * User meta that marks the product notes as dismissed.
@@ -60,11 +65,10 @@ final class Admin {
 	 */
 	private static function titles(): array {
 		return array(
-			'leitvia-studio'          => __( 'Lab', 'leitvia-studio' ),
+			'leitvia-studio'          => __( 'Pattern Lab', 'leitvia-studio' ),
 			'leitvia-studio-tokens'   => __( 'Tokens', 'leitvia-studio' ),
 			'leitvia-studio-model'    => __( 'Content Model', 'leitvia-studio' ),
 			'leitvia-studio-recipes'  => __( 'Recipes', 'leitvia-studio' ),
-			'leitvia-studio-inbox'    => __( 'Inbox', 'leitvia-studio' ),
 			'leitvia-studio-agents'   => __( 'Agents', 'leitvia-studio' ),
 			'leitvia-studio-settings' => __( 'Settings', 'leitvia-studio' ),
 		);
@@ -89,11 +93,65 @@ final class Admin {
 		);
 		self::$hooks[ $hook ] = 'leitvia-studio';
 		foreach ( self::SCREENS as $slug => $screen ) {
-			$hook = add_submenu_page( 'leitvia-studio', $titles[ $slug ], $titles[ $slug ], $screen['capability'], $slug, array( self::class, 'render' ) );
+			$menu = 'leitvia-studio-agents' === $slug ? $titles[ $slug ] . self::inbox_bubble() : $titles[ $slug ];
+			$hook = add_submenu_page( 'leitvia-studio', $titles[ $slug ], $menu, $screen['capability'], $slug, array( self::class, 'render' ) );
 			if ( $hook ) {
 				self::$hooks[ $hook ] = $slug;
 			}
 		}
+		// Hidden: no menu entry, the page only forwards before anything is printed.
+		$hook = add_submenu_page( '', $titles['leitvia-studio-agents'], '', self::SCREENS['leitvia-studio-agents']['capability'], self::INBOX_SLUG, array( self::class, 'render' ) );
+		if ( $hook ) {
+			add_action( 'load-' . $hook, array( self::class, 'redirect_inbox' ) );
+		}
+	}
+
+	/**
+	 * The count bubble of open changes in the Inbox next to "Agents", like the one of Comments; '' without any.
+	 */
+	private static function inbox_bubble(): string {
+		$count = current_user_can( 'edit_theme_options' ) ? \LeitviaStudio\Gateway\Packages::count_open() : 0;
+		if ( ! $count ) {
+			return '';
+		}
+		return sprintf(
+			' <span class="awaiting-mod count-%1$d"><span class="pending-count" aria-hidden="true">%2$s</span><span class="screen-reader-text">%3$s</span></span>',
+			$count,
+			esc_html( number_format_i18n( $count ) ),
+			esc_html(
+				sprintf(
+					/* translators: %s: number of changes. */
+					_n( '%s open change in the Inbox', '%s open changes in the Inbox', $count, 'leitvia-studio' ),
+					number_format_i18n( $count )
+				)
+			)
+		);
+	}
+
+	/**
+	 * URL of the Inbox tab, or of one change in it.
+	 *
+	 * @param int $package Change package ID, 0 for the list.
+	 */
+	public static function inbox_url( int $package = 0 ): string {
+		return add_query_arg(
+			array_filter(
+				array(
+					'page'    => 'leitvia-studio-agents',
+					'tab'     => 'inbox',
+					'package' => $package,
+				)
+			),
+			admin_url( 'admin.php' )
+		);
+	}
+
+	/**
+	 * Forwards the earlier Inbox page to its tab, with ?package=. Runs on load-{hook} of INBOX_SLUG.
+	 */
+	public static function redirect_inbox(): void {
+		wp_safe_redirect( self::inbox_url( absint( wp_unslash( $_GET['package'] ?? 0 ) ) ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Only forwards to another screen.
+		exit;
 	}
 
 	/**
@@ -276,17 +334,43 @@ final class Admin {
 	}
 
 	/**
-	 * Loads the app on Studio screens only. Runs on admin_enqueue_scripts.
+	 * Page slugs of add-on screens that look like Studio screens: the Studio stylesheet (accent, headings, status
+	 * rows, details) loads there, and the screen prints brand() first inside <div class="wrap leitvia-studio">.
+	 *
+	 * @return list<string>
+	 */
+	public static function framed_pages(): array {
+		/**
+		 * Filters the add-on screens that use the frame of Studio screens.
+		 *
+		 * @param list<string> $pages Page slugs, for example my-addon-settings.
+		 */
+		return array_values( array_filter( (array) apply_filters( 'leitvia_studio_framed_pages', array() ), 'is_string' ) );
+	}
+
+	/**
+	 * The product line of Studio screens, for the add-on screens of framed_pages().
+	 */
+	public static function brand(): void {
+		self::render_brand();
+	}
+
+	/**
+	 * Loads the app on Studio screens, and the stylesheet alone on the add-on screens of framed_pages(). Runs on
+	 * admin_enqueue_scripts.
 	 */
 	public static function enqueue(): void {
 		$screen_id  = self::current_screen();
+		$framed     = '' === $screen_id && in_array( (string) ( $GLOBALS['plugin_page'] ?? '' ), self::framed_pages(), true );
 		$asset_file = dirname( LEITVIA_STUDIO_FILE ) . '/build/admin.asset.php';
-		if ( '' === $screen_id || ! is_readable( $asset_file ) ) {
+		if ( ( '' === $screen_id && ! $framed ) || ! is_readable( $asset_file ) ) {
 			return;
 		}
 		$asset = require $asset_file;
 		$url   = plugin_dir_url( LEITVIA_STUDIO_FILE ) . 'build/';
-		wp_enqueue_script( 'leitvia-studio-admin', $url . 'admin.js', array_merge( $asset['dependencies'], array( 'leitvia-studio-api' ) ), $asset['version'], true );
+		if ( ! $framed ) {
+			wp_enqueue_script( 'leitvia-studio-admin', $url . 'admin.js', array_merge( $asset['dependencies'], array( 'leitvia-studio-api' ) ), $asset['version'], true );
+		}
 		wp_enqueue_style( 'leitvia-studio-admin', $url . 'style-admin.css', array( 'wp-components' ), $asset['version'] );
 		wp_style_add_data( 'leitvia-studio-admin', 'rtl', 'replace' );
 		// Open Sans for the headings of Studio screens, served from the plugin (Latin subset, 600 and 700).
@@ -296,6 +380,9 @@ final class Admin {
 			$faces .= sprintf( '@font-face{font-family:"Open Sans";font-style:normal;font-weight:%1$d;font-display:swap;src:url("%2$s") format("woff2");}', $weight, esc_url( $fonts . 'open-sans-latin-' . $weight . '.woff2' ) );
 		}
 		wp_add_inline_style( 'leitvia-studio-admin', $faces );
+		if ( $framed ) {
+			return;
+		}
 		wp_set_script_translations( 'leitvia-studio-admin', 'leitvia-studio' );
 
 		$panels = array();
@@ -342,12 +429,16 @@ final class Admin {
 			'usageIndex'     => \LeitviaStudio\Lab\Usage_Index::is_built(),
 			'brand'          => leitvia_studio_brand()['name'],
 			'agentRole'      => (string) ( wp_roles()->role_names[ \LeitviaStudio\Gateway\Gateway::ROLE ] ?? '' ),
+			'canManage'      => current_user_can( 'manage_options' ),
+			// Names of the steps and codes add-ons add to recipe runs, shown on the Recipes screen.
+			'recipeLabels'   => array_map( static fn( array $labels ): object => (object) $labels, \LeitviaStudio\Gateway\Recipes::labels() ),
 		);
 		wp_add_inline_script( 'leitvia-studio-admin', 'window.leitviaStudioAdmin = ' . wp_json_encode( $data ) . ';', 'before' );
 	}
 
 	/**
-	 * Registers the Studio panels of the Lab detail view. Runs on leitvia_studio_init.
+	 * Registers the Studio panels of the Lab detail view. Runs on leitvia_studio_init. Variants holds the test content
+	 * (states) too; the Lab hides Annotations for patterns without a wp_block post (src/lab/detail.js).
 	 *
 	 * @param \LeitviaStudio\Extension\Studio $studio Studio.
 	 */
@@ -358,16 +449,6 @@ final class Admin {
 				'label'      => __( 'Variants', 'leitvia-studio' ),
 				'script'     => 'leitvia-studio-admin',
 				'order'      => 10,
-				'capability' => 'edit_theme_options',
-			),
-			'leitvia-studio'
-		);
-		$studio->registry( 'lab_panels' )->register(
-			'leitvia/states',
-			array(
-				'label'      => __( 'States', 'leitvia-studio' ),
-				'script'     => 'leitvia-studio-admin',
-				'order'      => 20,
 				'capability' => 'edit_theme_options',
 			),
 			'leitvia-studio'
@@ -446,11 +527,7 @@ final class Admin {
 		if ( 'leitvia_pattern_status' !== $column ) {
 			return;
 		}
-		$labels = array(
-			'draft'    => __( 'Draft', 'leitvia-studio' ),
-			'review'   => __( 'In review', 'leitvia-studio' ),
-			'approved' => __( 'Approved', 'leitvia-studio' ),
-		);
-		echo esc_html( $labels[ \LeitviaStudio\Lab\Usage_Index::post_status( $post_id ) ] ?? '' );
+		$status = \LeitviaStudio\Lab\Usage_Index::post_status( $post_id );
+		echo esc_html( '' === $status ? '' : \LeitviaStudio\Lab\Status::label( $status ) );
 	}
 }

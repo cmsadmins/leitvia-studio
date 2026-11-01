@@ -11,13 +11,22 @@ import PreviewFrame from './preview-frame';
 import { STATUSES, labUrl, settings } from './common';
 import { notify } from '../admin/notify';
 import { countIssues, isOutdated } from './checks-panel';
+import './style.scss';
 
-const STORAGE_KEY = `leitvia-studio-lab-view-${ settings.userId }`;
+// v2: views of v1 had no sort and no "Updated" field.
+const STORAGE_KEY = `leitvia-studio-lab-view-${ settings.userId }-v2`;
+
+// Patterns added within this many days carry the label "New".
+const NEW_DAYS = 30;
+
+const isNew = ( item ) =>
+	!! item.added &&
+	Date.now() - new Date( item.added ).getTime() < NEW_DAYS * 86400000;
 
 const DEFAULT_LAYOUTS = {
 	grid: {
 		mediaField: 'preview',
-		fields: [ 'effective_status', 'source' ],
+		fields: [ 'effective_status', 'source', 'modified' ],
 		layout: { badgeFields: [ 'effective_status' ], aspectRatio: '4/3' },
 	},
 	table: {
@@ -26,6 +35,7 @@ const DEFAULT_LAYOUTS = {
 			'source',
 			'status',
 			'effective_status',
+			'modified',
 			'version',
 			'categories',
 			'variant_count',
@@ -41,6 +51,7 @@ const DEFAULT_VIEW = {
 	filters: [],
 	page: 1,
 	perPage: 20,
+	sort: { field: 'modified', direction: 'desc' },
 	titleField: 'title',
 	...DEFAULT_LAYOUTS.grid,
 };
@@ -48,7 +59,7 @@ const DEFAULT_VIEW = {
 function loadView() {
 	try {
 		const stored = JSON.parse( window.localStorage.getItem( STORAGE_KEY ) );
-		return stored?.type ? stored : DEFAULT_VIEW;
+		return stored?.type ? { ...DEFAULT_VIEW, ...stored } : DEFAULT_VIEW;
 	} catch {
 		return DEFAULT_VIEW;
 	}
@@ -67,10 +78,25 @@ const FIELDS = [
 		id: 'title',
 		label: __( 'Title', 'leitvia-studio' ),
 		enableHiding: false,
-		enableSorting: false,
 		render: ( { item } ) => (
-			<a href={ labUrl( item.ref ) }>{ item.title || item.ref }</a>
+			<>
+				<a href={ labUrl( item.ref ) }>{ item.title || item.ref }</a>
+				{ isNew( item ) && (
+					<>
+						{ ' ' }
+						<span className="leitvia-studio-new">
+							{ __( 'New', 'leitvia-studio' ) }
+						</span>
+					</>
+				) }
+			</>
 		),
+	},
+	{
+		id: 'modified',
+		label: __( 'Updated', 'leitvia-studio' ),
+		type: 'date',
+		filterBy: false,
 	},
 	{
 		id: 'preview',
@@ -94,6 +120,10 @@ const FIELDS = [
 		label: __( 'Source', 'leitvia-studio' ),
 		elements: [
 			{ value: 'theme', label: __( 'Theme', 'leitvia-studio' ) },
+			{
+				value: 'addon',
+				label: __( 'Plugins and core', 'leitvia-studio' ),
+			},
 			{ value: 'user', label: __( 'My patterns', 'leitvia-studio' ) },
 		],
 		filterBy: { operators: [ 'is' ] },
@@ -426,7 +456,10 @@ function UsageIndexNotice() {
 			);
 		}
 	};
-	const message = __( 'Usage index is incomplete', 'leitvia-studio' );
+	const message = __(
+		'Usage index is incomplete: Studio does not know yet which posts and pages use each pattern.',
+		'leitvia-studio'
+	);
 	// Notice turns children that are no string into text with renderToString, which runs the hooks of Flex, Button
 	// and Spinner inside its own render; the spinner of the build then changes their number and React stops the
 	// screen. The message as string avoids that.
@@ -474,6 +507,8 @@ export default function Gallery() {
 			search: view.search || undefined,
 			status: filter( 'status' ),
 			source: filter( 'source' ),
+			orderby: 'title' === view.sort?.field ? 'title' : 'modified',
+			order: 'asc' === view.sort?.direction ? 'asc' : 'desc',
 			page: view.page,
 			per_page: view.perPage,
 		};
@@ -525,6 +560,12 @@ export default function Gallery() {
 
 	return (
 		<>
+			<p className="leitvia-studio-gallery__intro">
+				{ __(
+					'Browse, check and approve the sections your pages are built from.',
+					'leitvia-studio'
+				) }
+			</p>
 			<Flex
 				justify="flex-start"
 				className="leitvia-studio-gallery__header"
@@ -559,7 +600,12 @@ export default function Gallery() {
 				defaultLayouts={ DEFAULT_LAYOUTS }
 				searchLabel={ __( 'Search patterns', 'leitvia-studio' ) }
 				empty={
-					<p>{ __( 'No patterns found.', 'leitvia-studio' ) }</p>
+					<p>
+						{ __(
+							'No patterns match. Clear the search and filters, or add patterns with "Import patterns".',
+							'leitvia-studio'
+						) }
+					</p>
 				}
 			/>
 		</>

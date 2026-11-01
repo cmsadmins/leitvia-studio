@@ -1,8 +1,9 @@
-// Inbox list: the change packages of agents, newest first, as a table with a filter by status.
+// Inbox list: the change packages of agents ("changes" on screen), newest first, as a table with a filter by status.
 import { __, sprintf } from '@wordpress/i18n';
 import { useEffect, useMemo, useState } from '@wordpress/element';
 import apiFetch from '@wordpress/api-fetch';
 import { DataViews, filterSortAndPaginate } from '@wordpress/dataviews/wp';
+import { errorText } from '../common';
 import { notify } from '../notify';
 import {
 	STATES,
@@ -24,7 +25,7 @@ const FIELDS = [
 				{ item.title ||
 					sprintf(
 						/* translators: %d: change package ID. */
-						__( 'Change package %d', 'leitvia-studio' ),
+						__( 'Change %d', 'leitvia-studio' ),
 						item.id
 					) }
 			</a>
@@ -111,11 +112,10 @@ export default function InboxList() {
 				setItems( [] );
 				notify(
 					'error',
-					error.message ??
-						__(
-							'The change packages could not be loaded.',
-							'leitvia-studio'
-						)
+					errorText(
+						error,
+						__( 'The Inbox could not be loaded.', 'leitvia-studio' )
+					)
 				);
 			} );
 	}, [] );
@@ -126,25 +126,33 @@ export default function InboxList() {
 	);
 
 	return (
-		<DataViews
-			data={ data }
-			fields={ FIELDS }
-			view={ view }
-			onChangeView={ setView }
-			actions={ ACTIONS }
-			getItemId={ ( item ) => String( item.id ) }
-			isLoading={ null === items }
-			paginationInfo={ paginationInfo }
-			defaultLayouts={ { table: {} } }
-			searchLabel={ __( 'Search change packages', 'leitvia-studio' ) }
-			empty={
-				<p>
-					{ __(
-						'No change packages. Agents propose changes here when their autonomy level asks for a decision.',
-						'leitvia-studio'
-					) }
-				</p>
-			}
-		/>
+		<>
+			<p>
+				{ __(
+					'Changes that agents propose wait here until you apply or reject them.',
+					'leitvia-studio'
+				) }
+			</p>
+			<DataViews
+				data={ data }
+				fields={ FIELDS }
+				view={ view }
+				onChangeView={ setView }
+				actions={ ACTIONS }
+				getItemId={ ( item ) => String( item.id ) }
+				isLoading={ null === items }
+				paginationInfo={ paginationInfo }
+				defaultLayouts={ { table: {} } }
+				searchLabel={ __( 'Search changes', 'leitvia-studio' ) }
+				empty={
+					<p>
+						{ __(
+							'No changes to review. Agents put a change here when the autonomy settings leave the decision to you.',
+							'leitvia-studio'
+						) }
+					</p>
+				}
+			/>
+		</>
 	);
 }

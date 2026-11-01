@@ -1,6 +1,7 @@
-// Labels and texts shared by the inbox list and the detail view of a change package.
+// Labels and texts shared by the Inbox list and the detail view of a change package. The Inbox is a tab of the Agents
+// screen; the page slug leitvia-studio-inbox forwards there (Admin::redirect_inbox()).
 import { __, _n, sprintf } from '@wordpress/i18n';
-import { addQueryArgs } from '@wordpress/url';
+import { screenUrl } from '../common';
 
 export const STATES = [
 	{ value: 'open', label: __( 'Open', 'leitvia-studio' ) },
@@ -17,31 +18,6 @@ const OPERATION_STATUSES = {
 	rolled_back: __( 'Rolled back', 'leitvia-studio' ),
 };
 
-export const LEVELS = {
-	locked: __( 'Locked', 'leitvia-studio' ),
-	suggest: __( 'Suggest', 'leitvia-studio' ),
-	draft: __( 'Draft', 'leitvia-studio' ),
-	autonomous: __( 'Autonomous', 'leitvia-studio' ),
-};
-
-export const AREAS = {
-	content: __( 'Content', 'leitvia-studio' ),
-	corrections: __( 'Corrections', 'leitvia-studio' ),
-	structure: __( 'Structure', 'leitvia-studio' ),
-	design: __( 'Design', 'leitvia-studio' ),
-	admin: __( 'Administration', 'leitvia-studio' ),
-	products: __( 'Products', 'leitvia-studio' ),
-};
-
-export const KINDS = {
-	prices: __( 'Prices', 'leitvia-studio' ),
-	legal: __( 'Legal texts', 'leitvia-studio' ),
-	slugs: __( 'Slugs', 'leitvia-studio' ),
-	organization: __( 'Organization data', 'leitvia-studio' ),
-	tax: __( 'Taxes', 'leitvia-studio' ),
-	shipping: __( 'Shipping', 'leitvia-studio' ),
-};
-
 const CHANGES = {
 	added: __( 'Added', 'leitvia-studio' ),
 	removed: __( 'Removed', 'leitvia-studio' ),
@@ -55,11 +31,9 @@ export const operationStatus = ( value ) =>
 	OPERATION_STATUSES[ value ] ?? value;
 export const changeLabel = ( value ) => CHANGES[ value ] ?? value;
 
+// Kept for the modules that import it; screenUrl() is the shared helper.
 export const inboxUrl = ( id ) =>
-	addQueryArgs( 'admin.php', {
-		page: 'leitvia-studio-inbox',
-		...( id ? { package: id } : {} ),
-	} );
+	screenUrl( 'leitvia-studio-agents', { tab: 'inbox', package: id } );
 
 /**
  * Date and time of a UTC timestamp from the database in the language of the admin.
@@ -77,7 +51,7 @@ export function formatDate( value ) {
 }
 
 /**
- * Result of the checks before writing: number of findings and the lowest composition score.
+ * Result of the checks before writing: number of findings and the lowest composition score, called layout score.
  *
  * @param {{findings: number, score: ?number}} checks Checks of a package summary.
  * @return {string} Text.
@@ -100,8 +74,8 @@ export function checksText( checks ) {
 	if ( null !== checks?.score && undefined !== checks?.score ) {
 		parts.push(
 			sprintf(
-				/* translators: %d: composition score from 0 to 100. */
-				__( 'composition score %d of 100', 'leitvia-studio' ),
+				/* translators: %d: layout score from 0 to 100. */
+				__( 'layout score %d of 100', 'leitvia-studio' ),
 				checks.score
 			)
 		);

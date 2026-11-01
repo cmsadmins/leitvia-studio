@@ -176,7 +176,7 @@ final class Packages {
 		}
 		$human = array();
 		foreach ( Store::operations( $id ) as $entry ) {
-			if ( $chosen( $entry ) && 'autonomous' !== Autonomy::level( (string) $entry['area'], (array) $entry['kinds'] ) ) {
+			if ( $chosen( $entry ) && 'autonomous' !== Autonomy::level( (string) $entry['area'], (array) $entry['kinds'], (array) ( $entry['target'] ?? array() ) ) ) {
 				$human[] = (int) $entry['id'];
 			}
 		}
@@ -193,7 +193,7 @@ final class Packages {
 			'never',
 			array(
 				'operations' => $human,
-				'inbox'      => admin_url( 'admin.php?page=leitvia-studio-inbox&package=' . $id ),
+				'inbox'      => \LeitviaStudio\Admin\Admin::inbox_url( $id ),
 			)
 		);
 	}

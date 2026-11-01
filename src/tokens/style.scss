@@ -17,16 +17,6 @@
 	min-width: 0;
 }
 
-.leitvia-studio-tokens__section {
-	padding: 16px;
-	// The surface DataViews uses, so help texts of @wordpress/components keep their contrast.
-	background: var(--wp-components-color-background, #fff);
-
-	@media (min-width: 782px) {
-		padding: 24px;
-	}
-}
-
 // Long role names and ratios wrap instead of widening the page at 320 px.
 .leitvia-studio-tokens__contrast {
 	th,

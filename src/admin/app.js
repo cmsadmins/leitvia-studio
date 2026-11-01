@@ -1,4 +1,5 @@
-// App shell: page heading, status messages and the screen of the current page.
+// App shell: page heading, the intro sentence of the screen (export `intro`, optional), status messages and the
+// screen of the current page.
 import { NoticeList, SnackbarList } from '@wordpress/components';
 import { useDispatch, useSelect } from '@wordpress/data';
 import { useEffect, useState } from '@wordpress/element';
@@ -47,6 +48,9 @@ export default function App( { screen } ) {
 		<>
 			<h1 className="wp-heading-inline">{ module.title }</h1>
 			<hr className="wp-header-end" />
+			{ module.intro && (
+				<p className="leitvia-studio-intro">{ module.intro }</p>
+			) }
 			<Notices />
 			<Screen />
 		</>

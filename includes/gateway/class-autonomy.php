@@ -11,7 +11,8 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Decides how far an agent may go: the level of the area (defaults of spec 7.5, profile, overrides), lowered to at most
- * "suggest" for prices, legal texts, slugs and organization data unless a human unlocked the kind.
+ * "suggest" for prices, legal texts, slugs and organization data unless a human unlocked the kind. Settings, the
+ * content model and the global styles of the site always stay at most "suggest" for agents, see person_decides().
  */
 final class Autonomy {
 
@@ -76,15 +77,32 @@ final class Autonomy {
 	}
 
 	/**
-	 * Level of an operation in an area that touches these content kinds.
+	 * Level of an operation in an area that touches these content kinds. For an agent, a target of person_decides()
+	 * stays at most "suggest" whatever profile, overrides and filters say: the change waits for a person in the inbox.
 	 *
-	 * @param string   $area  Area.
-	 * @param string[] $kinds Content kinds.
+	 * @param string               $area   Area.
+	 * @param string[]             $kinds  Content kinds.
+	 * @param array<string, mixed> $target Target of the operation, see Operation.
 	 */
-	public static function level( string $area, array $kinds ): string {
+	public static function level( string $area, array $kinds, array $target = array() ): string {
 		$level  = self::area_level( $area );
 		$locked = array_diff( $kinds, (array) Gateway::settings()['overrides']['kinds'] );
-		return $locked && self::RANK[ $level ] > self::RANK['suggest'] ? 'suggest' : $level;
+		$person = Gateway::is_agent() && self::person_decides( $target );
+		return ( $locked || $person ) && self::RANK[ $level ] > self::RANK['suggest'] ? 'suggest' : $level;
+	}
+
+	/**
+	 * Whether only a person may let a change of this target reach the site: every option (site and reading settings,
+	 * the content model declaration and its site details), the user global styles and the activation of a token set
+	 * into them, since each one changes the whole site. Agents may propose these changes, never make them; no ability
+	 * touches plugins, themes, users, roles or files outside the uploads at all.
+	 *
+	 * @param array<string, mixed> $target Target of the operation, see Operation.
+	 */
+	public static function person_decides( array $target ): bool {
+		$post = (int) ( $target['post'] ?? 0 );
+		$type = $post ? (string) get_post_type( $post ) : (string) ( $target['post_type'] ?? '' );
+		return isset( $target['option'] ) || isset( $target['token_set'] ) || 'wp_global_styles' === $type;
 	}
 
 	/**
@@ -107,7 +125,7 @@ final class Autonomy {
 	 */
 	public static function kinds( Operation $op, array $before, array $after ): array {
 		$kinds = $op->kinds;
-		if ( in_array( $op->option(), Pipeline::OPTIONS, true ) ) {
+		if ( in_array( $op->option(), Pipeline::OPTIONS, true ) || Pipeline::model_setting( $op->option() ) ) {
 			$kinds[] = 'organization';
 		}
 		if ( $op->post_id() ) {

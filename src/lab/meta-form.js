@@ -14,6 +14,7 @@ import {
 	TextareaControl,
 } from '@wordpress/components';
 import { STATUSES } from './common';
+import More from '../admin/more';
 import { notify } from '../admin/notify';
 
 const META = {
@@ -214,7 +215,7 @@ function ReplacementEdit( { data, field, onChange, exclude } ) {
 			__next40pxDefaultSize
 			__nextHasNoMarginBottom
 			label={ field.label }
-			help={ __( 'Type to search all patterns.', 'leitvia-studio' ) }
+			help={ field.description }
 			value={ value }
 			options={
 				value && ! options.some( ( option ) => option.value === value )
@@ -256,18 +257,30 @@ export default function MetaForm( { item, block, onSaved } ) {
 			type: 'text',
 			elements: STATUSES,
 			Edit: 'select',
+			description: __(
+				'Only approved patterns are ready for pages; drafts and patterns in review stay out of the inserter.',
+				'leitvia-studio'
+			),
 			readOnly,
 		},
 		{
 			id: 'version',
 			label: __( 'Version', 'leitvia-studio' ),
 			type: 'text',
+			description: __(
+				'Three numbers such as 1.2.0; raise them when you change the pattern.',
+				'leitvia-studio'
+			),
 			readOnly,
 		},
 		{
 			id: 'replaced_by',
 			label: __( 'Replaced by', 'leitvia-studio' ),
 			type: 'text',
+			description: __(
+				'The pattern to use instead once this one is deprecated. Type to search all patterns.',
+				'leitvia-studio'
+			),
 			Edit: ReplacementField,
 			render: ( { item: values } ) =>
 				values.replaced_by || __( 'None', 'leitvia-studio' ),
@@ -343,7 +356,7 @@ export default function MetaForm( { item, block, onSaved } ) {
 			{ readOnly && (
 				<p>
 					{ __(
-						'Theme patterns are maintained in the theme; their details are read-only here.',
+						'Theme and add-on patterns are maintained in their theme or plugin; their details are read-only here.',
 						'leitvia-studio'
 					) }
 				</p>
@@ -364,6 +377,16 @@ export default function MetaForm( { item, block, onSaved } ) {
 					setData( ( current ) => ( { ...current, ...edits } ) )
 				}
 			/>
+			{ ! readOnly && (
+				<More summary={ __( 'About versions', 'leitvia-studio' ) }>
+					<p>
+						{ __(
+							'Versions follow semantic versioning, MAJOR.MINOR.PATCH. Raise the last number for a fix that changes nothing visible, the middle one for an addition that keeps pages as they are, and the first one for a change that breaks pages that use the pattern; mark that entry in the changelog as a breaking change. An approved pattern needs a version at least as high as the latest changelog entry.',
+							'leitvia-studio'
+						) }
+					</p>
+				</More>
+			) }
 			{ ! readOnly && (
 				<Flex justify="flex-start">
 					<Button

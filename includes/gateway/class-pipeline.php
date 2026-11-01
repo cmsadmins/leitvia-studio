@@ -10,6 +10,7 @@ namespace LeitviaStudio\Gateway;
 use LeitviaStudio\Gateway\Abilities\Commerce;
 use LeitviaStudio\Gateway\Abilities\Content;
 use LeitviaStudio\Model\Model;
+use LeitviaStudio\Model\Registrar;
 use LeitviaStudio\Tokens\Compiler;
 use LeitviaStudio\Tokens\Token_Sets;
 
@@ -53,7 +54,7 @@ final class Pipeline {
 	/**
 	 * Options an operation may target: the organization data of the site, the reading settings, the pages a recipe
 	 * connects and the options a recipe may turn off (see schemas/recipe.schema.json). Every option counts as
-	 * organization data.
+	 * organization data. The site settings of the content model are open as well, see model_setting().
 	 */
 	public const OPTIONS = array( 'blogname', 'blogdescription', 'site_logo', 'site_icon', 'show_on_front', 'page_on_front', 'page_for_posts', 'default_pingback_flag', 'default_ping_status', 'default_comment_status', 'show_avatars', 'wp_page_for_privacy_policy', 'woocommerce_terms_page_id', 'woocommerce_feature_order_attribution_enabled', 'woocommerce_allow_tracking', 'woocommerce_show_marketplace_suggestions', 'woocommerce_feature_remote_logging_enabled' );
 
@@ -84,7 +85,8 @@ final class Pipeline {
 	 * Runs an operation and writes its audit entry. Fires leitvia_studio_gateway_executed after a write or a package.
 	 *
 	 * A replay (package > 0) writes a stored operation of that package live: no rate limit (the call that applies the
-	 * package counted) and no autonomy lock (whoever applies decided); checks and capabilities apply as always. A
+	 * package counted) and no autonomy lock (whoever applies decided), except that an agent never replays a target of
+	 * Autonomy::person_decides(); checks and capabilities apply as always. A
 	 * rollback replay writes a snapshot back: content safety and checks are skipped because the state existed before,
 	 * and the target key delete removes a post the package created.
 	 *
@@ -233,9 +235,14 @@ final class Pipeline {
 		}
 		// 5. Autonomy.
 		$kinds = Autonomy::kinds( $op, $before, $after );
-		$level = Autonomy::level( $op->area, $kinds );
+		$level = Autonomy::level( $op->area, $kinds, $op->target );
 		if ( 'locked' === $level && ! $package ) {
 			return Rejection::make( 'leitvia_locked', __( 'Agents may not change this area. A person can change the autonomy settings.', 'leitvia-studio' ), 403, 'autonomy', $target, '', 'never', array( 'kinds' => $kinds ) );
+		}
+		// Settings, the content model and the global styles reach the site only when a person applies them; an agent
+		// never replays such an operation, whatever path it takes (apply-package, rollback).
+		if ( $package && Gateway::is_agent() && Autonomy::person_decides( $op->target ) ) {
+			return Rejection::make( 'leitvia_needs_human', __( 'A person has to decide on these operations in the inbox. Apply only operations whose area is autonomous for you.', 'leitvia-studio' ), 403, 'autonomy', $target, '', 'never', array( 'kinds' => $kinds ) );
 		}
 		// A change that leaves the target as it is (a recipe or task run again) writes nothing and queues nothing.
 		if ( ! $package && ! $op->creates() && self::same( $before, $after ) ) {
@@ -366,7 +373,7 @@ final class Pipeline {
 		$out       = Rejection::make( 'leitvia_out_of_scope', __( 'Agents may not change this object. Only published or draft content of the allowed post types is open to them.', 'leitvia-studio' ), 403, 'scope', $target, '', 'never' );
 		$forbidden = Rejection::make( 'leitvia_forbidden', __( 'Your user may not change this object.', 'leitvia-studio' ), 403, 'capability', $target, '', 'never' );
 		if ( '' !== $op->option() ) {
-			return in_array( $op->option(), self::OPTIONS, true ) || self::MODEL_OPTION === $op->option() ? array( 'value' => get_option( $op->option() ) ) : $out;
+			return in_array( $op->option(), self::OPTIONS, true ) || self::MODEL_OPTION === $op->option() || self::model_setting( $op->option() ) ? array( 'value' => get_option( $op->option() ) ) : $out;
 		}
 		if ( isset( $op->target['term'] ) ) {
 			if ( ! Scope::term_readable( $op->term() ) ) {
@@ -389,6 +396,17 @@ final class Pipeline {
 			return $forbidden;
 		}
 		return self::state( $op->post_id() );
+	}
+
+	/**
+	 * Whether an option is a site setting of the current content model (leitvia_site_<key>), which a building block may
+	 * fill with its default value; it is organization data like the options of OPTIONS.
+	 *
+	 * @param string $option Option name.
+	 */
+	public static function model_setting( string $option ): bool {
+		$key = str_starts_with( $option, Registrar::SETTING_PREFIX ) ? substr( $option, strlen( Registrar::SETTING_PREFIX ) ) : '';
+		return '' !== $key && isset( Model::current()['settings'][ $key ] );
 	}
 
 	/**
@@ -663,8 +681,8 @@ final class Pipeline {
 	 * @param bool                 $warnings Whether checks warned.
 	 */
 	private static function mode( Operation $op, string $level, array $before, array $after, bool $warnings ): string {
-		// Only users with manage_options change settings live; for agents a settings change waits for a person.
-		if ( '' !== $op->option() && ! current_user_can( 'manage_options' ) ) {
+		// Only people with manage_options change settings live; for agents a settings change waits for a person.
+		if ( '' !== $op->option() && ! Gateway::is_person() ) {
 			return 'package';
 		}
 		if ( 'autonomous' === $level ) {

@@ -498,6 +498,47 @@ class Test_Registrar extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Saving the model twice after init registers each meta key and setting once: no sanitize or auth callback stacks.
+	 */
+	public function test_saving_twice_registers_once(): void {
+		$count = static fn( string $hook ): int => isset( $GLOBALS['wp_filter'][ $hook ] ) ? array_sum( array_map( 'count', $GLOBALS['wp_filter'][ $hook ]->callbacks ) ) : 0;
+		$hooks = array( 'sanitize_option_leitvia_site_company_phone', 'auth_post_meta_event_venue_for_event', 'auth_post_meta_event_speakers_for_event', 'sanitize_post_meta_event_poster_for_event' );
+		$this->assertTrue( Model::save( (array) get_option( Model::OPTION ) ) );
+		$this->assertTrue( Model::save( (array) get_option( Model::OPTION ) ) );
+		foreach ( $hooks as $hook ) {
+			$this->assertSame( 1, $count( $hook ), $hook );
+		}
+		$this->assertSame( 'string', get_registered_meta_keys( 'post', 'event' )['event_venue']['type'] );
+		$this->assertArrayHasKey( 'leitvia_site_company_phone', get_registered_settings() );
+	}
+
+	/**
+	 * Model::save() on another site of the network stores the declaration there and registers nothing in this request.
+	 *
+	 * @group ms-required
+	 */
+	public function test_save_on_a_switched_site_registers_nothing_here(): void {
+		switch_to_blog( self::factory()->blog->create() );
+		$saved  = Model::save(
+			array(
+				'version'   => 1,
+				'postTypes' => array(
+					'lv_elsewhere' => array(
+						'label'         => 'Elsewhere',
+						'singularLabel' => 'Elsewhere',
+					),
+				),
+			)
+		);
+		$stored = get_option( Model::OPTION );
+		restore_current_blog();
+		Model::forget();
+		$this->assertTrue( $saved );
+		$this->assertArrayHasKey( 'lv_elsewhere', $stored['postTypes'] );
+		$this->assertFalse( post_type_exists( 'lv_elsewhere' ) );
+	}
+
+	/**
 	 * Site settings are readable and writable for administrators under /wp/v2/settings; email values are checked.
 	 */
 	public function test_settings(): void {

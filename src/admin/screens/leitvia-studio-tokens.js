@@ -7,6 +7,11 @@ import '../../tokens/style.scss';
 
 export const title = __( 'Tokens', 'leitvia-studio' );
 
+export const intro = __(
+	'A token set holds the colors, fonts and spacing of your site; activating a set applies it to every page.',
+	'leitvia-studio'
+);
+
 export default function Tokens() {
 	const id = Number( getQueryArg( window.location.href, 'set' ) );
 	return id > 0 ? <Editor id={ id } /> : <List />;

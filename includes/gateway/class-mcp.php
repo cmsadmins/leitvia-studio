@@ -11,7 +11,8 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Registers the own MCP server leitvia with the abilities of Studio and its compatible add-ons when the MCP Adapter is
- * active in a supported version. Leitvia abilities never set meta.public, so the default server of the adapter lists none of them.
+ * active in a supported version. Leitvia abilities never set meta.mcp.public. Another plugin may still list them on the
+ * default server (MCP Access of the AI plugin); pipeline and autonomy apply there too, the details of a rejection only here.
  * Without the adapter nothing happens and the abilities stay available over REST.
  */
 final class Mcp {
@@ -33,6 +34,15 @@ final class Mcp {
 	public static function boot(): void {
 		add_action( 'mcp_adapter_init', array( self::class, 'register' ) );
 		add_filter( 'mcp_adapter_tool_call_result', array( self::class, 'error_details' ), 10, 5 );
+	}
+
+	/**
+	 * Whether the current request is a call to an MCP server: the route of this server or of another server of the
+	 * adapter (/mcp/…). Runs of an MCP client never apply a package at once, see Recipes::may_settle().
+	 */
+	public static function serving(): bool {
+		$route = isset( $GLOBALS['wp']->query_vars['rest_route'] ) ? '/' . trim( (string) $GLOBALS['wp']->query_vars['rest_route'], '/' ) : '';
+		return '/' . self::ROUTE_NAMESPACE . '/' . self::ROUTE === $route || str_starts_with( $route, '/mcp/' );
 	}
 
 	/**

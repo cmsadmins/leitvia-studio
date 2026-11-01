@@ -1,0 +1,11 @@
+// Pattern Lab: the label of new patterns. Its text says "New", the frame only sets it apart from the title.
+.leitvia-studio-new {
+	display: inline-block;
+	margin-inline-start: 8px;
+	padding: 0 6px;
+	border: 1px solid currentColor;
+	font-size: 12px;
+	font-weight: 600;
+	line-height: 1.6;
+	white-space: nowrap;
+}

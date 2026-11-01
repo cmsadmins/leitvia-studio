@@ -11,6 +11,7 @@ use LeitviaStudio\Gateway\Operation;
 use LeitviaStudio\Gateway\Packages;
 use LeitviaStudio\Gateway\Pipeline;
 use LeitviaStudio\Gateway\Store;
+use LeitviaStudio\Model\Model;
 
 /**
  * KSES and block attribute attacks, the write path through the pipeline, slashes, scope, identity and capabilities,
@@ -422,6 +423,30 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 				'pattern' => 'leitvia/header-search',
 			),
 			'leitvia/apply-recipe'         => static fn(): array => array( 'recipe' => 'leitvia/blog' ),
+			'leitvia/add-building-block'   => static function (): array {
+				add_action(
+					'leitvia_studio_init',
+					static fn( $studio ): bool => $studio->registry( 'building_blocks' )->register(
+						'leitvia/security-notes',
+						array(
+							'title'       => 'Notes',
+							'description' => 'Short notes.',
+							'model'       => array(
+								'postTypes' => array(
+									'lv_note' => array(
+										'label'         => 'Notes',
+										'singularLabel' => 'Note',
+									),
+								),
+							),
+						),
+						'leitvia-studio'
+					),
+					20
+				);
+				leitvia_studio()->reset_for_tests();
+				return array( 'name' => 'leitvia/security-notes' );
+			},
 			'leitvia/apply-package'        => fn(): array => array( 'id' => $this->queue( $this->page(), array( 'post_title' => 'Queued' ) ) ),
 			'leitvia/rollback'             => fn(): array => array( 'id' => $this->applied( $this->page(), array( 'post_title' => 'Applied' ) ) ),
 			'leitvia/create-content'       => static fn(): array => array(
@@ -526,7 +551,8 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Checksum over posts, post meta and options without transients.
+	 * Checksum over posts, post meta and options without transients and the hash of the last content model that passed
+	 * the schema (Model::validate() remembers it, a cache like a transient).
 	 */
 	private static function checksum(): string {
 		global $wpdb;
@@ -536,7 +562,7 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 				array(
 					$wpdb->get_results( "SELECT * FROM {$wpdb->posts} ORDER BY ID" ),
 					$wpdb->get_results( "SELECT * FROM {$wpdb->postmeta} ORDER BY meta_id" ),
-					$wpdb->get_results( "SELECT option_name, option_value FROM {$wpdb->options} WHERE option_name NOT LIKE '%\\_transient\\_%' ORDER BY option_name" ),
+					array_values( array_filter( $wpdb->get_results( "SELECT option_name, option_value FROM {$wpdb->options} WHERE option_name NOT LIKE '%\\_transient\\_%' ORDER BY option_name" ), static fn( $row ): bool => Model::CHECKED_OPTION !== $row->option_name ) ),
 				)
 			)
 		);
@@ -826,11 +852,13 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 		$this->assertSame( 401, rest_do_request( $request )->get_status() );
 		$this->assertSame( 'Page', get_the_title( $page ) );
 
-		wp_set_current_user( $this->agent );
+		// A person sets the global styles; an agent only proposes them.
+		wp_set_current_user( $this->admin );
 		self::call( 'leitvia/set-variation', array( 'variation' => 'corporate-light' ) );
 		$styles = (int) ( WP_Theme_JSON_Resolver::get_user_data_from_wp_global_styles( wp_get_theme() )['ID'] ?? 0 );
 		$this->assertGreaterThan( 0, $styles );
 		$json = get_post_field( 'post_content', $styles, 'raw' );
+		wp_set_current_user( $this->agent );
 		wp_get_current_user()->add_cap( 'edit_theme_options', false );
 		$editor = self::factory()->user->create( array( 'role' => 'editor' ) );
 		foreach ( array( $this->agent, $editor ) as $user ) {

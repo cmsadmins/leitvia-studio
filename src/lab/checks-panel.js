@@ -1,4 +1,5 @@
-// Lab panel "Checks": token lint findings and an axe run in every style variation, viewport and state.
+// Lab panel "Checks": token lint findings and an accessibility test (axe) in every style variation, viewport and test
+// content.
 import { __, _n, sprintf } from '@wordpress/i18n';
 import { speak } from '@wordpress/a11y';
 import { useRef, useState } from '@wordpress/element';
@@ -6,7 +7,29 @@ import apiFetch from '@wordpress/api-fetch';
 import { Button, Flex, Notice } from '@wordpress/components';
 import { VIEWPORTS, previewUrl, settings, stateLabel } from './common';
 import { originalRef, useStates } from './states-panel';
+import More from '../admin/more';
 import { notify } from '../admin/notify';
+
+// Token lint rules of Token_Lint::RULES (includes/lab/class-token-lint.php) in plain words.
+const RULES = {
+	'no-hex': __(
+		'A colour is set as a hex code instead of a colour of the design system.',
+		'leitvia-studio'
+	),
+	'no-px': __(
+		'A size is set in pixels instead of a size of the design system.',
+		'leitvia-studio'
+	),
+	'no-important': __(
+		'A style uses !important and overrides the design system.',
+		'leitvia-studio'
+	),
+	'no-digit-preset': __(
+		'A numbered default preset of WordPress is used instead of a design token of the theme.',
+		'leitvia-studio'
+	),
+};
+const ruleText = ( rule ) => RULES[ rule ] ?? rule;
 
 // Limits of the schema of _leitvia_lab_checks.axe.
 const MAX_RUNS = 200;
@@ -112,6 +135,7 @@ function TokenFindings( { tokens } ) {
 	if ( ! tokens.count ) {
 		return <p>{ __( 'No raw values found.', 'leitvia-studio' ) }</p>;
 	}
+	const rules = [ ...new Set( tokens.findings.map( ( f ) => f.rule ) ) ];
 	return (
 		<>
 			<p>
@@ -129,11 +153,20 @@ function TokenFindings( { tokens } ) {
 			<ul className="leitvia-studio-check-list">
 				{ tokens.findings.map( ( finding, index ) => (
 					<li key={ index }>
-						<code>{ finding.rule }</code>:{ ' ' }
+						{ ruleText( finding.rule ) }{ ' ' }
 						<code>{ finding.match }</code>
 					</li>
 				) ) }
 			</ul>
+			<More>
+				<ul className="leitvia-studio-check-list">
+					{ rules.map( ( rule ) => (
+						<li key={ rule }>
+							<code>{ rule }</code>: { ruleText( rule ) }
+						</li>
+					) ) }
+				</ul>
+			</More>
 		</>
 	);
 }
@@ -372,24 +405,32 @@ export default function ChecksPanel( { pattern, block, onChange } ) {
 			<h4>{ __( 'Design tokens', 'leitvia-studio' ) }</h4>
 			<TokenFindings tokens={ pattern.checks?.tokens } />
 			<h4>{ __( 'Accessibility', 'leitvia-studio' ) }</h4>
-			<p className="description">
+			<p>
 				{ __(
-					'Runs axe in every style variation, viewport and state. The result is for information; the binding check is the automated test suite.',
+					'Runs an accessibility check in every style variation, viewport and test content.',
 					'leitvia-studio'
 				) }
 			</p>
-			{ ! id && (
-				<Notice status="info" isDismissible={ false }>
+			<More>
+				<p>
 					{ __(
-						'Results of a theme pattern itself are shown but not stored; the results of its states are stored with the states.',
+						'The check uses axe. Its result is for information; the binding check is the automated test suite of the project.',
 						'leitvia-studio'
 					) }
-				</Notice>
-			) }
+				</p>
+				{ ! id && (
+					<p>
+						{ __(
+							'Results of a theme or add-on pattern itself are shown but not stored; the results of its test content are stored with the test content.',
+							'leitvia-studio'
+						) }
+					</p>
+				) }
+			</More>
 			{ ! rows && isOutdated( pattern ) && (
 				<Notice status="warning" isDismissible={ false }>
 					{ __(
-						'Outdated: the pattern or one of its states changed after the last check. Run the check again.',
+						'Outdated: the pattern or its test content changed after the last check. Run the check again.',
 						'leitvia-studio'
 					) }
 				</Notice>

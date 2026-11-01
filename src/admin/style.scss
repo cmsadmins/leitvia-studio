@@ -6,7 +6,7 @@
 
 // Brand accent for light surfaces: #B84A00 instead of the brand orange #FF6800, which reaches only 2.90:1 on white.
 // White text on it 5.22:1 (WCAG 1.4.3), the focus ring on white 5.22:1 (1.4.11). Hover and active get darker, as in
-// the admin colour schemes of core. #FF6800 stays reserved for dark surfaces (plan 6.2).
+// the admin colour schemes of core. #FF6800 stays reserved for dark surfaces.
 $leitvia-studio-accent: #b84a00;
 $leitvia-studio-accent-10: color.adjust($leitvia-studio-accent, $lightness: -5%);
 $leitvia-studio-accent-20: color.adjust($leitvia-studio-accent, $lightness: -10%);
@@ -54,12 +54,20 @@ $leitvia-studio-accent-20: color.adjust($leitvia-studio-accent, $lightness: -10%
 	font-weight: 700;
 }
 
+// One plain sentence under the heading of a screen (export `intro` of the screen module).
+.leitvia-studio-intro {
+	max-width: 720px;
+	margin: 8px 0 16px;
+	font-size: 14px;
+}
+
 .leitvia-studio :is(h2, h3) {
 	font-weight: 600;
 }
 
 // Plain links of the screens in the accent: 5.22:1 on white, 4.59:1 on the admin background #f0f0f1.
-.leitvia-studio a:not(.components-button) {
+// Core tabs (.nav-tab) of add-on screens keep the colours of core, which reach their contrast on the tab background.
+.leitvia-studio a:not(.components-button, .nav-tab) {
 	color: var(--wp-admin-theme-color);
 
 	&:hover,
@@ -141,16 +149,129 @@ $leitvia-studio-accent-20: color.adjust($leitvia-studio-accent, $lightness: -10%
 	}
 }
 
+// The surface DataViews uses, so help texts and labels of @wordpress/components keep their contrast.
 .leitvia-studio-detail,
-.leitvia-studio-settings__form {
+.leitvia-studio-settings__form,
+.leitvia-studio-tokens__section {
 	box-sizing: border-box;
-	margin-top: 16px;
 	padding: 16px;
-	// The surface DataViews uses, so help texts and labels of @wordpress/components keep their contrast.
 	background: var(--wp-components-color-background, #fff);
 
 	@media (min-width: 782px) {
 		padding: 24px;
+	}
+}
+
+.leitvia-studio-detail,
+.leitvia-studio-settings__form {
+	margin-top: 16px;
+}
+
+// Data tables of the Inbox, Agents and Recipes screens wrap long hashes and texts instead of widening the page.
+.leitvia-studio-inbox,
+.leitvia-studio-agents,
+.leitvia-studio-recipes {
+	max-width: 1200px;
+
+	table.widefat {
+		max-width: 100%;
+		margin-block: 8px 16px;
+	}
+
+	caption {
+		padding-block: 8px;
+		font-weight: 600;
+		text-align: start;
+	}
+
+	// Words stay whole ("anywhere" let narrow columns break "Change" into "Chan ge"); only code such as hashes and
+	// paths breaks at any point.
+	:is(th, td) {
+		overflow-wrap: break-word;
+	}
+
+	code {
+		overflow-wrap: anywhere;
+	}
+}
+
+// Way back from a detail view (breadcrumbs.js); links get a 24 px target (WCAG 2.5.8).
+.leitvia-studio-breadcrumbs ol {
+	display: flex;
+	flex-wrap: wrap;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+
+	li {
+		margin: 0;
+	}
+
+	li + li::before {
+		content: "/";
+		margin-inline: 8px;
+		color: #50575e;
+	}
+
+	a {
+		display: inline-block;
+		min-height: 24px;
+		line-height: 24px;
+	}
+}
+
+// Facts of a detail view: term over value in a grid (Inbox, Recipes).
+.leitvia-studio-facts {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+	gap: 8px 24px;
+
+	dt {
+		font-weight: 600;
+	}
+
+	dd {
+		margin: 0;
+	}
+}
+
+// Status rows (status-list.js): the state is written out next to the icon, the colour only repeats it (WCAG 1.4.1).
+.leitvia-studio-status {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+	gap: 8px;
+	max-width: 1200px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.leitvia-studio-status__row {
+	display: flex;
+	gap: 8px;
+	margin: 0;
+	padding: 12px;
+	border: 1px solid #ddd;
+	background: var(--wp-components-color-background, #fff);
+
+	:is(.dashicon, .dashicons) {
+		flex: none;
+	}
+
+	&.is-ok :is(.dashicon, .dashicons) {
+		color: #007017;
+	}
+
+	&.is-warning :is(.dashicon, .dashicons) {
+		color: #996800;
+	}
+
+	&.is-error :is(.dashicon, .dashicons) {
+		color: #cc1818;
+	}
+
+	&.is-info :is(.dashicon, .dashicons) {
+		color: #50575e;
 	}
 }
 
@@ -199,6 +320,15 @@ $leitvia-studio-accent-20: color.adjust($leitvia-studio-accent, $lightness: -10%
 	h3 {
 		margin: 0;
 	}
+}
+
+// Tabs of a screen (tabs.js): they wrap instead of widening the page at 320 px (WCAG 1.4.10).
+.leitvia-studio-tabs .components-tab-panel__tabs {
+	flex-wrap: wrap;
+}
+
+.leitvia-studio-tabs .components-tab-panel__tab-content {
+	padding-top: 16px;
 }
 
 // Five and more panel tabs wrap instead of widening the page at 320 px (WCAG 1.4.10).
@@ -325,5 +455,19 @@ $leitvia-studio-accent-20: color.adjust($leitvia-studio-accent, $lightness: -10%
 	.leitvia-studio :focus-visible {
 		outline: 2px solid Highlight !important;
 		outline-offset: 2px;
+	}
+}
+
+// More: details for experts, closed by default.
+.leitvia-studio-more {
+	max-width: 720px;
+
+	summary {
+		cursor: pointer;
+		font-weight: 600;
+	}
+
+	.leitvia-studio-more__body > :first-child {
+		margin-block-start: 8px;
 	}
 }

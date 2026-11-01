@@ -54,16 +54,44 @@ class Test_Admin extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The top-level menu sits after Appearance, the Lab is its first page.
+	 * The top-level menu sits after Appearance, the Pattern Lab is its first page.
 	 */
 	public function test_menu(): void {
 		global $menu, $submenu;
 		$this->assertSame( 'leitvia-studio', $menu[61][2] );
 		$this->assertSame( 'edit_theme_options', $menu[61][1] );
 		$this->assertSame( Admin::menu_icon(), $menu[61][6] );
-		$this->assertSame( array( 'Lab', 'edit_theme_options', 'leitvia-studio' ), array_slice( $submenu['leitvia-studio'][0], 0, 3 ) );
+		$this->assertSame( array( 'Pattern Lab', 'edit_theme_options', 'leitvia-studio' ), array_slice( $submenu['leitvia-studio'][0], 0, 3 ) );
 		$this->assertSame( array( 'Tokens', 'edit_theme_options', 'leitvia-studio-tokens' ), array_slice( $submenu['leitvia-studio'][1], 0, 3 ) );
 		$this->assertSame( array( 'Recipes', 'edit_theme_options', 'leitvia-studio-recipes' ), array_slice( $submenu['leitvia-studio'][3], 0, 3 ) );
+		$this->assertSame( array( 'Agents', 'edit_theme_options', 'leitvia-studio-agents' ), array_slice( $submenu['leitvia-studio'][4], 0, 3 ) );
+		$this->assertSame( array( 'Settings', 'manage_options', 'leitvia-studio-settings' ), array_slice( $submenu['leitvia-studio'][5], 0, 3 ) );
+		$this->assertCount( 6, $submenu['leitvia-studio'] );
+	}
+
+	/**
+	 * The Inbox is a tab of Agents: no menu entry, the old slug forwards with ?package=, and open changes show as a
+	 * count next to "Agents".
+	 */
+	public function test_inbox_is_a_tab_of_agents(): void {
+		global $submenu;
+		$this->assertNotContains( Admin::INBOX_SLUG, array_column( $submenu['leitvia-studio'], 2 ) );
+		$this->assertSame( 10, has_action( 'load-' . get_plugin_page_hookname( Admin::INBOX_SLUG, '' ), array( Admin::class, 'redirect_inbox' ) ) );
+		$this->assertSame( admin_url( 'admin.php?page=leitvia-studio-agents&tab=inbox' ), Admin::inbox_url() );
+		$this->assertSame( admin_url( 'admin.php?page=leitvia-studio-agents&tab=inbox&package=7' ), Admin::inbox_url( 7 ) );
+
+		$id = self::factory()->post->create(
+			array(
+				'post_type'   => \LeitviaStudio\Gateway\Packages::POST_TYPE,
+				'post_status' => 'private',
+			)
+		);
+		update_post_meta( $id, \LeitviaStudio\Gateway\Packages::STATE_META, 'open' );
+		$submenu = array(); // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Fresh admin menu.
+		Admin::register_menu();
+		$this->assertStringStartsWith( 'Agents <span class="awaiting-mod count-1">', $submenu['leitvia-studio'][4][0] );
+		$this->assertStringContainsString( '1 open change in the Inbox', $submenu['leitvia-studio'][4][0] );
+		$this->assertSame( 'Agents', $submenu['leitvia-studio'][4][3] );
 	}
 
 	/**
@@ -87,6 +115,27 @@ class Test_Admin extends WP_UnitTestCase {
 		$this->assertStringContainsString( '<span class="leitvia-studio-brand__name">Leitvia Studio</span> <a class="leitvia-studio-brand__by" href="https://www.cms-admins.de/">by CMS ADMINS</a>', $html );
 		$this->assertStringStartsWith( 'data:image/svg+xml;base64,', Admin::menu_icon() );
 		$this->assertMatchesRegularExpression( '#<svg [^>]*aria-hidden="true"#', $html );
+	}
+
+	/**
+	 * Add-on screens of leitvia_studio_framed_pages get the Studio stylesheet and fonts, but not the app.
+	 */
+	public function test_framed_pages_get_the_stylesheet_only(): void {
+		\LeitviaStudio\Plugin::register_api_script();
+		$filter = static fn( array $pages ): array => array_merge( $pages, array( 'my-addon-settings' ) );
+		add_filter( 'leitvia_studio_framed_pages', $filter );
+		set_current_screen( 'leitvia-studio_page_my-addon-settings' );
+		$GLOBALS['plugin_page'] = 'my-addon-settings';
+		Admin::enqueue();
+		unset( $GLOBALS['plugin_page'] );
+		remove_filter( 'leitvia_studio_framed_pages', $filter );
+
+		$this->assertTrue( wp_style_is( 'leitvia-studio-admin' ) );
+		$this->assertFalse( wp_script_is( 'leitvia-studio-admin' ) );
+		$this->assertStringContainsString( 'open-sans-latin-700.woff2', implode( '', wp_styles()->get_data( 'leitvia-studio-admin', 'after' ) ) );
+		ob_start();
+		Admin::brand();
+		$this->assertStringContainsString( 'leitvia-studio-brand__name', (string) ob_get_clean() );
 	}
 
 	/**
@@ -155,7 +204,7 @@ class Test_Admin extends WP_UnitTestCase {
 		Admin::enqueue();
 		$data = $this->inline_data();
 
-		$this->assertSame( array( 'test-addon/first', 'leitvia/variants', 'leitvia/states', 'leitvia/checks', 'leitvia/annotations', 'leitvia/usage' ), array_column( $data['labPanels'], 'name' ) );
+		$this->assertSame( array( 'test-addon/first', 'leitvia/variants', 'leitvia/checks', 'leitvia/annotations', 'leitvia/usage' ), array_column( $data['labPanels'], 'name' ) );
 		$this->assertContains(
 			array(
 				'slug'  => 'warm-editorial-dark',
@@ -163,6 +212,31 @@ class Test_Admin extends WP_UnitTestCase {
 			),
 			$data['variations']
 		);
+	}
+
+	/**
+	 * The Recipes screen gets the labels add-ons give their recipe steps and codes; values that are no text drop out.
+	 */
+	public function test_inline_data_carries_recipe_step_labels(): void {
+		add_filter(
+			'leitvia_studio_recipe_step_labels',
+			static fn( array $labels ): array => array_merge_recursive(
+				$labels,
+				array(
+					'steps' => array(
+						'myImport' => 'Sample images',
+						'broken'   => array( 'no text' ),
+					),
+					'codes' => array( 'images_pending' => 'Waits for the images.' ),
+				)
+			)
+		);
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+		set_current_screen( 'toplevel_page_leitvia-studio' );
+		Admin::enqueue();
+		$data = $this->inline_data();
+		$this->assertSame( array( 'myImport' => 'Sample images' ), $data['recipeLabels']['steps'] );
+		$this->assertSame( array( 'images_pending' => 'Waits for the images.' ), $data['recipeLabels']['codes'] );
 	}
 
 	/**

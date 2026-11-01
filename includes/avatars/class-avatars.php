@@ -201,7 +201,7 @@ final class Avatars {
 	}
 
 	/**
-	 * Stores or removes the picture. Runs on personal_options_update and edit_user_profile_update.
+	 * Stores or removes the picture. Runs on profile_update, after edit_user() saved the profile.
 	 *
 	 * @param int $user_id User being saved.
 	 */

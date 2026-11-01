@@ -85,12 +85,6 @@ export default function RecipeList( { items } ) {
 	);
 	return (
 		<div className="leitvia-studio-recipes">
-			<p>
-				{ __(
-					'A recipe sets up the site in one go: pages from patterns, header and footer, navigation, style and settings. Open a recipe to see its plan before you apply it.',
-					'leitvia-studio'
-				) }
-			</p>
 			<DataViews
 				data={ data }
 				fields={ FIELDS }

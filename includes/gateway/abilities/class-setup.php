@@ -107,7 +107,7 @@ final class Setup {
 		Abilities::write(
 			'leitvia/define-content-type',
 			__( 'Define content type', 'leitvia-studio' ),
-			__( 'Adds or replaces entries of the content model (postTypes, taxonomies, relations, settings) and keeps the others. Read the declaration with leitvia/get-content-model first. The base hash is the hash of the content model. No ability returns this hash: send base_hash empty and repeat the call once with current_hash from leitvia_stale_hash. showInAbilities stays a decision of a person: agents may not set it.', 'leitvia-studio' ),
+			__( 'Adds entries to the content model (postTypes, taxonomies, relations, settings) and keeps the others. An entry that exists is merged: the input sets its own keys and fields, fields, repeaters and supports it does not name stay, and the postTypes of a taxonomy are joined; relations and settings are replaced whole. Nothing is removed through this ability: an entry, field, repeater or supports value can only be removed by a person on the Model screen. Read the declaration with leitvia/get-content-model first. The base hash is the hash of the content model. No ability returns this hash: send base_hash empty and repeat the call once with current_hash from leitvia_stale_hash. showInAbilities stays a decision of a person: agents may not set it.', 'leitvia-studio' ),
 			'setup',
 			$add,
 			array(
@@ -314,8 +314,8 @@ final class Setup {
 	}
 
 	/**
-	 * Operation of define-content-type: the entries of the input over the stored declaration. A replaced entry keeps
-	 * the showInAbilities a person set.
+	 * Operation of define-content-type: the entries of the input over the stored declaration, see merge_entry(). An
+	 * entry keeps the showInAbilities a person set.
 	 *
 	 * @param array<string, mixed> $input Input.
 	 * @return array<string, mixed>|\WP_Error
@@ -335,6 +335,9 @@ final class Setup {
 					$kept    = (array) ( $stored[ $section ] ?? array() );
 					$entries = (array) ( $decl[ $section ] ?? array() );
 					foreach ( $entries as $key => $entry ) {
+						if ( is_array( $entry ) && isset( $kept[ $key ] ) && is_array( $kept[ $key ] ) ) {
+							$entries[ $key ] = self::merge_entry( $section, $kept[ $key ], $entry );
+						}
 						if ( is_array( $entry ) && isset( $kept[ $key ]['showInAbilities'] ) ) {
 							$entries[ $key ]['showInAbilities'] = $kept[ $key ]['showInAbilities'];
 						}
@@ -360,6 +363,47 @@ final class Setup {
 				return array( 'value' => $merged );
 			},
 		);
+	}
+
+	/**
+	 * A stored entry of the content model with the entry of the input over it. Post types and taxonomies merge at field
+	 * level, so a declaration that is added again (a recipe or building block) keeps what a person added: the input sets
+	 * its own keys and fields, every field, repeater and supports value it does not name stays, and the postTypes of a
+	 * taxonomy are joined. Relations and settings are replaced whole, as they have no parts of their own.
+	 *
+	 * @param string               $section Section of the content model.
+	 * @param array<string, mixed> $kept    Stored entry.
+	 * @param array<string, mixed> $entry   Entry of the input.
+	 * @return array<string, mixed>
+	 */
+	public static function merge_entry( string $section, array $kept, array $entry ): array {
+		if ( ! in_array( $section, array( 'postTypes', 'taxonomies' ), true ) ) {
+			return $entry;
+		}
+		$merged = $entry + $kept;
+		$join   = static fn( string $key ): array => array_values( array_unique( array_merge( (array) ( $kept[ $key ] ?? array() ), (array) ( $entry[ $key ] ?? array() ) ) ) );
+		if ( 'taxonomies' === $section ) {
+			$merged['postTypes'] = $join( 'postTypes' );
+			return $merged;
+		}
+		if ( isset( $kept['supports'], $entry['supports'] ) ) {
+			$merged['supports'] = $join( 'supports' );
+		}
+		if ( isset( $kept['fields'] ) || isset( $entry['fields'] ) ) {
+			$merged['fields'] = array_merge( (array) ( $kept['fields'] ?? array() ), (array) ( $entry['fields'] ?? array() ) );
+		}
+		if ( isset( $kept['repeaters'] ) || isset( $entry['repeaters'] ) ) {
+			$repeaters = (array) ( $kept['repeaters'] ?? array() );
+			foreach ( (array) ( $entry['repeaters'] ?? array() ) as $key => $repeater ) {
+				$old               = (array) ( $repeaters[ $key ] ?? array() );
+				$repeaters[ $key ] = (array) $repeater + $old;
+				if ( isset( $old['fields'] ) || isset( $repeater['fields'] ) ) {
+					$repeaters[ $key ]['fields'] = array_merge( (array) ( $old['fields'] ?? array() ), (array) ( $repeater['fields'] ?? array() ) );
+				}
+			}
+			$merged['repeaters'] = $repeaters;
+		}
+		return $merged;
 	}
 
 	/**

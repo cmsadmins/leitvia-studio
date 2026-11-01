@@ -10,6 +10,7 @@ namespace LeitviaStudio\Rest;
 use LeitviaStudio\Gateway\Abilities\Commerce;
 use LeitviaStudio\Gateway\Autonomy;
 use LeitviaStudio\Gateway\Gateway;
+use LeitviaStudio\Gateway\Mcp;
 use LeitviaStudio\Gateway\Scope;
 use LeitviaStudio\Gateway\Store;
 
@@ -19,7 +20,9 @@ defined( 'ABSPATH' ) || exit;
  * Agent users and their access, and the gateway settings, for people with manage_options who are no agent. An agent
  * gets an application password of core; its plain text is in the one response that created it and nowhere else.
  * Revoking deletes every application password of the agent. Each change gets an audit entry without the password.
- * Cookie requests need the REST nonce as always.
+ * Cookie requests need the REST nonce as always. Only the signed-in admin screen reaches these routes: a request with
+ * an application password or through an MCP server is refused, so no agent (and no remote client of a person) creates
+ * agents, passwords or autonomy settings.
  *
  * In a multisite network users belong to the network, application passwords to the user. So a new agent needs
  * create_users, as any new user of the network; a site administrator manages only agents that work on no other site;
@@ -41,7 +44,7 @@ final class Gateway_Access_Controller {
 	 * Registers the routes. Runs on rest_api_init.
 	 */
 	public static function register_routes(): void {
-		$can  = static fn(): bool => Gateway::is_person();
+		$can  = static fn(): bool => Gateway::is_person() && ! rest_get_authenticated_app_password() && ! Mcp::serving();
 		$id   = array(
 			'id' => array(
 				'type'     => 'integer',
@@ -127,7 +130,23 @@ final class Gateway_Access_Controller {
 					'required'   => self::MCP_ADAPTER,
 					'compatible' => '' !== $version && version_compare( $version, self::MCP_ADAPTER, '>=' ) && version_compare( $version, '0.8', '<' ),
 					'url'        => 'https://wordpress.org/plugins/mcp-adapter/',
+					// Another plugin (MCP Access of the AI plugin) may list Leitvia abilities on the default server too.
+					'shared'     => '' !== $version && function_exists( 'wp_get_abilities' ) && array() !== array_filter(
+						wp_get_abilities(),
+						static fn( $ability ): bool => str_starts_with( $ability->get_name(), 'leitvia/' ) && true === ( $ability->get_meta()['mcp']['public'] ?? false )
+					),
 				),
+				// Checks the pipeline runs before every write, add-on checks included, and the checks after writing.
+				'checks'    => array_values(
+					array_map(
+						static fn( array $check ): string => (string) $check['label'],
+						array_merge(
+							leitvia_studio()->registry( 'checks' )->all( array( 'scope' => 'content' ) ),
+							leitvia_studio()->registry( 'checks' )->all( array( 'scope' => 'page' ) )
+						)
+					)
+				),
+				'verify'    => Store::verify_summary(),
 			)
 		);
 	}

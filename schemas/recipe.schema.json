@@ -45,6 +45,15 @@
 			"type": "string",
 			"description": "Path to a content model declaration."
 		},
+		"buildingBlocks": {
+			"type": "array",
+			"description": "Names of the building blocks (registry building_blocks) the recipe brings. They are added after the content model; a run limited to some of them adds only theirs instead of the whole content model.",
+			"items": {
+				"type": "string",
+				"pattern": "^[a-z0-9-]+/[a-z0-9-]+$"
+			},
+			"uniqueItems": true
+		},
 		"templateParts": {
 			"type": "object",
 			"additionalProperties": false,

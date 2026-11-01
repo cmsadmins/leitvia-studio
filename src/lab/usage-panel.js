@@ -36,7 +36,7 @@ export default function UsagePanel( { pattern } ) {
 			{ ! data.index_built && (
 				<p>
 					{ __(
-						'The usage index is incomplete; build it in the pattern gallery to see every use.',
+						'The usage index lists which posts and pages use each pattern. It is not complete yet; build it in the pattern gallery to see every use.',
 						'leitvia-studio'
 					) }
 				</p>
@@ -93,7 +93,10 @@ export default function UsagePanel( { pattern } ) {
 							{ sprintf(
 								/* translators: %s: effective status. */
 								__( '(%s)', 'leitvia-studio' ),
-								statusLabel( item.effective_status )
+								statusLabel(
+									item.effective_status,
+									item.effective_status_label
+								)
 							) }
 							{ item.replaced_by && (
 								<>

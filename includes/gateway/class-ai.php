@@ -15,7 +15,8 @@ defined( 'ABSPATH' ) || exit;
  *
  * The core AI client turns every failed HTTP request into prompt_network_error (503). A refused connector approval of
  * the AI plugin (wpai_connector_not_approved from pre_http_request) only survives in the message, so every network
- * error that is no timeout is explained as "not reachable or not approved".
+ * error that is no timeout is explained as "not reachable or not approved". Over REST the AI plugin 1.5 replaces this
+ * rejection with its own wpai_connector_not_approved (403); the handbook lists that code too.
  */
 final class Ai {
 
@@ -86,7 +87,7 @@ final class Ai {
 			return Rejection::make( 'leitvia_ai_timeout', sprintf( __( 'The AI provider did not answer within %d seconds. Try once more, or call again with ai set to false.', 'leitvia-studio' ), self::TIMEOUT ), 504, 'ai', array(), $next_ability, 'once', $extra );
 		}
 		if ( 'prompt_network_error' === $code ) {
-			return Rejection::make( 'leitvia_ai_not_approved', __( 'The AI provider could not be reached, or an administrator has not approved this request for the connector yet. When the AI plugin is active, an administrator approves pending connector requests in its settings; until then, call again with ai set to false.', 'leitvia-studio' ), 503, 'ai', array(), $next_ability, 'never', $extra );
+			return Rejection::make( 'leitvia_ai_not_approved', __( 'The AI provider could not be reached, or an administrator has not approved this request for the connector yet. When the AI plugin is active, an administrator approves pending connector requests under Tools, Connector Approvals; until then, call again with ai set to false.', 'leitvia-studio' ), 503, 'ai', array(), $next_ability, 'never', $extra );
 		}
 		return Rejection::make( 'leitvia_ai_failed', __( 'The AI provider refused or failed the request. An administrator checks the connector under Settings, Connectors; until then, call again with ai set to false.', 'leitvia-studio' ), 502, 'ai', array(), $next_ability, 'never', $extra );
 	}

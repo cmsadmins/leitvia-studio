@@ -1,4 +1,5 @@
-// Editor of one token set: role values per group, live contrast check, preview at theme patterns, primitives.
+// Editor of one token set: role values per group, live contrast check, preview at theme patterns, primitives (shown
+// as base values).
 import { __, _n, sprintf } from '@wordpress/i18n';
 import { useCallback, useEffect, useMemo, useState } from '@wordpress/element';
 import apiFetch from '@wordpress/api-fetch';
@@ -15,19 +16,26 @@ import {
 	// eslint-disable-next-line @wordpress/no-unsafe-wp-apis
 	__experimentalToggleGroupControlOption as ToggleGroupControlOption,
 } from '@wordpress/components';
+import Breadcrumbs from '../admin/breadcrumbs';
 import Loading from '../admin/loading';
 import { notify } from '../admin/notify';
+import { VIEWPORTS } from '../lab/common';
 import PreviewFrame from '../lab/preview-frame';
 import ContrastTable, { contrastRows } from './contrast-table';
-import { ActivateDialog } from './list';
 import OverlayForm, { OVERLAY } from './overlay-form';
-import { Findings, GROUPS, META, errorFindings, tokensUrl } from './common';
+import {
+	ActivateDialog,
+	Findings,
+	GROUPS,
+	META,
+	errorFindings,
+	tokensUrl,
+} from './common';
 
 const HEX = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
 const ALIAS = /^\{([^{}]+)\}$/;
 const DIMENSION = /^(-?\d*\.?\d+)(px|rem)$/;
 const EXT = 'com.leitvia';
-const VIEWPORTS = [ 390, 782, 1440 ];
 const PREVIEW_AREAS = [
 	[ 'hero', __( 'Hero', 'leitvia-studio' ) ],
 	[ 'content', __( 'Content', 'leitvia-studio' ) ],
@@ -365,11 +373,11 @@ function Primitives( { list } ) {
 			className="leitvia-studio-tokens__section"
 		>
 			<h2 id="leitvia-studio-tokens-primitives">
-				{ __( 'Primitives', 'leitvia-studio' ) }
+				{ __( 'Base values', 'leitvia-studio' ) }
 			</h2>
 			<p>
 				{ __(
-					'Base values the roles can refer to. They are read only here; change them in the file and import it again.',
+					'Values the colors and sizes above can refer to; change them in the file and import it again.',
 					'leitvia-studio'
 				) }
 			</p>
@@ -406,7 +414,9 @@ function Primitives( { list } ) {
 					</tbody>
 				</table>
 			) : (
-				<p>{ __( 'This set has no primitives.', 'leitvia-studio' ) }</p>
+				<p>
+					{ __( 'This set has no base values.', 'leitvia-studio' ) }
+				</p>
 			) }
 		</section>
 	);
@@ -570,9 +580,12 @@ export default function Editor( { id } ) {
 		return <Loading />;
 	}
 	const back = (
-		<a href={ tokensUrl() }>
-			{ __( 'Back to all token sets', 'leitvia-studio' ) }
-		</a>
+		<Breadcrumbs
+			parent={ [ __( 'Tokens', 'leitvia-studio' ), tokensUrl() ] }
+			current={
+				state.title || __( 'Unknown token set', 'leitvia-studio' )
+			}
+		/>
 	);
 	if ( state.error || ! roles ) {
 		return (
@@ -585,7 +598,7 @@ export default function Editor( { id } ) {
 				<Notice status="error" isDismissible={ false }>
 					{ state.error?.message ??
 						__(
-							'The active theme has no valid contract.',
+							'The active theme does not tell Studio its colors and fonts.',
 							'leitvia-studio'
 						) }
 				</Notice>
@@ -728,7 +741,7 @@ export default function Editor( { id } ) {
 							] }
 						>
 							{ __(
-								'This is the active set, and its saved state is not applied to the global styles yet.',
+								'This is the active set, and your last save is not live yet.',
 								'leitvia-studio'
 							) }
 						</Notice>

@@ -7,6 +7,9 @@ parameters:
     - includes
   # WP-CLI signatures for includes/cli; the same file stands in for WP-CLI in PHPUnit.
   # WooCommerce signatures for the product comparison block.
+  # Core constants the WordPress stubs leave out, such as WPINC.
+  bootstrapFiles:
+    - tests/php/stubs/constants.php
   scanFiles:
     - tests/php/stubs/wp-cli.php
     - tests/php/stubs/woocommerce.php

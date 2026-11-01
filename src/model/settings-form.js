@@ -1,9 +1,11 @@
-// Site settings tab: the declared settings on DataForm, stored through /wp/v2/settings as leitvia_site_<key>.
+// Site details tab: the declared settings (key "settings" of the declaration) on DataForm, stored through
+// /wp/v2/settings as leitvia_site_<key>.
 import { __ } from '@wordpress/i18n';
 import { useEffect, useState } from '@wordpress/element';
 import apiFetch from '@wordpress/api-fetch';
 import { DataForm } from '@wordpress/dataviews/wp';
 import { Button, Flex } from '@wordpress/components';
+import { errorText } from '../admin/common';
 import { notify } from '../admin/notify';
 import Loading from '../admin/loading';
 
@@ -51,7 +53,11 @@ export default function SettingsForm( { settings = NONE } ) {
 	const [ busy, setBusy ] = useState( false );
 
 	useEffect( () => {
-		apiFetch( { path: '/wp/v2/settings' } )
+		apiFetch( {
+			path: `/wp/v2/settings?_fields=${ Object.keys( settings )
+				.map( ( key ) => PREFIX + key )
+				.join( ',' ) }`,
+		} )
 			.then( ( all ) => {
 				const values = Object.fromEntries(
 					Object.keys( settings ).map( ( key ) => [
@@ -69,7 +75,7 @@ export default function SettingsForm( { settings = NONE } ) {
 		return (
 			<p>
 				{ __(
-					'No site settings are declared. Add them under "settings" on the Declaration tab.',
+					'No site details are declared. Add them under "settings" on the Declaration tab.',
 					'leitvia-studio'
 				) }
 			</p>
@@ -96,15 +102,17 @@ export default function SettingsForm( { settings = NONE } ) {
 				),
 			} );
 			setStored( data );
-			notify( 'success', __( 'Site settings saved.', 'leitvia-studio' ) );
+			notify( 'success', __( 'Site details saved.', 'leitvia-studio' ) );
 		} catch ( error ) {
 			notify(
 				'error',
-				error.message ??
+				errorText(
+					error,
 					__(
-						'The site settings could not be saved.',
+						'The site details could not be saved.',
 						'leitvia-studio'
 					)
+				)
 			);
 		} finally {
 			setBusy( false );
@@ -141,7 +149,7 @@ export default function SettingsForm( { settings = NONE } ) {
 					disabled={ busy }
 					accessibleWhenDisabled
 				>
-					{ __( 'Save settings', 'leitvia-studio' ) }
+					{ __( 'Save site details', 'leitvia-studio' ) }
 				</Button>
 			</Flex>
 		</Flex>

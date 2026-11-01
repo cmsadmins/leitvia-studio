@@ -770,7 +770,7 @@ final class Command {
 			'area'      => (string) $entry['area'],
 			'target'    => $target,
 			'base_hash' => (string) $entry['base_hash'],
-			'level'     => \LeitviaStudio\Gateway\Autonomy::level( (string) $entry['area'], $kinds ),
+			'level'     => \LeitviaStudio\Gateway\Autonomy::level( (string) $entry['area'], $kinds, $target ),
 			'kinds'     => $kinds,
 			'state'     => $entry['state'],
 			'findings'  => array(),

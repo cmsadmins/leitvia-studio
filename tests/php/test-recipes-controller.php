@@ -7,6 +7,7 @@
 
 use LeitviaStudio\Extension\Studio;
 use LeitviaStudio\Gateway\Gateway;
+use LeitviaStudio\Gateway\Packages;
 
 /**
  * Recipes screen data.
@@ -147,11 +148,13 @@ class Test_Recipes_Controller extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The screen applies through POST /wp-abilities/v1/abilities/leitvia/apply-recipe/run: at "suggest" everything waits
-	 * in one change package, nothing goes live; an unavailable recipe is refused with its reason.
+	 * The screen applies through POST /wp-abilities/v1/abilities/leitvia/apply-recipe/run: for an agent at "suggest"
+	 * everything waits in one change package, nothing goes live; a person's run with settle applies that package at once
+	 * and lists it under applied, without settle or with an application password it waits; an unavailable recipe is
+	 * refused with its reason.
 	 */
 	public function test_apply_through_the_abilities_api(): void {
-		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+		wp_set_current_user( self::factory()->user->create( array( 'role' => Gateway::ROLE ) ) );
 		update_option(
 			Gateway::OPTION,
 			array(
@@ -161,10 +164,19 @@ class Test_Recipes_Controller extends WP_UnitTestCase {
 				),
 			) + Gateway::DEFAULTS
 		);
-		$run       = static function ( string $recipe ): WP_REST_Response {
+		$run       = static function ( string $recipe, bool $settle = true ): WP_REST_Response {
 			$request = new WP_REST_Request( 'POST', '/wp-abilities/v1/abilities/leitvia/apply-recipe/run' );
 			$request->set_header( 'Content-Type', 'application/json' );
-			$request->set_body( (string) wp_json_encode( array( 'input' => array( 'recipe' => $recipe ) ) ) );
+			$request->set_body(
+				(string) wp_json_encode(
+					array(
+						'input' => array(
+							'recipe' => $recipe,
+							'settle' => $settle,
+						),
+					)
+				)
+			);
 			return rest_do_request( $request );
 		};
 		$published = (int) wp_count_posts( 'page' )->publish;
@@ -176,9 +188,75 @@ class Test_Recipes_Controller extends WP_UnitTestCase {
 		$this->assertContains( 'package', array_column( $result['steps'], 'status' ) );
 		$this->assertNotContains( 'live', array_column( $result['steps'], 'status' ) );
 		$this->assertSame( $published, (int) wp_count_posts( 'page' )->publish );
+		$this->assertArrayNotHasKey( 'applied', $result );
+
+		Packages::reject( $result['package'] );
+
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+		$waits = $run( 'leitvia/company', false )->get_data();
+		$this->assertGreaterThan( 0, $waits['package'] );
+		$this->assertArrayNotHasKey( 'applied', $waits );
+		$this->assertSame( $published, (int) wp_count_posts( 'page' )->publish );
+		Packages::reject( $waits['package'] );
+
+		$GLOBALS['wp_rest_application_password_uuid'] = wp_generate_uuid4();
+		try {
+			$scripted = $run( 'leitvia/company' )->get_data();
+		} finally {
+			unset( $GLOBALS['wp_rest_application_password_uuid'] );
+		}
+		$this->assertGreaterThan( 0, $scripted['package'] );
+		$this->assertArrayNotHasKey( 'applied', $scripted );
+		$this->assertSame( $published, (int) wp_count_posts( 'page' )->publish );
+		Packages::reject( $scripted['package'] );
+
+		$person = $run( 'leitvia/company' )->get_data();
+		$this->assertNotEmpty( $person['applied'], (string) wp_json_encode( $person ) );
+		$this->assertContains( 'live', array_column( $person['steps'], 'status' ) );
+		$this->assertNotContains( 'package', array_column( $person['steps'], 'status' ) );
+		$this->assertGreaterThan( $published, (int) wp_count_posts( 'page' )->publish );
 
 		$refused = $run( 'leitvia/shop' );
 		$this->assertSame( 422, $refused->get_status() );
 		$this->assertSame( 'leitvia_recipe_unavailable', $refused->get_data()['code'] );
+	}
+
+	/**
+	 * Parts limit the plan; with dryRun the one recipe asked for gets the dry run of its parts, and nothing is written.
+	 * A dry run without a recipe is refused.
+	 */
+	public function test_plan_in_parts_with_dry_run(): void {
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+		$request = new WP_REST_Request( 'GET', '/leitvia-studio/v1/recipes' );
+		$request->set_query_params(
+			array(
+				'recipe' => 'leitvia/company',
+				'parts'  => array( 'pages', 'header' ),
+				'pages'  => array( 'home' ),
+				'dryRun' => true,
+			)
+		);
+		$pages    = (int) array_sum( (array) wp_count_posts( 'page' ) );
+		$response = rest_do_request( $request );
+		$this->assertSame( 200, $response->get_status() );
+		$items = $response->get_data();
+		$this->assertSame( array( 'leitvia/company' ), array_column( $items, 'name' ) );
+		$plan = $items[0]['plan'];
+		$this->assertSame( array( 'home' ), array_column( $plan['pages'], 'slug' ) );
+		$this->assertSame( array( 'header' ), array_keys( (array) $plan['templateParts'] ) );
+		$this->assertSame( '', $plan['variation'] );
+		$this->assertSame( array(), $plan['navigation'] );
+		$this->assertSame( array(), $plan['settings'] );
+		$dry = $items[0]['dryRun'];
+		$this->assertTrue( $dry['dryRun'] );
+		$this->assertSame( array( 'templateParts', 'pages' ), array_values( array_unique( array_column( $dry['steps'], 'step' ) ) ) );
+		$this->assertSame( array( 'header' ), $dry['replaces'] );
+		$this->assertSame( $pages, (int) array_sum( (array) wp_count_posts( 'page' ) ) );
+
+		$all = new WP_REST_Request( 'GET', '/leitvia-studio/v1/recipes' );
+		$all->set_query_params( array( 'dryRun' => true ) );
+		$refused = rest_do_request( $all );
+		$this->assertSame( 400, $refused->get_status() );
+		$this->assertSame( 'rest_missing_callback_param', $refused->get_data()['code'] );
 	}
 }

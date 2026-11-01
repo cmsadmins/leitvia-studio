@@ -1,4 +1,5 @@
-// Lab panel "Variants": the variants of a wp_block pattern and a form to add one.
+// Lab panel "Variants": the variants of a wp_block pattern with a form to add one, and the test content of any
+// original pattern (states-panel.js).
 import { __ } from '@wordpress/i18n';
 import { useCallback, useEffect, useState } from '@wordpress/element';
 import apiFetch from '@wordpress/api-fetch';
@@ -6,11 +7,31 @@ import { addQueryArgs } from '@wordpress/url';
 import { Button, TextControl, Flex } from '@wordpress/components';
 import Loading from '../admin/loading';
 import { labUrl, statusLabel } from './common';
+import { OriginalLink, TestContent, originalRef } from './states-panel';
 import { notify } from '../admin/notify';
 
-export default function VariantsPanel( { block, onChange } ) {
-	const original =
-		block && ! block.meta._leitvia_lab_variant_of ? block.id : 0;
+export default function VariantsPanel( { pattern, block, onChange } ) {
+	const ref = originalRef( pattern, block );
+	if ( ! ref ) {
+		return <OriginalLink block={ block } />;
+	}
+	return (
+		<Flex direction="column" justify="flex-start" gap={ 6 } align="stretch">
+			{ block && (
+				<section>
+					<h4>{ __( 'Variants', 'leitvia-studio' ) }</h4>
+					<Variants original={ block.id } onChange={ onChange } />
+				</section>
+			) }
+			<section>
+				<h4>{ __( 'Test content', 'leitvia-studio' ) }</h4>
+				<TestContent patternRef={ ref } />
+			</section>
+		</Flex>
+	);
+}
+
+function Variants( { original, onChange } ) {
 	const [ variants, setVariants ] = useState( null );
 	const [ title, setTitle ] = useState( '' );
 	const [ isSaving, setIsSaving ] = useState( false );
@@ -20,6 +41,8 @@ export default function VariantsPanel( { block, onChange } ) {
 			apiFetch( {
 				path: addQueryArgs( '/leitvia-studio/v1/patterns', {
 					variant_of: original,
+					orderby: 'title',
+					order: 'asc',
 					per_page: 100,
 				} ),
 			} )
@@ -28,31 +51,6 @@ export default function VariantsPanel( { block, onChange } ) {
 		}
 	}, [ original ] );
 	useEffect( load, [ load ] );
-
-	if ( ! block ) {
-		return (
-			<p>
-				{ __(
-					'Variants are made from your own patterns.',
-					'leitvia-studio'
-				) }
-			</p>
-		);
-	}
-	if ( ! original ) {
-		return (
-			<p>
-				{ __( 'This pattern is a variant.', 'leitvia-studio' ) }{ ' ' }
-				<a
-					href={ labUrl(
-						`block:${ block.meta._leitvia_lab_variant_of }`
-					) }
-				>
-					{ __( 'Open the original', 'leitvia-studio' ) }
-				</a>
-			</p>
-		);
-	}
 
 	const add = async ( event ) => {
 		event.preventDefault();
@@ -96,7 +94,12 @@ export default function VariantsPanel( { block, onChange } ) {
 							<a href={ labUrl( variant.ref ) }>
 								{ variant.title }
 							</a>{ ' ' }
-							({ statusLabel( variant.status ) })
+							(
+							{ statusLabel(
+								variant.status,
+								variant.status_label
+							) }
+							)
 							{ variant.edit_url && (
 								<>
 									{ ' ' }

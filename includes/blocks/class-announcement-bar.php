@@ -38,11 +38,7 @@ final class Announcement_Bar {
 		);
 		$end    = strrpos( $html, '</' . $tag . '>' );
 		$html   = false === $end ? $html : substr_replace( $html, $button, $end, 0 );
-		$script = sprintf(
-			'try{localStorage.getItem("leitvia-announcement")==="%s"&&document.documentElement.setAttribute("data-leitvia-announcement","dismissed")}catch(e){}',
-			$hash
-		);
-		Blocks::head_script( 'leitvia-announcement-bar-state', $script );
+		Blocks::head_script( 'leitvia-announcement-bar-state', 'announcement', (string) $hash );
 		return $html;
 	}
 }

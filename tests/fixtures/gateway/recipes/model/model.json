@@ -1,0 +1,9 @@
+{
+	"version": 1,
+	"postTypes": {
+		"lv_mnote": {
+			"label": "Notes",
+			"singularLabel": "Note"
+		}
+	}
+}

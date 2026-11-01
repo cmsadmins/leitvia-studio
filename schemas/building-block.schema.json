@@ -1,0 +1,51 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"title": "Leitvia Studio building block",
+	"description": "An entry of the registry building_blocks: a part of the content model with the patterns that show it, default values of its site settings and sample entries, added to a site as one unit by the ability leitvia/add-building-block. The model is checked against content-model.schema.json; samples is a path to a JSON file or, in PHP, a callable.",
+	"type": "object",
+	"required": [ "title", "description", "model" ],
+	"properties": {
+		"title": {
+			"type": "string",
+			"minLength": 1,
+			"maxLength": 100
+		},
+		"description": {
+			"type": "string",
+			"minLength": 1,
+			"maxLength": 500
+		},
+		"icon": {
+			"type": "string",
+			"description": "Dashicon, for example dashicons-star-filled.",
+			"pattern": "^dashicons-[a-z0-9-]+$"
+		},
+		"model": {
+			"type": "object",
+			"description": "Content model entries the block brings: postTypes, taxonomies, relations and settings, without version."
+		},
+		"patterns": {
+			"type": "array",
+			"description": "Names of the registered patterns that show the content of the block.",
+			"items": {
+				"type": "string",
+				"pattern": "^[a-z0-9-]+/[a-z0-9-]+$"
+			},
+			"uniqueItems": true
+		},
+		"settings": {
+			"type": "object",
+			"description": "Default values of site settings of the content model by key, written only while a setting is empty.",
+			"patternProperties": {
+				"^[a-z][a-z0-9_]{2,63}$": {
+					"type": [ "string", "number", "integer", "boolean" ]
+				}
+			},
+			"additionalProperties": false
+		},
+		"samples": {
+			"type": "string",
+			"description": "Absolute path to a JSON file with sample entries: one object of postType, terms and entries, or a list of them."
+		}
+	}
+}

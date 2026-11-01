@@ -109,7 +109,9 @@ final class Registrar {
 	}
 
 	/**
-	 * Registers everything. Runs on init, priority 9. An invalid declaration (from code) registers nothing.
+	 * Registers everything. Runs on init, priority 9, and again after Model::save() in the same request; each meta key
+	 * and setting is registered once, so a second run stacks no sanitize or auth callbacks. An invalid declaration
+	 * (from code) registers nothing.
 	 */
 	public static function register(): void {
 		$model = Model::current();
@@ -197,13 +199,15 @@ final class Registrar {
 				$schema['maxItems'] = 1;
 			}
 			// Targets are checked over REST, where a user picks them (check_rest_meta()); imports keep every ID.
-			register_post_meta( $relation['from'], $key, self::meta_args( 'array', $schema, $relation['label'] ) );
-			self::$meta[ $relation['from'] ][] = $key;
+			self::register_meta( $relation['from'], $key, self::meta_args( 'array', $schema, $relation['label'] ) );
 		}
 
 		foreach ( $model['settings'] ?? array() as $key => $setting ) {
 			list( $type, $schema ) = self::schema_for( $setting );
 			$name                  = self::SETTING_PREFIX . $key;
+			if ( isset( get_registered_settings()[ $name ] ) ) {
+				unregister_setting( self::SETTINGS_GROUP, $name );
+			}
 			register_setting(
 				self::SETTINGS_GROUP,
 				$name,
@@ -478,7 +482,8 @@ final class Registrar {
 	/**
 	 * Loads the editor script in the post and site editor, which always registers the format "Highlight", with the
 	 * bindings data while the content model declares something to bind. The model panel gets the declaration of post types with fields, relations or
-	 * repeaters; the site editor gets the types with repeaters for the "Child entries" variation. Runs on
+	 * repeaters; the site editor gets the types with repeaters for the "Child entries" variation. Both get
+	 * window.leitviaStudioNeeds while building blocks are registered (Building_Block_Views::editor_data()). Runs on
 	 * enqueue_block_editor_assets.
 	 */
 	public static function enqueue_editor(): void {
@@ -501,6 +506,7 @@ final class Registrar {
 		wp_set_script_translations( 'leitvia-studio-editor', 'leitvia-studio' );
 		foreach ( array_filter(
 			array(
+				'leitviaStudioNeeds'    => Building_Block_Views::editor_data(),
 				'leitviaStudioModel'    => $declaration,
 				'leitviaStudioBindings' => $bindings,
 			)
@@ -732,7 +738,24 @@ final class Registrar {
 			if ( 'image' === $field['type'] ) {
 				$args['sanitize_callback'] = static fn( $id ): int => wp_attachment_is_image( (int) $id ) ? (int) $id : 0;
 			}
-			register_post_meta( $post_type, $key, $args );
+			self::register_meta( $post_type, $key, $args );
+		}
+	}
+
+	/**
+	 * Registers a meta key of a post type once: a key registered before is unregistered first, which removes its
+	 * sanitize and auth callbacks.
+	 *
+	 * @param string               $post_type Post type.
+	 * @param string               $key       Meta key.
+	 * @param array<string, mixed> $args      Arguments of register_post_meta().
+	 */
+	private static function register_meta( string $post_type, string $key, array $args ): void {
+		if ( registered_meta_key_exists( 'post', $key, $post_type ) ) {
+			unregister_meta_key( 'post', $key, $post_type );
+		}
+		register_post_meta( $post_type, $key, $args );
+		if ( ! self::owns_meta( $post_type, $key ) ) {
 			self::$meta[ $post_type ][] = $key;
 		}
 	}

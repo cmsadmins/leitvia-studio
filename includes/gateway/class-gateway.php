@@ -98,6 +98,7 @@ final class Gateway {
 		add_action( 'leitvia_studio_init', array( Abilities\Setup::class, 'register' ) );
 		add_action( 'leitvia_studio_init', array( Recipes::class, 'register' ) );
 		add_action( 'leitvia_studio_init', array( Abilities\Recipes::class, 'register' ) );
+		add_action( 'leitvia_studio_init', array( Abilities\Building_Blocks::class, 'register' ) );
 		add_action( 'leitvia_studio_init', array( Abilities\Packages::class, 'register' ) );
 		add_action( 'leitvia_studio_init', array( Abilities\Maintain::class, 'register' ) );
 		add_action( 'leitvia_studio_init', array( Abilities\Content::class, 'register' ) );

@@ -1,6 +1,6 @@
 // Labels shared by the recipe list and the recipe detail.
 import { __, sprintf } from '@wordpress/i18n';
-import { addQueryArgs } from '@wordpress/url';
+import { screenUrl } from '../common';
 
 export const STATUSES = [
 	{ value: 'available', label: __( 'Available', 'leitvia-studio' ) },
@@ -25,7 +25,4 @@ export const sourceLabel = ( item ) =>
 export const recipeTitle = ( item ) => item.title || item.label || item.name;
 
 export const recipesUrl = ( name ) =>
-	addQueryArgs( 'admin.php', {
-		page: 'leitvia-studio-recipes',
-		...( name ? { recipe: name } : {} ),
-	} );
+	screenUrl( 'leitvia-studio-recipes', { recipe: name } );

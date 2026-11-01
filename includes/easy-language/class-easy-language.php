@@ -133,8 +133,7 @@ final class Easy_Language {
 			. $button( 'read', esc_html__( 'Read aloud', 'leitvia-studio' ), sprintf( ' hidden data-stop="%s"', esc_attr__( 'Stop reading', 'leitvia-studio' ) ) )
 			. '</div>';
 		$html     = substr_replace( $html, $controls, $end, 0 );
-		$script   = 'try{var s=JSON.parse(localStorage.getItem("leitvia-a11y"))||{},d=document.documentElement,z=Math.max(100,Math.min(200,+s.size||100));d.classList.add("leitvia-a11y-js");if(z-100)d.style.fontSize=z+"%";if(s.contrast)d.classList.add("leitvia-high-contrast")}catch(e){}';
-		\LeitviaStudio\Blocks\Blocks::head_script( 'leitvia-a11y-bar-state', $script );
+		\LeitviaStudio\Blocks\Blocks::head_script( 'leitvia-a11y-bar-state', 'a11y' );
 		return $html;
 	}
 

@@ -124,6 +124,11 @@ final class Plugin {
 		add_action( 'switch_blog', array( Model\Model::class, 'forget' ) );
 		add_action( 'rest_api_init', static fn() => ( new Rest\Model_Controller() )->register_routes() );
 		add_action( 'rest_api_init', static fn() => ( new Rest\Recipes_Controller() )->register_routes() );
+		add_action( 'rest_api_init', static fn() => ( new Rest\Building_Blocks_Controller() )->register_routes() );
+		add_filter( 'render_block', array( Model\Building_Block_Views::class, 'hide_unmet' ), 10, 2 );
+		add_action( 'manage_posts_extra_tablenav', array( Model\Building_Block_Views::class, 'list_notice' ) );
+		add_action( 'admin_post_' . Model\Building_Block_Views::PAGE_ACTION, array( Model\Building_Block_Views::class, 'new_page' ) );
+		add_filter( 'rest_request_before_callbacks', array( Model\Building_Block_Views::class, 'pattern_request' ), 10, 3 );
 		add_action( 'admin_enqueue_scripts', array( self::class, 'enqueue_model_editor' ), 21 );
 		add_action( 'init', array( Model\Bindings::class, 'register' ) );
 		add_action( 'save_post', array( Lab\Usage_Index::class, 'index' ), 10, 2 );
@@ -154,7 +159,6 @@ final class Plugin {
 		add_filter( 'render_block_core/heading', array( Blocks\Table_Of_Contents::class, 'add_id' ), 10, 2 );
 		add_action( 'init', array( Blocks\Code_Copy::class, 'register_module' ) );
 		add_filter( 'render_block_core/code', array( Blocks\Code_Copy::class, 'render' ) );
-		add_action( 'init', array( Blocks\Blocks::class, 'patterns' ) );
 		add_filter( 'default_wp_template_part_areas', array( Blocks\Mega_Menu::class, 'areas' ) );
 		add_filter( 'register_block_type_args', array( Blocks\Mega_Menu::class, 'block_args' ), 10, 2 );
 		add_filter( 'register_block_type_args', array( Blocks\Blocks::class, 'render_callbacks' ), 10, 2 );

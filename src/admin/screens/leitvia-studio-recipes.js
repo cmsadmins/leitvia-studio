@@ -3,6 +3,7 @@ import { __ } from '@wordpress/i18n';
 import { useEffect, useState } from '@wordpress/element';
 import apiFetch from '@wordpress/api-fetch';
 import { getQueryArg } from '@wordpress/url';
+import { errorText } from '../common';
 import Loading from '../loading';
 import { notify } from '../notify';
 import RecipeList from '../recipes/list';
@@ -10,6 +11,11 @@ import RecipeDetail from '../recipes/detail';
 import '../recipes/style.scss';
 
 export const title = __( 'Recipes', 'leitvia-studio' );
+
+export const intro = __(
+	'A recipe sets up pages, header, footer, navigation and style in one go; open one to see its plan before you apply it.',
+	'leitvia-studio'
+);
 
 export default function Recipes() {
 	const name = getQueryArg( window.location.href, 'recipe' );
@@ -22,11 +28,13 @@ export default function Recipes() {
 				setItems( [] );
 				notify(
 					'error',
-					error.message ??
+					errorText(
+						error,
 						__(
 							'The recipes could not be loaded.',
 							'leitvia-studio'
 						)
+					)
 				);
 			} );
 	}, [] );

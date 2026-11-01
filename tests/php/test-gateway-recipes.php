@@ -622,4 +622,338 @@ class Test_Gateway_Recipes extends WP_UnitTestCase {
 		$this->assertSame( 'recipe-leitvia-company', $seen['key'] );
 		$this->assertSame( get_page_by_path( 'home' )->ID, $seen['pages']['home'] );
 	}
+
+	/**
+	 * A person's run with settle at "suggest" applies the package before leitvia_studio_recipe_steps, so add-on steps
+	 * find the pages live, and again after it; applied lists both packages. A package an add-on applied itself stays a
+	 * no-op.
+	 */
+	public function test_person_run_settles_before_the_add_on_steps(): void {
+		$this->sign_in(
+			'administrator',
+			array(
+				'overrides' => array(
+					'areas' => array_fill_keys( array( 'content', 'structure', 'design' ), 'suggest' ),
+					'kinds' => array(),
+				),
+			)
+		);
+		$seen  = array();
+		$extra = static function ( array $steps, string $name, array $recipe, string $key, array $pages ) use ( &$seen ): array {
+			$seen = array(
+				'open' => Packages::find( $key ),
+				'home' => get_post_status( (int) ( $pages['home'] ?? 0 ) ),
+			);
+			// What the add-on writes with the key collects in a new package.
+			$steps[] = Recipes::call(
+				'addon',
+				'leitvia/compose-page',
+				array(
+					'title'    => 'Add-on page',
+					'frame'    => 'contact',
+					'slug'     => 'add-on-page',
+					'sections' => array( array( 'pattern' => 'leitvia/content-faq' ) ),
+					'package'  => $key,
+				)
+			);
+			return $steps;
+		};
+		add_filter( 'leitvia_studio_recipe_steps', $extra, 10, 5 );
+		$result = $this->run_recipe(
+			array(
+				'recipe' => 'leitvia/company',
+				'settle' => true,
+			)
+		);
+		remove_filter( 'leitvia_studio_recipe_steps', $extra );
+		$this->assertSame( 0, $seen['open'] );
+		$this->assertSame( 'publish', $seen['home'] );
+		$this->assertCount( 2, $result['applied'], (string) wp_json_encode( $result ) );
+		$this->assertSame( 'publish', get_post_status( get_page_by_path( 'add-on-page' ) ) );
+		$this->assertNotContains( 'package', array_column( $result['steps'], 'status' ) );
+	}
+
+	/**
+	 * The filters leitvia_studio_recipe_document and leitvia_studio_recipe_model localise a recipe: the plan and dry
+	 * run of the Recipes screen show the filtered page title and type label, and the run writes them.
+	 */
+	public function test_localisation_filters(): void {
+		add_action(
+			'leitvia_studio_init',
+			static function ( Studio $studio ): void {
+				$studio->registry( 'recipes' )->register(
+					'leitvia/model',
+					array(
+						'label' => 'Model',
+						'path'  => __DIR__ . '/../fixtures/gateway/recipes/model/recipe.json',
+					),
+					'leitvia-studio'
+				);
+			},
+			20
+		);
+		self::boot();
+		$this->sign_in_live();
+		$names    = array();
+		$document = static function ( array $recipe, string $name ) use ( &$names ): array {
+			$names[]                     = $name;
+			$recipe['pages'][0]['title'] = 'Seite';
+			return $recipe;
+		};
+		$model    = static function ( array $declaration, string $name ) use ( &$names ): array {
+			$names[]                                       = $name;
+			$declaration['postTypes']['lv_mnote']['label'] = 'Notizen';
+			return $declaration;
+		};
+		add_filter( 'leitvia_studio_recipe_document', $document, 10, 2 );
+		add_filter( 'leitvia_studio_recipe_model', $model, 10, 2 );
+
+		$request = new WP_REST_Request( 'GET', '/leitvia-studio/v1/recipes' );
+		$request->set_query_params(
+			array(
+				'recipe' => 'leitvia/model',
+				'dryRun' => true,
+			)
+		);
+		$item = rest_do_request( $request )->get_data()[0];
+		$this->assertSame( array( 'Seite' ), array_column( $item['plan']['pages'], 'title' ) );
+		$this->assertSame( array( 'Notizen' ), $item['plan']['contentModel'] );
+		$this->assertSame( array( 'new' ), self::statuses( $item['dryRun'], 'contentModel' ) );
+		$this->assertFalse( post_type_exists( 'lv_mnote' ) );
+
+		$this->run_recipe( array( 'recipe' => 'leitvia/model' ) );
+		remove_filter( 'leitvia_studio_recipe_document', $document, 10 );
+		remove_filter( 'leitvia_studio_recipe_model', $model, 10 );
+		// The list of recipes localises every recipe as well; each call names the recipe it filters.
+		$this->assertContains( 'leitvia/model', $names );
+		$this->assertSame( array(), array_diff( $names, array_column( Recipes::all(), 'name' ) ) );
+		$this->assertSame( 'Seite', get_page_by_path( 'model-page' )->post_title );
+		$this->assertTrue( post_type_exists( 'lv_mnote' ) );
+		$this->assertSame( 'Notizen', get_post_type_object( 'lv_mnote' )->labels->name );
+		unregister_post_type( 'lv_mnote' );
+		delete_option( LeitviaStudio\Model\Model::OPTION );
+		LeitviaStudio\Model\Model::forget();
+	}
+
+	/**
+	 * The part frontPage without the front page on the site: show_on_front waits with page_on_front instead of switching
+	 * the site to an empty static front page, in the dry run and in the run.
+	 */
+	public function test_front_page_waits_for_its_page(): void {
+		$this->sign_in_live();
+		$this->assertNull( get_page_by_path( 'home' ) );
+		$input = array(
+			'recipe' => 'leitvia/company',
+			'parts'  => array( 'frontPage' ),
+		);
+		foreach ( array( $input + array( 'dryRun' => true ), $input ) as $run ) {
+			$result = $this->run_recipe( $run );
+			$this->assertSame( array( 'waiting', 'waiting' ), self::statuses( $result, 'reading' ), wp_json_encode( $result['steps'] ) );
+			$this->assertSame( array( 'page_missing' ), array_values( array_unique( array_column( $result['steps'], 'code' ) ) ) );
+			$this->assertSame( 'posts', get_option( 'show_on_front' ) );
+		}
+	}
+
+	/**
+	 * Runs apply-recipe with an input of parts, pages, building blocks or a dry run.
+	 *
+	 * @param array<string, mixed> $input Input.
+	 * @return array<string, mixed>
+	 */
+	private function run_recipe( array $input ): array {
+		$result = wp_get_ability( 'leitvia/apply-recipe' )->execute( $input );
+		$this->assertIsArray( $result, is_wp_error( $result ) ? $result->get_error_message() : '' );
+		foreach ( $result['steps'] as $step ) {
+			$this->assertNotSame( 'rejected', $step['status'], wp_json_encode( $step ) );
+		}
+		return $result;
+	}
+
+	/**
+	 * Names of a column of the steps, once each.
+	 *
+	 * @param array<string, mixed> $result Result.
+	 * @param string               $column step or part.
+	 * @return list<string>
+	 */
+	private static function column( array $result, string $column ): array {
+		return array_values( array_unique( array_column( $result['steps'], $column ) ) );
+	}
+
+	/**
+	 * Parts limit a run: only pages, and of them only home and contact, leave style, template parts, navigation and
+	 * reading settings alone; the part frontPage then sets the front page to the page that exists.
+	 */
+	public function test_parts_and_pages(): void {
+		$this->sign_in_live();
+		$before = self::footprint();
+		$front  = get_option( 'show_on_front' );
+		$result = $this->run_recipe(
+			array(
+				'recipe' => 'leitvia/company',
+				'parts'  => array( 'pages' ),
+				'pages'  => array( 'home', 'contact' ),
+			)
+		);
+		$this->assertSame( array( 'pages' ), self::column( $result, 'step' ) );
+		$this->assertSame( array( 'pages' ), self::column( $result, 'part' ) );
+		$this->assertSame( array( 'live', 'live' ), self::statuses( $result, 'pages' ) );
+		$this->assertInstanceOf( WP_Post::class, get_page_by_path( 'home' ) );
+		$this->assertInstanceOf( WP_Post::class, get_page_by_path( 'contact' ) );
+		$this->assertNull( get_page_by_path( 'about' ) );
+		$after = self::footprint();
+		foreach ( array( 'wp_template_part', 'wp_navigation', 'wp_global_styles' ) as $type ) {
+			$this->assertSame( $before[ $type ], $after[ $type ], $type );
+		}
+		$this->assertSame( $front, get_option( 'show_on_front' ) );
+
+		$reading = $this->run_recipe(
+			array(
+				'recipe' => 'leitvia/company',
+				'parts'  => array( 'frontPage' ),
+			)
+		);
+		$this->assertSame( array( 'reading' ), self::column( $reading, 'step' ) );
+		$this->assertSame( array( 'frontPage' ), self::column( $reading, 'part' ) );
+		$this->assertSame( 'page', get_option( 'show_on_front' ) );
+		$this->assertSame( get_page_by_path( 'home' )->ID, (int) get_option( 'page_on_front' ) );
+		$this->assertNull( get_page_by_path( 'about' ), 'pages stay out' );
+	}
+
+	/**
+	 * A dry run writes nothing and says what a run would replace on a fresh site; after the run nothing is replaced and
+	 * the parts the recipe wrote are unchanged. It runs the filter of dry runs, not the one of runs, with the selection.
+	 */
+	public function test_dry_run_writes_nothing(): void {
+		$this->sign_in_live();
+		$runs      = 0;
+		$selection = array();
+		$count     = static function ( array $steps ) use ( &$runs ): array {
+			++$runs;
+			return $steps;
+		};
+		$plan      = static function ( array $steps, string $name, array $recipe, string $key, array $pages, array $sel ) use ( &$selection ): array {
+			$selection = $sel;
+			return $steps;
+		};
+		add_filter( 'leitvia_studio_recipe_steps', $count );
+		add_filter( 'leitvia_studio_recipe_plan_steps', $plan, 10, 6 );
+		$before  = self::footprint();
+		$options = static fn(): array => array( get_option( 'show_on_front' ), get_option( 'page_on_front' ), get_option( 'default_comment_status' ), get_option( Recipes::WRITES_OPTION ) );
+		$stored  = $options();
+		$dry     = $this->run_recipe(
+			array(
+				'recipe' => 'leitvia/company',
+				'dryRun' => true,
+			)
+		);
+		$this->assertTrue( $dry['dryRun'] );
+		$this->assertSame( 0, $dry['package'] );
+		$this->assertSame( 0, $runs );
+		$this->assertTrue( $selection['dryRun'] );
+		$this->assertSame( Recipes::PARTS, $selection['parts'] );
+		foreach ( $dry['steps'] as $step ) {
+			$this->assertContains( $step['status'], array( 'new', 'replace', 'exists', 'unchanged', 'waiting', 'package' ), wp_json_encode( $step ) );
+		}
+		$this->assertSame( array( 'new' ), array_values( array_unique( self::statuses( $dry, 'pages' ) ) ) );
+		$this->assertEqualsCanonicalizing( array( 'design', 'header', 'footer', 'navigation', 'frontPage', 'options' ), $dry['replaces'] );
+		$this->assertSame( $before, self::footprint() );
+		$this->assertSame( $stored, $options() );
+
+		$this->apply( 'leitvia/company' );
+		$this->assertSame( 1, $runs );
+		$again = $this->run_recipe(
+			array(
+				'recipe' => 'leitvia/company',
+				'dryRun' => true,
+			)
+		);
+		remove_filter( 'leitvia_studio_recipe_steps', $count );
+		remove_filter( 'leitvia_studio_recipe_plan_steps', $plan, 10 );
+		$this->assertSame( array(), $again['replaces'] );
+		$this->assertSame( array( 'exists' ), array_values( array_unique( self::statuses( $again, 'pages' ) ) ) );
+		foreach ( array( 'variation', 'templateParts', 'navigation' ) as $step ) {
+			$this->assertSame( array( 'unchanged' ), array_values( array_unique( self::statuses( $again, $step ) ) ), $step );
+		}
+	}
+
+	/**
+	 * The building blocks a recipe lists are added with the part buildingBlocks, their samples as drafts with the part
+	 * samples; design, header, navigation, pages and the front page stay as they are.
+	 */
+	public function test_building_blocks_of_a_recipe(): void {
+		add_action(
+			'leitvia_studio_init',
+			static function ( Studio $studio ): void {
+				$studio->registry( 'recipes' )->register(
+					'leitvia/notes',
+					array(
+						'label' => 'Notes',
+						'path'  => __DIR__ . '/../fixtures/gateway/recipes/notes/recipe.json',
+					),
+					'leitvia-studio'
+				);
+				$studio->registry( 'building_blocks' )->register(
+					'leitvia/recipe-notes',
+					array(
+						'title'       => 'Notes',
+						'description' => 'Short notes.',
+						'model'       => array(
+							'postTypes' => array(
+								'lv_rnote' => array(
+									'label'         => 'Notes',
+									'singularLabel' => 'Note',
+								),
+							),
+						),
+						'samples'     => static fn(): array => array(
+							'postType' => 'lv_rnote',
+							'entries'  => array(
+								array(
+									'slug'    => 'a-note',
+									'title'   => 'A note',
+									'content' => '<!-- wp:paragraph --><p>Hello.</p><!-- /wp:paragraph -->',
+								),
+							),
+						),
+					),
+					'leitvia-studio'
+				);
+			},
+			20
+		);
+		self::boot();
+		$this->sign_in_live();
+		$before = self::footprint();
+		$front  = get_option( 'show_on_front' );
+		$plan   = Recipes::selection( array( 'buildingBlocks' => array( 'leitvia/recipe-notes', 'leitvia/unknown' ) ), Recipes::load( __DIR__ . '/../fixtures/gateway/recipes/notes/recipe.json' ) );
+		$this->assertSame( array( 'leitvia/recipe-notes' ), $plan['buildingBlocks'], 'only blocks the recipe lists' );
+		$this->assertFalse( $plan['contentModel'] );
+
+		$result = $this->run_recipe(
+			array(
+				'recipe' => 'leitvia/notes',
+				'parts'  => array( 'buildingBlocks', 'samples' ),
+			)
+		);
+		$this->assertSame( array( 'contentModel', 'blockEntries' ), self::column( $result, 'step' ) );
+		$this->assertSame( array( 'buildingBlocks', 'samples' ), self::column( $result, 'part' ) );
+		$this->assertTrue( post_type_exists( 'lv_rnote' ) );
+		$note = get_posts(
+			array(
+				'post_type'   => 'lv_rnote',
+				'name'        => 'a-note',
+				'post_status' => 'any',
+			)
+		);
+		$this->assertCount( 1, $note );
+		$this->assertSame( 'draft', $note[0]->post_status );
+		$this->assertNull( get_page_by_path( 'notes-home' ) );
+		$after = self::footprint();
+		foreach ( array( 'page', 'wp_template_part', 'wp_navigation', 'wp_global_styles' ) as $type ) {
+			$this->assertSame( $before[ $type ], $after[ $type ], $type );
+		}
+		$this->assertSame( $front, get_option( 'show_on_front' ) );
+		unregister_post_type( 'lv_rnote' );
+	}
 }

@@ -52,3 +52,9 @@
 	width: 260px;
 	padding: 16px;
 }
+
+// The status line of the building block warning sits under its sentence.
+.leitvia-studio-needs__status:not(:empty) {
+	display: block;
+	margin-top: 4px;
+}

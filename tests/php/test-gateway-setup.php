@@ -10,6 +10,7 @@ use LeitviaStudio\Gateway\Hashes;
 use LeitviaStudio\Gateway\Packages;
 use LeitviaStudio\Gateway\Store;
 use LeitviaStudio\Model\Model;
+use LeitviaStudio\Model\Registrar;
 use LeitviaStudio\Tokens\Compiler;
 use LeitviaStudio\Tokens\Dtcg;
 use LeitviaStudio\Tokens\Token_Sets;
@@ -205,7 +206,8 @@ class Test_Gateway_Setup extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Activation goes through the compiler with a snapshot of the global styles and needs their hash.
+	 * Activation goes through the compiler with a snapshot of the global styles and needs their hash. An agent creates
+	 * the set but only proposes its activation, also in the profile full; a person activates it.
 	 */
 	public function test_activate_token_set(): void {
 		$this->sign_in( 'full' );
@@ -218,9 +220,11 @@ class Test_Gateway_Setup extends WP_UnitTestCase {
 				'document' => $doc,
 			)
 		)['target']['post'];
+		$this->assertSame( 'suggest', $this->assert_mode( 'package', self::call( 'leitvia/activate-token-set', array( 'set' => $set ) ) )['level'] );
+		$this->assertSame( 0, self::styles_id() );
 
 		// No global styles yet: the operation creates them.
-		$this->assertSame( 0, self::styles_id() );
+		$this->sign_in( 'full', 'administrator' );
 		$this->assert_mode( 'live', self::call( 'leitvia/activate-token-set', array( 'set' => $set ) ) );
 		$this->assertSame( $set, (int) get_option( Compiler::ACTIVE_OPTION ) );
 		$styles = self::styles_id();
@@ -229,9 +233,10 @@ class Test_Gateway_Setup extends WP_UnitTestCase {
 
 		$data = $this->assert_rejected( 'leitvia_stale_hash', self::call( 'leitvia/activate-token-set', array( 'set' => $set ) ) );
 		$this->assertSame( Hashes::document( $styles ), $data['current_hash'] );
+		// With the current hash the same set again leaves the global styles as they are: nothing written, no snapshot.
 		$before = get_post_field( 'post_content', $styles );
 		$result = $this->assert_mode(
-			'live',
+			'unchanged',
 			self::call(
 				'leitvia/activate-token-set',
 				array(
@@ -240,7 +245,8 @@ class Test_Gateway_Setup extends WP_UnitTestCase {
 				)
 			)
 		);
-		$this->assertSame( $before, Store::get_snapshot( $result['snapshot'] )['state']['post_content'] );
+		$this->assertSame( 0, $result['snapshot'] );
+		$this->assertSame( $before, get_post_field( 'post_content', $styles ) );
 
 		$this->assert_rejected( 'leitvia_invalid_input', self::call( 'leitvia/activate-token-set', array( 'set' => self::factory()->post->create() ) ) );
 
@@ -271,14 +277,32 @@ class Test_Gateway_Setup extends WP_UnitTestCase {
 		$this->assertCount( 1, $accent );
 		$this->assertSame( '#0b4f9c', strtolower( reset( $accent )['before'] ) );
 		$this->assertSame( '#b00020', strtolower( reset( $accent )['after'] ) );
+
+		// A person activates the other set live; the snapshot keeps the global styles before.
+		$this->sign_in( 'full', 'administrator' );
+		$result = $this->assert_mode(
+			'live',
+			self::call(
+				'leitvia/activate-token-set',
+				array(
+					'set'       => $red,
+					'base_hash' => Hashes::document( $styles ),
+				)
+			)
+		);
+		$this->assertSame( $before, Store::get_snapshot( $result['snapshot'] )['state']['post_content'] );
+		$this->assertSame( '#b00020', self::user_color( 'accent' ) );
 	}
 
 	/**
 	 * A full variation replaces the global styles, a colors variation only its colors; the snapshot keeps the state
-	 * before; unknown variations are refused.
+	 * before; unknown variations are refused. An agent proposes a variation in the profile full as well.
 	 */
 	public function test_set_variation(): void {
 		$this->sign_in( 'full' );
+		$this->assert_mode( 'package', self::call( 'leitvia/set-variation', array( 'variation' => 'corporate-light' ) ) );
+		$this->assertSame( 0, self::styles_id() );
+		$this->sign_in( 'full', 'administrator' );
 		$this->assert_mode( 'live', self::call( 'leitvia/set-variation', array( 'variation' => 'corporate-light' ) ) );
 		$styles = self::styles_id();
 		$this->assertSame( array( get_stylesheet() ), wp_get_object_terms( $styles, 'wp_theme', array( 'fields' => 'names' ) ) );
@@ -402,6 +426,177 @@ class Test_Gateway_Setup extends WP_UnitTestCase {
 		$this->assertTrue( $stored['postTypes']['book']['showInAbilities'] );
 		$this->assertSame( 'Genres', $stored['taxonomies']['genre']['label'] );
 		$this->assertEquals( 1, get_option( Model::FLUSH_OPTION ) );
+	}
+
+	/**
+	 * A live define-content-type registers the new post type, taxonomy and setting in the same request, so the next
+	 * step of a recipe or building block can write entries; the rewrite rules still flush on the next init.
+	 */
+	public function test_define_content_type_registers_in_the_same_request(): void {
+		$this->sign_in( 'full', 'administrator' );
+		$this->assertFalse( post_type_exists( 'lv_movie' ) );
+		$this->assert_mode(
+			'live',
+			self::call(
+				'leitvia/define-content-type',
+				array(
+					'declaration' => array(
+						'version'    => 1,
+						'postTypes'  => array(
+							'lv_movie' => array(
+								'label'         => 'Movies',
+								'singularLabel' => 'Movie',
+								'fields'        => array(
+									'movie_year' => array(
+										'type'  => 'integer',
+										'label' => 'Year',
+									),
+								),
+							),
+						),
+						'taxonomies' => array(
+							'lv_genre' => array(
+								'label'         => 'Genres',
+								'singularLabel' => 'Genre',
+								'postTypes'     => array( 'lv_movie' ),
+							),
+						),
+						'settings'   => array(
+							'cinema_name' => array(
+								'type'  => 'text',
+								'label' => 'Cinema',
+							),
+						),
+					),
+					'base_hash'   => Hashes::of( (string) wp_json_encode( get_option( Model::OPTION ) ) ),
+				)
+			)
+		);
+		$this->assertTrue( post_type_exists( 'lv_movie' ) );
+		$this->assertTrue( taxonomy_exists( 'lv_genre' ) );
+		$this->assertTrue( is_object_in_taxonomy( 'lv_movie', 'lv_genre' ) );
+		$this->assertTrue( registered_meta_key_exists( 'post', 'movie_year', 'lv_movie' ) );
+		$this->assertArrayHasKey( Registrar::SETTING_PREFIX . 'cinema_name', get_registered_settings() );
+		$this->assertEquals( 1, get_option( Model::FLUSH_OPTION ) );
+		unregister_post_type( 'lv_movie' );
+		unregister_taxonomy( 'lv_genre' );
+		unregister_setting( Registrar::SETTINGS_GROUP, Registrar::SETTING_PREFIX . 'cinema_name' );
+	}
+
+	/**
+	 * An entry that is defined again keeps what a person added: fields and repeater fields not in the input stay, the
+	 * input updates its own fields, supports and the post types of a taxonomy are joined, relations are replaced.
+	 */
+	public function test_define_content_type_merges_fields(): void {
+		$text = static fn( string $label ): array => array(
+			'type'  => 'text',
+			'label' => $label,
+		);
+		update_option(
+			Model::OPTION,
+			array(
+				'version'    => 1,
+				'postTypes'  => array(
+					'lv_book'     => array(
+						'label'         => 'Books',
+						'singularLabel' => 'Book',
+						'description'   => 'Our own description.',
+						'supports'      => array( 'title', 'thumbnail' ),
+						'fields'        => array(
+							'isbn'       => $text( 'ISBN' ),
+							'shelf_note' => $text( 'Shelf note' ),
+						),
+						'repeaters'     => array(
+							'chapters' => array(
+								'postType'      => 'lv_chapter',
+								'label'         => 'Chapters',
+								'singularLabel' => 'Chapter',
+								'fields'        => array( 'chapter_pages' => $text( 'Pages' ) ),
+							),
+						),
+					),
+					'lv_magazine' => array(
+						'label'         => 'Magazines',
+						'singularLabel' => 'Magazine',
+					),
+				),
+				'taxonomies' => array(
+					'lv_shelf' => array(
+						'label'         => 'Shelves',
+						'singularLabel' => 'Shelf',
+						'postTypes'     => array( 'lv_magazine' ),
+					),
+				),
+				'relations'  => array(
+					'book_magazines' => array(
+						'label'    => 'Magazines',
+						'from'     => 'lv_book',
+						'to'       => 'lv_magazine',
+						'multiple' => true,
+					),
+				),
+			)
+		);
+		Model::forget();
+		$this->sign_in( 'full', 'administrator' );
+		$this->assert_mode(
+			'live',
+			self::call(
+				'leitvia/define-content-type',
+				array(
+					'declaration' => array(
+						'version'    => 1,
+						'postTypes'  => array(
+							'lv_book' => array(
+								'label'         => 'Books',
+								'singularLabel' => 'Book',
+								'supports'      => array( 'title', 'excerpt' ),
+								'fields'        => array(
+									'isbn'     => $text( 'ISBN-13' ),
+									'subtitle' => $text( 'Subtitle' ),
+								),
+								'repeaters'     => array(
+									'chapters' => array(
+										'postType'      => 'lv_chapter',
+										'label'         => 'Chapters',
+										'singularLabel' => 'Chapter',
+										'fields'        => array( 'chapter_title' => $text( 'Title' ) ),
+									),
+								),
+							),
+						),
+						'taxonomies' => array(
+							'lv_shelf' => array(
+								'label'         => 'Shelves',
+								'singularLabel' => 'Shelf',
+								'postTypes'     => array( 'lv_book' ),
+							),
+						),
+						'relations'  => array(
+							'book_magazines' => array(
+								'label' => 'Magazine',
+								'from'  => 'lv_book',
+								'to'    => 'lv_magazine',
+							),
+						),
+					),
+					'base_hash'   => Hashes::of( (string) wp_json_encode( get_option( Model::OPTION ) ) ),
+				)
+			)
+		);
+		$book = Model::stored()['postTypes']['lv_book'];
+		$this->assertSame( array( 'isbn', 'shelf_note', 'subtitle' ), array_keys( $book['fields'] ) );
+		$this->assertSame( 'ISBN-13', $book['fields']['isbn']['label'] );
+		$this->assertSame( 'Our own description.', $book['description'] );
+		$this->assertSame( array( 'title', 'thumbnail', 'excerpt' ), $book['supports'] );
+		$this->assertSame( array( 'chapter_pages', 'chapter_title' ), array_keys( $book['repeaters']['chapters']['fields'] ) );
+		$this->assertSame( array( 'lv_magazine', 'lv_book' ), Model::stored()['taxonomies']['lv_shelf']['postTypes'] );
+		$this->assertArrayNotHasKey( 'multiple', Model::stored()['relations']['book_magazines'], 'a relation is replaced whole' );
+		$this->assertArrayHasKey( 'lv_magazine', Model::stored()['postTypes'] );
+		foreach ( array( 'lv_book', 'lv_chapter', 'lv_magazine' ) as $type ) {
+			unregister_post_type( $type );
+		}
+		unregister_taxonomy( 'lv_shelf' );
 	}
 
 	/**

@@ -449,7 +449,7 @@ class Test_Gateway_Package_Flow extends WP_UnitTestCase {
 		$this->assertWPError( $human );
 		$this->assertSame( 'leitvia_needs_human', $human->get_error_code() );
 		$this->assertSame( array( 1 ), $human->get_error_data()['operations'] );
-		$this->assertStringContainsString( 'page=leitvia-studio-inbox', $human->get_error_data()['inbox'] );
+		$this->assertStringContainsString( 'page=leitvia-studio-agents&tab=inbox', $human->get_error_data()['inbox'] );
 		$this->assertSame( 'open', Packages::state( $package ) );
 
 		$list = wp_get_ability( 'leitvia/list-packages' )->execute( array() );
