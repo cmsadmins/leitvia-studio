@@ -2,11 +2,10 @@
 	"$schema": "http://json-schema.org/draft-07/schema#",
 	"$id": "https://leitvia.com/schemas/news/profile-page.schema.json",
 	"title": "Author profile page",
-	"description": "A ProfilePage whose main entity is the person the page is about, with name and page address and, where there is one, a short biography.",
+	"description": "A ProfilePage node whose main entity is the person the page is about, with name and page address and, where there is one, a short biography.",
 	"type": "object",
-	"required": [ "@context", "@type", "mainEntity" ],
+	"required": [ "@type", "mainEntity" ],
 	"properties": {
-		"@context": { "const": "https://schema.org" },
 		"@type": { "const": "ProfilePage" },
 		"mainEntity": {
 			"type": "object",

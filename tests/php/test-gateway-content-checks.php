@@ -367,4 +367,70 @@ class Test_Gateway_Content_Checks extends WP_UnitTestCase {
 		}
 		$this->assertGreaterThanOrEqual( 6, $pages, 'imprints of company and publication, four legal pages of the shop' );
 	}
+
+	/**
+	 * The first page of audit-site reports the site: closed to search engines (error, not on a preview site), missing
+	 * imprint, contact and editorial page while there are posts, recent news without a large image or author biography
+	 * (warnings). Later pages carry no site findings.
+	 */
+	public function test_audit_site_findings(): void {
+		$site = static fn(): array => wp_get_ability( 'leitvia/audit-site' )->execute( array( 'limit' => 1 ) )['site'];
+		update_option( 'blog_public', '0' );
+		add_filter( 'leitvia_studio_preview_site', '__return_false' );
+		$this->assertSame( array( 'leitvia/search-blocked' ), array_column( $site(), 'check' ), 'no posts, no page or news findings' );
+		$this->assertSame( 'error', $site()[0]['severity'] );
+		add_filter( 'leitvia_studio_preview_site', '__return_true', 20 );
+		$this->assertSame( array(), $site() );
+		remove_all_filters( 'leitvia_studio_preview_site' );
+		update_option( 'blog_public', '1' );
+
+		$author = self::factory()->user->create( array( 'role' => 'author' ) );
+		$post   = self::factory()->post->create( array( 'post_author' => $author ) );
+		$checks = array_column( $site(), 'check' );
+		$this->assertSame( array( 'leitvia/missing-page', 'leitvia/missing-page', 'leitvia/missing-page', 'leitvia/news-image', 'leitvia/author-bio' ), $checks );
+		$this->assertSame( array( 'warning' ), array_values( array_unique( array_column( $site(), 'severity' ) ) ) );
+
+		self::factory()->post->create(
+			array(
+				'post_type' => 'page',
+				'post_name' => 'impressum',
+			)
+		);
+		self::factory()->post->create(
+			array(
+				'post_type'  => 'page',
+				'post_name'  => 'reach-us',
+				'meta_input' => array( '_leitvia_page_kind' => 'contact' ),
+			)
+		);
+		self::factory()->post->create(
+			array(
+				'post_type' => 'page',
+				'post_name' => 'redaktion',
+			)
+		);
+		$image = self::factory()->attachment->create_object(
+			array(
+				'file'           => 'news-wide.jpg',
+				'post_mime_type' => 'image/jpeg',
+			)
+		);
+		wp_update_attachment_metadata(
+			$image,
+			array(
+				'width'  => 1600,
+				'height' => 900,
+				'file'   => 'news-wide.jpg',
+			)
+		);
+		set_post_thumbnail( $post, $image );
+		update_user_meta( $author, 'description', 'Writes about bikes.' );
+		$this->assertSame( array(), $site() );
+
+		// Outside the news categories a post is no news.
+		update_post_meta( $post, '_thumbnail_id', 0 );
+		update_option( 'leitvia_studio_settings', array( 'news_categories' => array( self::factory()->category->create() ) ) );
+		$this->assertSame( array(), $site() );
+		$this->assertArrayNotHasKey( 'site', wp_get_ability( 'leitvia/audit-site' )->execute( array( 'after' => $post ) ) );
+	}
 }

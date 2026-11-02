@@ -135,6 +135,13 @@ final class Plugin {
 		add_action( 'init', array( Admin\Admin::class, 'register_status_column' ), 20 );
 		add_action( 'after_setup_theme', array( News\Image_Sizes::class, 'register' ) );
 		add_action( 'wp_head', array( News\Schema::class, 'print' ) );
+		add_filter( 'leitvia_editorial_url', static fn( $url ): string => '' !== (string) $url ? (string) $url : News\Schema::editorial_url() );
+		add_action( 'init', array( News\Sitemap::class, 'register' ) );
+		add_filter( 'query_vars', array( News\Sitemap::class, 'query_vars' ) );
+		// Before redirect_canonical, which could add a trailing slash to the address.
+		add_action( 'template_redirect', array( News\Sitemap::class, 'maybe_render' ), 1 );
+		add_filter( 'robots_txt', array( News\Sitemap::class, 'robots' ), 20 );
+		add_action( 'transition_post_status', array( News\Sitemap::class, 'forget' ), 10, 3 );
 		add_action( 'leitvia_studio_init', array( Blocks\Blocks::class, 'register' ) );
 		add_filter( 'block_categories_all', array( Blocks\Blocks::class, 'category' ) );
 		add_filter( 'render_block_core/tabs', array( Blocks\Tabs::class, 'render_tabs' ) );

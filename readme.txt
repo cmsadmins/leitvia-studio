@@ -4,7 +4,7 @@ Tags: ai, mcp, block theme, accessibility, design tokens
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.15
+Stable tag: 1.3.16
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -26,7 +26,7 @@ Leitvia Studio lets people and AI agents build and maintain sites with block the
 
 **Pattern Lab, tokens and content model.** The Pattern Lab under Leitvia Studio shows all theme and own patterns with live previews in every style variation at 390, 782 and 1440 px, state variants (long text, empty, error, disabled) and an axe check per preview. Token sets are imported, exported, checked for contrast and scheduled as overlays. The content model declares post types and fields that blocks can show through block bindings.
 
-Posts and author pages get structured data for search engines (JSON-LD): a BlogPosting, or a NewsArticle for categories you mark as news, with headline, dates, authors, publisher and logo, and a ProfilePage on author pages, with three image sizes of 1200 px (16:9, 4:3 and 1:1) made on upload. While an SEO plugin such as Yoast SEO, Rank Math, SEOPress, All in One SEO or The SEO Framework is active, Leitvia Studio prints none, so that plugin stays the only source.
+Posts, archives and author pages get structured data for search engines (JSON-LD): a NewsArticle, or a BlogPosting outside the categories you mark as news, with headline, dates, language, authors, publisher, logo and breadcrumbs, a CollectionPage on the posts page and on category and tag archives, and a ProfilePage on author pages, with three image sizes of 1200 px (16:9, 4:3 and 1:1) made on upload. A news sitemap for Google News lists the news of the last 48 hours at /news.xml. While an SEO plugin such as Yoast SEO, Rank Math, SEOPress, All in One SEO or The SEO Framework is active, Leitvia Studio prints none, so that plugin stays the only source.
 
 Embedded videos, posts and other content from sites such as YouTube, Vimeo or X load nothing from the provider until the visitor agrees. A placeholder names the provider, links to its privacy policy and to the content and offers to load it; the Consent Settings block, best placed on your privacy policy page, lists and revokes what a visitor always allows.
 
@@ -62,7 +62,7 @@ An agent such as Claude Code, Codex or Cursor connects to your site over MCP or 
 
 = Does the plugin change my front end? =
 
-Only where you use its features. It loads scripts and styles for visitors only on pages with its blocks or an embed placeholder. It does change front end output in seven places: structured data in the head of posts and author pages, profile pictures and the placeholder replace Gravatar images wherever WordPress shows avatars, embeds from other sites wait behind a consent placeholder, a scheduled token overlay changes the styles while it runs, the "Child entries" query lists the rows of a content model entry, code blocks get a "Copy code" button that shows once JavaScript runs, and the emoji script of WordPress is left out (see below). The Lab preview, which logged-in editors open from the admin, loads its own scripts, and axe-core only while an accessibility check runs.
+Only where you use its features. It loads scripts and styles for visitors only on pages with its blocks or an embed placeholder. It does change front end output in seven places: structured data in the head of posts, archives and author pages with the news sitemap and its line in robots.txt, profile pictures and the placeholder replace Gravatar images wherever WordPress shows avatars, embeds from other sites wait behind a consent placeholder, a scheduled token overlay changes the styles while it runs, the "Child entries" query lists the rows of a content model entry, code blocks get a "Copy code" button that shows once JavaScript runs, and the emoji script of WordPress is left out (see below). The Lab preview, which logged-in editors open from the admin, loads its own scripts, and axe-core only while an accessibility check runs.
 
 = What happens to blocks connected to content model fields when I deactivate the plugin? =
 
@@ -70,7 +70,7 @@ Paragraphs, headings, buttons and images can show content model fields, site set
 
 = How do I mark posts as news articles? =
 
-Return the slugs or IDs of your news categories from the filter `leitvia_studio_news_categories`; posts in them get the type NewsArticle instead of BlogPosting. The setting "Add structured data to posts and author pages" switches the output off. The filter `leitvia_studio_seo_plugin_active` tells Leitvia Studio about an SEO plugin it does not detect.
+Every post is a news article until you choose categories under Studio, Settings, Design and search, "Posts that are news"; posts outside them get the type BlogPosting and stay out of the news sitemap. The filter `leitvia_studio_news_categories` receives that list and can return other slugs or IDs. The setting "Add structured data to posts and author pages" switches the structured data off, "Publish a news sitemap for Google News" the sitemap; the sitemap also stays off while the site discourages search engines or another plugin makes a news sitemap (filter `leitvia_studio_news_sitemap_enabled`). The filter `leitvia_studio_seo_plugin_active` tells Leitvia Studio about an SEO plugin it does not detect.
 
 = Which forms does the "Form error summary" block work with? =
 
@@ -208,6 +208,14 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * Privacy policy: https://leitvia.com/privacy-policy/
 
 == Changelog ==
+
+= 1.3.16 =
+* News for Google News: every post is a NewsArticle, or only the posts of the categories chosen under Design and search; the others stay BlogPosting.
+* The article data names the page, description, language, section and free access, and the publisher names the editorial page as its publishing principles.
+* Posts index and archives get a CollectionPage with the list of their posts, posts and archives a BreadcrumbList.
+* A news sitemap at /news.xml lists the news of the last 48 hours for Google News and is named in robots.txt while the site is open to search engines. The address avoids the word sitemap, which the Yoast rules of many nginx hosts catch.
+* create-content takes seo with title and description and writes them through the active SEO plugin.
+* get-seo reports indexable, the news sitemap and the schema type of each post; audit-site reports a site hidden from search engines, missing imprint, contact or editorial page, news without a 1200 px image and authors without a biography.
 
 = 1.3.15 =
 * A dark token set keeps inverse bands dark: activating a set now writes the inverse mapping of group and cover for the scheme of the set.

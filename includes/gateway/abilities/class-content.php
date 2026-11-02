@@ -155,6 +155,21 @@ final class Content {
 						),
 						'description' => __( 'URLs of the sources of the text, stored with it.', 'leitvia-studio' ),
 					),
+					'seo'            => array(
+						'type'                 => 'object',
+						'properties'           => array(
+							'title'       => array(
+								'type'      => 'string',
+								'maxLength' => 200,
+							),
+							'description' => array(
+								'type'      => 'string',
+								'maxLength' => 500,
+							),
+						),
+						'additionalProperties' => false,
+						'description'          => __( 'SEO title and meta description, checked and written as by leitvia/update-seo. Without a supported SEO plugin they are left out and notice says so.', 'leitvia-studio' ),
+					),
 				),
 				'required'             => array( 'post_type', 'title' ),
 				'additionalProperties' => false,
@@ -516,6 +531,12 @@ final class Content {
 		if ( is_wp_error( $media ) ) {
 			return $media;
 		}
+		$seo = isset( $input['seo'] ) ? Seo::texts( (array) $input['seo'], $target ) : array();
+		if ( is_wp_error( $seo ) ) {
+			return $seo;
+		}
+		$notice  = $seo && ! Seo::writable() ? __( 'No SEO plugin Leitvia Studio can write to is active, so the SEO title and description were left out.', 'leitvia-studio' ) : '';
+		$seo     = '' === $notice ? $seo : array();
 		$meta    = array_filter(
 			array(
 				'_wp_page_template'  => $template,
@@ -529,7 +550,8 @@ final class Content {
 			'area'   => 'content',
 			'target' => $target,
 			'kinds'  => in_array( $kind, \LeitviaStudio\Gateway\Autonomy::LEGAL_PAGES, true ) ? array( 'legal' ) : array(),
-			'change' => static function ( array $state ) use ( $input, $sections, $status, $date, $parent, $meta, $type ) {
+			'notice' => $notice,
+			'change' => static function ( array $state ) use ( $input, $sections, $status, $date, $parent, $meta, $type, $seo ) {
 				$content = $sections ? Build::compose( $sections ) : (string) ( $input['content'] ?? '' );
 				if ( is_wp_error( $content ) ) {
 					return $content;
@@ -553,6 +575,10 @@ final class Content {
 				if ( $missing ) {
 					/* translators: %s: field labels */
 					return Block_Edit::invalid( 'required', sprintf( __( 'Set these required fields before publishing, or create a draft: %s.', 'leitvia-studio' ), implode( ', ', $missing ) ), array( 'post' => 0 ), 'leitvia/get-content-model' );
+				}
+				$state = Seo::write_texts( $state, $seo, array( 'post' => 0 ) );
+				if ( is_wp_error( $state ) ) {
+					return $state;
 				}
 				$state['meta_input'] = array_filter( (array) $state['meta_input'], static fn( $value ): bool => ! in_array( $value, array( '', 0, null, array() ), true ) ) + $meta;
 				$state['terms']      = array_filter( (array) $state['terms'] );

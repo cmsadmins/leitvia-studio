@@ -55,6 +55,23 @@ class Test_Settings extends WP_UnitTestCase {
 					'default' => 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
 					'pattern' => '^https://(?=[^\s]*\{z\})(?=[^\s]*\{x\})(?=[^\s]*\{y\})[^\s"\'<>]+$',
 				),
+				'news_categories'            => array(
+					'type'    => 'array',
+					'default' => array(),
+					'items'   => array(
+						'type'    => 'integer',
+						'minimum' => 1,
+					),
+				),
+				'news_sitemap'               => array(
+					'type'    => 'boolean',
+					'default' => true,
+				),
+				'editorial_page'             => array(
+					'type'    => 'integer',
+					'default' => 0,
+					'minimum' => 0,
+				),
 			),
 			$schema['properties']
 		);
@@ -114,9 +131,35 @@ class Test_Settings extends WP_UnitTestCase {
 				'consent_embeds'             => true,
 				'emoji_script'               => false,
 				'map_tile_url'               => 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+				'news_categories'            => array(),
+				'news_sitemap'               => true,
+				'editorial_page'             => 0,
 			),
 			get_option( 'leitvia_studio_settings' )
 		);
+	}
+
+	/**
+	 * News settings: category IDs as a list of unique positive integers, the editorial page as an ID, the sitemap as a
+	 * boolean; missing keys keep their saved value.
+	 */
+	public function test_sanitize_news_settings(): void {
+		update_option(
+			'leitvia_studio_settings',
+			array(
+				'news_categories' => array( '3', 3, 0, -2, 'x', 7 ),
+				'news_sitemap'    => '0',
+				'editorial_page'  => '12',
+			)
+		);
+		$saved = get_option( 'leitvia_studio_settings' );
+		$this->assertSame( array( 3, 2, 7 ), $saved['news_categories'] );
+		$this->assertFalse( $saved['news_sitemap'] );
+		$this->assertSame( 12, $saved['editorial_page'] );
+
+		update_option( 'leitvia_studio_settings', array( 'hide_product_notes' => true ) );
+		$this->assertSame( array( 3, 2, 7 ), leitvia_studio_setting( 'news_categories' ) );
+		$this->assertSame( 12, leitvia_studio_setting( 'editorial_page' ) );
 	}
 
 	/**
@@ -153,6 +196,9 @@ class Test_Settings extends WP_UnitTestCase {
 				'consent_embeds'             => true,
 				'emoji_script'               => false,
 				'map_tile_url'               => 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+				'news_categories'            => array(),
+				'news_sitemap'               => true,
+				'editorial_page'             => 0,
 			),
 			$response->get_data()['leitvia_studio_settings']
 		);
@@ -170,6 +216,9 @@ class Test_Settings extends WP_UnitTestCase {
 				'consent_embeds'             => true,
 				'emoji_script'               => false,
 				'map_tile_url'               => 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+				'news_categories'            => array(),
+				'news_sitemap'               => true,
+				'editorial_page'             => 0,
 			),
 			rest_do_request( $request )->get_data()['leitvia_studio_settings']
 		);

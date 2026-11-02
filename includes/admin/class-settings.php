@@ -28,6 +28,9 @@ final class Settings {
 		'consent_embeds'             => true,
 		'emoji_script'               => false,
 		'map_tile_url'               => 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+		'news_categories'            => array(),
+		'news_sitemap'               => true,
+		'editorial_page'             => 0,
 	);
 
 	/**
@@ -51,16 +54,30 @@ final class Settings {
 					'schema' => array(
 						'type'                 => 'object',
 						'properties'           => array_map(
-							static fn( $fallback ): array => is_bool( $fallback )
-								? array(
+							static fn( $fallback ): array => match ( true ) {
+								is_bool( $fallback )  => array(
 									'type'    => 'boolean',
 									'default' => $fallback,
-								)
-								: array(
+								),
+								is_int( $fallback )   => array(
+									'type'    => 'integer',
+									'default' => $fallback,
+									'minimum' => 0,
+								),
+								is_array( $fallback ) => array(
+									'type'    => 'array',
+									'default' => $fallback,
+									'items'   => array(
+										'type'    => 'integer',
+										'minimum' => 1,
+									),
+								),
+								default               => array(
 									'type'    => 'string',
 									'default' => $fallback,
 									'pattern' => self::TILE_URL_PATTERN,
 								),
+							},
 							self::DEFAULTS
 						),
 						'additionalProperties' => false,
@@ -71,22 +88,24 @@ final class Settings {
 	}
 
 	/**
-	 * Keeps the known keys as booleans, the tile URL as a valid tile URL, and drops the rest. Missing keys and an invalid
+	 * Keeps the known keys as booleans, page IDs and lists of term IDs, the tile URL as a valid tile URL, and drops the rest. Missing keys and an invalid
 	 * tile URL keep their saved value, so a partial update through /wp/v2/settings changes only the keys it sends;
 	 * without a saved value they get their default.
 	 *
 	 * @param mixed $value Submitted value.
-	 * @return array<string, bool|string>
+	 * @return array<string, mixed>
 	 */
 	public static function sanitize( $value ): array {
 		$value = is_array( $value ) ? $value : array();
 		$clean = array();
 		foreach ( self::DEFAULTS as $key => $fallback ) {
-			if ( ! is_bool( $fallback ) ) {
-				$clean[ $key ] = self::tile_url( $value[ $key ] ?? self::get( $key ) );
-				continue;
-			}
-			$clean[ $key ] = array_key_exists( $key, $value ) ? filter_var( $value[ $key ], FILTER_VALIDATE_BOOLEAN ) : (bool) self::get( $key );
+			$given         = array_key_exists( $key, $value ) ? $value[ $key ] : self::get( $key );
+			$clean[ $key ] = match ( true ) {
+				is_bool( $fallback )  => array_key_exists( $key, $value ) ? filter_var( $given, FILTER_VALIDATE_BOOLEAN ) : (bool) $given,
+				is_int( $fallback )   => absint( $given ),
+				is_array( $fallback ) => array_values( array_unique( array_filter( array_map( 'absint', (array) $given ) ) ) ),
+				default               => self::tile_url( $given ),
+			};
 		}
 		return $clean;
 	}

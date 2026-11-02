@@ -1,0 +1,25 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"$id": "https://leitvia.com/schemas/news/breadcrumb-list.schema.json",
+	"title": "Breadcrumb trail",
+	"description": "A BreadcrumbList node: at least two items, numbered from 1 in order, each with a name and an absolute address.",
+	"type": "object",
+	"required": [ "@type", "itemListElement" ],
+	"properties": {
+		"@type": { "const": "BreadcrumbList" },
+		"itemListElement": {
+			"type": "array",
+			"minItems": 2,
+			"items": {
+				"type": "object",
+				"required": [ "@type", "position", "name", "item" ],
+				"properties": {
+					"@type": { "const": "ListItem" },
+					"position": { "type": "integer", "minimum": 1 },
+					"name": { "type": "string", "minLength": 1 },
+					"item": { "type": "string", "pattern": "^https?://\\S+$" }
+				}
+			}
+		}
+	}
+}

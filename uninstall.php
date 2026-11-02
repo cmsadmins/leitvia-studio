@@ -93,6 +93,8 @@ $leitvia_studio_uninstall_site = static function (): void {
 	delete_option( 'leitvia_studio_usage_index_built' );
 	delete_option( 'leitvia_studio_restore_show_avatars' );
 	delete_option( 'leitvia_studio_flush_rewrite' );
+	delete_option( 'leitvia_studio_news_sitemap_rules' );
+	delete_transient( 'leitvia_news_sitemap' );
 	delete_option( 'leitvia_studio_model_checked' );
 	// Overlay state, windows and the compiled overlay sets: the transients leitvia_studio_overlay_*. With an external
 	// object cache they live there until they expire or are evicted (state and windows have no expiry); without one they are options, deleted through the API so

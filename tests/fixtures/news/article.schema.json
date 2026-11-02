@@ -2,16 +2,27 @@
 	"$schema": "http://json-schema.org/draft-07/schema#",
 	"$id": "https://leitvia.com/schemas/news/article.schema.json",
 	"title": "Article structured data",
-	"description": "A BlogPosting or NewsArticle as Leitvia Studio prints it. Covers the fields search engines need or recommend for articles: headline, both dates in ISO 8601 with a time zone, the authors as people with a name and a page, images and the publisher.",
+	"description": "A BlogPosting or NewsArticle node of the @graph Leitvia Studio prints. Covers the fields search engines need or recommend for articles: headline, the page it is the main entity of, both dates in ISO 8601 with a time zone, the language as a BCP 47 tag, the authors as people with a name and a page, images and the publisher.",
 	"type": "object",
-	"required": [ "@context", "@type", "headline", "datePublished", "dateModified", "author", "publisher" ],
+	"required": [ "@type", "headline", "mainEntityOfPage", "datePublished", "dateModified", "inLanguage", "author", "publisher" ],
 	"properties": {
-		"@context": { "const": "https://schema.org" },
 		"@type": { "enum": [ "Article", "BlogPosting", "NewsArticle" ] },
 		"headline": { "type": "string", "minLength": 1 },
 		"url": { "$ref": "#/definitions/url" },
+		"mainEntityOfPage": {
+			"type": "object",
+			"required": [ "@type", "@id" ],
+			"properties": {
+				"@type": { "const": "WebPage" },
+				"@id": { "$ref": "#/definitions/url" }
+			}
+		},
 		"datePublished": { "$ref": "#/definitions/datetime" },
 		"dateModified": { "$ref": "#/definitions/datetime" },
+		"inLanguage": { "type": "string", "pattern": "^[a-z]{2,3}(-[A-Z]{2})?$" },
+		"isAccessibleForFree": { "type": "boolean" },
+		"description": { "type": "string", "minLength": 1 },
+		"articleSection": { "type": "string", "minLength": 1 },
 		"author": {
 			"type": "array",
 			"minItems": 1,

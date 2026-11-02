@@ -1,0 +1,38 @@
+{
+	"@context": "https://schema.org",
+	"@graph": [
+		{
+			"@type": "CollectionPage",
+			"name": "News",
+			"url": "http://example.org/category/news/",
+			"inLanguage": "en-US",
+			"mainEntity": {
+				"@type": "ItemList",
+				"itemListElement": [
+					{
+						"@type": "ListItem",
+						"position": 1,
+						"url": "http://example.org/structure-and-rhythm/"
+					}
+				]
+			}
+		},
+		{
+			"@type": "BreadcrumbList",
+			"itemListElement": [
+				{
+					"@type": "ListItem",
+					"position": 1,
+					"name": "Leitvia News",
+					"item": "http://example.org/"
+				},
+				{
+					"@type": "ListItem",
+					"position": 2,
+					"name": "News",
+					"item": "http://example.org/category/news/"
+				}
+			]
+		}
+	]
+}

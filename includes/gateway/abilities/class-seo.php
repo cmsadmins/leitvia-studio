@@ -128,7 +128,7 @@ final class Seo {
 		Abilities::read(
 			'leitvia/get-seo',
 			__( 'Get SEO data', 'leitvia-studio' ),
-			__( 'Returns the SEO data of posts, pages and entries from the active SEO plugin. Supported are Yoast SEO, Rank Math, SEOPress and The SEO Framework. Per item: title, meta description, canonical, noindex, nofollow, Open Graph title, description and image, focus keyword and schema type. An empty value means the plugin falls back to its template. defaults holds what WordPress itself would print and a description suggested from the excerpt; without a supported plugin seo is null and notice says why. hash is the base_hash of leitvia/update-seo. IDs that are no readable content come back under skipped.', 'leitvia-studio' ),
+			__( 'Returns the SEO data of posts, pages and entries from the active SEO plugin. Supported are Yoast SEO, Rank Math, SEOPress and The SEO Framework. Per item: title, meta description, canonical, noindex, nofollow, Open Graph title, description and image, focus keyword and schema type. schema_type is the article type Leitvia Studio prints for a post (NewsArticle or BlogPosting), null where it prints none. indexable says whether the site is open to search engines, news_sitemap is the address of the news sitemap of Leitvia Studio or null. An empty value means the plugin falls back to its template. defaults holds what WordPress itself would print and a description suggested from the excerpt; without a supported plugin seo is null and notice says why. hash is the base_hash of leitvia/update-seo. IDs that are no readable content come back under skipped.', 'leitvia-studio' ),
 			array(
 				'type'                 => 'object',
 				'properties'           => array(
@@ -148,7 +148,7 @@ final class Seo {
 			array(
 				'type'       => 'object',
 				'properties' => array(
-					'plugin'  => array(
+					'plugin'       => array(
 						'type'       => array( 'object', 'null' ),
 						'properties' => array(
 							'key'      => $string,
@@ -156,27 +156,33 @@ final class Seo {
 							'writable' => $bool,
 						),
 					),
-					'notice'  => $string,
-					'items'   => array(
+					'notice'       => $string,
+					'items'        => array(
 						'type'  => 'array',
 						'items' => array(
 							'type'       => 'object',
 							'properties' => array(
-								'post'     => array( 'type' => 'integer' ),
-								'type'     => $string,
-								'status'   => $string,
-								'title'    => $string,
-								'url'      => $string,
-								'hash'     => $string,
-								'seo'      => array( 'type' => array( 'object', 'null' ) ),
-								'defaults' => array( 'type' => 'object' ),
+								'post'        => array( 'type' => 'integer' ),
+								'type'        => $string,
+								'status'      => $string,
+								'title'       => $string,
+								'url'         => $string,
+								'hash'        => $string,
+								'seo'         => array( 'type' => array( 'object', 'null' ) ),
+								'defaults'    => array( 'type' => 'object' ),
+								'schema_type' => array(
+									'type' => array( 'string', 'null' ),
+									'enum' => array( 'NewsArticle', 'BlogPosting', null ),
+								),
 							),
 						),
 					),
-					'skipped' => array(
+					'skipped'      => array(
 						'type'  => 'array',
 						'items' => array( 'type' => 'integer' ),
 					),
+					'indexable'    => $bool,
+					'news_sitemap' => array( 'type' => array( 'string', 'null' ) ),
 				),
 			),
 			array( self::class, 'get' )
@@ -243,6 +249,14 @@ final class Seo {
 	}
 
 	/**
+	 * Whether an SEO plugin is active whose meta Leitvia Studio writes.
+	 */
+	public static function writable(): bool {
+		$key = self::plugin();
+		return '' !== $key && array() !== self::PLUGINS[ $key ]['meta'];
+	}
+
+	/**
 	 * Meta keys update-seo writes for the active plugin; part of the state of a content type.
 	 *
 	 * @return list<string>
@@ -262,7 +276,7 @@ final class Seo {
 		$input    = is_array( $input ) ? $input : array();
 		$ids      = array_slice( array_values( array_unique( array_map( 'intval', (array) ( $input['posts'] ?? array() ) ) ) ), 0, self::MAX_POSTS );
 		$key      = self::plugin();
-		$writable = '' !== $key && array() !== self::PLUGINS[ $key ]['meta'];
+		$writable = self::writable();
 		$items    = array();
 		$skipped  = array();
 		foreach ( $ids as $id ) {
@@ -272,14 +286,15 @@ final class Seo {
 				continue;
 			}
 			$items[] = array(
-				'post'     => $id,
-				'type'     => $post->post_type,
-				'status'   => $post->post_status,
-				'title'    => $post->post_title,
-				'url'      => (string) get_permalink( $post ),
-				'hash'     => Hashes::document( $id ),
-				'seo'      => $writable ? self::values( $id, $key ) : null,
-				'defaults' => self::defaults( $post ),
+				'post'        => $id,
+				'type'        => $post->post_type,
+				'status'      => $post->post_status,
+				'title'       => $post->post_title,
+				'url'         => (string) get_permalink( $post ),
+				'hash'        => Hashes::document( $id ),
+				'seo'         => $writable ? self::values( $id, $key ) : null,
+				'defaults'    => self::defaults( $post ),
+				'schema_type' => self::schema_type( $post ),
 			);
 		}
 		$notice = match ( true ) {
@@ -288,15 +303,27 @@ final class Seo {
 			default     => '',
 		};
 		return array(
-			'plugin'  => '' === $key ? null : array(
+			'plugin'       => '' === $key ? null : array(
 				'key'      => $key,
 				'name'     => self::PLUGINS[ $key ]['name'],
 				'writable' => $writable,
 			),
-			'notice'  => $notice,
-			'items'   => $items,
-			'skipped' => $skipped,
+			'notice'       => $notice,
+			'items'        => $items,
+			'skipped'      => $skipped,
+			'indexable'    => (bool) get_option( 'blog_public' ),
+			'news_sitemap' => \LeitviaStudio\News\Sitemap::enabled() ? \LeitviaStudio\News\Sitemap::url() : null,
 		);
+	}
+
+	/**
+	 * Article type Leitvia Studio prints for a post, null for other content, with the setting news_schema off or an
+	 * SEO plugin active.
+	 *
+	 * @param \WP_Post $post Post.
+	 */
+	private static function schema_type( \WP_Post $post ): ?string {
+		return 'post' === $post->post_type && leitvia_studio_setting( 'news_schema' ) && ! leitvia_studio_seo_plugin_active() ? ( \LeitviaStudio\News\Schema::is_news( $post ) ? 'NewsArticle' : 'BlogPosting' ) : null;
 	}
 
 	/**
@@ -356,10 +383,7 @@ final class Seo {
 			$text = mb_substr( $text, 0, self::DESCRIPTION_MAX );
 			$text = (string) preg_replace( '/\s+\S*$/u', '', $text );
 		}
-		$schema = array();
-		if ( 'post' === $post->post_type && leitvia_studio_setting( 'news_schema' ) && ! leitvia_studio_seo_plugin_active() ) {
-			$schema[] = (string) \LeitviaStudio\News\Schema::article( $post )['@type'];
-		}
+		$schema = array_filter( array( self::schema_type( $post ) ) );
 		return array(
 			'title'       => html_entity_decode( $title, ENT_QUOTES | ENT_HTML5, 'UTF-8' ),
 			'description' => $text,
@@ -382,20 +406,13 @@ final class Seo {
 		if ( '' === $key || array() === self::PLUGINS[ $key ]['meta'] ) {
 			return Rejection::make( 'leitvia_no_seo_plugin', __( 'No SEO plugin Leitvia Studio can write to is active (Yoast SEO, Rank Math, SEOPress or The SEO Framework). Change the excerpt with leitvia/update-content instead, or ask a person to install one.', 'leitvia-studio' ), 422, 'seo_plugin', $target, 'leitvia/update-content', 'never' );
 		}
-		$texts = array_filter( array_intersect_key( $input, array_flip( array( 'title', 'description' ) ) ), 'is_string' );
-		$texts = array_map( static fn( string $text ): string => trim( (string) preg_replace( '/\s+/u', ' ', $text ) ), $texts );
+		$texts = self::texts( $input, $target );
+		if ( is_wp_error( $texts ) ) {
+			return $texts;
+		}
 		$flags = array_map( 'boolval', array_intersect_key( $input, array_flip( array( 'noindex', 'nofollow' ) ) ) );
 		if ( ! $texts && ! $flags ) {
 			return Block_Edit::invalid( 'change', __( 'Name what to change: title, description, noindex or nofollow.', 'leitvia-studio' ), $target );
-		}
-		if ( isset( $texts['title'] ) && mb_strlen( $texts['title'] ) > self::TITLE_MAX ) {
-			/* translators: %d: most characters */
-			return Block_Edit::invalid( 'length', sprintf( __( 'The title is too long; search results cut it after about %d characters. Shorten it.', 'leitvia-studio' ), self::TITLE_MAX ), $target );
-		}
-		$length = isset( $texts['description'] ) ? mb_strlen( $texts['description'] ) : 0;
-		if ( $length && ( $length < self::DESCRIPTION_MIN || $length > self::DESCRIPTION_MAX ) ) {
-			/* translators: 1: fewest characters, 2: most characters */
-			return Block_Edit::invalid( 'length', sprintf( __( 'A description has %1$d to %2$d characters. Summarize what the page offers in one or two sentences.', 'leitvia-studio' ), self::DESCRIPTION_MIN, self::DESCRIPTION_MAX ), $target );
 		}
 		$plugin = self::PLUGINS[ $key ];
 		return array(
@@ -407,14 +424,11 @@ final class Seo {
 				if ( ! array_key_exists( $plugin['meta']['title'], $meta ) ) {
 					return Block_Edit::invalid( 'post_type', __( 'SEO data can change on posts, pages and entries only.', 'leitvia-studio' ), $target );
 				}
-				$unsupported = self::unsupported( implode( ' ', $texts ), $state );
-				if ( $unsupported ) {
-					/* translators: %s: numbers */
-					return Block_Edit::invalid( 'unsupported_fact', sprintf( __( 'The page does not say %s. Use only facts from the title, excerpt or content of the post.', 'leitvia-studio' ), implode( ', ', $unsupported ) ), $target, 'leitvia/get-page-outline' );
+				$state = self::write_texts( $state, $texts, $target );
+				if ( is_wp_error( $state ) ) {
+					return $state;
 				}
-				foreach ( $texts as $field => $text ) {
-					$meta[ $plugin['meta'][ $field ] ] = $text;
-				}
+				$meta = (array) $state['meta_input'];
 				if ( $flags && isset( $plugin['meta']['robots'] ) ) {
 					$list  = array_values( array_filter( array_map( 'strval', (array) $meta[ $plugin['meta']['robots'] ] ) ) );
 					$flags = $flags + self::robots( $plugin, static fn() => $list );
@@ -434,6 +448,56 @@ final class Seo {
 	}
 
 	/**
+	 * SEO title and description of an input with whitespace collapsed, checked for length; shared by update-seo and
+	 * the seo field of create-content.
+	 *
+	 * @param array<string, mixed> $input  Input with title and description.
+	 * @param array<string, mixed> $target Target for rejections.
+	 * @return array<string, string>|\WP_Error
+	 */
+	public static function texts( array $input, array $target ) {
+		$texts = array_filter( array_intersect_key( $input, array_flip( array( 'title', 'description' ) ) ), 'is_string' );
+		$texts = array_map( static fn( string $text ): string => trim( (string) preg_replace( '/\s+/u', ' ', $text ) ), $texts );
+		if ( isset( $texts['title'] ) && mb_strlen( $texts['title'] ) > self::TITLE_MAX ) {
+			/* translators: %d: most characters */
+			return Block_Edit::invalid( 'length', sprintf( __( 'The title is too long; search results cut it after about %d characters. Shorten it.', 'leitvia-studio' ), self::TITLE_MAX ), $target );
+		}
+		$length = isset( $texts['description'] ) ? mb_strlen( $texts['description'] ) : 0;
+		if ( $length && ( $length < self::DESCRIPTION_MIN || $length > self::DESCRIPTION_MAX ) ) {
+			/* translators: 1: fewest characters, 2: most characters */
+			return Block_Edit::invalid( 'length', sprintf( __( 'A description has %1$d to %2$d characters. Summarize what the page offers in one or two sentences.', 'leitvia-studio' ), self::DESCRIPTION_MIN, self::DESCRIPTION_MAX ), $target );
+		}
+		return $texts;
+	}
+
+	/**
+	 * State with SEO title and description in the meta of the active plugin, after the fact check against the title,
+	 * excerpt and content of the state. A state without a writable plugin comes back unchanged.
+	 *
+	 * @param array<string, mixed>  $state  State of a post.
+	 * @param array<string, string> $texts  Texts from texts().
+	 * @param array<string, mixed>  $target Target for rejections.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public static function write_texts( array $state, array $texts, array $target ) {
+		if ( ! $texts || ! self::writable() ) {
+			return $state;
+		}
+		$meta        = self::PLUGINS[ self::plugin() ]['meta'];
+		$unsupported = self::unsupported( implode( ' ', $texts ), $state );
+		if ( $unsupported ) {
+			/* translators: %s: numbers */
+			return Block_Edit::invalid( 'unsupported_fact', sprintf( __( 'The page does not say %s. Use only facts from the title, excerpt or content of the post.', 'leitvia-studio' ), implode( ', ', $unsupported ) ), $target, 'leitvia/get-page-outline' );
+		}
+		foreach ( $texts as $field => $text ) {
+			if ( isset( $meta[ $field ] ) ) {
+				$state['meta_input'][ $meta[ $field ] ] = $text;
+			}
+		}
+		return $state;
+	}
+
+	/**
 	 * Numbers of a text that the title, excerpt and content of the post do not contain. A number is the commonest fact
 	 * a summary invents (prices, years, counts).
 	 * ponytail: numbers only; names and claims without digits pass, the skill asks agents to keep to the page.
@@ -443,7 +507,7 @@ final class Seo {
 	 * @return list<string>
 	 */
 	private static function unsupported( string $text, array $state ): array {
-		$source = (string) preg_replace( '/\s+/u', ' ', html_entity_decode( wp_strip_all_tags( $state['post_title'] . ' ' . $state['post_excerpt'] . ' ' . $state['post_content'] . ' ' . get_bloginfo( 'name' ) ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
+		$source = (string) preg_replace( '/\s+/u', ' ', html_entity_decode( wp_strip_all_tags( ( $state['post_title'] ?? '' ) . ' ' . ( $state['post_excerpt'] ?? '' ) . ' ' . ( $state['post_content'] ?? '' ) . ' ' . get_bloginfo( 'name' ) ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
 		preg_match_all( '/\d+(?:[.,:]\d+)*/u', $text, $numbers );
 		return array_values( array_unique( array_filter( $numbers[0], static fn( string $number ): bool => ! str_contains( $source, $number ) ) ) );
 	}

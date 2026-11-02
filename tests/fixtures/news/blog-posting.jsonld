@@ -1,31 +1,59 @@
 {
 	"@context": "https://schema.org",
-	"@type": "BlogPosting",
-	"headline": "Structure & rhythm in long reads",
-	"url": "http://example.org/structure-and-rhythm/",
-	"datePublished": "2026-09-01T11:00:00+02:00",
-	"dateModified": "2026-10-01T11:00:00+02:00",
-	"author": [
+	"@graph": [
 		{
-			"@type": "Person",
-			"name": "Mara Lindqvist",
-			"url": "http://example.org/author/mara/",
-			"description": "Mara writes about design systems & accessible publishing."
+			"@type": "BlogPosting",
+			"headline": "Structure & rhythm in long reads",
+			"url": "http://example.org/structure-and-rhythm/",
+			"mainEntityOfPage": {
+				"@type": "WebPage",
+				"@id": "http://example.org/structure-and-rhythm/"
+			},
+			"datePublished": "2026-09-01T11:00:00+02:00",
+			"dateModified": "2026-10-01T11:00:00+02:00",
+			"inLanguage": "en-US",
+			"isAccessibleForFree": true,
+			"author": [
+				{
+					"@type": "Person",
+					"name": "Mara Lindqvist",
+					"url": "http://example.org/author/mara/",
+					"description": "Mara writes about design systems & accessible publishing."
+				}
+			],
+			"publisher": {
+				"@type": "Organization",
+				"name": "Leitvia News",
+				"url": "http://example.org/",
+				"logo": {
+					"@type": "ImageObject",
+					"url": "http://example.org/wp-content/uploads/news-logo.png",
+					"width": 200,
+					"height": 200
+				}
+			},
+			"description": "How headings & spacing guide readers through long texts.",
+			"image": [
+				"http://example.org/wp-content/uploads/news-photo-1200x675.png",
+				"http://example.org/wp-content/uploads/news-photo-1200x900.png"
+			]
+		},
+		{
+			"@type": "BreadcrumbList",
+			"itemListElement": [
+				{
+					"@type": "ListItem",
+					"position": 1,
+					"name": "Leitvia News",
+					"item": "http://example.org/"
+				},
+				{
+					"@type": "ListItem",
+					"position": 2,
+					"name": "Structure & rhythm in long reads",
+					"item": "http://example.org/structure-and-rhythm/"
+				}
+			]
 		}
-	],
-	"publisher": {
-		"@type": "Organization",
-		"name": "Leitvia News",
-		"url": "http://example.org/",
-		"logo": {
-			"@type": "ImageObject",
-			"url": "http://example.org/wp-content/uploads/news-logo.png",
-			"width": 200,
-			"height": 200
-		}
-	},
-	"image": [
-		"http://example.org/wp-content/uploads/news-photo-1200x675.png",
-		"http://example.org/wp-content/uploads/news-photo-1200x900.png"
 	]
 }

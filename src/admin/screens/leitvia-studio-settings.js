@@ -4,8 +4,15 @@
 import { __, sprintf } from '@wordpress/i18n';
 import { useEffect, useState } from '@wordpress/element';
 import apiFetch from '@wordpress/api-fetch';
+import { decodeEntities } from '@wordpress/html-entities';
 import { DataForm, DataViews } from '@wordpress/dataviews/wp';
-import { Button, Flex } from '@wordpress/components';
+import {
+	Button,
+	CheckboxControl,
+	Flex,
+	RadioControl,
+	SelectControl,
+} from '@wordpress/components';
 import { errorText } from '../common';
 import Loading from '../loading';
 import More from '../more';
@@ -23,6 +30,101 @@ export const intro = __(
 // Product name from Admin::enqueue(), filter leitvia_studio_brand.
 const BRAND = settings.brand ?? 'Leitvia Studio';
 const OPTION = 'leitvia_studio_settings';
+
+/**
+ * Loads a REST collection once: null while loading, then the items (empty on an error).
+ *
+ * @param {string} path REST path.
+ * @return {Array|null} Items.
+ */
+function useCollection( path ) {
+	const [ items, setItems ] = useState( null );
+	useEffect( () => {
+		apiFetch( { path } )
+			.then( setItems )
+			.catch( () => setItems( [] ) );
+	}, [ path ] );
+	return items;
+}
+
+// Setting news_categories: empty means every post is news; "Only these categories" shows the category list.
+function NewsCategories( { data, field, onChange } ) {
+	const value = data.news_categories ?? [];
+	const [ only, setOnly ] = useState( value.length > 0 );
+	const categories = useCollection(
+		'/wp/v2/categories?per_page=100&_fields=id,name&orderby=name'
+	);
+	const set = ( ids ) => onChange( { news_categories: ids } );
+	return (
+		<fieldset>
+			<RadioControl
+				label={ field.label }
+				help={ field.description }
+				selected={ only ? 'only' : 'all' }
+				options={ [
+					{
+						label: __( 'All posts', 'leitvia-studio' ),
+						value: 'all',
+					},
+					{
+						label: __( 'Only these categories', 'leitvia-studio' ),
+						value: 'only',
+					},
+				] }
+				onChange={ ( choice ) => {
+					setOnly( 'only' === choice );
+					if ( 'all' === choice ) {
+						set( [] );
+					}
+				} }
+			/>
+			{ only &&
+				( categories ?? [] ).map( ( category ) => (
+					<CheckboxControl
+						key={ category.id }
+						__nextHasNoMarginBottom
+						label={ decodeEntities( category.name ) }
+						checked={ value.includes( category.id ) }
+						onChange={ ( checked ) =>
+							set(
+								checked
+									? [ ...value, category.id ]
+									: value.filter(
+											( id ) => id !== category.id
+										)
+							)
+						}
+					/>
+				) ) }
+		</fieldset>
+	);
+}
+
+// Setting editorial_page: a published page, or none.
+function EditorialPage( { data, field, onChange } ) {
+	const pages = useCollection(
+		'/wp/v2/pages?per_page=100&status=publish&_fields=id,title&orderby=title&order=asc'
+	);
+	return (
+		<SelectControl
+			__next40pxDefaultSize
+			__nextHasNoMarginBottom
+			label={ field.label }
+			help={ field.description }
+			value={ String( data.editorial_page ?? 0 ) }
+			options={ [
+				{ label: __( 'None', 'leitvia-studio' ), value: '0' },
+				...( pages ?? [] ).map( ( page ) => ( {
+					label:
+						decodeEntities( page.title.rendered ) ||
+						`#${ page.id }`,
+					value: String( page.id ),
+				} ) ),
+			] }
+			onChange={ ( id ) => onChange( { editorial_page: Number( id ) } ) }
+		/>
+	);
+}
 
 const FIELDS = [
 	{
@@ -118,6 +220,36 @@ const FIELDS = [
 		),
 		type: 'boolean',
 		Edit: 'toggle',
+	},
+	{
+		id: 'news_categories',
+		label: __( 'Posts that are news', 'leitvia-studio' ),
+		description: __(
+			'News posts are marked as news articles and listed in the news sitemap.',
+			'leitvia-studio'
+		),
+		type: 'array',
+		Edit: NewsCategories,
+	},
+	{
+		id: 'news_sitemap',
+		label: __( 'Publish a news sitemap for Google News', 'leitvia-studio' ),
+		description: __(
+			'Lists the news of the last two days at /news.xml and names it in robots.txt.',
+			'leitvia-studio'
+		),
+		type: 'boolean',
+		Edit: 'toggle',
+	},
+	{
+		id: 'editorial_page',
+		label: __( 'Page with your editorial guidelines', 'leitvia-studio' ),
+		description: __(
+			'Linked in the structured data and in the author box of your posts.',
+			'leitvia-studio'
+		),
+		type: 'integer',
+		Edit: EditorialPage,
 	},
 ];
 
@@ -333,7 +465,13 @@ function Privacy( { form } ) {
 function DesignAndSearch( { form } ) {
 	return (
 		<>
-			{ form( [ 'guard_site_editor_contrast', 'news_schema' ] ) }
+			{ form( [
+				'guard_site_editor_contrast',
+				'news_schema',
+				'news_categories',
+				'news_sitemap',
+				'editorial_page',
+			] ) }
 			<More>
 				<Background
 					label={ __(
@@ -351,6 +489,17 @@ function DesignAndSearch( { form } ) {
 						/* translators: %s: product name. */
 						__(
 							'Prints JSON-LD for search engines: the article with author and publisher on posts, the author profile on author pages. %s skips it while an SEO plugin is active, so that plugin stays the only source.',
+							'leitvia-studio'
+						),
+						BRAND
+					) }
+				/>
+				<Background
+					label={ __( 'News sitemap:', 'leitvia-studio' ) }
+					text={ sprintf(
+						/* translators: %s: product name. */
+						__(
+							'Google News reads news posts of the last 48 hours from it, at most 1000. %s serves it only while the site is open to search engines and no other news sitemap plugin is active.',
 							'leitvia-studio'
 						),
 						BRAND

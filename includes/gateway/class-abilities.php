@@ -145,6 +145,9 @@ final class Abilities {
 		if ( ! empty( $parts['record'] ) && 'live' === $result['mode'] && ! $result['package'] ) {
 			$result['package'] = Packages::record( $op, $result );
 		}
+		if ( ! empty( $parts['notice'] ) ) {
+			$result['notice'] = (string) $parts['notice'];
+		}
 		if ( isset( $parts['report'] ) ) {
 			$result['report'] = (array) ( $parts['report'] )();
 		}
@@ -182,6 +185,7 @@ final class Abilities {
 					'items' => array( 'type' => 'object' ),
 				),
 				'report'   => array( 'type' => 'object' ),
+				'notice'   => array( 'type' => 'string' ),
 			),
 		);
 	}

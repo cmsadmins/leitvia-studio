@@ -208,4 +208,65 @@ class Test_Gateway_Seo extends WP_UnitTestCase {
 		$this->assertSame( '', get_post_meta( $page, '_seopress_titles_title', true ) );
 		$this->assertSame( 'package', self::update( $page, array( 'title' => 'Bike repairs from 40 euros' ) )['mode'] );
 	}
+
+	/**
+	 * Get-seo names the article type per post, whether the site is indexable and the news sitemap.
+	 */
+	public function test_schema_type_indexable_and_news_sitemap(): void {
+		update_option( 'blog_public', '1' );
+		$post   = self::factory()->post->create( array( 'post_title' => 'News' ) );
+		$result = wp_get_ability( 'leitvia/get-seo' )->execute( array( 'posts' => array( $post, $this->page() ) ) );
+		$this->assertSame( array( 'NewsArticle', null ), array_column( $result['items'], 'schema_type' ) );
+		$this->assertTrue( $result['indexable'] );
+		$this->assertSame( \LeitviaStudio\News\Sitemap::url(), $result['news_sitemap'] );
+
+		$category = self::factory()->category->create();
+		update_option( 'leitvia_studio_settings', array( 'news_categories' => array( $category ) ) );
+		update_option( 'blog_public', '0' );
+		$result = wp_get_ability( 'leitvia/get-seo' )->execute( array( 'posts' => array( $post ) ) );
+		$this->assertSame( 'BlogPosting', $result['items'][0]['schema_type'] );
+		$this->assertFalse( $result['indexable'] );
+		$this->assertNull( $result['news_sitemap'] );
+
+		add_filter( 'leitvia_studio_seo_plugin_active', '__return_true' );
+		$this->assertNull( wp_get_ability( 'leitvia/get-seo' )->execute( array( 'posts' => array( $post ) ) )['items'][0]['schema_type'] );
+		remove_filter( 'leitvia_studio_seo_plugin_active', '__return_true' );
+	}
+
+	/**
+	 * Create-content takes SEO title and description with the checks of update-seo and writes them through the
+	 * adapter; without a writable SEO plugin they are left out and notice says so.
+	 */
+	public function test_create_content_with_seo(): void {
+		update_option( Gateway::OPTION, array( 'profile' => 'full' ) + Gateway::DEFAULTS );
+		$create = static fn( array $seo ) => wp_get_ability( 'leitvia/create-content' )->execute(
+			array(
+				'post_type' => 'page',
+				'title'     => 'Repairs',
+				'excerpt'   => 'We repair city bikes and e-bikes in 2 days, from 40 euros.',
+				'content'   => '<!-- wp:paragraph --><p>Bring your bike on weekdays.</p><!-- /wp:paragraph -->',
+				'seo'       => $seo,
+				'base_hash' => '',
+			)
+		);
+		$texts  = array(
+			'title'       => 'Bike repairs in 2 days',
+			'description' => 'We repair city bikes and e-bikes in 2 days, from 40 euros. Bring your bike on weekdays.',
+		);
+
+		$result = $create( $texts );
+		$this->assertIsArray( $result, $result instanceof WP_Error ? $result->get_error_message() : '' );
+		$this->assertNotSame( '', $result['notice'] ?? '' );
+		$this->assertSame( '', get_post_meta( $result['target']['post'], '_yoast_wpseo_title', true ) );
+
+		self::adapter( 'yoast' );
+		$result = $create( $texts );
+		$this->assertIsArray( $result, $result instanceof WP_Error ? $result->get_error_message() : '' );
+		$this->assertArrayNotHasKey( 'notice', $result );
+		$this->assertSame( $texts['title'], get_post_meta( $result['target']['post'], '_yoast_wpseo_title', true ) );
+		$this->assertSame( $texts['description'], get_post_meta( $result['target']['post'], '_yoast_wpseo_metadesc', true ) );
+
+		$this->assert_rejected( 'leitvia_invalid_input', 'length', $create( array( 'title' => str_repeat( 'a', 61 ) ) ) );
+		$this->assert_rejected( 'leitvia_invalid_input', 'unsupported_fact', $create( array( 'title' => 'Bike repairs since 1998' ) ) );
+	}
 }

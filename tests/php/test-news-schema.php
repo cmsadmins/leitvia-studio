@@ -9,9 +9,9 @@ use LeitviaStudio\News\Image_Sizes;
 use LeitviaStudio\News\Schema;
 
 /**
- * Google News criteria 13 to 20 (docs/clean-room/reportedip-analyse.md 4.3). The rendered JSON-LD is stored in
- * tests/fixtures/news/*.jsonld and compared with the committed state; tests/unit/news-schema.test.mjs validates
- * those files against the schemas next to them.
+ * Google News criteria 13 to 20 and 22 to 25 (docs/clean-room/reportedip-analyse.md 4.3). The rendered JSON-LD, a
+ * graph per page, is stored in tests/fixtures/news/*.jsonld and compared with the committed state;
+ * tests/unit/news-schema.test.mjs validates those files against the schemas next to them.
  */
 class Test_News_Schema extends WP_UnitTestCase {
 
@@ -58,10 +58,11 @@ class Test_News_Schema extends WP_UnitTestCase {
 		);
 		$this->post   = self::factory()->post->create(
 			array(
-				'post_author' => $this->author,
-				'post_title'  => 'Structure &amp; rhythm in long reads',
-				'post_name'   => 'structure-and-rhythm',
-				'post_date'   => '2026-09-01 11:00:00',
+				'post_author'  => $this->author,
+				'post_title'   => 'Structure &amp; rhythm in long reads',
+				'post_name'    => 'structure-and-rhythm',
+				'post_date'    => '2026-09-01 11:00:00',
+				'post_excerpt' => 'How <em>headings</em> &amp; spacing guide readers through long texts.',
 			)
 		);
 		global $wpdb;
@@ -106,16 +107,18 @@ class Test_News_Schema extends WP_UnitTestCase {
 	}
 
 	/**
-	 * 13 to 17: a BlogPosting with a large featured image and a logo; written to blog-posting.jsonld.
+	 * 13 to 17: a BlogPosting with a large featured image and a logo, for a post outside the news categories; written
+	 * to blog-posting.jsonld.
 	 */
 	public function test_blog_posting(): void {
+		add_filter( 'leitvia_studio_news_categories', static fn() => array( 'news' ) );
 		set_post_thumbnail( $this->post, $this->upload( 'news-photo', 1600, 1000 ) );
 		set_theme_mod( 'custom_logo', $this->upload( 'news-logo', 200, 200 ) );
 		$this->go_to( get_permalink( $this->post ) );
 
 		$head = get_echo( 'wp_head' );
 		$this->assertSame( 1, substr_count( $head, '<script type="application/ld+json">' ), 'one JSON-LD block' );
-		$data = Schema::current();
+		$data = $this->node( 'BlogPosting' );
 		$this->assertSame( 'BlogPosting', $data['@type'] );
 		$this->assertSame( 'Structure & rhythm in long reads', $data['headline'] );
 		// 14: the values of the datetime attributes the post date block prints.
@@ -139,28 +142,162 @@ class Test_News_Schema extends WP_UnitTestCase {
 	}
 
 	/**
-	 * 13, 16, 17: NewsArticle for a news category; a small image, the logo as featured image and a small logo are
-	 * all left out. Written to news-article.jsonld.
+	 * 13, 16, 17, 22, 23, 24: by default every post is a NewsArticle, with main page, language, free access, excerpt,
+	 * section, the editorial principles of the publisher and a BreadcrumbList; a small image, the logo as featured image
+	 * and a small logo are all left out. Written to news-article.jsonld.
 	 */
 	public function test_news_article_without_image_or_logo(): void {
-		$news = self::factory()->category->create( array( 'slug' => 'news' ) );
+		$news = self::factory()->category->create(
+			array(
+				'slug' => 'news',
+				'name' => 'News',
+			)
+		);
 		wp_set_post_categories( $this->post, array( $news ) );
-		add_filter( 'leitvia_studio_news_categories', static fn() => array( 'news' ) );
+		$editorial = self::factory()->post->create(
+			array(
+				'post_type' => 'page',
+				'post_name' => 'editorial-guidelines',
+			)
+		);
+		update_option( 'leitvia_studio_settings', array( 'editorial_page' => $editorial ) );
 		set_post_thumbnail( $this->post, $this->upload( 'news-small', 1000, 800 ) );
 		set_theme_mod( 'custom_logo', $this->upload( 'news-tiny-logo', 100, 100 ) );
 		$this->go_to( get_permalink( $this->post ) );
 
-		$data = Schema::current();
-		$this->assertSame( 'NewsArticle', $data['@type'] );
+		$data = $this->node( 'NewsArticle' );
 		$this->assertArrayNotHasKey( 'image', $data );
 		$this->assertArrayNotHasKey( 'logo', $data['publisher'] );
+		$url = get_permalink( $this->post );
+		$this->assertSame(
+			array(
+				'@type' => 'WebPage',
+				'@id'   => $url,
+			),
+			$data['mainEntityOfPage']
+		);
+		$this->assertSame( 'en-US', $data['inLanguage'] );
+		$this->assertTrue( $data['isAccessibleForFree'] );
+		$this->assertSame( 'How headings & spacing guide readers through long texts.', $data['description'] );
+		$this->assertSame( 'News', $data['articleSection'] );
+		$this->assertSame( get_permalink( $editorial ), $data['publisher']['publishingPrinciples'] );
+		$this->assertSame( array( home_url( '/' ), get_category_link( $news ), $url ), array_column( $this->node( 'BreadcrumbList' )['itemListElement'], 'item' ) );
 		$this->assertMatchesFixture( 'news-article', get_echo( 'wp_head' ) );
 
 		// The site logo never stands in for the article image, even when it is large enough.
 		$logo = $this->upload( 'news-big-logo', 1200, 1200 );
 		set_theme_mod( 'custom_logo', $logo );
 		set_post_thumbnail( $this->post, $logo );
-		$this->assertArrayNotHasKey( 'image', Schema::current() );
+		$this->assertArrayNotHasKey( 'image', $this->node( 'NewsArticle' ) );
+	}
+
+	/**
+	 * 22: news by the setting news_categories, or the filter: with categories set, posts outside them are a BlogPosting;
+	 * no excerpt means no description; only the default category means no section and no category in the breadcrumbs.
+	 * Pages are never news.
+	 */
+	public function test_news_categories_setting(): void {
+		$news = self::factory()->category->create( array( 'slug' => 'news' ) );
+		$this->assertTrue( Schema::is_news( get_post( $this->post ) ), 'every post by default' );
+		update_option( 'leitvia_studio_settings', array( 'news_categories' => array( $news ) ) );
+		$this->assertFalse( Schema::is_news( get_post( $this->post ) ) );
+		$other = self::factory()->post->create( array( 'post_category' => array( $news ) ) );
+		$this->assertTrue( Schema::is_news( get_post( $other ) ) );
+		$this->assertFalse( Schema::is_news( get_post( self::factory()->post->create( array( 'post_type' => 'page' ) ) ) ) );
+
+		wp_update_post(
+			array(
+				'ID'           => $this->post,
+				'post_excerpt' => '',
+			)
+		);
+		$this->go_to( get_permalink( $this->post ) );
+		$data = $this->node( 'BlogPosting' );
+		$this->assertArrayNotHasKey( 'description', $data );
+		$this->assertArrayNotHasKey( 'articleSection', $data );
+		$this->assertCount( 2, $this->node( 'BreadcrumbList' )['itemListElement'] );
+
+		// The filter receives the setting and wins.
+		add_filter( 'leitvia_studio_news_categories', '__return_empty_array' );
+		$this->assertSame( 'NewsArticle', $this->node( 'NewsArticle' )['@type'] );
+	}
+
+	/**
+	 * 23: publishingPrinciples and the filter leitvia_editorial_url name the editorial page only while it is published;
+	 * a value the theme already has stays.
+	 */
+	public function test_editorial_url(): void {
+		$this->assertSame( '', Schema::editorial_url() );
+		$this->assertSame( '', apply_filters( 'leitvia_editorial_url', '' ) );
+		$page = self::factory()->post->create(
+			array(
+				'post_type'   => 'page',
+				'post_status' => 'draft',
+			)
+		);
+		update_option( 'leitvia_studio_settings', array( 'editorial_page' => $page ) );
+		$this->assertSame( '', Schema::editorial_url() );
+		$this->go_to( get_permalink( $this->post ) );
+		$this->assertArrayNotHasKey( 'publishingPrinciples', $this->node( 'NewsArticle' )['publisher'] );
+
+		wp_publish_post( $page );
+		$this->assertSame( get_permalink( $page ), Schema::editorial_url() );
+		$this->assertSame( get_permalink( $page ), apply_filters( 'leitvia_editorial_url', '' ) );
+		$this->assertSame( 'https://example.com/own', apply_filters( 'leitvia_editorial_url', 'https://example.com/own' ) );
+		$this->assertSame( get_permalink( $page ), $this->node( 'NewsArticle' )['publisher']['publishingPrinciples'] );
+	}
+
+	/**
+	 * 25: A category archive carries a CollectionPage of its posts and a BreadcrumbList; written to
+	 * collection-page.jsonld. The posts page does the same without breadcrumbs, under its own title.
+	 */
+	public function test_collection_page(): void {
+		$news = self::factory()->category->create(
+			array(
+				'slug' => 'news',
+				'name' => 'News',
+			)
+		);
+		wp_set_post_categories( $this->post, array( $news ) );
+		$this->go_to( get_category_link( $news ) );
+		$data = $this->node( 'CollectionPage' );
+		$this->assertSame( 'News', $data['name'] );
+		$this->assertSame( array( get_permalink( $this->post ) ), array_column( $data['mainEntity']['itemListElement'], 'url' ) );
+		$this->assertMatchesFixture( 'collection-page', get_echo( 'wp_head' ) );
+
+		$this->go_to( get_tag_link( self::factory()->tag->create( array( 'name' => 'Tagged' ) ) ) );
+		$this->assertSame( array( 'CollectionPage', 'BreadcrumbList' ), array_column( Schema::current()['@graph'], '@type' ) );
+
+		$blog = self::factory()->post->create(
+			array(
+				'post_type'  => 'page',
+				'post_title' => 'Journal',
+			)
+		);
+		update_option( 'show_on_front', 'page' );
+		update_option( 'page_on_front', self::factory()->post->create( array( 'post_type' => 'page' ) ) );
+		update_option( 'page_for_posts', $blog );
+		$this->go_to( get_permalink( $blog ) );
+		$this->assertTrue( is_home() && ! is_front_page() );
+		$graph = Schema::current()['@graph'];
+		$this->assertSame( array( 'CollectionPage' ), array_column( $graph, '@type' ) );
+		$this->assertSame( 'Journal', $graph[0]['name'] );
+		$this->assertSame( get_permalink( $blog ), $graph[0]['url'] );
+		$this->assertContains( get_permalink( $this->post ), array_column( $graph[0]['mainEntity']['itemListElement'], 'url' ) );
+
+		// With a posts page, the breadcrumbs of a post lead through it.
+		$this->go_to( get_permalink( $this->post ) );
+		$this->assertSame( array( home_url( '/' ), get_permalink( $blog ), get_category_link( $news ), get_permalink( $this->post ) ), array_column( $this->node( 'BreadcrumbList' )['itemListElement'], 'item' ) );
+	}
+
+	/**
+	 * BCP 47 tags from WordPress locales.
+	 */
+	public function test_language(): void {
+		$this->assertSame( 'de-DE', Schema::language( 'de_DE' ) );
+		$this->assertSame( 'de-DE', Schema::language( 'de_DE_formal' ) );
+		$this->assertSame( 'fr', Schema::language( 'fr' ) );
+		$this->assertSame( 'pt-BR', Schema::language( 'pt_BR' ) );
 	}
 
 	/**
@@ -171,10 +308,10 @@ class Test_News_Schema extends WP_UnitTestCase {
 		$image = $this->upload_without_crops( 'news-old-photo', 1600, 1000 );
 		set_post_thumbnail( $this->post, $image );
 		$this->go_to( get_permalink( $this->post ) );
-		$this->assertSame( array( wp_get_attachment_url( $image ) ), Schema::current()['image'] );
+		$this->assertSame( array( wp_get_attachment_url( $image ) ), $this->node( 'NewsArticle' )['image'] );
 
 		set_post_thumbnail( $this->post, $this->upload_without_crops( 'news-old-small', 1000, 800 ) );
-		$this->assertArrayNotHasKey( 'image', Schema::current() );
+		$this->assertArrayNotHasKey( 'image', $this->node( 'NewsArticle' ) );
 	}
 
 	/**
@@ -183,7 +320,7 @@ class Test_News_Schema extends WP_UnitTestCase {
 	 */
 	public function test_site_icon_stands_in_for_the_logo(): void {
 		$this->go_to( get_permalink( $this->post ) );
-		$this->assertArrayNotHasKey( 'logo', Schema::current()['publisher'] );
+		$this->assertArrayNotHasKey( 'logo', $this->node( 'NewsArticle' )['publisher'] );
 
 		$icon = $this->upload( 'news-icon', 512, 512 );
 		update_option( 'site_icon', $icon );
@@ -207,17 +344,17 @@ class Test_News_Schema extends WP_UnitTestCase {
 					'width'  => 512,
 					'height' => 512,
 				),
-				Schema::current()['publisher']['logo'] ?? null,
+				$this->node( 'NewsArticle' )['publisher']['logo'] ?? null,
 				"custom logo $case"
 			);
 		}
 
 		// A usable custom logo wins over the icon; a too small icon is no fallback.
 		set_theme_mod( 'custom_logo', $this->upload( 'news-logo', 200, 200 ) );
-		$this->assertSame( 200, Schema::current()['publisher']['logo']['width'] );
+		$this->assertSame( 200, $this->node( 'NewsArticle' )['publisher']['logo']['width'] );
 		set_theme_mod( 'custom_logo', 0 );
 		update_option( 'site_icon', $this->upload( 'news-small-icon', 64, 64 ) );
-		$this->assertArrayNotHasKey( 'logo', Schema::current()['publisher'] );
+		$this->assertArrayNotHasKey( 'logo', $this->node( 'NewsArticle' )['publisher'] );
 	}
 
 	/**
@@ -226,8 +363,7 @@ class Test_News_Schema extends WP_UnitTestCase {
 	public function test_profile_page(): void {
 		$this->go_to( get_author_posts_url( $this->author ) );
 		$this->assertTrue( is_author() );
-		$data = Schema::current();
-		$this->assertSame( 'ProfilePage', $data['@type'] );
+		$data = $this->node( 'ProfilePage' );
 		$this->assertSame(
 			array(
 				'@type'       => 'Person',
@@ -259,7 +395,7 @@ class Test_News_Schema extends WP_UnitTestCase {
 
 		$this->go_to( get_permalink( self::factory()->post->create( array( 'post_type' => 'page' ) ) ) );
 		$this->assertNull( Schema::current() );
-		$this->go_to( get_category_link( 1 ) );
+		$this->go_to( get_year_link( 2026 ) );
 		$this->assertNull( Schema::current() );
 	}
 
@@ -270,8 +406,7 @@ class Test_News_Schema extends WP_UnitTestCase {
 		update_option( 'blogdescription', 'Pages &amp; posts' );
 		set_theme_mod( 'custom_logo', $this->upload( 'news-logo', 200, 200 ) );
 		$this->go_to( home_url( '/' ) );
-		$data = Schema::current();
-		$this->assertSame( 'WebSite', $data['@type'] );
+		$data = $this->node( 'WebSite' );
 		$this->assertSame( 'Leitvia News', $data['name'] );
 		$this->assertSame( home_url( '/' ), $data['url'] );
 		$this->assertSame( 'Pages & posts', $data['description'] );
@@ -280,7 +415,7 @@ class Test_News_Schema extends WP_UnitTestCase {
 		$this->assertSame( 1, substr_count( get_echo( 'wp_head' ), 'application/ld+json' ) );
 
 		update_option( 'blogdescription', '' );
-		$this->assertArrayNotHasKey( 'description', Schema::current() );
+		$this->assertArrayNotHasKey( 'description', $this->node( 'WebSite' ) );
 	}
 
 	/**
@@ -297,8 +432,21 @@ class Test_News_Schema extends WP_UnitTestCase {
 		$head = get_echo( 'wp_head' );
 		// The block ends at the first closing tag: it must hold the whole JSON.
 		$this->assertSame( 1, preg_match( '#<script type="application/ld\+json">(.*?)</script>#s', $head, $match ) );
-		$this->assertSame( 'Why </script> ends a script', json_decode( $match[1], true )['headline'] ?? null );
+		$this->assertSame( 'Why </script> ends a script', json_decode( $match[1], true )['@graph'][0]['headline'] ?? null );
 		$this->assertStringNotContainsString( 'Why </script>', $head );
+	}
+
+	/**
+	 * The node of a type in the graph of the current request; fails when there is none.
+	 *
+	 * @param string $type Schema.org type.
+	 * @return array<string, mixed>
+	 */
+	private function node( string $type ): array {
+		$graph = Schema::current()['@graph'] ?? array();
+		$nodes = wp_list_filter( $graph, array( '@type' => $type ) );
+		$this->assertCount( 1, $nodes, "one $type node" );
+		return reset( $nodes );
 	}
 
 	/**

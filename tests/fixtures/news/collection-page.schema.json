@@ -1,0 +1,36 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"$id": "https://leitvia.com/schemas/news/collection-page.schema.json",
+	"title": "Post listing",
+	"description": "A CollectionPage node of the posts page or a category or tag archive: name, address, language and the posts of the page as an ItemList in their order.",
+	"type": "object",
+	"required": [ "@type", "name", "url", "inLanguage", "mainEntity" ],
+	"properties": {
+		"@type": { "const": "CollectionPage" },
+		"name": { "type": "string", "minLength": 1 },
+		"url": { "$ref": "#/definitions/url" },
+		"inLanguage": { "type": "string", "pattern": "^[a-z]{2,3}(-[A-Z]{2})?$" },
+		"mainEntity": {
+			"type": "object",
+			"required": [ "@type", "itemListElement" ],
+			"properties": {
+				"@type": { "const": "ItemList" },
+				"itemListElement": {
+					"type": "array",
+					"items": {
+						"type": "object",
+						"required": [ "@type", "position", "url" ],
+						"properties": {
+							"@type": { "const": "ListItem" },
+							"position": { "type": "integer", "minimum": 1 },
+							"url": { "$ref": "#/definitions/url" }
+						}
+					}
+				}
+			}
+		}
+	},
+	"definitions": {
+		"url": { "type": "string", "pattern": "^https?://\\S+$" }
+	}
+}

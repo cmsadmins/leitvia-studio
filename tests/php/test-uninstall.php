@@ -48,6 +48,8 @@ class Test_Uninstall extends WP_UnitTestCase {
 			$this->assertSame( array( 'version' => 1 ), get_option( 'leitvia_studio_model' ) );
 			$this->assert_site_content_kept( $content[ $site ] );
 			$this->assertFalse( get_option( 'leitvia_studio_flush_rewrite' ) );
+			$this->assertFalse( get_option( 'leitvia_studio_news_sitemap_rules' ) );
+			$this->assertFalse( get_transient( 'leitvia_news_sitemap' ) );
 			$this->assertFalse( get_option( 'leitvia_studio_model_checked' ) );
 			$this->assertFalse( get_transient( 'leitvia_studio_overlay_state' ) );
 			$this->assertFalse( get_transient( 'leitvia_studio_overlay_windows' ) );
@@ -259,6 +261,8 @@ class Test_Uninstall extends WP_UnitTestCase {
 			update_option( 'leitvia_studio_restore_show_avatars', 1 );
 			update_option( 'leitvia_studio_model', array( 'version' => 1 ) );
 			update_option( 'leitvia_studio_flush_rewrite', 1 );
+			update_option( 'leitvia_studio_news_sitemap_rules', '1' );
+			set_transient( 'leitvia_news_sitemap', '<urlset/>', HOUR_IN_SECONDS );
 			update_option( 'leitvia_studio_model_checked', 'x' );
 			set_transient( 'leitvia_studio_overlay_state', 5 );
 			set_transient( 'leitvia_studio_overlay_windows', array() );
