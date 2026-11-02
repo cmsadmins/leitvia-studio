@@ -190,6 +190,29 @@ class Test_Compiler extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A dark set on a light variation turns the inverse bands dark: surface-alt with ink text and a hairline.
+	 */
+	public function test_dark_set_keeps_inverse_bands_dark(): void {
+		self::apply_variation( 'corporate-light' );
+		$id  = self::set_with_accent( '#ff6800' );
+		$doc = Compiler::document( $id );
+		foreach ( array(
+			'surface'     => '#0f172a',
+			'surface-alt' => '#1e293b',
+			'ink'         => '#f1f5f9',
+		) as $slug => $hex ) {
+			$doc['color'][ $slug ]['$value']['hex'] = $hex;
+		}
+		$data = Compiler::inverse( array(), $doc );
+		$this->assertSame( 'var:preset|color|surface-alt', $data['styles']['blocks']['core/group']['variations']['inverse']['color']['background'] );
+		$this->assertSame( 'var:preset|color|ink', $data['styles']['blocks']['core/cover']['variations']['inverse']['color']['text'] );
+
+		$light = Compiler::inverse( $data, Compiler::document( $id ) );
+		$this->assertSame( 'var:preset|color|ink', $light['styles']['blocks']['core/group']['variations']['inverse']['color']['background'] );
+		$this->assertArrayNotHasKey( 'border', $light['styles']['blocks']['core/group']['variations']['inverse'] );
+	}
+
+	/**
 	 * Writes a style variation of the theme into the user global styles, as the site editor and set-variation do.
 	 *
 	 * @param string $slug Variation slug.

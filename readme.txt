@@ -4,7 +4,7 @@ Tags: ai, mcp, block theme, accessibility, design tokens
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.14
+Stable tag: 1.3.15
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -208,6 +208,14 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * Privacy policy: https://leitvia.com/privacy-policy/
 
 == Changelog ==
+
+= 1.3.15 =
+* A dark token set keeps inverse bands dark: activating a set now writes the inverse mapping of group and cover for the scheme of the set.
+* update-content takes link_text in blocks, as update-block does.
+* A recipe run with a selection of pages links only pages that exist or that the run creates, and a second run writes the same footer again.
+* plan-page no longer plans patterns of kits that are not unlocked, and puts a named point on its section.
+* update-block moves the points of a spotlight; the spotlight patterns say that their points belong to the sample image.
+* A suggestion with a package key no longer fails on the privacy policy page; whoever applies the package needs the capability.
 
 = 1.3.14 =
 * With the AI plugin 1.5, the rejection of a connector request names Tools, Connector Approvals, where an administrator approves it.

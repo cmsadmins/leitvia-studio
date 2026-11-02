@@ -1,6 +1,6 @@
 {
 	"usage": {
-		"useWhen": "One point on a spotlight image with a name and a short text.",
+		"useWhen": "One point on a spotlight image with a name and a short text. x and y place it in percent of the image from the start edge and the top; leitvia/update-block moves it with attributes x and y, for example after the image changed.",
 		"avoidWhen": "Outside a spotlight; it only works as its child.",
 		"a11y": "The name must describe the point without the image, for example Charging port instead of Point 1."
 	}

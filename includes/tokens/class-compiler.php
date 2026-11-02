@@ -132,10 +132,50 @@ final class Compiler {
 			return $valid;
 		}
 		$settings = (array) Dtcg::to_settings( $doc, $contract );
-		return self::lay_over( $data, $settings ) + array(
+		return self::inverse( self::lay_over( $data, $settings ), $doc ) + array(
 			'version'                     => \WP_Theme_JSON::LATEST_SCHEMA,
 			'isGlobalStylesUserThemeJSON' => true,
 		);
+	}
+
+	/**
+	 * Sets the block style inverse of group and cover to the scheme of the set. The style variations carry it: light
+	 * ones put surface text on ink, dark ones ink text on surface-alt with a hairline. A set replaces the colors of a
+	 * variation but not this mapping, so a dark set on a light variation turned every "dark" band light. The scheme is
+	 * dark when surface is darker than ink.
+	 *
+	 * @param array<string, mixed> $data User global styles data.
+	 * @param array<string, mixed> $doc  Token document.
+	 * @return array<string, mixed>
+	 */
+	public static function inverse( array $data, array $doc ): array {
+		$surface = Contrast::luminance( (string) ( $doc['color']['surface']['$value']['hex'] ?? '' ) );
+		$ink     = Contrast::luminance( (string) ( $doc['color']['ink']['$value']['hex'] ?? '' ) );
+		if ( is_wp_error( $surface ) || is_wp_error( $ink ) ) {
+			return $data;
+		}
+		$style = $surface < $ink
+			? array(
+				'color'  => array(
+					'background' => 'var:preset|color|surface-alt',
+					'text'       => 'var:preset|color|ink',
+				),
+				'border' => array(
+					'color' => 'var:preset|color|stroke',
+					'style' => 'solid',
+					'width' => '1px',
+				),
+			)
+			: array(
+				'color' => array(
+					'background' => 'var:preset|color|ink',
+					'text'       => 'var:preset|color|surface',
+				),
+			);
+		foreach ( array( 'core/cover', 'core/group' ) as $block ) {
+			$data['styles']['blocks'][ $block ]['variations']['inverse'] = $style;
+		}
+		return $data;
 	}
 
 	/**

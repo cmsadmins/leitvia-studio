@@ -43,7 +43,7 @@ final class Maintain {
 		Abilities::write(
 			'leitvia/update-content',
 			__( 'Update content', 'leitvia-studio' ),
-			__( 'Updates title, excerpt, slug, date, terms, fields, featured image, comment status and the texts and button links of several blocks of one post in one operation, blocks found by their ID from the outline. Terms, fields and featured image follow the rules of leitvia/create-content; terms replace those of their taxonomy. Instead of blocks, content replaces the whole content with block markup, for example to turn classic content into blocks; the new content may hold no classic block. Read the post with leitvia/get-page-outline first and send its hash as base_hash. A slug change is a URL change and lands at most as a suggestion; after one, leitvia/repair-links with auto points the links of other posts to the new address. For attributes or images of a block use leitvia/update-block.', 'leitvia-studio' ),
+			__( 'Updates title, excerpt, slug, date, terms, fields, featured image, comment status and the texts and button links of several blocks of one post in one operation, blocks found by their ID from the outline. Per block, url changes the one link of a text too and link_text names the part that stays linked, as in leitvia/update-block. Terms, fields and featured image follow the rules of leitvia/create-content; terms replace those of their taxonomy. Instead of blocks, content replaces the whole content with block markup, for example to turn classic content into blocks; the new content may hold no classic block. Read the post with leitvia/get-page-outline first and send its hash as base_hash. A slug change is a URL change and lands at most as a suggestion; after one, leitvia/repair-links with auto points the links of other posts to the new address. For attributes or images of a block use leitvia/update-block.', 'leitvia-studio' ),
 			'maintain',
 			$overwrite,
 			array(
@@ -68,21 +68,27 @@ final class Maintain {
 						'items'    => array(
 							'type'                 => 'object',
 							'properties'           => array(
-								'block' => array(
+								'block'     => array(
 									'type'        => 'string',
 									'minLength'   => 1,
 									'maxLength'   => 200,
 									'description' => __( 'Block ID or path ID from the outline.', 'leitvia-studio' ),
 								),
-								'text'  => array(
+								'text'      => array(
 									'type'        => 'string',
 									'maxLength'   => 5000,
 									'description' => __( 'Plain text of a paragraph, heading, list item or button.', 'leitvia-studio' ),
 								),
-								'url'   => array(
+								'link_text' => array(
+									'type'        => 'string',
+									'minLength'   => 1,
+									'maxLength'   => 500,
+									'description' => __( 'Part of text that stays linked when the text holds a link, such as the mail address in a contact line. Without it the link stays around its old text, and a text without that is refused unless the link only points to #.', 'leitvia-studio' ),
+								),
+								'url'       => array(
 									'type'        => 'string',
 									'maxLength'   => 2000,
-									'description' => __( 'Link of a button.', 'leitvia-studio' ),
+									'description' => __( 'Link of a button, or of the one link in a paragraph, heading or list item (mailto: and tel: work too).', 'leitvia-studio' ),
 								),
 							),
 							'required'             => array( 'block' ),

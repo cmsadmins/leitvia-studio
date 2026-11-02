@@ -202,6 +202,80 @@ class Test_Gateway_Maintain extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A block edit of update-content keeps the one link of a text around link_text, as update-block does; without it a
+	 * text that drops the link is refused.
+	 */
+	public function test_update_content_keeps_link_with_link_text(): void {
+		$page = $this->page( self::paragraph( 'Write to <a href="mailto:old@example.org">old@example.org</a> today.' ) );
+		update_option( Gateway::OPTION, array( 'profile' => 'full' ) + Gateway::DEFAULTS );
+		$edit = array(
+			'block' => 'p:0',
+			'text'  => 'Mail new@example.org any time.',
+		);
+
+		$data = $this->assert_rejected(
+			'leitvia_invalid_input',
+			self::call(
+				'leitvia/update-content',
+				$page,
+				array(
+					'post'   => $page,
+					'blocks' => array( $edit ),
+				)
+			)
+		);
+		$this->assertSame( 'link_text', $data['reason'] );
+
+		$live = $this->assert_ok(
+			self::call(
+				'leitvia/update-content',
+				$page,
+				array(
+					'post'   => $page,
+					'blocks' => array(
+						$edit + array(
+							'link_text' => 'new@example.org',
+							'url'       => 'mailto:new@example.org',
+						),
+					),
+				)
+			)
+		);
+		$this->assertStringContainsString( '<p>Mail <a href="mailto:new@example.org">new@example.org</a> any time.</p>', get_post_field( 'post_content', $page ) );
+		$this->roll_back( $live );
+	}
+
+	/**
+	 * Core asks manage_privacy_options to edit the privacy policy page, which the agent role lacks: a change without a
+	 * package key is forbidden, with a key it is a proposal in the package, and an administrator applies it.
+	 */
+	public function test_update_content_proposes_a_change_of_the_privacy_page(): void {
+		$page = $this->page( self::paragraph( 'Placeholder' ) );
+		update_option( 'wp_page_for_privacy_policy', $page );
+		$this->assertFalse( current_user_can( 'edit_post', $page ) );
+		$input = array(
+			'post'   => $page,
+			'blocks' => array(
+				array(
+					'block' => 'p:0',
+					'text'  => 'We keep no logs.',
+				),
+			),
+		);
+		$this->assert_rejected( 'leitvia_forbidden', self::call( 'leitvia/update-content', $page, $input ) );
+
+		$result = $this->assert_ok( self::call( 'leitvia/update-content', $page, $input + array( 'package' => 'privacy-2026' ) ) );
+		$this->assertSame( 'package', $result['mode'] );
+		$this->assertStringContainsString( 'Placeholder', get_post_field( 'post_content', $page ) );
+
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+		$report = Packages::apply( $result['package'] );
+		$this->assertSame( 'applied', $report['state'], wp_json_encode( $report ) );
+		$this->assertStringContainsString( '<p>We keep no logs.</p>', get_post_field( 'post_content', $page ) );
+		delete_option( 'wp_page_for_privacy_policy' );
+	}
+
+	/**
 	 * Content replaces classic content whole and rolls back; it may not come with blocks, and it may hold no classic
 	 * block, raw HTML or Custom HTML even though the old content was classic.
 	 */

@@ -52,6 +52,17 @@ final class Block_Edit {
 	);
 
 	/**
+	 * Attributes of Studio blocks that save as a custom property in percent in the style of their element, rebuilt from
+	 * the new value: the position of a spotlight point on its image.
+	 */
+	public const POSITION_ATTRIBUTES = array(
+		'leitvia/spotlight-hotspot' => array(
+			'x' => '--x',
+			'y' => '--y',
+		),
+	);
+
+	/**
 	 * Content with one block changed.
 	 *
 	 * @param string               $content Block markup.
@@ -287,12 +298,49 @@ final class Block_Edit {
 		if ( $core ) {
 			return isset( $attrs['level'] ) ? self::level( $block, (int) $attrs['level'], $rebuild ) : $block;
 		}
+		$position = self::POSITION_ATTRIBUTES[ $name ] ?? array();
+		if ( $position && ! array_diff_key( $attrs, $position ) ) {
+			return self::position( $block, $attrs, $position, $target, $rebuild );
+		}
 		$type = \WP_Block_Type_Registry::get_instance()->get_registered( $name );
 		$own  = implode( '', array_filter( (array) $block['innerContent'], 'is_string' ) );
 		if ( ! $type || ( ! $type->is_dynamic() && '' !== trim( $own ) ) ) {
 			return $rebuild;
 		}
 		$block['attrs'] = $attrs + (array) $block['attrs'];
+		return $block;
+	}
+
+	/**
+	 * Block with a new position (POSITION_ATTRIBUTES): the attributes in the comment and the custom properties in the
+	 * style of its first element, as the editor saves them.
+	 *
+	 * @param array<string, mixed>  $block    Parsed block.
+	 * @param array<string, mixed>  $attrs    New attribute values, numbers from 0 to 100.
+	 * @param array<string, string> $position Custom property by attribute.
+	 * @param array<string, mixed>  $target   Target.
+	 * @param \WP_Error             $rebuild  Rejection for static markup.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private static function position( array $block, array $attrs, array $position, array $target, \WP_Error $rebuild ) {
+		$tags  = new \WP_HTML_Tag_Processor( (string) ( $block['innerContent'][0] ?? '' ) );
+		$style = $tags->next_tag() ? $tags->get_attribute( 'style' ) : null;
+		if ( ! is_string( $style ) ) {
+			return $rebuild;
+		}
+		foreach ( $attrs as $key => $value ) {
+			if ( $value < 0 || $value > 100 ) {
+				/* translators: %s: attribute name. */
+				return self::invalid( 'attributes', sprintf( __( 'The attribute %s is a position in percent from 0 to 100.', 'leitvia-studio' ), $key ), $target );
+			}
+			$style = preg_replace( '/(^|;)\s*' . preg_quote( $position[ $key ], '/' ) . ':[^;]*/', '${1}' . $position[ $key ] . ':' . $value . '%', $style, 1, $count );
+			if ( null === $style || 1 !== $count ) {
+				return $rebuild;
+			}
+		}
+		$tags->set_attribute( 'style', (string) $style );
+		$block['innerContent'][0] = $tags->get_updated_html();
+		$block['attrs']           = $attrs + (array) $block['attrs'];
 		return $block;
 	}
 

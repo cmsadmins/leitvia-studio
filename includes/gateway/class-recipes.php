@@ -478,6 +478,12 @@ final class Recipes {
 				self::remember( 'variation', $call( 'variation', 'leitvia/set-variation', array( 'variation' => (string) $recipe['variation'] ), self::planned( 'variation' ) ) );
 			}
 		}
+		// Recipe pages this run creates or that wait in its package. Links of the navigation and the footer to other recipe
+		// pages that are not on the site are left out, so a run with some pages links no page it does not create.
+		$coming = array_merge(
+			$has( 'pages' ) ? array_map( 'strval', (array) $sel['pages'] ) : array(),
+			array_map( static fn( string $item ): string => substr( $item, 5 ), (array) preg_grep( '/^page:/', self::queued( $key ) ) )
+		);
 		foreach ( (array) ( $recipe['templateParts'] ?? array() ) as $part => $pattern ) {
 			if ( ! $has( (string) $part ) ) {
 				continue;
@@ -497,7 +503,7 @@ final class Recipes {
 			// Only a recipe that names footerNavigation rewrites the links to "#"; without it the pattern stays as it is, so
 			// a kit can still put its own pages in place of those links.
 			$part_content = 'footer' === $part && ! empty( $recipe['footerNavigation'] )
-				? self::linked_part( $pattern, self::links( (array) $recipe['footerNavigation'], $recipe, array() ) )
+				? self::linked_part( $pattern, self::links( (array) $recipe['footerNavigation'], $recipe, array(), $coming ) )
 				: '';
 			if ( $edits ) {
 				$registered   = \WP_Block_Patterns_Registry::get_instance()->get_registered( $pattern );
@@ -565,7 +571,13 @@ final class Recipes {
 			if ( self::changed( 'navigation' ) ) {
 				$steps[] = self::step( 'navigation', 'leitvia/update-navigation', 'exists', array() );
 			} else {
-				self::remember( 'navigation', $call( 'navigation', 'leitvia/update-navigation', array( 'items' => self::links( (array) $recipe['navigation'], $recipe, $pages ) ), self::planned( 'navigation' ) ) );
+				$items = self::links( (array) $recipe['navigation'], $recipe, $pages, $coming );
+				// Without any of its pages the navigation waits for them; a menu needs at least one link.
+				if ( $items ) {
+					self::remember( 'navigation', $call( 'navigation', 'leitvia/update-navigation', array( 'items' => $items ), self::planned( 'navigation' ) ) );
+				} else {
+					$steps[] = self::step( 'navigation', 'leitvia/update-navigation', 'waiting', array(), 'page_missing' );
+				}
 			}
 		}
 		// A static front page waits together with its page: show_on_front alone would show an empty front page.
@@ -686,20 +698,30 @@ final class Recipes {
 
 	/**
 	 * Links to pages by slug, label and url each: a recipe page by its title, at its address or, while it is not on the
-	 * site yet, at the address its slug gives it; another slug links to the published page of the site with that path,
-	 * such as the shop page of WooCommerce, and is left out without one.
+	 * site yet but comes in this run, at the address its slug gives it; a recipe page that is neither on the site nor
+	 * coming is left out. Another slug links to the published page of the site with that path, such as the shop page of
+	 * WooCommerce, and is left out without one.
 	 *
 	 * @param string[]             $slugs  Page slugs in order.
 	 * @param array<string, mixed> $recipe Recipe.
-	 * @param array<string, int>   $pages  Page IDs by recipe slug, 0 for a page that is not on the site yet.
+	 * @param array<string, int>   $pages  Page IDs by recipe slug, 0 for a page that is not on the site yet; a slug
+	 *                                     missing here is looked up.
+	 * @param string[]             $coming Slugs of recipe pages this run creates or that wait in its package.
 	 * @return list<array{label: string, url: string}>
 	 */
-	private static function links( array $slugs, array $recipe, array $pages ): array {
+	private static function links( array $slugs, array $recipe, array $pages, array $coming ): array {
 		$items  = array();
 		$titles = array_column( (array) $recipe['pages'], 'title', 'slug' );
+		$byslug = array_column( (array) $recipe['pages'], null, 'slug' );
 		foreach ( $slugs as $slug ) {
 			$slug = (string) $slug;
 			if ( isset( $titles[ $slug ] ) ) {
+				$id = $pages[ $slug ] ?? self::find( (array) $byslug[ $slug ], 0 );
+				if ( ! $id && ! in_array( $slug, $coming, true ) ) {
+					continue;
+				}
+				// The ID only decides whether the page is linked; the address stays as before, so a second run writes
+				// the same part and reports it unchanged.
 				$items[] = array(
 					'label' => (string) $titles[ $slug ],
 					'url'   => ! empty( $pages[ $slug ] ) ? (string) get_permalink( $pages[ $slug ] ) : home_url( '/' . $slug . '/' ),

@@ -524,6 +524,48 @@ class Test_Gateway_Recipes extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A run with some pages links only pages that are on the site or come in this run: navigation and footer of the
+	 * company recipe with home and imprint lead to the imprint and leave out services, about and contact.
+	 */
+	public function test_navigation_links_only_pages_of_the_run(): void {
+		$this->set_permalink_structure( '/%postname%/' );
+		$this->sign_in_live();
+		$result = $this->run_recipe(
+			array(
+				'recipe' => 'leitvia/company',
+				'pages'  => array( 'home', 'imprint' ),
+			)
+		);
+		$this->assertNull( get_page_by_path( 'services' ) );
+		$this->assertSame( array( 'waiting' ), self::statuses( $result, 'navigation' ), 'none of services, about and contact is there, so the menu waits' );
+		$footer = array();
+		foreach ( parse_blocks( get_block_template( get_stylesheet() . '//footer', 'wp_template_part' )->content ) as $block ) {
+			array_push( $footer, ...self::navigation_links( $block ) );
+		}
+		$this->assertSame( array( 'Imprint' => home_url( '/imprint/' ) ), array_column( $footer, 'url', 'label' ) );
+
+		$this->run_recipe(
+			array(
+				'recipe' => 'leitvia/company',
+				'pages'  => array( 'contact' ),
+			)
+		);
+		$navigation = get_posts(
+			array(
+				'post_type'   => 'wp_navigation',
+				'post_status' => 'publish',
+				'numberposts' => 1,
+			)
+		);
+		$this->assertNotEmpty( $navigation );
+		$links = array();
+		foreach ( parse_blocks( $navigation[0]->post_content ) as $block ) {
+			array_push( $links, ...self::navigation_links( $block ) );
+		}
+		$this->assertSame( array( 'Contact' => home_url( '/contact/' ) ), array_column( $links, 'url', 'label' ), 'the menu names the page of the run only' );
+	}
+
+	/**
 	 * Attributes of the navigation links in a parsed block and its inner blocks.
 	 *
 	 * @param array<string, mixed> $block Parsed block.

@@ -164,7 +164,7 @@ final class Pipeline {
 			return $limited;
 		}
 		// 2. Scope and the capability for this target.
-		$before = self::before( $op );
+		$before = self::before( $op, $package );
 		if ( is_wp_error( $before ) ) {
 			return $before;
 		}
@@ -363,12 +363,16 @@ final class Pipeline {
 
 	/**
 	 * Current state of the target after the scope and capability checks: post fields, array( 'value' => … ) for an
-	 * option, an empty array for a new post.
+	 * option, an empty array for a new post. A post the user may not edit (core asks manage_privacy_options for the
+	 * privacy policy page) is open to a proposal: a write with a package key, outside a replay and a settled recipe run,
+	 * only lands in the package, and the person who applies it needs the capability then; edit_posts of the post type
+	 * is enough to propose.
 	 *
-	 * @param Operation $op Operation.
+	 * @param Operation $op      Operation.
+	 * @param int       $package Package of a replay, 0 for none.
 	 * @return array<string, mixed>|\WP_Error
 	 */
-	private static function before( Operation $op ) {
+	private static function before( Operation $op, int $package = 0 ) {
 		$target    = self::target( $op );
 		$out       = Rejection::make( 'leitvia_out_of_scope', __( 'Agents may not change this object. Only published or draft content of the allowed post types is open to them.', 'leitvia-studio' ), 403, 'scope', $target, '', 'never' );
 		$forbidden = Rejection::make( 'leitvia_forbidden', __( 'Your user may not change this object.', 'leitvia-studio' ), 403, 'capability', $target, '', 'never' );
@@ -393,7 +397,11 @@ final class Pipeline {
 			return $out;
 		}
 		if ( ! current_user_can( 'edit_post', $op->post_id() ) ) {
-			return $forbidden;
+			$object   = get_post_type_object( (string) get_post_type( $op->post_id() ) );
+			$proposal = ! $package && '' !== $op->package && ! Recipes::collects( $op->package ) && $object && current_user_can( $object->cap->edit_posts );
+			if ( ! $proposal ) {
+				return $forbidden;
+			}
 		}
 		return self::state( $op->post_id() );
 	}

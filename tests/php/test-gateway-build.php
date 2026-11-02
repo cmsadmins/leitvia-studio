@@ -8,6 +8,7 @@
 use LeitviaStudio\Gateway\Block_Edit;
 use LeitviaStudio\Gateway\Gateway;
 use LeitviaStudio\Gateway\Hashes;
+use LeitviaStudio\Gateway\Outline;
 
 /**
  * Block edits from fixtures, compose-page, update-block, create-pattern, vary-pattern and add-media through the
@@ -335,6 +336,53 @@ class Test_Gateway_Build extends WP_UnitTestCase {
 		$this->assertIsArray( self::call( 'leitvia/update-block', $level( 2 ) ) );
 		$this->assertArrayNotHasKey( 'level', $heading()['attrs'] );
 		$this->assertSame( "\n<h2 class=\"wp-block-heading\">Details <em>here</em></h2>\n", $heading()['innerHTML'] );
+	}
+
+	/**
+	 * The ability update-block moves a point of the spotlight pattern: x and y change in the comment and in the custom
+	 * properties of its element together. A position outside 0 to 100 and another static attribute are refused.
+	 */
+	public function test_update_block_spotlight_position(): void {
+		$pattern = WP_Block_Patterns_Registry::get_instance()->get_registered( 'leitvia-studio/content-spotlight' );
+		$page    = self::factory()->post->create(
+			array(
+				'post_type'    => 'page',
+				'post_status'  => 'publish',
+				'post_content' => wp_slash( $pattern['content'] ),
+			)
+		);
+		$point   = static function () use ( $page ): array {
+			$outline = Outline::page( $page );
+			foreach ( $outline['blocks'][0]['children'][1]['children'] as $child ) {
+				if ( 'leitvia/spotlight-hotspot' === $child['name'] ) {
+					return Outline::block( $page, $child['id'] );
+				}
+			}
+			return array();
+		};
+		$move    = static fn( array $attributes ): array => array(
+			'post'       => $page,
+			'block'      => $point()['id'],
+			'attributes' => $attributes,
+			'base_hash'  => Hashes::document( $page ),
+		);
+
+		$result = self::call(
+			'leitvia/update-block',
+			$move(
+				array(
+					'x' => 10,
+					'y' => 62.5,
+				)
+			)
+		);
+		$this->assertIsArray( $result, is_wp_error( $result ) ? wp_json_encode( $result->get_error_data() ) : '' );
+		$this->assertSame( array( 10, 62.5 ), array( $point()['attributes']->x, $point()['attributes']->y ) );
+		$this->assertStringContainsString( '<details style="--x:10%;--y:62.5%"', $point()['inner_html'] );
+
+		$data = $this->assert_rejected( 'leitvia_invalid_input', self::call( 'leitvia/update-block', $move( array( 'x' => 120 ) ) ) );
+		$this->assertSame( 'attributes', $data['reason'] );
+		$this->assert_rejected( 'leitvia_static_markup', self::call( 'leitvia/update-block', $move( array( 'label' => 'Moved' ) ) ) );
 	}
 
 	/**

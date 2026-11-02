@@ -42,7 +42,7 @@ final class Read_Plan {
 		Gateway\Abilities::read(
 			self::NAME,
 			__( 'Plan page', 'leitvia-studio' ),
-			__( 'Proposes a page for a goal and content points: page frame, template, the patterns in page order with role, slot, text lengths and the points each section carries, and the composition score. Without AI the plan follows the page frames, examples and composition rules of the contract and is the same for the same input; it leaves out patterns that need images while the media library has none, post teasers below three published posts and proof or offer patterns, which carry facts of the person, and plans a shop home from the home page of the shop recipe. With ai set to true the AI connector the site owner set up in WordPress refines it; the goal, the points and pattern names with their metadata are sent to that provider. Writes nothing; build the page with leitvia/compose-page.', 'leitvia-studio' ),
+			__( 'Proposes a page for a goal and content points: page frame, template, the patterns in page order with role, slot, text lengths and the points each section carries, and the composition score. Without AI the plan follows the page frames, examples and composition rules of the contract and is the same for the same input; it leaves out patterns that need images while the media library has none, post teasers below three published posts and proof or offer patterns, which carry facts of the person, and patterns the inserter hides, and plans a shop home from the home page of the shop recipe. A point that starts with the role, slot or area of a section and a colon (Hero: ...) lands on that section. With ai set to true the AI connector the site owner set up in WordPress refines it; the goal, the points and pattern names with their metadata are sent to that provider. Writes nothing; build the page with leitvia/compose-page.', 'leitvia-studio' ),
 			array(
 				'type'                 => 'object',
 				'properties'           => array(
@@ -137,7 +137,8 @@ final class Read_Plan {
 	}
 
 	/**
-	 * Registered, approved patterns of the contract by slug; deprecated ones and those with deprecated parts are left out.
+	 * Registered, approved patterns of the contract by slug; deprecated ones and those with deprecated parts are left out,
+	 * as are patterns the inserter hides, such as the patterns of an industry kit that is not unlocked on this site.
 	 *
 	 * @return array<string, array<string, mixed>>
 	 */
@@ -147,7 +148,7 @@ final class Read_Plan {
 		$usable   = array();
 		foreach ( array_merge( (array) ( $data['patterns'] ?? array() ), (array) ( $data['studioPatterns'] ?? array() ), (array) ( $data['addonPatterns'] ?? array() ) ) as $pattern ) {
 			$slug = (string) ( $pattern['slug'] ?? '' );
-			if ( '' !== $slug && $registry->is_registered( $slug ) && 'approved' === Status::effective( 'pattern:' . $slug ) ) {
+			if ( '' !== $slug && $registry->is_registered( $slug ) && false !== ( $registry->get_registered( $slug )['inserter'] ?? true ) && 'approved' === Status::effective( 'pattern:' . $slug ) ) {
 				$usable[ $slug ] = $pattern;
 			}
 		}
@@ -275,8 +276,9 @@ final class Read_Plan {
 	}
 
 	/**
-	 * The plan for a list of sections: role, slot, text lengths and points per section, score and findings. Points
-	 * without a section of their own go round the sections of the content slot, or of the whole page without one.
+	 * The plan for a list of sections: role, slot, text lengths and points per section, score and findings. A point that
+	 * starts with the role, slot or area of a section and a colon (Hero: ..., CTA: ...) goes to the first such section;
+	 * the other points go round the sections of the content slot, or of the whole page without one.
 	 *
 	 * @param array<string, mixed>     $frame    Page frame.
 	 * @param string[]                 $slugs    Pattern slugs in page order.
@@ -311,8 +313,14 @@ final class Read_Plan {
 		if ( ! $assigned && $sections && $points ) {
 			$targets = array_keys( array_filter( $sections, static fn( array $s ): bool => 'content' === $s['slot'] ) );
 			$targets = $targets ? $targets : array_keys( $sections );
-			foreach ( $points as $i => $point ) {
-				$sections[ $targets[ $i % count( $targets ) ] ]['points'][] = $point;
+			$round   = 0;
+			foreach ( $points as $point ) {
+				$at = self::labelled( $point, $sections, $patterns );
+				if ( null === $at ) {
+					$at = $targets[ $round % count( $targets ) ];
+					++$round;
+				}
+				$sections[ $at ]['points'][] = $point;
 			}
 		}
 		$score = Gateway\Composition::score( $slugs, $contract, (string) $frame['template'] );
@@ -325,6 +333,27 @@ final class Read_Plan {
 			'source'   => $source,
 			'dropped'  => $dropped,
 		);
+	}
+
+	/**
+	 * Index of the first section whose role, slot or area the point names before a colon, such as Hero: or CTA:; null
+	 * for a point without such a label.
+	 *
+	 * @param string                              $point    Content point.
+	 * @param list<array<string, mixed>>          $sections Sections of the plan.
+	 * @param array<string, array<string, mixed>> $patterns Usable patterns.
+	 */
+	private static function labelled( string $point, array $sections, array $patterns ): ?int {
+		if ( ! preg_match( '/^\s*([\p{L} -]{2,20}):/u', $point, $match ) ) {
+			return null;
+		}
+		$label = mb_strtolower( trim( $match[1] ) );
+		foreach ( $sections as $index => $section ) {
+			if ( in_array( $label, array( $section['role'], $section['slot'], (string) ( $patterns[ $section['pattern'] ]['area'] ?? '' ) ), true ) ) {
+				return $index;
+			}
+		}
+		return null;
 	}
 
 	/**

@@ -173,6 +173,36 @@ class Test_Gateway_Ai extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Without AI the plan leaves out a pattern the inserter hides (as Pro hides the patterns of a kit that is not
+	 * unlocked), and a point labelled with the area, role or slot of a section lands there; the others go round the
+	 * content sections.
+	 */
+	public function test_plan_skips_hidden_patterns_and_places_labelled_points(): void {
+		$input = array(
+			'goal'   => 'Home of a software product',
+			'frame'  => 'home',
+			'points' => array( 'Hero: Feedback on the page itself', 'Pins on any element', 'CTA: Install it free' ),
+		);
+		$plan  = self::plan( $input );
+		$hero  = $plan['sections'][0];
+		$this->assertSame( 'hook', $hero['role'] );
+		$this->assertSame( array( 'Hero: Feedback on the page itself' ), $hero['points'] );
+		$close = array_values( wp_list_filter( $plan['sections'], array( 'slot' => 'actions' ) ) );
+		$this->assertContains( 'CTA: Install it free', $close[0]['points'] ?? array() );
+		$this->assertSame( array( 'Pins on any element' ), array_values( wp_list_filter( $plan['sections'], array( 'slot' => 'content' ) ) )[0]['points'] );
+
+		$registry = WP_Block_Patterns_Registry::get_instance();
+		$pattern  = $registry->get_registered( $hero['pattern'] );
+		$registry->unregister( $hero['pattern'] );
+		register_block_pattern( $hero['pattern'], array( 'inserter' => false ) + $pattern );
+		$hidden = self::plan( $input );
+		$registry->unregister( $hero['pattern'] );
+		register_block_pattern( $hero['pattern'], $pattern );
+		$this->assertNotContains( $hero['pattern'], array_column( $hidden['sections'], 'pattern' ) );
+		$this->assertSame( $plan, self::plan( $input ), 'shown again, it is planned again' );
+	}
+
+	/**
 	 * With ai: true but without AI support in WordPress or without a connector: leitvia_ai_unavailable (424) pointing back to
 	 * plan-page with ai: false, retry never, and the plan without AI in the data.
 	 */
