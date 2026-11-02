@@ -189,8 +189,16 @@ final class Schema {
 		if ( $target instanceof WP_Post ) {
 			$trail[] = array( self::text( get_the_title( $target ) ), (string) get_permalink( $target ) );
 		}
+		// A posts page named like the category ("News" and the category News) gives two neighbours with one name. The
+		// earlier one stays, unless the later one is the target itself; the theme drops the same crumb on screen.
+		$last = count( $trail ) - 1;
+		for ( $i = $last; $i > 0; $i-- ) {
+			if ( isset( $trail[ $i ], $trail[ $i - 1 ] ) && 0 === strcasecmp( $trail[ $i ][0], $trail[ $i - 1 ][0] ) ) {
+				unset( $trail[ $i === $last ? $i - 1 : $i ] );
+			}
+		}
 		$items = array();
-		foreach ( $trail as $index => list( $name, $url ) ) {
+		foreach ( array_values( $trail ) as $index => list( $name, $url ) ) {
 			$items[] = array(
 				'@type'    => 'ListItem',
 				'position' => $index + 1,

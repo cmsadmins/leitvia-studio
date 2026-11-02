@@ -4,7 +4,7 @@ Tags: ai, mcp, block theme, accessibility, design tokens
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.16
+Stable tag: 1.3.17
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -208,6 +208,9 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * Privacy policy: https://leitvia.com/privacy-policy/
 
 == Changelog ==
+
+= 1.3.17 =
+* The BreadcrumbList names a posts page and a category of the same name (News and News) only once.
 
 = 1.3.16 =
 * News for Google News: every post is a NewsArticle, or only the posts of the categories chosen under Design and search; the others stay BlogPosting.

@@ -288,6 +288,18 @@ class Test_News_Schema extends WP_UnitTestCase {
 		// With a posts page, the breadcrumbs of a post lead through it.
 		$this->go_to( get_permalink( $this->post ) );
 		$this->assertSame( array( home_url( '/' ), get_permalink( $blog ), get_category_link( $news ), get_permalink( $this->post ) ), array_column( $this->node( 'BreadcrumbList' )['itemListElement'], 'item' ) );
+
+		// A posts page named like the category: the post keeps the posts page, the archive keeps itself.
+		wp_update_post(
+			array(
+				'ID'         => $blog,
+				'post_title' => get_cat_name( $news ),
+			)
+		);
+		$this->go_to( get_permalink( $this->post ) );
+		$this->assertSame( array( home_url( '/' ), get_permalink( $blog ), get_permalink( $this->post ) ), array_column( $this->node( 'BreadcrumbList' )['itemListElement'], 'item' ) );
+		$this->go_to( get_category_link( $news ) );
+		$this->assertSame( array( home_url( '/' ), get_category_link( $news ) ), array_column( $this->node( 'BreadcrumbList' )['itemListElement'], 'item' ) );
 	}
 
 	/**
