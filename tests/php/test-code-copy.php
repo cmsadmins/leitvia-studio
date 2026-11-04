@@ -44,6 +44,22 @@ class Test_Code_Copy extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A named code block names its button after the visible text; without a name the button keeps its text as name.
+	 */
+	public function test_named_block_names_its_button(): void {
+		$html = do_blocks( '<!-- wp:code {"metadata":{"name":"phone"}} --><pre class="wp-block-code"><code>x</code></pre><!-- /wp:code -->' );
+		$this->assertStringContainsString( '<button type="button" class="leitvia-code-copy__button" aria-label="Copy code: phone" hidden>Copy code</button>', $html );
+	}
+
+	/**
+	 * A group saved as a list keeps its list role; other groups stay as they are.
+	 */
+	public function test_list_group_gets_list_role(): void {
+		$this->assertStringContainsString( '<ul role="list" class="wp-block-group', do_blocks( '<!-- wp:group {"tagName":"ul"} --><ul class="wp-block-group"></ul><!-- /wp:group -->' ) );
+		$this->assertStringNotContainsString( 'role=', do_blocks( '<!-- wp:group --><div class="wp-block-group"></div><!-- /wp:group -->' ) );
+	}
+
+	/**
 	 * Wide code stays wide: the wrapper takes the alignment class.
 	 */
 	public function test_wrapper_keeps_alignment(): void {

@@ -42,7 +42,7 @@ final class Icon {
 
 	/**
 	 * The SVG of an icon. Without a label it is decorative and hidden from assistive technology; with one it is an
-	 * image named by the label. Empty for an unknown name.
+	 * image named by the label. The class leitvia-icon--<name> lets a theme style one icon. Empty for an unknown name.
 	 *
 	 * @param string $name  Icon name.
 	 * @param string $label Accessible name, empty for a decorative icon.
@@ -55,9 +55,10 @@ final class Icon {
 		$a11y = '' === $label ? 'aria-hidden="true" focusable="false"' : sprintf( 'role="img" aria-label="%s"', esc_attr( $label ) );
 		// The markup comes from the bundled file, not from the post, so it is not escaped.
 		return sprintf(
-			'<svg class="leitvia-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" %1$s>%2$s</svg>',
+			'<svg class="leitvia-icon leitvia-icon--%3$s" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" %1$s>%2$s</svg>',
 			$a11y,
-			$inner
+			$inner,
+			esc_attr( $name )
 		);
 	}
 

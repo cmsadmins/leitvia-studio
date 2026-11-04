@@ -149,6 +149,26 @@ final class Blocks {
 	}
 
 	/**
+	 * Gives a group saved as ul or ol role="list": a grid or flex layout hides the bullets, and Safari then drops the list
+	 * semantics, as the icon list notes in its save.js. Runs on render_block_core/group.
+	 *
+	 * @param string               $content Block HTML.
+	 * @param array<string, mixed> $block   Parsed block.
+	 * @return string
+	 */
+	public static function list_group( string $content, array $block ): string {
+		$tag = (string) ( $block['attrs']['tagName'] ?? '' );
+		if ( 'ul' !== $tag && 'ol' !== $tag ) {
+			return $content;
+		}
+		$tags = new \WP_HTML_Tag_Processor( $content );
+		if ( $tags->next_tag( array( 'tag_name' => $tag ) ) && null === $tags->get_attribute( 'role' ) ) {
+			$tags->set_attribute( 'role', 'list' );
+		}
+		return $tags->get_updated_html();
+	}
+
+	/**
 	 * Gives the server-rendered blocks their render callback, which returns the markup instead of printing it from a
 	 * render.php file. Runs on register_block_type_args.
 	 *

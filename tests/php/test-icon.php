@@ -29,7 +29,7 @@ class Test_Icon extends WP_UnitTestCase {
 	 */
 	public function test_decorative_icon_is_hidden(): void {
 		$html = do_blocks( '<!-- wp:leitvia/icon {"icon":"phone"} /-->' );
-		$this->assertMatchesRegularExpression( '#^<div class="wp-block-leitvia-icon"><svg class="leitvia-icon" [^>]*stroke="currentColor"[^>]* aria-hidden="true" focusable="false"><path #', $html );
+		$this->assertMatchesRegularExpression( '#^<div class="wp-block-leitvia-icon"><svg class="leitvia-icon leitvia-icon--phone" [^>]*stroke="currentColor"[^>]* aria-hidden="true" focusable="false"><path #', $html );
 		$this->assertStringNotContainsString( 'role="img"', $html );
 	}
 
@@ -88,7 +88,7 @@ class Test_Icon extends WP_UnitTestCase {
 	 */
 	public function test_list_items_use_the_list_icon_or_their_own(): void {
 		$html = do_blocks( '<!-- wp:leitvia/icon-list {"icon":"shield-check"} --><ul role="list" class="wp-block-leitvia-icon-list">' . self::item( 'Hosted in Germany' ) . self::item( 'Call us', '{"icon":"phone"}' ) . '</ul><!-- /wp:leitvia/icon-list -->' );
-		$this->assertSame( 2, substr_count( $html, '<li class="wp-block-leitvia-icon-list-item"><svg class="leitvia-icon"' ) );
+		$this->assertSame( 2, substr_count( $html, '<li class="wp-block-leitvia-icon-list-item"><svg class="leitvia-icon ' ) );
 		$this->assertSame( 2, substr_count( $html, 'aria-hidden="true" focusable="false"' ) );
 		$shield = Icon::icons()['shield-check'];
 		$phone  = Icon::icons()['phone'];

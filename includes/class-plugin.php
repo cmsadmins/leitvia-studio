@@ -170,7 +170,8 @@ final class Plugin {
 		add_filter( 'render_block_core/post-content', array( Blocks\Table_Of_Contents::class, 'leave_content' ) );
 		add_filter( 'render_block_core/heading', array( Blocks\Table_Of_Contents::class, 'add_id' ), 10, 2 );
 		add_action( 'init', array( Blocks\Code_Copy::class, 'register_module' ) );
-		add_filter( 'render_block_core/code', array( Blocks\Code_Copy::class, 'render' ) );
+		add_filter( 'render_block_core/code', array( Blocks\Code_Copy::class, 'render' ), 10, 2 );
+		add_filter( 'render_block_core/group', array( Blocks\Blocks::class, 'list_group' ), 10, 2 );
 		add_action( 'init', array( Blocks\Lightbox_Focus::class, 'register_module' ) );
 		add_filter( 'render_block_core/image', array( Blocks\Lightbox_Focus::class, 'render' ), 20 );
 		add_filter( 'default_wp_template_part_areas', array( Blocks\Mega_Menu::class, 'areas' ) );

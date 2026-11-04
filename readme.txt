@@ -4,7 +4,7 @@ Tags: ai, mcp, block theme, accessibility, design tokens
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.19
+Stable tag: 1.3.20
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -182,7 +182,7 @@ Token sets can name [Libre Franklin](https://github.com/googlefonts/Libre-Frankl
 
 The Map block bundles [Leaflet](https://leafletjs.com/) 1.9.4 by Volodymyr Agafonkin and contributors into `build/blocks/map/leaflet.js`, loaded only after the visitor agrees to load the map, and ships its stylesheet as `build/blocks/map/leaflet.css`. Leaflet is licensed under the BSD 2-Clause License, which is compatible with the GPL; the license text is in `licenses/LEAFLET.txt`.
 
-Icons: [Lucide](https://lucide.dev/) 1.60.0, ISC License (some from Feather, MIT), in `assets/icons/lucide.json`, license in `licenses/LUCIDE.txt`.
+Icons: 112 icons of [Lucide](https://lucide.dev/) 1.60.0, ISC License (some from Feather, MIT), in `assets/icons/lucide.json`, license in `licenses/LUCIDE.txt`.
 
 The pattern illustration `assets/images/landscape.webp` was drawn for Leitvia by CMS ADMINS and is licensed under the GPL, version 2 or later, like the plugin.
 
@@ -210,6 +210,12 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * Privacy policy: https://leitvia.com/privacy-policy/
 
 == Changelog ==
+
+= 1.3.20 =
+* Icon set grows from 76 to 112 Lucide icons, among them chef hat, heart with pulse, gavel, hard hat, trophy, code, shopping bag, newspaper, ear and languages for the topics of the kits.
+* Every icon SVG carries the class leitvia-icon--<name>, so a theme can style a single icon.
+* Code copy: a named code block gives its button the name "Copy code: <name>", so many code blocks on one page have distinct button names.
+* A group saved as a list (ul or ol) keeps its list role in Safari when a grid or flex layout hides the bullets.
 
 = 1.3.19 =
 * New pattern FAQ with structured data: heading and intro above five questions in the FAQ block, one open at a time.

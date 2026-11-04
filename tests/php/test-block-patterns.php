@@ -67,7 +67,7 @@ class Test_Block_Patterns extends WP_UnitTestCase {
 		$html = $this->render( 'leitvia-studio/content-icon-benefits' );
 		$this->assertSame( 1, substr_count( $html, '<h2' ) );
 		$this->assertSame( 1, substr_count( $html, '<ul role="list" class="wp-block-leitvia-icon-list' ) );
-		$this->assertSame( 5, substr_count( $html, '<li class="wp-block-leitvia-icon-list-item"><svg class="leitvia-icon"' ) );
+		$this->assertSame( 5, substr_count( $html, '<li class="wp-block-leitvia-icon-list-item"><svg class="leitvia-icon ' ) );
 		$this->assertSame( 5, substr_count( $html, 'aria-hidden="true" focusable="false"' ) );
 		foreach ( array( 'truck', 'recycle', 'credit-card', 'leaf', 'headphones' ) as $icon ) {
 			$this->assertStringContainsString( Icon::icons()[ $icon ] . '</svg>', $html, $icon );
