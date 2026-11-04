@@ -32,7 +32,7 @@ registerBlockType( metadata.name, {
 								setAttributes( { effect: value } )
 							}
 							help={ __(
-								'Plays only while the page scrolls, never with reduced motion. The editor shows the content without the effect.',
+								'Plays once when the block scrolls into view, never with reduced motion. The editor shows the content without the effect.',
 								'leitvia-studio'
 							) }
 						/>

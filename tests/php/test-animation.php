@@ -46,7 +46,7 @@ class Test_Animation extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The classes land on the outer element only; the saved markup is otherwise unchanged and the style is queued.
+	 * The classes land on the outer element only; the saved markup is otherwise unchanged, style and script are queued.
 	 */
 	public function test_classes_on_the_outer_element(): void {
 		$html = do_blocks( '<!-- wp:group {"leitviaAnimation":"stagger"} --><div class="wp-block-group"><!-- wp:paragraph --><p>One</p><!-- /wp:paragraph --></div><!-- /wp:group -->' );
@@ -54,6 +54,9 @@ class Test_Animation extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'One</p>', $html );
 		$this->assertSame( 1, substr_count( $html, 'has-lv-animation' ) );
 		$this->assertTrue( wp_style_is( self::STYLE ) );
+		ob_start();
+		wp_script_modules()->print_enqueued_script_modules();
+		$this->assertStringContainsString( 'leitvia-reveal-view-script-module-js', (string) ob_get_clean() );
 	}
 
 	/**

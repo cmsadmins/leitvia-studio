@@ -12,10 +12,11 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Every block with markup of its own gets the attribute leitviaAnimation (none, fade, rise, stagger). The saved markup
  * stays as it is, so no block becomes invalid: only the block comment carries the value, and render_block adds the
- * classes has-lv-animation and is-lv-animation-<effect> to the outer element on the front end. The rules live in the
- * style of the reveal block (src/blocks/reveal/style.scss), one source for both: CSS only, scroll-driven, opacity in
- * one step and transform, nothing without support for view timelines or with reduced motion, so the content is always
- * visible, also without JavaScript. The editor panel is src/editor/animation.js.
+ * classes has-lv-animation and is-lv-animation-<effect> to the outer element on the front end. Style and script are
+ * those of the reveal block (src/blocks/reveal/style.scss and view.js), one source for both: the block appears once
+ * when it scrolls into view, opacity and transform only, 600 ms. Only blocks below the visible area are hidden until
+ * then; without JavaScript, with reduced motion and in the editor the content is always visible. The editor panel is
+ * src/editor/animation.js.
  */
 final class Animation {
 
@@ -55,7 +56,7 @@ final class Animation {
 	/**
 	 * When the attribute fits, for agents: the block catalog copies the description of each attribute.
 	 */
-	private const DESCRIPTION = 'Every block accepts leitviaAnimation, also core blocks: fade, rise or stagger (the direct children one after another, up to the sixth) while the block scrolls into view. Use it sparingly, for one or two sections of a landing page; never in the header, the navigation or content needed right away. Visitors with reduced motion and browsers without scroll-driven animation see the block without the effect.';
+	private const DESCRIPTION = 'Every block accepts leitviaAnimation, also core blocks: fade, rise or stagger (the direct children one after another, up to the sixth) once as the block scrolls into view. Use it sparingly, for one or two sections of a landing page; never in the header, the navigation or content needed right away. Visitors with reduced motion and pages without JavaScript show the block without the effect.';
 
 	/**
 	 * Registers the attribute on every block but the excluded ones, so the REST API and ServerSideRender accept it.
@@ -80,8 +81,8 @@ final class Animation {
 	}
 
 	/**
-	 * Adds the classes of the effect to the outer element and loads the style of the reveal block, only on pages that
-	 * use an effect. Block themes render the template before wp_head, so the style lands in the head. Runs on
+	 * Adds the classes of the effect to the outer element and loads style and script of the reveal block, only on pages
+	 * that use an effect. Block themes render the template before wp_head, so the style lands in the head. Runs on
 	 * render_block.
 	 *
 	 * @param string               $content Block HTML.
@@ -100,6 +101,7 @@ final class Animation {
 		$tags->add_class( 'has-lv-animation' );
 		$tags->add_class( 'is-lv-animation-' . $effect );
 		wp_enqueue_style( generate_block_asset_handle( 'leitvia/reveal', 'style' ) );
+		wp_enqueue_script_module( 'leitvia-reveal-view-script-module' );
 		return $tags->get_updated_html();
 	}
 }

@@ -1,35 +1,49 @@
-// Scroll-driven, CSS only, opacity and transform only. Without support for view timelines or with reduced motion no
-// rule below applies and the content is simply there. The effect ends at the latest when the element reaches the middle of the viewport;
-// stagger starts each child a little later, up to the sixth child. Opacity switches from 0 to 1 in one step, so text
-// is never visible below its contrast (WCAG 1.4.3); only the lift is gradual.
+// Appears once when it comes into view: a short fade (Appear) or a fade with a lift of 2.5rem (Rise), 600 ms;
+// "One after another" moves each direct child the same way, 100 ms apart up to the sixth. Opacity and transform only.
+//
+// view.js (the viewScriptModule of this block, loaded by the animation attribute as well) marks a block that starts
+// below the visible area with is-lv-pending and swaps it for is-lv-revealed once it scrolls in or something inside it
+// gets focus. Without JavaScript, with reduced motion, in print and in the editor nothing carries is-lv-pending, so the
+// content is simply there. What is in view when the page loads is never hidden: nothing flickers, LCP and CLS stay as
+// they are. The fade is short and passing; contrast counts in the end state, which is the block as designed.
+// The animation fills backwards only, so afterwards the block keeps its own transform and transitions (hover effects).
 //
 // One source for the reveal block and the animation of any block (attribute leitviaAnimation,
 // includes/blocks/class-animation.php), which adds has-lv-animation is-lv-animation-<effect> on the front end and
-// loads this file.
+// loads this file and view.js.
 $fade: ".wp-block-leitvia-reveal.is-effect-fade, .has-lv-animation.is-lv-animation-fade";
 $rise: ".wp-block-leitvia-reveal.is-effect-rise, .has-lv-animation.is-lv-animation-rise";
 $stagger: ".wp-block-leitvia-reveal.is-effect-stagger, .has-lv-animation.is-lv-animation-stagger";
 
-@supports (animation-timeline: view()) {
-	@media (prefers-reduced-motion: no-preference) {
-		#{$fade},
-		#{$rise},
-		:is(#{$stagger}) > * {
-			animation: leitvia-reveal linear both;
-			animation-timeline: view();
-			animation-range: entry calc(var(--leitvia-reveal-step, 0) * 10%) cover calc(25% + var(--leitvia-reveal-step, 0) * 5%);
-		}
+@media screen and (prefers-reduced-motion: no-preference) {
+	:is(#{$fade}, #{$rise}).is-lv-pending,
+	:is(#{$stagger}).is-lv-pending > * {
+		opacity: 0;
+	}
 
-		#{$rise},
-		:is(#{$stagger}) > * {
-			--leitvia-reveal-shift: 2rem;
-		}
+	:is(#{$rise}),
+	:is(#{$stagger}) > * {
+		--leitvia-reveal-shift: 2.5rem;
+	}
 
-		@for $i from 2 through 6 {
-			:is(#{$stagger}) > :nth-child(#{$i}) {
-				--leitvia-reveal-step: #{$i - 1};
-			}
+	:is(#{$rise}).is-lv-pending,
+	:is(#{$stagger}).is-lv-pending > * {
+		transform: translateY(var(--leitvia-reveal-shift));
+	}
+
+	:is(#{$fade}, #{$rise}).is-lv-revealed,
+	:is(#{$stagger}).is-lv-revealed > * {
+		animation: leitvia-reveal 600ms cubic-bezier(0.2, 0.7, 0.2, 1) calc(var(--leitvia-reveal-step, 0) * 100ms) backwards;
+	}
+
+	@for $i from 2 through 6 {
+		:is(#{$stagger}) > :nth-child(#{$i}) {
+			--leitvia-reveal-step: #{$i - 1};
 		}
+	}
+
+	:is(#{$stagger}) > :nth-child(n + 7) {
+		--leitvia-reveal-step: 5;
 	}
 }
 
@@ -37,11 +51,5 @@ $stagger: ".wp-block-leitvia-reveal.is-effect-stagger, .has-lv-animation.is-lv-a
 	from {
 		opacity: 0;
 		transform: translateY(var(--leitvia-reveal-shift, 0));
-	}
-
-	// Only opacity has this keyframe, so the step applies to opacity alone.
-	40% {
-		opacity: 0;
-		animation-timing-function: step-start;
 	}
 }

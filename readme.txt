@@ -4,7 +4,7 @@ Tags: ai, mcp, block theme, accessibility, design tokens
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.20
+Stable tag: 1.3.21
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -210,6 +210,12 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * Privacy policy: https://leitvia.com/privacy-policy/
 
 == Changelog ==
+
+= 1.3.21 =
+* Sticky header: on pages whose header uses a sticky style of the theme, a script module of under 0.4 KB measures the header, so focused elements and jump targets stop exactly below it, and lets a header taller than a quarter of the window scroll away.
+* Animation and Reveal: a block now fades in once when it scrolls into view (600 ms; Rise also moves up 2.5rem, One after another starts each child 100 ms later) instead of following the scroll position, so the effect is clearly visible, also in Firefox and Safari.
+* Only blocks that start below the visible area wait hidden; what is in view on load, pages without JavaScript and visitors with reduced motion see the content at once. Keyboard focus inside a waiting block shows it right away.
+* The script is a module of under 0.4 KB gzip and loads only on pages with an animated block.
 
 = 1.3.20 =
 * Icon set grows from 76 to 112 Lucide icons, among them chef hat, heart with pulse, gavel, hard hat, trophy, code, shopping bag, newspaper, ear and languages for the topics of the kits.

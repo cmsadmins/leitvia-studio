@@ -84,7 +84,8 @@ const scriptConfig = {
 };
 
 // The script modules @leitvia/consent (includes/consent/class-consent.php), @leitvia/code-copy
-// (includes/blocks/class-code-copy.php) and @leitvia/lightbox-focus (class-lightbox-focus.php) belong to no block.
+// (includes/blocks/class-code-copy.php), @leitvia/lightbox-focus (class-lightbox-focus.php) and @leitvia/sticky-header
+// (class-sticky-header.php) belong to no block.
 // No split chunks: a lazy chunk keeps its dependencies, so Leaflet lands in build/blocks/map/leaflet.js (named in
 // src/blocks/map/view.js) instead of a numbered vendor chunk in build/ next to the chunks of the script build.
 const [ moduleConfig ] = moduleConfigs;
@@ -95,6 +96,7 @@ const consentModule = {
 		'consent/view': join( __dirname, 'src/consent/view.js' ),
 		'code-copy/view': join( __dirname, 'src/code-copy/view.js' ),
 		'lightbox-focus/view': join( __dirname, 'src/lightbox-focus/view.js' ),
+		'sticky-header/view': join( __dirname, 'src/sticky-header/view.js' ),
 	} ),
 	optimization: { ...moduleConfig.optimization, splitChunks: false },
 };

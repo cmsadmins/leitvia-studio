@@ -174,6 +174,8 @@ final class Plugin {
 		add_filter( 'render_block_core/group', array( Blocks\Blocks::class, 'list_group' ), 10, 2 );
 		add_action( 'init', array( Blocks\Lightbox_Focus::class, 'register_module' ) );
 		add_filter( 'render_block_core/image', array( Blocks\Lightbox_Focus::class, 'render' ), 20 );
+		add_action( 'init', array( Blocks\Sticky_Header::class, 'register_module' ) );
+		add_filter( 'render_block_core/group', array( Blocks\Sticky_Header::class, 'render' ), 10, 2 );
 		add_filter( 'default_wp_template_part_areas', array( Blocks\Mega_Menu::class, 'areas' ) );
 		add_filter( 'register_block_type_args', array( Blocks\Mega_Menu::class, 'block_args' ), 10, 2 );
 		add_filter( 'register_block_type_args', array( Blocks\Blocks::class, 'render_callbacks' ), 10, 2 );
