@@ -63,7 +63,7 @@ class Test_Hero_Search extends WP_UnitTestCase {
 	 * The home page of the docs demo (site/demo.leitvia.com/docs/content.php) scores 100.
 	 */
 	public function test_docs_home_composition(): void {
-		$sections = array( 'leitvia/hero-search', 'leitvia-studio/content-story-highlight', 'leitvia-studio/content-bento-features', 'leitvia/proof-testimonial', 'leitvia/content-steps', 'leitvia/content-faq', 'leitvia/cta-contact' );
+		$sections = array( 'leitvia/hero-search', 'leitvia-studio/content-story-highlight', 'leitvia-studio/content-bento-features', 'leitvia/proof-testimonial', 'leitvia/content-steps', 'leitvia-studio/content-faq-schema', 'leitvia/cta-contact' );
 		$result   = Composition::score( $sections, leitvia_studio_contract()->data(), 'page-landing' );
 		$this->assertSame( array(), $result['issues'] ?? array() );
 		$this->assertSame( 100, $result['score'] );
