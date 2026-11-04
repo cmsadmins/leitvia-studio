@@ -14,8 +14,8 @@ defined( 'ABSPATH' ) || exit;
  * stays as it is, so no block becomes invalid: only the block comment carries the value, and render_block adds the
  * classes has-lv-animation and is-lv-animation-<effect> to the outer element on the front end. Style and script are
  * those of the reveal block (src/blocks/reveal/style.scss and view.js), one source for both: the block appears once
- * when it scrolls into view, opacity and transform only, 600 ms. Only blocks below the visible area are hidden until
- * then; without JavaScript, with reduced motion and in the editor the content is always visible. The editor panel is
+ * when a fifth of it is clearly in view, opacity and transform only, 800 ms; One after another watches each child on
+ * its own. Only blocks below the visible area are hidden until then; without JavaScript, with reduced motion and in the editor the content is always visible. The editor panel is
  * src/editor/animation.js.
  */
 final class Animation {

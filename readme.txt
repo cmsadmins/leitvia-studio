@@ -4,7 +4,7 @@ Tags: ai, mcp, block theme, accessibility, design tokens
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.21
+Stable tag: 1.3.22
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -210,6 +210,12 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * Privacy policy: https://leitvia.com/privacy-policy/
 
 == Changelog ==
+
+= 1.3.22 =
+* Animation and Reveal start where you look: a block appears once a fifth of it has passed a line 12 % above the bottom edge of the window (a block taller than the window needs a third of the window height), not with its first pixel, so on a phone the effect no longer runs below the edge.
+* One after another watches each child on its own: stacked cards on a phone appear one by one as each comes into view; children that come into view together, as in a row on a large screen, start 100 ms apart.
+* Softer timing: 800 ms on the curve of GSAP power3.out (CSS linear(), with a close cubic-bezier where linear() is missing), the lift stays 2.5rem.
+* A jump to an anchor, by a link in the page or the address, shows the target and every animated block above it at once, as keyboard focus does. The script stays a module of under 0.8 KB gzip.
 
 = 1.3.21 =
 * Sticky header: on pages whose header uses a sticky style of the theme, a script module of under 0.4 KB measures the header, so focused elements and jump targets stop exactly below it, and lets a header taller than a quarter of the window scroll away.
