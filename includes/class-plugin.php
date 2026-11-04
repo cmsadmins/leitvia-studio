@@ -135,6 +135,7 @@ final class Plugin {
 		add_action( 'init', array( Admin\Admin::class, 'register_status_column' ), 20 );
 		add_action( 'after_setup_theme', array( News\Image_Sizes::class, 'register' ) );
 		add_action( 'wp_head', array( News\Schema::class, 'print' ) );
+		add_action( 'wp_head', array( Blocks\Schema_Nodes::class, 'print' ) );
 		add_filter( 'leitvia_editorial_url', static fn( $url ): string => '' !== (string) $url ? (string) $url : News\Schema::editorial_url() );
 		add_action( 'init', array( News\Sitemap::class, 'register' ) );
 		add_filter( 'query_vars', array( News\Sitemap::class, 'query_vars' ) );
@@ -148,10 +149,14 @@ final class Plugin {
 		add_filter( 'render_block_core/tab-panel', array( Blocks\Tabs::class, 'render_panel' ), 10, 2 );
 		add_filter( 'render_block', array( Blocks\Blocks::class, 'highlight_style' ) );
 		add_action( 'enqueue_block_assets', array( Blocks\Blocks::class, 'editor_highlight_style' ) );
+		add_filter( 'register_block_type_args', array( Blocks\Animation::class, 'block_args' ), 10, 2 );
+		add_filter( 'render_block', array( Blocks\Animation::class, 'render' ), 10, 2 );
 		add_filter( 'render_block_data', array( Blocks\Marquee::class, 'state' ) );
 		add_filter( 'wp_kses_allowed_html', array( Blocks\Blocks::class, 'allow_inputs' ), 10, 2 );
 		add_filter( 'render_block_leitvia/pricing', array( Blocks\Blocks::class, 'unique_pricing_group' ) );
 		add_filter( 'render_block_leitvia/spotlight', array( Blocks\Blocks::class, 'spotlight_group' ) );
+		add_filter( 'render_block_leitvia/faq', array( Blocks\Faq::class, 'render' ), 10, 2 );
+		add_filter( 'leitvia_studio_schema_nodes', array( Blocks\Faq::class, 'merge' ) );
 		add_filter( 'render_block_core/image', array( Blocks\Blocks::class, 'pattern_image_size' ) );
 		add_filter( 'render_block_leitvia/announcement-bar', array( Blocks\Announcement_Bar::class, 'render' ) );
 		add_filter( 'register_block_type_args', array( Blocks\Product_Compare::class, 'block_args' ), 10, 2 );
@@ -166,6 +171,8 @@ final class Plugin {
 		add_filter( 'render_block_core/heading', array( Blocks\Table_Of_Contents::class, 'add_id' ), 10, 2 );
 		add_action( 'init', array( Blocks\Code_Copy::class, 'register_module' ) );
 		add_filter( 'render_block_core/code', array( Blocks\Code_Copy::class, 'render' ) );
+		add_action( 'init', array( Blocks\Lightbox_Focus::class, 'register_module' ) );
+		add_filter( 'render_block_core/image', array( Blocks\Lightbox_Focus::class, 'render' ), 20 );
 		add_filter( 'default_wp_template_part_areas', array( Blocks\Mega_Menu::class, 'areas' ) );
 		add_filter( 'register_block_type_args', array( Blocks\Mega_Menu::class, 'block_args' ), 10, 2 );
 		add_filter( 'register_block_type_args', array( Blocks\Blocks::class, 'render_callbacks' ), 10, 2 );

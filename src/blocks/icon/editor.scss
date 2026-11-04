@@ -1,0 +1,62 @@
+// Icon picker in the block sidebar (picker.js), shared by the icon blocks. Loaded in the editor only.
+.leitvia-icon-picker {
+	margin: 0;
+	padding: 0;
+	border: 0;
+
+	legend {
+		margin-block-end: 8px;
+		font-weight: 500;
+	}
+}
+
+.leitvia-icon-picker__status:empty {
+	display: none;
+}
+
+.leitvia-icon-picker__grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+	gap: 4px;
+	max-block-size: 320px;
+	margin-block-start: 8px;
+	overflow-y: auto;
+}
+
+.leitvia-icon-picker__option {
+	display: flex;
+	position: relative;
+	flex-direction: column;
+	gap: 4px;
+	align-items: center;
+	padding: 8px 4px;
+	border: 1px solid transparent;
+	font-size: 11px;
+	line-height: 1.2;
+	text-align: center;
+	cursor: pointer;
+
+	.leitvia-icon {
+		inline-size: 24px;
+		block-size: 24px;
+	}
+
+	// The radio stays in the accessibility tree and takes the focus; the option shows its state and the focus ring.
+	input {
+		position: absolute;
+		inset: 0;
+		margin: 0;
+		opacity: 0;
+		cursor: pointer;
+	}
+
+	&:has(input:checked) {
+		border-color: var(--wp-admin-theme-color, #3858e9);
+		background: rgba(56, 88, 233, 0.08);
+	}
+
+	&:has(input:focus-visible) {
+		outline: 2px solid var(--wp-admin-theme-color, #3858e9);
+		outline-offset: -2px;
+	}
+}

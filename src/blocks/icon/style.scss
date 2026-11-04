@@ -1,0 +1,29 @@
+// The icon (Icon::svg()) is 1em in the text color, so the font size preset and the text color of the block set size
+// and color.
+.wp-block-leitvia-icon {
+	font-size: var(--wp--preset--font-size--heading-m, 2rem);
+	line-height: 1;
+
+	.leitvia-icon {
+		display: inline-block;
+		inline-size: 1em;
+		block-size: 1em;
+		vertical-align: middle;
+	}
+}
+
+// The link keeps the color of the icon and a target of at least 24 by 24 px around small icons (WCAG 2.5.8).
+.wp-block-leitvia-icon__link {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-inline-size: 1.5rem;
+	min-block-size: 1.5rem;
+	color: inherit;
+
+	// Focus ring in the focus role of the contract, as the theme draws it on links and buttons (WCAG 2.4.7, 2.4.13).
+	&:focus-visible {
+		outline: 0.125rem solid var(--wp--preset--color--focus, currentcolor);
+		outline-offset: 0.125rem;
+	}
+}

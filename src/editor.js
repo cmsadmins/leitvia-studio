@@ -1,6 +1,6 @@
 // Entry point of the block editor integration: the format "Highlight", the block bindings sources, the "Easy language"
-// panel of pages, the "Child entries" query variation, the notices of missing building blocks
-// (window.leitviaStudioNeeds) and, in the editor of a content model type, the model panel.
+// panel of pages, the "Animation" panel of every block, the "Child entries" query variation, the notices of missing
+// building blocks (window.leitviaStudioNeeds) and, in the editor of a content model type, the model panel.
 // Registrar::enqueue_editor() loads it in
 // the post and site editor, with window.leitviaStudioBindings while the content model declares something to bind, and
 // prints window.leitviaStudioModel: in the post editor the declaration of the edited type, in the site editor every type with
@@ -13,6 +13,7 @@ import { registerBuildingBlocks } from './editor/building-blocks';
 import EasyLanguagePanel from './editor/easy-language-panel';
 import './editor/style.scss';
 import './formats/highlight';
+import './editor/animation';
 
 // Shows itself only in the editor of a page.
 registerPlugin( 'leitvia-studio-easy-language', { render: EasyLanguagePanel } );

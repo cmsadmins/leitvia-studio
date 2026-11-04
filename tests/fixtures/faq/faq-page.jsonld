@@ -1,0 +1,34 @@
+{
+	"@context": "https://schema.org",
+	"@graph": [
+		{
+			"@type": "FAQPage",
+			"mainEntity": [
+				{
+					"@type": "Question",
+					"name": "How long does a typical project take?",
+					"acceptedAnswer": {
+						"@type": "Answer",
+						"text": "<p>Most relaunches take twelve to sixteen weeks from the first workshop to going live.</p>"
+					}
+				},
+				{
+					"@type": "Question",
+					"name": "Can we keep our existing content?",
+					"acceptedAnswer": {
+						"@type": "Answer",
+						"text": "<p>Yes. We move <strong>posts, pages and media</strong> and check the redirects.</p><ul><li>Old links keep working.</li><li>Search rankings stay.</li></ul>"
+					}
+				},
+				{
+					"@type": "Question",
+					"name": "Who maintains the site after launch?",
+					"acceptedAnswer": {
+						"@type": "Answer",
+						"text": "<p>Your team edits the content; we take care of updates. <a href=\"/maintenance/\">Read the maintenance terms</a>.</p>"
+					}
+				}
+			]
+		}
+	]
+}

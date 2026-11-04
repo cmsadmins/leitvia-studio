@@ -41,7 +41,7 @@
 				"type": "object"
 			},
 			"attributes": {
-				"description": "JSON schema of the block attributes from block.json. A property with source is stored in the block markup, not in the block comment; rich-text is a string of HTML.",
+				"description": "JSON schema of the block attributes from block.json. A property with source is stored in the block markup, not in the block comment; rich-text is a string of HTML. leitviaAnimation (none, fade, rise, stagger) is on every block, core blocks included, except blocks without markup of their own, the navigation and leitvia/reveal; its description says when it fits.",
 				"type": "object",
 				"additionalProperties": false,
 				"required": [ "type", "properties" ],

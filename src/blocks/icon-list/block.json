@@ -1,0 +1,144 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "leitvia/icon-list",
+	"version": "0.1.0",
+	"title": "Icon list",
+	"category": "leitvia",
+	"icon": "editor-ul",
+	"description": "A list whose items start with an icon instead of a bullet. One icon for the list, each item can choose its own.",
+	"keywords": [ "checklist", "list", "benefits", "features" ],
+	"textdomain": "leitvia-studio",
+	"allowedBlocks": [ "leitvia/icon-list-item" ],
+	"attributes": {
+		"icon": {
+			"type": "string",
+			"enum": [
+				"accessibility",
+				"arrow-right",
+				"at-sign",
+				"award",
+				"badge-check",
+				"briefcase",
+				"building-2",
+				"calendar",
+				"camera",
+				"car",
+				"chart-bar",
+				"check",
+				"chevron-right",
+				"circle-check",
+				"circle-help",
+				"circle-x",
+				"clipboard-check",
+				"clock",
+				"coffee",
+				"credit-card",
+				"download",
+				"euro",
+				"external-link",
+				"eye",
+				"file-text",
+				"gift",
+				"globe",
+				"graduation-cap",
+				"hammer",
+				"handshake",
+				"headphones",
+				"heart",
+				"house",
+				"info",
+				"landmark",
+				"leaf",
+				"lightbulb",
+				"link",
+				"lock",
+				"mail",
+				"map-pin",
+				"message-circle",
+				"minus",
+				"monitor",
+				"moon",
+				"package",
+				"percent",
+				"phone",
+				"plus",
+				"quote",
+				"recycle",
+				"rocket",
+				"scale",
+				"search",
+				"send",
+				"settings",
+				"shield-check",
+				"shopping-cart",
+				"smartphone",
+				"sparkles",
+				"sprout",
+				"star",
+				"stethoscope",
+				"sun",
+				"target",
+				"thumbs-up",
+				"triangle-alert",
+				"truck",
+				"user",
+				"users",
+				"utensils",
+				"wallet",
+				"wifi",
+				"wrench",
+				"x",
+				"zap"
+			],
+			"default": "check"
+		}
+	},
+	"providesContext": {
+		"leitvia/iconListIcon": "icon"
+	},
+	"supports": {
+		"anchor": true,
+		"html": false,
+		"color": {
+			"text": true,
+			"background": true,
+			"link": true
+		},
+		"typography": {
+			"fontSize": true
+		},
+		"spacing": {
+			"margin": true,
+			"padding": true
+		}
+	},
+	"example": {
+		"attributes": {
+			"icon": "check"
+		},
+		"innerBlocks": [
+			{
+				"name": "leitvia/icon-list-item",
+				"attributes": {
+					"text": "Free delivery from 50 euros"
+				}
+			},
+			{
+				"name": "leitvia/icon-list-item",
+				"attributes": {
+					"text": "Returns within 30 days"
+				}
+			},
+			{
+				"name": "leitvia/icon-list-item",
+				"attributes": {
+					"icon": "phone",
+					"text": "Advice by phone"
+				}
+			}
+		]
+	},
+	"editorScript": "file:./index.js",
+	"style": "file:./style-index.css"
+}

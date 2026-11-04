@@ -1,0 +1,53 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "leitvia/faq",
+	"version": "0.1.0",
+	"title": "FAQ",
+	"category": "leitvia",
+	"icon": "editor-help",
+	"description": "Questions with answers that open on click, as details blocks. Adds FAQ structured data for search engines.",
+	"keywords": [ "faq", "questions", "answers", "accordion", "details" ],
+	"textdomain": "leitvia-studio",
+	"allowedBlocks": [ "core/details" ],
+	"attributes": {
+		"schema": {
+			"type": "boolean",
+			"default": true
+		},
+		"exclusive": {
+			"type": "boolean",
+			"default": false
+		}
+	},
+	"supports": {
+		"anchor": true,
+		"align": [ "wide" ],
+		"html": false,
+		"color": {
+			"background": true,
+			"text": true,
+			"link": true
+		},
+		"spacing": {
+			"margin": true,
+			"padding": true
+		}
+	},
+	"example": {
+		"innerBlocks": [
+			{
+				"name": "core/details",
+				"attributes": { "summary": "How long does a project take?", "showContent": true },
+				"innerBlocks": [ { "name": "core/paragraph", "attributes": { "content": "Most projects take four to six weeks." } } ]
+			},
+			{
+				"name": "core/details",
+				"attributes": { "summary": "Can we keep our content?" },
+				"innerBlocks": [ { "name": "core/paragraph", "attributes": { "content": "Yes, posts, pages and media move over." } } ]
+			}
+		]
+	},
+	"editorScript": "file:./index.js",
+	"style": "file:./style-index.css"
+}

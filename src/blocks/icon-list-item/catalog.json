@@ -1,0 +1,7 @@
+{
+	"usage": {
+		"useWhen": "One line of an icon list; set icon only when the item needs a different icon than the list.",
+		"avoidWhen": "Outside an icon list; it only works as its child.",
+		"a11y": "The icon is hidden from screen readers, so the text alone must carry the meaning of the item."
+	}
+}

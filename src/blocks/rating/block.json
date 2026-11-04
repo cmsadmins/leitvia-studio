@@ -1,0 +1,64 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "leitvia/rating",
+	"version": "0.1.0",
+	"title": "Rating",
+	"category": "leitvia",
+	"icon": "star-half",
+	"description": "A star rating with its value as text, optionally a review with structured data for search engines.",
+	"keywords": [ "stars", "review", "score" ],
+	"textdomain": "leitvia-studio",
+	"attributes": {
+		"rating": {
+			"type": "number",
+			"default": 0
+		},
+		"max": {
+			"type": "integer",
+			"default": 5
+		},
+		"label": {
+			"type": "string",
+			"default": ""
+		},
+		"reviewBody": {
+			"type": "string",
+			"default": ""
+		},
+		"reviewAuthor": {
+			"type": "string",
+			"default": ""
+		},
+		"itemName": {
+			"type": "string",
+			"default": ""
+		},
+		"itemType": {
+			"type": "string",
+			"enum": [ "", "Product", "Book", "Course", "Recipe", "SoftwareApplication", "LocalBusiness", "Movie", "Event", "CreativeWorkSeason" ],
+			"default": ""
+		}
+	},
+	"supports": {
+		"anchor": true,
+		"html": false,
+		"spacing": {
+			"margin": true,
+			"padding": true
+		},
+		"color": {
+			"background": true,
+			"text": true,
+			"link": false
+		},
+		"typography": {
+			"fontSize": true
+		}
+	},
+	"example": {
+		"attributes": { "rating": 4.5, "label": "Customer service", "reviewBody": "Quick answers and a fix on the same day.", "reviewAuthor": "Alex Example" }
+	},
+	"editorScript": "file:./index.js",
+	"style": "file:./style-index.css"
+}

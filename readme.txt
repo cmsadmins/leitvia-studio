@@ -4,7 +4,7 @@ Tags: ai, mcp, block theme, accessibility, design tokens
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.17
+Stable tag: 1.3.18
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -176,11 +176,13 @@ The other exception is Gravatar, a service of Automattic Inc., and only if an ad
 
 The accessibility check bundles [axe-core](https://github.com/dequelabs/axe-core) 4.13.0 by Deque Systems, Inc. into `build/axe-runner.js`. axe-core is licensed under the Mozilla Public License 2.0 (MPL-2.0); the license text is in `licenses/AXE-CORE.txt` and the notices of the libraries it includes are in `licenses/AXE-CORE-THIRD-PARTY.txt`. MPL-2.0 is compatible with the GPL: its section 3.3 allows combining the covered code with GPL-licensed code, and axe-core does not use the "Incompatible With Secondary Licenses" notice. The unmodified source code is available from the axe-core repository and the npm package `axe-core`. The file is served from your own site and makes no external requests.
 
-The headings of the Studio admin screens use [Open Sans](https://github.com/googlefonts/opensans) by The Open Sans Project Authors, weights 600 and 700, reduced to the Latin characters and stored as WOFF2 in `assets/fonts/open-sans/`. Open Sans is licensed under the SIL Open Font License 1.1; the license text is in `licenses/OPEN-SANS.txt`. The fonts are served from your own site.
+The headings of the Studio admin screens use [Open Sans](https://github.com/googlefonts/opensans) by The Open Sans Project Authors, weights 600 and 700, reduced to the Latin characters and stored as WOFF2 in `assets/fonts/open-sans/`. Open Sans is licensed under the SIL Open Font License 1.1; the license text is in `licenses/OPEN-SANS.txt`.
 
 Token sets can name [Libre Franklin](https://github.com/googlefonts/Libre-Franklin) by The Libre Franklin Project Authors (one variable file, weights 100 to 900, in `assets/fonts/libre-franklin/`, license `licenses/LIBRE-FRANKLIN.txt`) and [Young Serif](https://github.com/noirblancrouge/YoungSerif) by The Young Serif Project Authors (regular weight, in `assets/fonts/young-serif/`, license `licenses/YOUNG-SERIF.txt`). Both are reduced to the Latin characters, stored as WOFF2, licensed under the SIL Open Font License 1.1, served from your own site and loaded only on sites whose active token set uses them.
 
-The Map block bundles [Leaflet](https://leafletjs.com/) 1.9.4 by Volodymyr Agafonkin and contributors into `build/blocks/map/leaflet.js`, loaded only after the visitor agrees to load the map, and ships its stylesheet as `build/blocks/map/leaflet.css`, which loads with the block. Leaflet is licensed under the BSD 2-Clause License, which is compatible with the GPL; the license text is in `licenses/LEAFLET.txt`. The source code is available from the Leaflet repository and the npm package `leaflet`.
+The Map block bundles [Leaflet](https://leafletjs.com/) 1.9.4 by Volodymyr Agafonkin and contributors into `build/blocks/map/leaflet.js`, loaded only after the visitor agrees to load the map, and ships its stylesheet as `build/blocks/map/leaflet.css`. Leaflet is licensed under the BSD 2-Clause License, which is compatible with the GPL; the license text is in `licenses/LEAFLET.txt`.
+
+Icons: [Lucide](https://lucide.dev/) 1.60.0, ISC License (some from Feather, MIT), in `assets/icons/lucide.json`, license in `licenses/LUCIDE.txt`.
 
 The pattern illustration `assets/images/landscape.webp` was drawn for Leitvia by CMS ADMINS and is licensed under the GPL, version 2 or later, like the plugin.
 
@@ -208,6 +210,15 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * Privacy policy: https://leitvia.com/privacy-policy/
 
 == Changelog ==
+
+= 1.3.18 =
+* New block FAQ: questions as core Details blocks, one FAQPage in the structured data per page, optionally only one answer open at a time.
+* New blocks Icon and Icon list with a local icon set (76 Lucide icons, ISC), decorative or with an accessible name, no external requests.
+* New block Share: plain share links for LinkedIn, Bluesky, Facebook, WhatsApp, Threads, Xing and email, Copy link and the system share dialog, no scripts or requests before a click.
+* New block Rating: stars in half steps with the value as text, optionally a Review in the structured data with author and reviewed item.
+* Every block can fade or rise into view (Animation panel in the block settings), off for visitors who prefer reduced motion and without scroll-driven animation support.
+* Lightbox: Tab stays inside the dialog of a single image (WordPress 7.1 lets the focus leave it).
+* Structured data from blocks prints as one graph in the head, off while an SEO plugin is active.
 
 = 1.3.17 =
 * The BreadcrumbList names a posts page and a category of the same name (News and News) only once.

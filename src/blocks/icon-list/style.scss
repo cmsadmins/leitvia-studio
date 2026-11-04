@@ -1,0 +1,22 @@
+// Items start with the icon instead of a bullet (Icon::render_item()). The icon is 1.25em of the item text in its color,
+// centred on the first line; the gaps come from the spacing presets.
+.wp-block-leitvia-icon-list {
+	display: flex;
+	flex-direction: column;
+	gap: var(--wp--preset--spacing--xs, 0.5rem);
+	padding-inline-start: 0;
+	list-style: none;
+}
+
+.wp-block-leitvia-icon-list-item {
+	display: flex;
+	gap: var(--wp--preset--spacing--xs, 0.5rem);
+	align-items: flex-start;
+
+	.leitvia-icon {
+		inline-size: 1.25em;
+		block-size: 1.25em;
+		flex-shrink: 0;
+		margin-block-start: calc((1lh - 1.25em) / 2);
+	}
+}

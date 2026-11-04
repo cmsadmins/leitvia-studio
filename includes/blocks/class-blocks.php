@@ -162,6 +162,10 @@ final class Blocks {
 			'leitvia/load-more'         => static fn( array $attributes, string $content, \WP_Block $block ): string => Query_Filter::render_load_more( $attributes, $block ),
 			'leitvia/table-of-contents' => static fn( array $attributes, string $content, \WP_Block $block ): string => Table_Of_Contents::render( $attributes, $block ),
 			'leitvia/language-switch'   => static fn( array $attributes, string $content, \WP_Block $block ): string => \LeitviaStudio\Easy_Language\Easy_Language::render_switch( $block ),
+			'leitvia/icon'              => static fn( array $attributes ): string => Icon::render( $attributes ),
+			'leitvia/icon-list-item'    => static fn( array $attributes, string $content, \WP_Block $block ): string => Icon::render_item( $attributes, $content, $block ),
+			'leitvia/rating'            => static fn( array $attributes ): string => Rating::render( $attributes ),
+			'leitvia/share'             => static fn( array $attributes, string $content, \WP_Block $block ): string => Share::render( $attributes, $block ),
 			default                     => null,
 		};
 		if ( $callback ) {

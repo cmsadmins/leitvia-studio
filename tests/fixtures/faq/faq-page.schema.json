@@ -1,0 +1,37 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"$id": "https://leitvia.com/schemas/faq/faq-page.schema.json",
+	"title": "FAQ page",
+	"description": "The FAQPage node of leitvia/faq: at least one question with a name and an answer whose HTML uses only the tags Google reads (h2 to h6, br, ol, ul, li, a, p, div, b, strong, i, em).",
+	"type": "object",
+	"required": [ "@type", "mainEntity" ],
+	"properties": {
+		"@type": { "const": "FAQPage" },
+		"mainEntity": {
+			"type": "array",
+			"minItems": 1,
+			"items": {
+				"type": "object",
+				"required": [ "@type", "name", "acceptedAnswer" ],
+				"additionalProperties": false,
+				"properties": {
+					"@type": { "const": "Question" },
+					"name": { "type": "string", "pattern": "\\S" },
+					"acceptedAnswer": {
+						"type": "object",
+						"required": [ "@type", "text" ],
+						"additionalProperties": false,
+						"properties": {
+							"@type": { "const": "Answer" },
+							"text": {
+								"type": "string",
+								"pattern": "\\S",
+								"not": { "pattern": "<(?!/?(?:h[2-6]|br|ol|ul|li|a|p|div|b|strong|i|em)[\\s/>])" }
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}

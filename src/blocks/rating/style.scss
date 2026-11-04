@@ -1,0 +1,68 @@
+// Stars as two CSS masks over one color: outlined stars across the whole width, filled stars over the share of the
+// rating (--leitvia-rating, a percentage from Rating::render()). Half stars cut the filled layer in the middle of a
+// tile. Filled and outlined stars share the accent color (link color of the style variation, so at least 3:1 against
+// the background, WCAG 1.4.11); outline versus fill tells them apart without color (WCAG 1.4.1). The size is fixed by
+// the number of stars (--leitvia-rating-max), so nothing shifts. The value is text next to the stars.
+$star: "M12 2.5l2.94 5.96 6.56.95-4.75 4.63 1.12 6.54L12 17.5l-5.87 3.08 1.12-6.54L2.5 9.41l6.56-.95z";
+
+.wp-block-leitvia-rating {
+	> * {
+		margin-block: 0;
+	}
+
+	> * + * {
+		margin-block-start: var(--wp--preset--spacing--xs, 0.5rem);
+	}
+}
+
+.wp-block-leitvia-rating__label {
+	font-weight: 600;
+}
+
+.wp-block-leitvia-rating__stars {
+	position: relative;
+	display: inline-block;
+	inline-size: calc(var(--leitvia-rating-max, 5) * 1.25em);
+	block-size: 1.25em;
+	vertical-align: -0.25em;
+	color: var(--wp--preset--color--accent, currentColor);
+
+	// A text color chosen for the block also colors the stars.
+	.has-text-color & {
+		color: inherit;
+	}
+
+	&::before,
+	&::after {
+		content: "";
+		position: absolute;
+		inset-block: 0;
+		inset-inline-start: 0;
+		inline-size: 100%;
+		background: currentColor;
+		mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.5' stroke-linejoin='round'%3E%3Cpath d='#{$star}'/%3E%3C/svg%3E") 0 0 / 1.25em 1.25em repeat-x;
+	}
+
+	&::after {
+		inline-size: var(--leitvia-rating, 0%);
+		mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='#{$star}'/%3E%3C/svg%3E");
+	}
+
+	// The filled layer starts at the inline start; in right-to-left text its tiles line up from the right.
+	&:dir(rtl)::after {
+		mask-position: 100% 0;
+	}
+
+	// Forced colors drop backgrounds, the stars keep the text color of the system.
+	@media (forced-colors: active) {
+		&::before,
+		&::after {
+			background: CanvasText;
+			forced-color-adjust: none;
+		}
+	}
+}
+
+.wp-block-leitvia-rating__author {
+	font-size: var(--wp--preset--font-size--small, 0.875em);
+}

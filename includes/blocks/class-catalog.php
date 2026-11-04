@@ -35,9 +35,10 @@ final class Catalog {
 	private const GLOBAL_ATTRIBUTES = array( 'lock', 'metadata', 'className', 'style', 'anchor', 'align', 'layout', 'backgroundColor', 'textColor', 'gradient', 'borderColor', 'fontSize', 'fontFamily', 'shadow', 'ariaLabel' );
 
 	/**
-	 * Attribute keys copied into the JSON schema of an attribute.
+	 * Attribute keys copied into the JSON schema of an attribute. description tells an agent when an attribute fits, for
+	 * example leitviaAnimation, which Studio adds to every block (Animation::block_args()).
 	 */
-	private const ATTRIBUTE_KEYS = array( 'type', 'enum', 'default', 'items', 'properties', 'source' );
+	private const ATTRIBUTE_KEYS = array( 'type', 'enum', 'default', 'items', 'properties', 'source', 'description' );
 
 	/**
 	 * Core blocks whose behavior Studio changes, with the change and their usage rules.

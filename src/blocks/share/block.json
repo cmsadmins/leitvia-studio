@@ -1,0 +1,49 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "leitvia/share",
+	"version": "0.1.0",
+	"title": "Share",
+	"category": "leitvia",
+	"icon": "share",
+	"description": "Plain links to share this post on social networks, by email or by copying the link. Nothing loads from the networks before a click.",
+	"keywords": [ "social", "share buttons", "linkedin", "whatsapp", "copy link" ],
+	"textdomain": "leitvia-studio",
+	"attributes": {
+		"services": {
+			"type": "array",
+			"items": {
+				"type": "string",
+				"enum": [ "linkedin", "bluesky", "facebook", "whatsapp", "threads", "xing", "email", "copy" ]
+			},
+			"default": [ "linkedin", "bluesky", "whatsapp", "email", "copy" ]
+		},
+		"display": {
+			"type": "string",
+			"enum": [ "text", "icon-text", "icon" ],
+			"default": "icon-text"
+		}
+	},
+	"usesContext": [ "postId" ],
+	"supports": {
+		"anchor": true,
+		"html": false,
+		"color": {
+			"background": true,
+			"text": true
+		},
+		"spacing": {
+			"margin": true,
+			"padding": true
+		},
+		"typography": {
+			"fontSize": true
+		}
+	},
+	"example": {
+		"attributes": { "services": [ "linkedin", "bluesky", "email", "copy" ], "display": "icon-text" }
+	},
+	"editorScript": "file:./index.js",
+	"style": "file:./style-index.css",
+	"viewScriptModule": "file:./view.js"
+}

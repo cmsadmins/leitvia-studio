@@ -1,0 +1,11 @@
+// Questions one below the other, divided by a hairline. Spacing and colours
+// set on a details block win, they sit inline on the element.
+.wp-block-leitvia-faq > .wp-block-details {
+	margin-block: 0;
+	padding-block: var(--wp--preset--spacing--s, 1rem);
+	border-block-end: 1px solid var(--wp--preset--color--stroke, currentColor);
+
+	> summary {
+		cursor: pointer;
+	}
+}

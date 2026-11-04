@@ -1,0 +1,7 @@
+{
+	"usage": {
+		"useWhen": "Frequently asked questions with short answers, such as on a service, product or contact page. Turn schema off for questions the site does not answer itself.",
+		"avoidWhen": "Content everyone must read, or steps in order; use headings, a list or the wizard block instead.",
+		"a11y": "Each question is the summary of a details element, so it works with keyboard and screen readers without scripting. Write questions as full sentences."
+	}
+}

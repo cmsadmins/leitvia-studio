@@ -1,0 +1,7 @@
+{
+	"usage": {
+		"useWhen": "One honest rating of a product, book, course or service, alone or as a short review with author.",
+		"avoidWhen": "Average ratings without a real data source, and reviews of your own business: Google shows no review stars for LocalBusiness or Organization reviews on its own site.",
+		"a11y": "The stars are hidden from assistive technology; the value is visible text, for example 4.5 out of 5 stars. Filled and outlined stars share one color, so the rating never depends on color."
+	}
+}

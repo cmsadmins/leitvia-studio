@@ -1,0 +1,7 @@
+{
+	"usage": {
+		"useWhen": "Short lists of benefits, included services or contact details, where an icon such as a check mark replaces the bullet.",
+		"avoidWhen": "Numbered steps or long text per item; use a numbered list, the timeline or feature group.",
+		"a11y": "Renders a real list, so screen readers announce the number of items. The icons are decorative; each item text must make sense on its own."
+	}
+}

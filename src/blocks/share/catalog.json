@@ -1,0 +1,7 @@
+{
+	"usage": {
+		"useWhen": "Below articles, news and case studies that readers may want to pass on.",
+		"avoidWhen": "Legal pages, checkout, forms and pages behind a login; never several share blocks on one page.",
+		"a11y": "A navigation landmark named Share this post; every link names the service and says when it opens a new window; copy and share buttons report in a polite live region."
+	}
+}

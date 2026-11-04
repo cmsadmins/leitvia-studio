@@ -1,0 +1,7 @@
+{
+	"usage": {
+		"useWhen": "A single pictogram next to a heading, in a feature column or as a small linked symbol, for example a phone icon that links to the number.",
+		"avoidWhen": "Lists of benefits or contact details; use the icon list. Logos and photos; use the image block.",
+		"a11y": "Without a label the icon is decorative and hidden from screen readers. Set a label when the icon carries meaning; a link renders only with a label, which becomes its name."
+	}
+}
