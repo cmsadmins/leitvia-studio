@@ -118,12 +118,19 @@ class Test_Uninstall extends WP_UnitTestCase {
 
 	/**
 	 * Change packages, gateway tables, schema version, settings, prune event, pending checks after writing with their
-	 * tokens and role go on every site; agent users stay.
+	 * tokens, role and the application passwords of agents go on every site; agent users stay.
 	 */
 	public function test_removes_gateway_data(): void {
 		global $wpdb;
-		$sites    = array_keys( self::sites_with_data() );
-		$agent    = self::factory()->user->create( array( 'role' => 'leitvia_agent' ) );
+		$sites   = array_keys( self::sites_with_data() );
+		$agent   = self::factory()->user->create( array( 'role' => 'leitvia_agent' ) );
+		$person  = self::factory()->user->create( array( 'role' => 'editor' ) );
+		$created = WP_Application_Passwords::create_new_application_password( $agent, array( 'name' => 'Agent' ) );
+		$own     = WP_Application_Passwords::create_new_application_password( $person, array( 'name' => 'Person' ) );
+		// On a network the Agents screen binds each password to its site.
+		if ( is_multisite() ) {
+			update_user_meta( $agent, 'leitvia_agent_password_sites', array( $created[1]['uuid'] => get_current_blog_id() ) );
+		}
 		$dropped  = array();
 		$packages = array();
 		$files    = array();
@@ -176,6 +183,9 @@ class Test_Uninstall extends WP_UnitTestCase {
 			self::switch_to( 0 );
 		}
 		$this->assertInstanceOf( WP_User::class, get_user_by( 'id', $agent ), 'agent users stay' );
+		$this->assertSame( array(), WP_Application_Passwords::get_user_application_passwords( $agent ), 'passwords of agents go' );
+		$this->assertSame( '', get_user_meta( $agent, 'leitvia_agent_password_sites', true ) );
+		$this->assertSame( $own[1]['uuid'], WP_Application_Passwords::get_user_application_passwords( $person )[0]['uuid'], 'passwords of people stay' );
 	}
 
 	/**

@@ -59,7 +59,7 @@ $leitvia_studio_uninstall_site = static function (): void {
 		delete_post_meta_by_key( '_leitvia_page_kind' );
 	}
 	// Gateway: change packages, audit log, snapshots, schema version, settings, the prune event, pending checks after
-	// writing with their tokens, and the role; agent users stay.
+	// writing with their tokens, the application passwords of agents and the role; agent users stay.
 	$delete_posts( 'leitvia_package' );
 	// Files of package operations that were never applied wait in uploads/leitvia-studio/private/<random>/; before
 	// 1.3.10 they waited in uploads/leitvia-private/, which stays on sites that never loaded 1.3.10.
@@ -85,6 +85,22 @@ $leitvia_studio_uninstall_site = static function (): void {
 	$leitvia_studio_tokens = $wpdb->get_col( $wpdb->prepare( "SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE %s", $wpdb->esc_like( '_transient_leitvia_verify_' ) . '%' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- One-time cleanup on uninstall, no API lists transients by prefix.
 	foreach ( $leitvia_studio_tokens as $leitvia_studio_token ) {
 		delete_transient( substr( $leitvia_studio_token, strlen( '_transient_' ) ) );
+	}
+	// Application passwords of agents, while the role still names them: on a network only those bound to this site, a
+	// user may be a person elsewhere (Gateway_Access_Controller::SITES_META). The users and their content stay.
+	foreach ( get_users(
+		array(
+			'role'   => 'leitvia_agent',
+			'fields' => 'ids',
+		)
+	) as $leitvia_studio_agent ) {
+		$leitvia_studio_agent = (int) $leitvia_studio_agent;
+		$leitvia_studio_uuids = is_multisite()
+			? array_keys( array_intersect( (array) get_user_meta( $leitvia_studio_agent, 'leitvia_agent_password_sites', true ), array( get_current_blog_id() ) ) )
+			: wp_list_pluck( WP_Application_Passwords::get_user_application_passwords( $leitvia_studio_agent ), 'uuid' );
+		foreach ( $leitvia_studio_uuids as $leitvia_studio_uuid ) {
+			WP_Application_Passwords::delete_application_password( $leitvia_studio_agent, (string) $leitvia_studio_uuid );
+		}
 	}
 	remove_role( 'leitvia_agent' );
 	delete_option( 'leitvia_studio_active_set' );
@@ -129,3 +145,6 @@ if ( is_multisite() ) {
 } else {
 	$leitvia_studio_uninstall_site();
 }
+
+// The site of each agent password, after the sites above read it.
+delete_metadata( 'user', 0, 'leitvia_agent_password_sites', '', true );

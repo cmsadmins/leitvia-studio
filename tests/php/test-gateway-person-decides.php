@@ -238,7 +238,7 @@ class Test_Gateway_Person_Decides extends WP_UnitTestCase {
 	}
 
 	/**
-	 * No Leitvia ability manages plugins, themes, users, roles, options or files; the agent role holds none of their
+	 * No Leitvia ability manages plugins, themes, users, roles, options or files; an agent holds none of their
 	 * capabilities, and core routes refuse its writes to them.
 	 */
 	public function test_no_administration_at_all(): void {
@@ -246,9 +246,9 @@ class Test_Gateway_Person_Decides extends WP_UnitTestCase {
 		$this->assertNotEmpty( $names );
 		$this->assertSame( array(), array_values( preg_grep( '/plugin|theme|user|role|capabilit|option|setting|file|code|login|password/', $names ) ) );
 
-		$role = get_role( Gateway::ROLE );
+		wp_set_current_user( $this->agent );
 		foreach ( array( 'activate_plugins', 'install_plugins', 'update_plugins', 'delete_plugins', 'edit_plugins', 'switch_themes', 'install_themes', 'update_themes', 'delete_themes', 'edit_themes', 'update_core', 'list_users', 'create_users', 'edit_users', 'promote_users', 'delete_users', 'manage_options', 'unfiltered_html', 'unfiltered_upload', 'edit_files', 'import', 'export' ) as $cap ) {
-			$this->assertFalse( $role->has_cap( $cap ), $cap );
+			$this->assertFalse( user_can( $this->agent, $cap ), $cap );
 		}
 
 		foreach ( array( '/wp/v2/plugins', '/wp/v2/users', '/wp/v2/settings', '/wp/v2/users/me/application-passwords', '/wp/v2/themes' ) as $route ) {

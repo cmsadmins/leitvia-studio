@@ -56,6 +56,72 @@ class Test_Gateway_Store extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The stored role holds nothing: what an agent may do exists only while Studio runs.
+	 */
+	public function test_stored_role_holds_no_capability(): void {
+		Gateway::install();
+		$this->assertSame( array(), get_role( Gateway::ROLE )->capabilities );
+	}
+
+	/**
+	 * A role from before 1.3.25 with stored capabilities is emptied on the next load, also at the current schema version;
+	 * its agents keep the role and what Studio gives them.
+	 */
+	public function test_stored_capabilities_are_removed_on_load(): void {
+		$agent = self::factory()->user->create( array( 'role' => Gateway::ROLE ) );
+		remove_role( Gateway::ROLE );
+		add_role( Gateway::ROLE, 'Leitvia Agent', array_fill_keys( Gateway::CAPS, true ) );
+		$this->assertSame( Store::VERSION, (int) get_option( Store::VERSION_OPTION ) );
+
+		Gateway::maybe_install();
+
+		$this->assertSame( array(), get_role( Gateway::ROLE )->capabilities );
+		$this->assertTrue( user_can( $agent, 'edit_theme_options' ) );
+	}
+
+	/**
+	 * Studio inactive or its folder gone: no filter and no guard runs, as on a site that never loads the plugin. The agent
+	 * then holds no capability of CAPS, and core refuses its writes for lack of them, not because of a guard. The theme
+	 * routes the review of November 2026 named are the reason for this test.
+	 */
+	public function test_agent_can_do_nothing_without_studio(): void {
+		$agent = self::factory()->user->create( array( 'role' => Gateway::ROLE ) );
+		$post  = self::factory()->post->create();
+		wp_set_current_user( $agent );
+		$this->assertTrue( current_user_can( 'edit_theme_options' ), 'while Studio runs' );
+
+		remove_filter( 'user_has_cap', array( Gateway::class, 'grant_caps' ) );
+		remove_filter( 'rest_pre_dispatch', array( Gateway::class, 'rest_guard' ) );
+		wp_set_current_user( 0 );
+		wp_set_current_user( $agent );
+
+		foreach ( Gateway::CAPS as $cap ) {
+			$this->assertFalse( current_user_can( $cap ), $cap );
+		}
+		$this->assertFalse( current_user_can( 'edit_post', $post ) );
+		$writes = array(
+			'/wp/v2/posts'          => array( 'title' => 'No' ),
+			'/wp/v2/pages'          => array( 'title' => 'No' ),
+			'/wp/v2/navigation'     => array( 'title' => 'No' ),
+			'/wp/v2/templates'      => array( 'slug' => 'no' ),
+			'/wp/v2/template-parts' => array(
+				'slug' => 'no',
+				'area' => 'header',
+			),
+			'/wp/v2/global-styles/' . WP_Theme_JSON_Resolver::get_user_global_styles_post_id() => array( 'styles' => array() ),
+			'/wp/v2/menus'          => array( 'name' => 'No' ),
+			'/wp/v2/settings'       => array( 'title' => 'No' ),
+			'/wp/v2/posts/' . $post => array( 'title' => 'No' ),
+		);
+		foreach ( $writes as $route => $params ) {
+			$request = new WP_REST_Request( 'POST', $route );
+			$request->set_body_params( $params );
+			$this->assertContains( rest_do_request( $request )->get_status(), array( 401, 403 ), $route );
+		}
+		$this->assertNotSame( 'No', get_post( $post )->post_title );
+	}
+
+	/**
 	 * A site with an older schema version is installed on the next load.
 	 */
 	public function test_old_schema_version_installs_on_load(): void {

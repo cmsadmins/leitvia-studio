@@ -149,13 +149,13 @@ class Test_Gateway_Abilities extends WP_UnitTestCase {
 	 * The agent role edits and publishes content and theme options, nothing more.
 	 */
 	public function test_role(): void {
-		$role = get_role( Gateway::ROLE );
+		$agent = self::factory()->user->create( array( 'role' => Gateway::ROLE ) );
 		$this->assertSame( 'Leitvia Agent', wp_roles()->role_names[ Gateway::ROLE ] );
 		foreach ( Gateway::CAPS as $cap ) {
-			$this->assertTrue( $role->has_cap( $cap ), $cap );
+			$this->assertTrue( user_can( $agent, $cap ), $cap );
 		}
 		foreach ( array( 'unfiltered_html', 'manage_options', 'edit_users', 'install_plugins', 'activate_plugins', 'delete_users' ) as $cap ) {
-			$this->assertFalse( $role->has_cap( $cap ), $cap );
+			$this->assertFalse( user_can( $agent, $cap ), $cap );
 		}
 	}
 }

@@ -4,7 +4,7 @@ Tags: ai, mcp, block theme, accessibility, design tokens
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.24
+Stable tag: 1.3.25
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -16,7 +16,7 @@ Leitvia Studio lets people and AI agents build and maintain sites with block the
 
 **Gateway for AI agents.** Agents work through Leitvia abilities of the WordPress Abilities API: read the design contract, tokens, patterns and page outlines, then build pages from patterns, change single blocks, fix links and alt text or set up navigation. Every write runs through one pipeline with identity, scope, a hash check against stale reads, content checks (headings, alt text, link text, contrast, landmarks), a snapshot and an audit entry. An autonomy level per area decides whether a change goes live, lands as a draft or waits as a change package. People review packages in the inbox with a block diff and apply, reject or roll them back.
 
-**Agents are tools you choose.** An agent is a program you connect with the application password of a "Leitvia Agent" user, created and revoked on the Agents screen. It never touches plugins, themes, users or code, and settings, content model and global styles always wait for a person.
+**Agents are tools you choose.** An agent is a program you connect with the application password of a "Leitvia Agent" user, created and revoked on the Agents screen. It never installs or changes plugins, themes, users or code, and settings, content model and global styles always wait for a person.
 
 **MCP, REST and WP-CLI.** With the plugin MCP Adapter active, Studio adds its own MCP server "leitvia" with exactly the Leitvia abilities as tools. Without it, every ability is available over the REST API. `wp leitvia` runs the same abilities from the command line: token sets, patterns, content model, site audit, change packages and recipes.
 
@@ -58,7 +58,7 @@ Automated tests run axe in three widths and keyboard tests on the admin screens,
 
 = How do AI agents use Leitvia? =
 
-An agent such as Claude Code, Codex or Cursor connects to your site over MCP or the REST API with the application password of an agent user from Leitvia Studio, Agents. It reads the design contract and the outline of a page first, then calls the Leitvia abilities, and every change runs through the gateway checks and your autonomy levels. No service of ours sits in between: the agent signs in as a user of your site that an administrator created, with the role Leitvia Agent and without administrator rights. It works on content, media, navigation, template parts and token set drafts. It cannot install, activate, update or remove plugins or themes, manage users, log in to wp-admin or edit code. Changes to site settings (such as the front page or the comment defaults), the content model, the active token set or the global styles only ever reach the inbox as a suggestion that a person applies or rejects, whatever the autonomy profile. Ready-made agent skills for setup, design, pages, patterns, maintenance, accessibility and migration, with the full reference of all abilities, are described at https://leitvia.com/docs/.
+An agent such as Claude Code, Codex or Cursor connects to your site over MCP or the REST API with the application password of an agent user from Leitvia Studio, Agents. It reads the design contract and the outline of a page first, then calls the Leitvia abilities, and every change runs through the gateway checks and your autonomy levels. No service of ours sits in between: the agent signs in as a user of your site that an administrator created, with the role Leitvia Agent and without administrator rights. It works on content, media, navigation, template parts and token set drafts. It cannot install, activate, update or remove plugins or themes, manage users, log in to wp-admin or edit code. The role itself stores no capability: Studio gives an agent the rights for content, media and theme options only while it runs. Deactivate Studio or remove its folder and the agent has the rights of a user without a role: it can sign in and change its own profile, as any WordPress user can, and nothing on the site. Its application password stays and works again when you activate Studio. Deleting Studio in the admin removes the application passwords of agents and the role; the users and their content stay. Application passwords come into being only when an administrator creates an agent or a new password on the Agents screen, and the password is shown there once. Changes to site settings (such as the front page or the comment defaults), the content model, the active token set or the global styles only ever reach the inbox as a suggestion that a person applies or rejects, whatever the autonomy profile. Ready-made agent skills for setup, design, pages, patterns, maintenance, accessibility and migration, with the full reference of all abilities, are described at https://leitvia.com/docs/.
 
 = Does the plugin change my front end? =
 
@@ -210,6 +210,10 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * Privacy policy: https://leitvia.com/privacy-policy/
 
 == Changelog ==
+
+= 1.3.25 =
+* Security: the stored role Leitvia Agent holds no capability any more. Studio gives an agent its rights only while it runs, so with a deactivated plugin or a removed plugin folder the agent has the rights of a user without a role: it can change its own profile and nothing on the site, also over the REST routes of core. A role from an older version is emptied on the next load.
+* Deleting Studio in the admin removes the application passwords of agents. On a network it removes those bound to a site of the network.
 
 = 1.3.24 =
 * Script modules of Leitvia load at the end of the page at low priority, behind everything the first paint needs.

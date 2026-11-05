@@ -19,8 +19,10 @@ final class Gateway {
 	public const OPTION = 'leitvia_studio_gateway';
 
 	/**
-	 * Capabilities of the role. No unfiltered_html, manage_options, edit_users or install_plugins. Others' posts and pages
-	 * are open because agents maintain what people wrote; autonomy, area and content kind draw the line, not the role.
+	 * Capabilities of an agent, given by grant_caps() only while Studio runs: the stored role holds none, so an agent
+	 * has no right on the site once Studio is deactivated or its folder removed, when the guards below no longer run. No
+	 * unfiltered_html, manage_options, edit_users or install_plugins. Others' posts and pages are open because agents
+	 * maintain what people wrote; autonomy, area and content kind draw the line, not the role.
 	 * Products and their categories and tags of WooCommerce likewise; no capability of orders, coupons, reports or
 	 * WooCommerce settings.
 	 */
@@ -76,6 +78,7 @@ final class Gateway {
 		// On init, not earlier: the role name is translated.
 		add_action( 'init', array( self::class, 'maybe_install' ), 1 );
 		add_action( 'init', array( self::class, 'role_name' ), 2 );
+		add_filter( 'user_has_cap', array( self::class, 'grant_caps' ), 10, 4 );
 		add_action( 'wp_initialize_site', array( self::class, 'initialize_site' ), 20 );
 		// Deleting a site of a network: core drops only the tables it knows, see Store::drop_tables().
 		add_filter( 'wpmu_drop_tables', array( Store::class, 'drop_tables' ) );
@@ -130,6 +133,20 @@ final class Gateway {
 	}
 
 	/**
+	 * Filter user_has_cap: gives a user with the agent role the capabilities in CAPS. An explicit cap of the user stays.
+	 *
+	 * @param array<string, bool> $allcaps Capabilities of the user.
+	 * @param string[]            $caps    Capabilities asked for.
+	 * @param array<int, mixed>   $args    Arguments of the check.
+	 * @param \WP_User            $user    User.
+	 * @return array<string, bool>
+	 */
+	public static function grant_caps( array $allcaps, array $caps, array $args, \WP_User $user ): array {
+		unset( $caps, $args );
+		return in_array( self::ROLE, (array) $user->roles, true ) ? $allcaps + array_fill_keys( self::CAPS, true ) : $allcaps;
+	}
+
+	/**
 	 * Whether the current user has the agent role.
 	 */
 	public static function is_agent(): bool {
@@ -138,7 +155,7 @@ final class Gateway {
 
 	/**
 	 * Filter rest_pre_dispatch: agents read through any route but write only through the abilities of Leitvia
-	 * (/wp-abilities/v1/abilities/leitvia/…/run) and its MCP server. The role holds core capabilities such as
+	 * (/wp-abilities/v1/abilities/leitvia/…/run) and its MCP server. Agents hold core capabilities such as
 	 * edit_pages and edit_theme_options for the pipeline to check; without this, an application password could write
 	 * through /wp/v2 or the Studio routes past autonomy, checks, snapshot and audit log.
 	 *
@@ -222,12 +239,12 @@ final class Gateway {
 	}
 
 	/**
-	 * Installs the current site when its schema version is older or the agent role misses a capability of CAPS, for
-	 * example the first load of a site after an update.
+	 * Installs the current site when its schema version is older or the stored agent role still holds a capability
+	 * (before 1.3.25 it held CAPS), for example the first load of a site after an update.
 	 */
 	public static function maybe_install(): void {
 		$role = get_role( self::ROLE );
-		if ( (int) get_option( Store::VERSION_OPTION ) !== Store::VERSION || ( $role && array_diff( self::CAPS, array_keys( array_filter( $role->capabilities ) ) ) ) ) {
+		if ( (int) get_option( Store::VERSION_OPTION ) !== Store::VERSION || ( $role && $role->capabilities ) ) {
 			self::install();
 		}
 	}
@@ -238,9 +255,9 @@ final class Gateway {
 	public static function install(): void {
 		Store::install();
 		Packages::migrate_private_dir();
-		// Removing first keeps the capabilities current after an update; users keep the role name.
+		// Removing first empties a role from before 1.3.25; users keep the role name. CAPS come from grant_caps().
 		remove_role( self::ROLE );
-		add_role( self::ROLE, __( 'Leitvia Agent', 'leitvia-studio' ), array_fill_keys( self::CAPS, true ) );
+		add_role( self::ROLE, __( 'Leitvia Agent', 'leitvia-studio' ), array() );
 		if ( ! wp_next_scheduled( Store::CRON ) ) {
 			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', Store::CRON );
 		}
@@ -270,7 +287,8 @@ final class Gateway {
 
 	/**
 	 * Deactivation hook: stops the prune event and pending checks after writing; tables, role and settings stay until
-	 * uninstall.
+	 * uninstall. Agents lose every capability here on their own, see CAPS; their application passwords stay, so they
+	 * work again when a person activates Studio again.
 	 *
 	 * @param bool $network_wide Whether the plugin is deactivated for the whole network.
 	 */
