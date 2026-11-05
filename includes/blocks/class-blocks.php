@@ -108,6 +108,8 @@ final class Blocks {
 	 */
 	private static function enqueue_highlight_style(): void {
 		wp_enqueue_style( 'leitvia-studio-highlight', plugins_url( 'assets/highlight.css', LEITVIA_STUDIO_FILE ), array(), LEITVIA_STUDIO_VERSION );
+		// With its path core can print it inside the document instead of a blocking link.
+		wp_style_add_data( 'leitvia-studio-highlight', 'path', dirname( LEITVIA_STUDIO_FILE ) . '/assets/highlight.css' );
 	}
 
 	/**

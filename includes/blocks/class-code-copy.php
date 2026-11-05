@@ -29,6 +29,8 @@ final class Code_Copy {
 		$asset = require $asset_file;
 		wp_register_script_module( self::MODULE, plugin_dir_url( LEITVIA_STUDIO_FILE ) . 'build/code-copy/view.js', $asset['dependencies'], $asset['version'] );
 		wp_register_style( 'leitvia-code-copy', plugin_dir_url( LEITVIA_STUDIO_FILE ) . 'assets/code-copy.css', array(), LEITVIA_STUDIO_VERSION );
+		// With its path core can print it inside the document instead of a blocking link.
+		wp_style_add_data( 'leitvia-code-copy', 'path', dirname( LEITVIA_STUDIO_FILE ) . '/assets/code-copy.css' );
 	}
 
 	/**

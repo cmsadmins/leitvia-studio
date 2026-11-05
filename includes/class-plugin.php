@@ -136,6 +136,7 @@ final class Plugin {
 		add_action( 'after_setup_theme', array( News\Image_Sizes::class, 'register' ) );
 		add_action( 'wp_head', array( News\Schema::class, 'print' ) );
 		add_action( 'wp_head', array( Blocks\Schema_Nodes::class, 'print' ) );
+		add_action( 'wp_head', array( self::class, 'defer_modules' ), 1 );
 		add_filter( 'leitvia_editorial_url', static fn( $url ): string => '' !== (string) $url ? (string) $url : News\Schema::editorial_url() );
 		add_action( 'init', array( News\Sitemap::class, 'register' ) );
 		add_filter( 'query_vars', array( News\Sitemap::class, 'query_vars' ) );
@@ -189,6 +190,20 @@ final class Plugin {
 		add_action( 'init', array( Easy_Language\Easy_Language::class, 'register' ) );
 		add_filter( 'render_block_leitvia/a11y-bar', array( Easy_Language\Easy_Language::class, 'render_bar' ) );
 		Gateway\Gateway::boot();
+	}
+
+	/**
+	 * Moves the script modules of Leitvia behind everything the first paint needs, as core does for interactive blocks:
+	 * low priority, at the end of the body. Block modules are queued by now, a block theme renders before wp_head.
+	 */
+	public static function defer_modules(): void {
+		$modules = wp_script_modules();
+		foreach ( $modules->get_queue() as $id ) {
+			if ( str_contains( $id, 'leitvia' ) ) {
+				$modules->set_fetchpriority( $id, 'low' );
+				$modules->set_in_footer( $id, true );
+			}
+		}
 	}
 
 	/**

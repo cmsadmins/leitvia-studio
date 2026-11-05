@@ -4,7 +4,7 @@ Tags: ai, mcp, block theme, accessibility, design tokens
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.23
+Stable tag: 1.3.24
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -210,6 +210,10 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * Privacy policy: https://leitvia.com/privacy-policy/
 
 == Changelog ==
+
+= 1.3.24 =
+* Script modules of Leitvia load at the end of the page at low priority, behind everything the first paint needs.
+* The styles of the Highlight format and of the copy button of code blocks can be printed inside the document.
 
 = 1.3.23 =
 * Effect library for Animation: besides fade, rise and one after another now zoom, slide from the start or end (follows the writing direction), wipe up, wipe from the start, blur, mask (an image is revealed from the inside) and parallax (the background of a cover or the line of a timeline moves a little with the scroll position, only where the browser supports scroll-driven animation). Pure CSS on opacity, transform, clip-path and filter, so nothing shifts the layout; the script stays one small module.
