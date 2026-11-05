@@ -40,7 +40,7 @@ ob_start();
 		<!-- /wp:column -->
 	</div>
 	<!-- /wp:columns -->
-	<!-- wp:leitvia/bento {"align":"wide","style":{"spacing":{"margin":{"top":"var:preset|spacing|l"}}}} -->
+	<!-- wp:leitvia/bento {"leitviaAnimation":"stagger","align":"wide","style":{"spacing":{"margin":{"top":"var:preset|spacing|l"}}}} -->
 	<div class="wp-block-leitvia-bento alignwide" style="margin-top:var(--wp--preset--spacing--l)">
 	<?php foreach ( $leitvia_studio_tiles as $leitvia_studio_tile ) : ?>
 		<!-- wp:leitvia/bento-item <?php echo '1x1' === $leitvia_studio_tile[0] ? '' : '{"size":"' . esc_attr( $leitvia_studio_tile[0] ) . '"} '; ?>-->

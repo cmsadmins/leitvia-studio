@@ -57,7 +57,10 @@ function NewsCategories( { data, field, onChange } ) {
 	const set = ( ids ) => onChange( { news_categories: ids } );
 	return (
 		<fieldset>
+			{ /* Own id: the radio control of DataForm (setting motion) counts its ids apart from this one, so both
+			started at inspector-radio-control-0 and the options took the labels of the other group. */ }
 			<RadioControl
+				id="leitvia-news-categories"
 				label={ field.label }
 				help={ field.description }
 				selected={ only ? 'only' : 'all' }
@@ -207,6 +210,21 @@ const FIELDS = [
 		),
 		type: 'boolean',
 		Edit: 'toggle',
+	},
+	{
+		id: 'motion',
+		label: __( 'Motion on scroll', 'leitvia-studio' ),
+		description: __(
+			'How blocks with an animation move into view. Off loads no animation at all.',
+			'leitvia-studio'
+		),
+		type: 'text',
+		Edit: 'radio',
+		elements: [
+			{ value: 'off', label: __( 'Off', 'leitvia-studio' ) },
+			{ value: 'subtle', label: __( 'Subtle', 'leitvia-studio' ) },
+			{ value: 'bold', label: __( 'Bold', 'leitvia-studio' ) },
+		],
 	},
 	{
 		id: 'news_schema',
@@ -467,6 +485,7 @@ function DesignAndSearch( { form } ) {
 		<>
 			{ form( [
 				'guard_site_editor_contrast',
+				'motion',
 				'news_schema',
 				'news_categories',
 				'news_sitemap',
@@ -480,6 +499,13 @@ function DesignAndSearch( { form } ) {
 					) }
 					text={ __(
 						'Uses the contrast pairs of the active theme. Token sets in Studio are always checked.',
+						'leitvia-studio'
+					) }
+				/>
+				<Background
+					label={ __( 'Motion on scroll:', 'leitvia-studio' ) }
+					text={ __(
+						'Subtle moves a block 2.5rem in 800 ms as it scrolls into view, bold twice the way in 1200 ms; a block can choose its own strength in the panel Animation. Visitors who reduce motion in their system or turn on "Motion off" in the accessibility bar never see motion. Off loads neither style nor script and also stops the hover motion of the theme.',
 						'leitvia-studio'
 					) }
 				/>

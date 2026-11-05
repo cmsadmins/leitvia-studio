@@ -72,6 +72,11 @@ class Test_Settings extends WP_UnitTestCase {
 					'default' => 0,
 					'minimum' => 0,
 				),
+				'motion'                     => array(
+					'type'    => 'string',
+					'default' => 'subtle',
+					'enum'    => array( 'off', 'subtle', 'bold' ),
+				),
 			),
 			$schema['properties']
 		);
@@ -134,6 +139,7 @@ class Test_Settings extends WP_UnitTestCase {
 				'news_categories'            => array(),
 				'news_sitemap'               => true,
 				'editorial_page'             => 0,
+				'motion'                     => 'subtle',
 			),
 			get_option( 'leitvia_studio_settings' )
 		);
@@ -160,6 +166,27 @@ class Test_Settings extends WP_UnitTestCase {
 		update_option( 'leitvia_studio_settings', array( 'hide_product_notes' => true ) );
 		$this->assertSame( array( 3, 2, 7 ), leitvia_studio_setting( 'news_categories' ) );
 		$this->assertSame( 12, leitvia_studio_setting( 'editorial_page' ) );
+	}
+
+	/**
+	 * Motion keeps off, subtle and bold; anything else keeps the saved value, else subtle. REST refuses other values.
+	 */
+	public function test_sanitize_motion(): void {
+		delete_option( 'leitvia_studio_settings' );
+		$this->assertSame( 'subtle', leitvia_studio_setting( 'motion' ) );
+		update_option( 'leitvia_studio_settings', array( 'motion' => 'bold' ) );
+		$this->assertSame( 'bold', leitvia_studio_setting( 'motion' ) );
+		update_option( 'leitvia_studio_settings', array( 'motion' => 'spin' ) );
+		$this->assertSame( 'bold', leitvia_studio_setting( 'motion' ) );
+		update_option( 'leitvia_studio_settings', array( 'motion' => 'off' ) );
+		$this->assertSame( 'off', leitvia_studio_setting( 'motion' ) );
+
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+		$request = new WP_REST_Request( 'POST', '/wp/v2/settings' );
+		$request->set_body_params( array( 'leitvia_studio_settings' => array( 'motion' => 'wild' ) ) );
+		$this->assertSame( 400, rest_do_request( $request )->get_status() );
+		$request->set_body_params( array( 'leitvia_studio_settings' => array( 'motion' => 'subtle' ) ) );
+		$this->assertSame( 'subtle', rest_do_request( $request )->get_data()['leitvia_studio_settings']['motion'] );
 	}
 
 	/**
@@ -199,6 +226,7 @@ class Test_Settings extends WP_UnitTestCase {
 				'news_categories'            => array(),
 				'news_sitemap'               => true,
 				'editorial_page'             => 0,
+				'motion'                     => 'subtle',
 			),
 			$response->get_data()['leitvia_studio_settings']
 		);
@@ -219,6 +247,7 @@ class Test_Settings extends WP_UnitTestCase {
 				'news_categories'            => array(),
 				'news_sitemap'               => true,
 				'editorial_page'             => 0,
+				'motion'                     => 'subtle',
 			),
 			rest_do_request( $request )->get_data()['leitvia_studio_settings']
 		);

@@ -27,7 +27,7 @@ ob_start();
 		<!-- /wp:column -->
 		<!-- wp:column -->
 		<div class="wp-block-column">
-			<!-- wp:leitvia/icon-list {"fontSize":"lead"} -->
+			<!-- wp:leitvia/icon-list {"leitviaAnimation":"stagger","fontSize":"lead"} -->
 			<ul role="list" class="wp-block-leitvia-icon-list has-lead-font-size"><!-- wp:leitvia/icon-list-item {"icon":"truck"} -->
 			<li class="wp-block-leitvia-icon-list-item"><span class="wp-block-leitvia-icon-list-item__text"><?php echo esc_html__( 'Delivery in two to four working days', 'leitvia-studio' ); ?></span></li>
 			<!-- /wp:leitvia/icon-list-item -->

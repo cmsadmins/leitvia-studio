@@ -265,8 +265,9 @@ final class Block_Edit {
 
 	/**
 	 * Block with new attributes. Allowed are attributes of the block catalog that live in the block comment, on blocks
-	 * that render on the server or save no markup of their own, and the CORE_ATTRIBUTES whose markup is rebuilt here;
-	 * anything else would leave the saved markup behind.
+	 * that render on the server or save no markup of their own, the CORE_ATTRIBUTES whose markup is rebuilt here, and
+	 * leitviaAnimation and leitviaMotion on every block that has them, static markup included: the server adds their
+	 * classes on render, the saved markup stays (animation()). Anything else would leave the saved markup behind.
 	 *
 	 * @param array<string, mixed> $block  Parsed block.
 	 * @param array<string, mixed> $attrs  New attribute values.
@@ -275,7 +276,10 @@ final class Block_Edit {
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	private static function attributes( array $block, array $attrs, array $target, \WP_Error $rebuild ) {
-		$name  = (string) $block['blockName'];
+		$name = (string) $block['blockName'];
+		if ( $attrs && ! array_diff_key( $attrs, array_flip( array( 'leitviaAnimation', 'leitviaMotion' ) ) ) ) {
+			return self::animation( $block, $attrs, $target );
+		}
 		$core  = self::CORE_ATTRIBUTES[ $name ] ?? null;
 		$entry = $core ? array( 'attributes' => array( 'properties' => $core ) ) : array_column( \LeitviaStudio\Blocks\Catalog::get(), null, 'name' )[ $name ] ?? null;
 		if ( ! $entry ) {
@@ -308,6 +312,34 @@ final class Block_Edit {
 			return $rebuild;
 		}
 		$block['attrs'] = $attrs + (array) $block['attrs'];
+		return $block;
+	}
+
+	/**
+	 * Block with a new effect on scroll: leitviaAnimation (none removes it) and leitviaMotion (null removes it) in the
+	 * block comment, in the order the editor saves them; the markup stays as it is.
+	 *
+	 * @param array<string, mixed> $block  Parsed block.
+	 * @param array<string, mixed> $attrs  leitviaAnimation and/or leitviaMotion.
+	 * @param array<string, mixed> $target Target.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private static function animation( array $block, array $attrs, array $target ) {
+		$name   = (string) $block['blockName'];
+		$schema = \WP_Block_Type_Registry::get_instance()->get_registered( $name )->attributes ?? array();
+		if ( ! isset( $schema['leitviaAnimation'] ) ) {
+			return self::invalid( 'attributes', __( 'This block takes no effect on scroll.', 'leitvia-studio' ), $target, 'leitvia/list-blocks' );
+		}
+		foreach ( $attrs as $key => $value ) {
+			if ( 'leitviaMotion' === $key && null === $value ) {
+				continue;
+			}
+			$valid = rest_validate_value_from_schema( $value, array_diff_key( (array) $schema[ $key ], array( 'default' => true ) ), (string) $key );
+			if ( is_wp_error( $valid ) ) {
+				return self::invalid( 'attributes', $valid->get_error_message(), $target, 'leitvia/list-blocks' );
+			}
+		}
+		$block['attrs'] = \LeitviaStudio\Blocks\Animation::with_attrs( $name, (array) $block['attrs'], $attrs );
 		return $block;
 	}
 

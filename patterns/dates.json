@@ -1,7 +1,7 @@
 {
 	"leitvia-studio/content-bento-features": {
 		"added": "2026-10-18",
-		"updated": "2026-10-20"
+		"updated": "2026-11-05"
 	},
 	"leitvia-studio/content-entry-facts": {
 		"added": "2026-10-24",
@@ -9,7 +9,7 @@
 	},
 	"leitvia-studio/content-faq-schema": {
 		"added": "2026-11-04",
-		"updated": "2026-11-04"
+		"updated": "2026-11-05"
 	},
 	"leitvia-studio/content-features-catalog": {
 		"added": "2026-10-18",
@@ -17,7 +17,7 @@
 	},
 	"leitvia-studio/content-icon-benefits": {
 		"added": "2026-11-04",
-		"updated": "2026-11-04"
+		"updated": "2026-11-05"
 	},
 	"leitvia-studio/content-share-post": {
 		"added": "2026-11-04",
@@ -25,11 +25,11 @@
 	},
 	"leitvia-studio/content-spotlight": {
 		"added": "2026-10-24",
-		"updated": "2026-10-28"
+		"updated": "2026-11-05"
 	},
 	"leitvia-studio/content-spotlight-scene": {
 		"added": "2026-10-24",
-		"updated": "2026-10-28"
+		"updated": "2026-11-05"
 	},
 	"leitvia-studio/content-story-highlight": {
 		"added": "2026-10-18",
@@ -37,7 +37,7 @@
 	},
 	"leitvia-studio/content-timeline": {
 		"added": "2026-10-24",
-		"updated": "2026-10-24"
+		"updated": "2026-11-05"
 	},
 	"leitvia-studio/header-announcement": {
 		"added": "2026-10-20",
@@ -53,6 +53,6 @@
 	},
 	"leitvia-studio/teaser-type-entries": {
 		"added": "2026-10-24",
-		"updated": "2026-10-24"
+		"updated": "2026-11-05"
 	}
 }

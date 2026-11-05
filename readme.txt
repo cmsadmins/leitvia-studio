@@ -4,7 +4,7 @@ Tags: ai, mcp, block theme, accessibility, design tokens
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.22
+Stable tag: 1.3.23
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -210,6 +210,15 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * Privacy policy: https://leitvia.com/privacy-policy/
 
 == Changelog ==
+
+= 1.3.23 =
+* Effect library for Animation: besides fade, rise and one after another now zoom, slide from the start or end (follows the writing direction), wipe up, wipe from the start, blur, mask (an image is revealed from the inside) and parallax (the background of a cover or the line of a timeline moves a little with the scroll position, only where the browser supports scroll-driven animation). Pure CSS on opacity, transform, clip-path and filter, so nothing shifts the layout; the script stays one small module.
+* Strength per block (leitviaMotion): subtle moves 2.5rem in 800 ms, bold twice the way in 1200 ms, for lively brands, images and galleries.
+* New setting Motion in Studio, Settings: off, subtle (default) or bold. Off loads neither style nor script of the effects and marks the page with leitvia-motion-off, so the theme leaves out its hover motion too.
+* The accessibility bar has a switch Motion off (WCAG 2.2.2, 2.3.3): it stops the effects on scroll, the marquee, the counter and the hover motion of the theme at once, and is kept for the next page before the first paint. Marquee and counter also stay still with the site setting off.
+* The Animation panel in the editor offers every effect and the strength, with a Preview button.
+* Agents can set leitviaAnimation and leitviaMotion with leitvia/update-block on every block, static core blocks included; the saved markup stays as it is.
+* Seven Studio patterns use the new effects (Bento features, FAQ, Icon benefits, Spotlight, Spotlight scene, Timeline, Type entries).
 
 = 1.3.22 =
 * Animation and Reveal start where you look: a block appears once a fifth of it has passed a line 12 % above the bottom edge of the window (a block taller than the window needs a third of the window height), not with its first pixel, so on a phone the effect no longer runs below the edge.

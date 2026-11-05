@@ -153,6 +153,8 @@ class Test_Easy_Language extends WP_UnitTestCase {
 		$this->assertStringStartsWith( 'try{var s=JSON.parse(localStorage.getItem("leitvia-a11y"))', $script );
 		$this->assertStringContainsString( '<a class="wp-block-leitvia-a11y-bar__statement" href="/accessibility/">Accessibility statement</a><button type="button" class="wp-block-leitvia-a11y-bar__toggle" aria-expanded="false" aria-controls="leitvia-a11y-controls" hidden>Display settings</button><div class="wp-block-leitvia-a11y-bar__controls" id="leitvia-a11y-controls" hidden>', $html );
 		$this->assertStringContainsString( '<button type="button" data-action="contrast" aria-pressed="false">High contrast</button>', $html );
+		$this->assertStringContainsString( '<button type="button" data-action="motion" aria-pressed="false">Motion off</button>', $html );
+		$this->assertStringContainsString( 's.motion&&c.add("leitvia-motion-off")', $script );
 		$this->assertMatchesRegularExpression( '#<button type="button" data-action="read" hidden data-stop="Stop reading">Read aloud</button></div></nav>$#', $html );
 		$this->assertLessThan( 300, strlen( $script ) );
 	}

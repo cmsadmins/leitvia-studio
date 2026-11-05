@@ -1,6 +1,11 @@
 // Counter (leitvia/counter): a copy hidden from assistive technology counts up over the end value, which stays in the
-// text for screen readers. Only with JavaScript and without reduced motion; transparency only, so nothing moves.
+// text for screen readers. Only with JavaScript, without reduced motion and without "Motion off" (accessibility bar
+// on html, site setting on body, also when switched on while counting); transparency only, so nothing moves.
 const DURATION = 1500;
+const off = () =>
+	!! document.querySelector(
+		':root.leitvia-motion-off, body.leitvia-motion-off'
+	);
 
 function count( value ) {
 	const lang = document.documentElement.lang || undefined;
@@ -10,7 +15,7 @@ function count( value ) {
 	const end = parseFloat(
 		`${ whole.replace( /\D/g, '' ) }.${ fraction.replace( /\D/g, '' ) }`
 	);
-	if ( ! Number.isFinite( end ) ) {
+	if ( ! Number.isFinite( end ) || off() ) {
 		return;
 	}
 	// ponytail: assumes the end value uses the separators of the page language; otherwise the copy shows them
@@ -31,7 +36,7 @@ function count( value ) {
 	const step = ( now ) => {
 		const t = Math.min( 1, ( now - start ) / DURATION );
 		copy.textContent = format.format( end * ( 1 - ( 1 - t ) ** 3 ) );
-		if ( t < 1 ) {
+		if ( t < 1 && ! off() ) {
 			window.requestAnimationFrame( step );
 		} else {
 			copy.remove();

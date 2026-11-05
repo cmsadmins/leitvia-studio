@@ -13,11 +13,16 @@ const { state } = store( 'leitvia/marquee', {
 		},
 	},
 	callbacks: {
-		// Motion only without reduced motion. The copy of the track closes the loop; it is hidden from assistive
-		// technology and out of the focus order.
+		// Motion only without reduced motion and without "Motion off" (accessibility bar on html, site setting on
+		// body). The copy of the track closes the loop; it is hidden from assistive technology and out of the focus
+		// order.
 		init() {
 			if (
-				window.matchMedia( '(prefers-reduced-motion: reduce)' ).matches
+				window.matchMedia( '(prefers-reduced-motion: reduce)' )
+					.matches ||
+				document.querySelector(
+					':root.leitvia-motion-off, body.leitvia-motion-off'
+				)
 			) {
 				return;
 			}

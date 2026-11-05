@@ -18,12 +18,12 @@ final class Blocks {
 
 	/**
 	 * Scripts that must run before the first paint, by name (head_script()). The announcement bar reads the hash of
-	 * its dismissed message, the accessibility bar restores text size and contrast; both only set classes or
+	 * its dismissed message, the accessibility bar restores text size, contrast and motion off; both only set classes or
 	 * attributes on the root element.
 	 */
 	public const HEAD_SCRIPTS = array(
 		'announcement' => 'try{localStorage.getItem("leitvia-announcement")==={value}&&document.documentElement.setAttribute("data-leitvia-announcement","dismissed")}catch(e){}',
-		'a11y'         => 'try{var s=JSON.parse(localStorage.getItem("leitvia-a11y"))||{},d=document.documentElement,z=Math.max(100,Math.min(200,+s.size||100));d.classList.add("leitvia-a11y-js");if(z-100)d.style.fontSize=z+"%";if(s.contrast)d.classList.add("leitvia-high-contrast")}catch(e){}',
+		'a11y'         => 'try{var s=JSON.parse(localStorage.getItem("leitvia-a11y"))||{},d=document.documentElement,c=d.classList,z=Math.max(100,Math.min(200,+s.size||100));c.add("leitvia-a11y-js");if(z-100)d.style.fontSize=z+"%";s.contrast&&c.add("leitvia-high-contrast");s.motion&&c.add("leitvia-motion-off")}catch(e){}',
 	);
 
 	/**

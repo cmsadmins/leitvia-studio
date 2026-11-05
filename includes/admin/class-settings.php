@@ -31,6 +31,7 @@ final class Settings {
 		'news_categories'            => array(),
 		'news_sitemap'               => true,
 		'editorial_page'             => 0,
+		'motion'                     => 'subtle',
 	);
 
 	/**
@@ -53,32 +54,42 @@ final class Settings {
 				'show_in_rest'      => array(
 					'schema' => array(
 						'type'                 => 'object',
-						'properties'           => array_map(
-							static fn( $fallback ): array => match ( true ) {
-								is_bool( $fallback )  => array(
-									'type'    => 'boolean',
-									'default' => $fallback,
-								),
-								is_int( $fallback )   => array(
-									'type'    => 'integer',
-									'default' => $fallback,
-									'minimum' => 0,
-								),
-								is_array( $fallback ) => array(
-									'type'    => 'array',
-									'default' => $fallback,
-									'items'   => array(
-										'type'    => 'integer',
-										'minimum' => 1,
+						// array_map() with two arrays drops the keys, array_combine() puts them back.
+						'properties'           => array_combine(
+							array_keys( self::DEFAULTS ),
+							array_map(
+								static fn( $fallback, string $key ): array => match ( true ) {
+									is_bool( $fallback )  => array(
+										'type'    => 'boolean',
+										'default' => $fallback,
 									),
-								),
-								default               => array(
-									'type'    => 'string',
-									'default' => $fallback,
-									'pattern' => self::TILE_URL_PATTERN,
-								),
-							},
-							self::DEFAULTS
+									is_int( $fallback )   => array(
+										'type'    => 'integer',
+										'default' => $fallback,
+										'minimum' => 0,
+									),
+									is_array( $fallback ) => array(
+										'type'    => 'array',
+										'default' => $fallback,
+										'items'   => array(
+											'type'    => 'integer',
+											'minimum' => 1,
+										),
+									),
+									'motion' === $key     => array(
+										'type'    => 'string',
+										'default' => $fallback,
+										'enum'    => \LeitviaStudio\Blocks\Animation::SITE,
+									),
+									default               => array(
+										'type'    => 'string',
+										'default' => $fallback,
+										'pattern' => self::TILE_URL_PATTERN,
+									),
+								},
+								self::DEFAULTS,
+								array_keys( self::DEFAULTS )
+							)
 						),
 						'additionalProperties' => false,
 					),
@@ -88,7 +99,8 @@ final class Settings {
 	}
 
 	/**
-	 * Keeps the known keys as booleans, page IDs and lists of term IDs, the tile URL as a valid tile URL, and drops the rest. Missing keys and an invalid
+	 * Keeps the known keys as booleans, page IDs and lists of term IDs, the tile URL as a valid tile URL, motion as off,
+	 * subtle or bold (else the saved value or its default), and drops the rest. Missing keys and an invalid
 	 * tile URL keep their saved value, so a partial update through /wp/v2/settings changes only the keys it sends;
 	 * without a saved value they get their default.
 	 *
@@ -104,10 +116,19 @@ final class Settings {
 				is_bool( $fallback )  => array_key_exists( $key, $value ) ? filter_var( $given, FILTER_VALIDATE_BOOLEAN ) : (bool) $given,
 				is_int( $fallback )   => absint( $given ),
 				is_array( $fallback ) => array_values( array_unique( array_filter( array_map( 'absint', (array) $given ) ) ) ),
+				'motion' === $key     => in_array( $given, \LeitviaStudio\Blocks\Animation::SITE, true ) ? $given : self::motion(),
 				default               => self::tile_url( $given ),
 			};
 		}
 		return $clean;
+	}
+
+	/**
+	 * The saved motion setting when it is valid, else its default.
+	 */
+	private static function motion(): string {
+		$saved = self::get( 'motion' );
+		return in_array( $saved, \LeitviaStudio\Blocks\Animation::SITE, true ) ? $saved : self::DEFAULTS['motion'];
 	}
 
 	/**

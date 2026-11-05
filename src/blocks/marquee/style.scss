@@ -1,4 +1,4 @@
-// Still and wrapping by default (no JavaScript, reduced motion). With scripting and without reduced motion the band
+// Still and wrapping by default (no JavaScript, reduced motion, motion off). With scripting and without reduced motion the band
 // is one line from the first paint and the button keeps its place while hidden, so starting the motion moves nothing
 // but the transform (CLS 0). Hover and focus inside the band hold the motion; the button pauses it for good.
 .wp-block-leitvia-marquee__track > ul {
@@ -16,36 +16,45 @@
 }
 
 @media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
-	.wp-block-leitvia-marquee__toggle[hidden] {
-		display: inline-block;
-		visibility: hidden;
-	}
+	:root:not(.leitvia-motion-off) body:not(.leitvia-motion-off) {
+		.wp-block-leitvia-marquee__toggle[hidden] {
+			display: inline-block;
+			visibility: hidden;
+		}
 
-	.wp-block-leitvia-marquee__viewport {
-		display: flex;
-		overflow: hidden;
-	}
+		.wp-block-leitvia-marquee__viewport {
+			display: flex;
+			overflow: hidden;
+		}
 
-	.wp-block-leitvia-marquee__track {
-		display: flex;
-		flex: none;
-		padding-inline-end: var(--wp--preset--spacing--l, 2.5rem);
+		.wp-block-leitvia-marquee__track {
+			display: flex;
+			flex: none;
+			padding-inline-end: var(--wp--preset--spacing--l, 2.5rem);
 
-		> ul {
-			flex-wrap: nowrap;
-			white-space: nowrap;
+			> ul {
+				flex-wrap: nowrap;
+				white-space: nowrap;
+			}
+		}
+
+		.wp-block-leitvia-marquee.is-running .wp-block-leitvia-marquee__track {
+			animation: leitvia-marquee var(--leitvia-marquee-duration, 40s) linear infinite;
+		}
+
+		.wp-block-leitvia-marquee.is-paused .wp-block-leitvia-marquee__track,
+		.wp-block-leitvia-marquee__viewport:hover .wp-block-leitvia-marquee__track,
+		.wp-block-leitvia-marquee__viewport:focus-within .wp-block-leitvia-marquee__track {
+			animation-play-state: paused;
 		}
 	}
+}
 
-	.wp-block-leitvia-marquee.is-running .wp-block-leitvia-marquee__track {
-		animation: leitvia-marquee var(--leitvia-marquee-duration, 40s) linear infinite;
-	}
-
-	.wp-block-leitvia-marquee.is-paused .wp-block-leitvia-marquee__track,
-	.wp-block-leitvia-marquee__viewport:hover .wp-block-leitvia-marquee__track,
-	.wp-block-leitvia-marquee__viewport:focus-within .wp-block-leitvia-marquee__track {
-		animation-play-state: paused;
-	}
+// "Motion off" of the accessibility bar (html) or the site setting of Studio (body) keep the still list, also when
+// the switch comes after the band started: the copy and the button leave, the list wraps again (WCAG 2.2.2).
+:is(html, body).leitvia-motion-off .wp-block-leitvia-marquee__track[aria-hidden="true"],
+:is(html, body).leitvia-motion-off .wp-block-leitvia-marquee__toggle {
+	display: none;
 }
 
 @keyframes leitvia-marquee {

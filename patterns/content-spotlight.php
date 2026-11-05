@@ -37,7 +37,7 @@ ob_start();
 		<!-- /wp:column -->
 	</div>
 	<!-- /wp:columns -->
-	<!-- wp:leitvia/spotlight {"align":"wide","style":{"spacing":{"margin":{"top":"var:preset|spacing|l"}}}} -->
+	<!-- wp:leitvia/spotlight {"leitviaAnimation":"wipe-up","align":"wide","style":{"spacing":{"margin":{"top":"var:preset|spacing|l"}}}} -->
 	<div data-wp-interactive="leitvia/spotlight" data-wp-on--keydown="actions.keydown" class="wp-block-leitvia-spotlight alignwide" style="margin-top:var(--wp--preset--spacing--l)">
 		<!-- wp:image {"aspectRatio":"3/2","scale":"cover","sizeSlug":"full","linkDestination":"none"} -->
 		<figure class="wp-block-image size-full"><img src="<?php echo esc_url( plugins_url( 'assets/images/landscape.webp', LEITVIA_STUDIO_FILE ) ); ?>" alt="<?php echo esc_attr__( 'Illustration of layered green hills below a terracotta sun', 'leitvia-studio' ); ?>" style="aspect-ratio:3/2;object-fit:cover"/></figure>

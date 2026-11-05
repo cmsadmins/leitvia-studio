@@ -55,7 +55,7 @@ class Test_Editor_Assets extends WP_UnitTestCase {
 		$this->enqueue_for( 'event' );
 		$this->assertTrue( wp_script_is( 'leitvia-studio-editor' ) );
 		$this->assertTrue( wp_style_is( 'leitvia-studio-editor' ) );
-		$inline = array_filter( (array) wp_scripts()->get_data( 'leitvia-studio-editor', 'before' ) );
+		$inline = self::inline();
 		$this->assertStringStartsWith( 'window.leitviaStudioBindings = ', (string) end( $inline ) );
 		$inline = (string) reset( $inline );
 		$this->assertStringStartsWith( 'window.leitviaStudioModel = ', $inline );
@@ -133,6 +133,22 @@ class Test_Editor_Assets extends WP_UnitTestCase {
 		$this->assertNull( Bindings::editor_data() );
 		$this->enqueue_for( 'post' );
 		$this->assertTrue( wp_script_is( 'leitvia-studio-editor' ) );
-		$this->assertSame( array(), array_filter( (array) wp_scripts()->get_data( 'leitvia-studio-editor', 'before' ) ) );
+		$this->assertSame( array(), self::inline() );
+		// Only the site default of the motion setting for the panel Animation.
+		$this->assertSame( array( 'window.leitviaStudioMotion = "subtle";' ), array_values( array_filter( (array) wp_scripts()->get_data( 'leitvia-studio-editor', 'before' ) ) ) );
+	}
+
+	/**
+	 * Inline data before the editor script, without the site default of the motion setting that every screen gets.
+	 *
+	 * @return string[]
+	 */
+	private static function inline(): array {
+		return array_values(
+			array_filter(
+				(array) wp_scripts()->get_data( 'leitvia-studio-editor', 'before' ),
+				static fn( $line ) => is_string( $line ) && '' !== $line && ! str_starts_with( $line, 'window.leitviaStudioMotion = ' )
+			)
+		);
 	}
 }

@@ -151,6 +151,7 @@ final class Plugin {
 		add_action( 'enqueue_block_assets', array( Blocks\Blocks::class, 'editor_highlight_style' ) );
 		add_filter( 'register_block_type_args', array( Blocks\Animation::class, 'block_args' ), 10, 2 );
 		add_filter( 'render_block', array( Blocks\Animation::class, 'render' ), 10, 2 );
+		add_filter( 'body_class', array( Blocks\Animation::class, 'body_class' ) );
 		add_filter( 'render_block_data', array( Blocks\Marquee::class, 'state' ) );
 		add_filter( 'wp_kses_allowed_html', array( Blocks\Blocks::class, 'allow_inputs' ), 10, 2 );
 		add_filter( 'render_block_leitvia/pricing', array( Blocks\Blocks::class, 'unique_pricing_group' ) );

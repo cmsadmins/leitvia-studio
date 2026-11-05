@@ -1,55 +1,211 @@
-// Appears once when it has clearly come into view: a fade (Appear) or a fade with a lift of 2.5rem (Rise), 800 ms on
-// the curve of GSAP power3.out (fast start, long soft landing); "One after another" moves each direct child the same
-// way, each when it comes into view itself, and children that come in together start 100 ms apart up to the sixth.
-// Opacity and transform only.
+// Appears once when it has clearly come into view, on the curve of GSAP power3.out (fast start, long soft landing):
+// a fade (Appear), a fade with a lift (Rise), a zoom from slightly smaller (Zoom), a slide in from the start or the end
+// of the line (Slide from start, Slide from end, logical: mirrored in right-to-left languages), a wipe that uncovers the
+// block from the bottom up or from the start of the line (Wipe up, Wipe from start, clip-path on the whole element, so
+// headings are never split into spans), a fade out of a blur (Blur) or an image that uncovers itself from its centre
+// (Mask). "One after another" moves each direct child, each when it comes into view itself; children that come in
+// together start 100 ms apart up to the sixth. A child that carries an effect of its own keeps it, the others rise.
+// Opacity, transform, clip-path and filter only, so nothing moves the layout (CLS 0).
+//
+// Two strengths through custom properties, one set of rules: subtle (the default) moves 2.5rem in 800 ms, zooms from
+// 0.92, blurs 8 px and masks 15 % of each side; bold doubles the way (5rem, 0.84, 16 px, 30 %) on the longer curve of
+// expo.out in 1200 ms. The block gets is-lv-motion-bold from its attribute leitviaMotion or from the site default in
+// the Studio settings (includes/blocks/class-animation.php). Children of One after another take the strength of their
+// parent, since custom properties inherit; the effect values are reset on every animated element, so a nested block
+// never inherits the way of its parent.
+//
+// Parallax is bound to the scroll position, not a reveal: the background image or video of a cover moves by up to 4 %
+// (subtle) or 8 % (bold) of its height while the cover passes the window, and the line of a timeline (leitvia/timeline)
+// draws itself along as the entries pass. Only where the browser supports scroll-driven animations
+// (animation-timeline: view()); elsewhere both stay still. Never for the first screen.
 //
 // view.js (the viewScriptModule of this block, loaded by the animation attribute as well) marks a block, or each direct
 // child of One after another, that starts below the visible area with is-lv-pending and swaps it for is-lv-revealed
 // once a fifth of it is clearly in view (details there). Focus inside it and a jump to an anchor only remove
-// is-lv-pending, so the block shows at once without the effect. Without JavaScript, with reduced motion, in print and
-// in the editor nothing carries is-lv-pending, so the content is simply there. What is in view when the page loads is
-// never hidden: nothing flickers, LCP and CLS stay as they are. The fade is short and passing; contrast counts in the
-// end state, which is the block as designed.
-// The animation fills backwards only, so afterwards the block keeps its own transform and transitions (hover effects).
-// The curve is a linear() with 17 points of 1 - (1 - t)^4; browsers without linear() take the cubic-bezier close to it.
+// is-lv-pending, so the block shows at once without the effect. Without JavaScript, with reduced motion, with the switch
+// "Motion off" of the accessibility bar (html.leitvia-motion-off), in print and in the editor nothing is hidden and
+// nothing moves, so the content is simply there; the switch also stops a parallax at once. With the site setting
+// "Motion off" Studio loads neither this file nor view.js. What is in view when the page loads is never hidden: nothing
+// flickers, LCP and CLS stay as they are. The motion is short and passing; contrast counts in the end state, which is
+// the block as designed.
+// The animation fills backwards only, so afterwards the block keeps its own transform, clip-path, filter and
+// transitions (hover effects). The curves are linear() with 17 points of 1 - (1 - t)^4 and 1 - 2^(-10 t); browsers
+// without linear() take the cubic-bezier close to each.
 //
 // One source for the reveal block and the animation of any block (attribute leitviaAnimation,
-// includes/blocks/class-animation.php), which adds has-lv-animation is-lv-animation-<effect> on the front end and
-// loads this file and view.js.
+// includes/blocks/class-animation.php), which adds has-lv-animation is-lv-animation-<effect> (or has-lv-parallax) and
+// is-lv-motion-<strength> on the front end and loads this file and view.js. The editor preview of the panel Animation
+// (src/editor/animation.js) sets the same classes for a moment.
 $fade: ".wp-block-leitvia-reveal.is-effect-fade, .has-lv-animation.is-lv-animation-fade";
 $rise: ".wp-block-leitvia-reveal.is-effect-rise, .has-lv-animation.is-lv-animation-rise";
 $stagger: ".wp-block-leitvia-reveal.is-effect-stagger, .has-lv-animation.is-lv-animation-stagger";
+$animated: ".wp-block-leitvia-reveal, .has-lv-animation, .has-lv-parallax";
+$power3: linear(0, 0.228, 0.414, 0.564, 0.684, 0.777, 0.847, 0.9, 0.938, 0.963, 0.98, 0.99, 0.996, 0.999, 1, 1, 1);
+$expo: linear(0, 0.352, 0.58, 0.727, 0.823, 0.885, 0.926, 0.952, 0.969, 0.98, 0.987, 0.991, 0.994, 0.996, 0.998, 0.998, 1);
 
 @media screen and (prefers-reduced-motion: no-preference) {
-	:is(#{$fade}, #{$rise}).is-lv-pending,
-	:is(#{$stagger}) > .is-lv-pending {
-		opacity: 0;
-	}
+	html:not(.leitvia-motion-off) {
+		// Strength.
+		:is(#{$animated}) {
+			--lv-motion-distance: 2.5rem;
+			--lv-motion-duration: 800ms;
+			--lv-motion-ease: #{$power3};
+			--lv-motion-scale: 0.92;
+			--lv-motion-blur: 8px;
+			--lv-motion-inset: 15%;
+			--lv-motion-parallax: 2%;
+			--lv-motion-parallax-scale: 1.04;
+		}
 
-	:is(#{$rise}),
-	:is(#{$stagger}) > * {
-		--leitvia-reveal-shift: 2.5rem;
-	}
+		:is(#{$animated}).is-lv-motion-bold {
+			--lv-motion-distance: 5rem;
+			--lv-motion-duration: 1200ms;
+			--lv-motion-ease: #{$expo};
+			--lv-motion-scale: 0.84;
+			--lv-motion-blur: 16px;
+			--lv-motion-inset: 30%;
+			--lv-motion-parallax: 4%;
+			--lv-motion-parallax-scale: 1.08;
+		}
 
-	:is(#{$rise}).is-lv-pending,
-	:is(#{$stagger}) > .is-lv-pending {
-		transform: translateY(var(--leitvia-reveal-shift));
-	}
+		@supports not (animation-timing-function: linear(0, 1)) {
+			:is(#{$animated}) {
+				--lv-motion-ease: cubic-bezier(0.25, 1, 0.5, 1);
+			}
 
-	// view.js sets --leitvia-reveal-step on the children of One after another that come into view together (0 to 5).
-	:is(#{$fade}, #{$rise}).is-lv-revealed,
-	:is(#{$stagger}) > .is-lv-revealed {
-		animation: leitvia-reveal 800ms cubic-bezier(0.25, 1, 0.5, 1) calc(var(--leitvia-reveal-step, 0) * 100ms) backwards;
+			:is(#{$animated}).is-lv-motion-bold {
+				--lv-motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
+			}
+		}
 
-		@supports (animation-timing-function: linear(0, 1)) {
-			animation-timing-function: linear(0, 0.228, 0.414, 0.564, 0.684, 0.777, 0.847, 0.9, 0.938, 0.963, 0.98, 0.99, 0.996, 0.999, 1, 1, 1);
+		// Where each effect starts. Reset on every animated element first, so nothing inherits from a parent.
+		.wp-block-leitvia-reveal,
+		.has-lv-animation,
+		:is(#{$stagger}) > * {
+			--lv-opacity: 0;
+			--lv-x: 0px;
+			--lv-y: 0px;
+			--lv-scale: 1;
+			--lv-clip: none;
+			--lv-clip-end: none;
+			--lv-filter: none;
+		}
+
+		:is(#{$rise}),
+		:is(#{$stagger}) > :not(.has-lv-animation) {
+			--lv-y: var(--lv-motion-distance);
+		}
+
+		.has-lv-animation.is-lv-animation-zoom {
+			--lv-scale: var(--lv-motion-scale);
+		}
+
+		.has-lv-animation.is-lv-animation-slide-start {
+			--lv-x: calc(-1 * var(--lv-motion-distance));
+		}
+
+		.has-lv-animation.is-lv-animation-slide-end {
+			--lv-x: var(--lv-motion-distance);
+		}
+
+		.has-lv-animation.is-lv-animation-wipe-up {
+			--lv-opacity: 1;
+			--lv-clip: inset(100% 0 0 0);
+			--lv-clip-end: inset(0 0 0 0);
+		}
+
+		.has-lv-animation.is-lv-animation-wipe-start {
+			--lv-opacity: 1;
+			--lv-clip: inset(0 100% 0 0);
+			--lv-clip-end: inset(0 0 0 0);
+		}
+
+		.has-lv-animation.is-lv-animation-blur {
+			--lv-filter: blur(var(--lv-motion-blur));
+		}
+
+		.has-lv-animation.is-lv-animation-mask {
+			--lv-clip: inset(var(--lv-motion-inset));
+			--lv-clip-end: inset(0 0 0 0);
+		}
+
+		// Right to left, by the direction of the element (also a passage in another language): start is on the right.
+		// The -rtl.css that the build writes for right-to-left sites keeps these rules as they are (custom properties
+		// are not flipped), so both files mirror only here.
+		.has-lv-animation.is-lv-animation-slide-start:dir(rtl) {
+			--lv-x: var(--lv-motion-distance);
+		}
+
+		.has-lv-animation.is-lv-animation-slide-end:dir(rtl) {
+			--lv-x: calc(-1 * var(--lv-motion-distance));
+		}
+
+		.has-lv-animation.is-lv-animation-wipe-start:dir(rtl) {
+			--lv-clip: inset(0 0 0 100%);
+		}
+
+		// A slide starts beside its place: no horizontal scroll bar for its way. clip, not hidden, keeps sticky headers.
+		body:has(.is-lv-animation-slide-start, .is-lv-animation-slide-end) {
+			overflow-x: clip;
+		}
+
+		:is(#{$animated}).is-lv-pending,
+		:is(#{$stagger}) > .is-lv-pending {
+			opacity: 0;
+		}
+
+		// view.js sets --leitvia-reveal-step on the children of One after another that come into view together (0 to 5).
+		:is(#{$animated}).is-lv-revealed,
+		:is(#{$stagger}) > .is-lv-revealed {
+			animation: leitvia-reveal var(--lv-motion-duration) var(--lv-motion-ease) calc(var(--leitvia-reveal-step, 0) * 100ms) backwards;
+		}
+
+		@supports (animation-timeline: view()) {
+			.has-lv-parallax.wp-block-cover {
+				overflow: clip;
+			}
+
+			.has-lv-parallax.wp-block-cover > :is(.wp-block-cover__image-background, .wp-block-cover__video-background) {
+				scale: var(--lv-motion-parallax-scale);
+				animation: leitvia-parallax linear both;
+				animation-timeline: view();
+			}
+
+			.has-lv-parallax.wp-block-leitvia-timeline > .wp-block-leitvia-timeline-item::before {
+				transform-origin: 50% 0;
+				animation: leitvia-draw linear both;
+				animation-timeline: view();
+				animation-range: entry 0% cover 50%;
+			}
 		}
 	}
 }
 
 @keyframes leitvia-reveal {
 	from {
-		opacity: 0;
-		transform: translateY(var(--leitvia-reveal-shift, 0));
+		opacity: var(--lv-opacity, 0);
+		transform: translate(var(--lv-x, 0px), var(--lv-y, 0px)) scale(var(--lv-scale, 1));
+		clip-path: var(--lv-clip, none);
+		filter: var(--lv-filter, none);
+	}
+
+	to {
+		clip-path: var(--lv-clip-end, none);
+	}
+}
+
+@keyframes leitvia-parallax {
+	from {
+		translate: 0 calc(-1 * var(--lv-motion-parallax, 2%));
+	}
+
+	to {
+		translate: 0 var(--lv-motion-parallax, 2%);
+	}
+}
+
+@keyframes leitvia-draw {
+	from {
+		transform: scaleY(0);
 	}
 }

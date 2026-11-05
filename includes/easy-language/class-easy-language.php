@@ -104,7 +104,8 @@ final class Easy_Language {
 	}
 
 	/**
-	 * Adds to the saved accessibility bar what only works with JavaScript: text size, high contrast and read aloud,
+	 * Adds to the saved accessibility bar what only works with JavaScript: text size, high contrast, motion off (class
+	 * leitvia-motion-off on html, which stops the effects on scroll of Studio and the hover motion of the theme) and read aloud,
 	 * hidden until the view module shows them. On a narrow screen they sit behind a disclosure button, so the bar
 	 * stays one or two lines above the header. An inline script in the head applies the stored settings before the
 	 * first paint (Blocks::head_script()), so a reload does not shift the layout. Runs on render_block_leitvia/a11y-bar.
@@ -130,6 +131,7 @@ final class Easy_Language {
 			. $button( 'reset', esc_html__( 'Reset', 'leitvia-studio' ) . '<span class="screen-reader-text"> ' . esc_html__( 'text size', 'leitvia-studio' ) . '</span>' )
 			. '</div>'
 			. ( '' === $css ? '' : $button( 'contrast', esc_html__( 'High contrast', 'leitvia-studio' ), ' aria-pressed="false"' ) )
+			. $button( 'motion', esc_html__( 'Motion off', 'leitvia-studio' ), ' aria-pressed="false"' )
 			. $button( 'read', esc_html__( 'Read aloud', 'leitvia-studio' ), sprintf( ' hidden data-stop="%s"', esc_attr__( 'Stop reading', 'leitvia-studio' ) ) )
 			. '</div>';
 		$html     = substr_replace( $html, $controls, $end, 0 );

@@ -29,7 +29,7 @@ ob_start();
 		<!-- /wp:column -->
 		<!-- wp:column {"width":"62%"} -->
 		<div class="wp-block-column" style="flex-basis:62%">
-			<!-- wp:leitvia/timeline -->
+			<!-- wp:leitvia/timeline {"leitviaAnimation":"parallax"} -->
 			<ol class="wp-block-leitvia-timeline"><!-- wp:leitvia/timeline-item -->
 <li class="wp-block-leitvia-timeline-item"><time class="wp-block-leitvia-timeline-item__date" datetime="2017"><?php echo esc_html__( '2017', 'leitvia-studio' ); ?></time><h3 class="wp-block-leitvia-timeline-item__heading"><?php echo esc_html__( 'A first sketch', 'leitvia-studio' ); ?></h3><div class="wp-block-leitvia-timeline-item__content"><!-- wp:paragraph -->
 <p><?php echo esc_html__( 'Two architects propose to turn the old post office into a library.', 'leitvia-studio' ); ?></p>

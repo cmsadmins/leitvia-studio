@@ -20,7 +20,7 @@ ob_start();
 	<!-- wp:paragraph {"textColor":"ink-muted"} -->
 	<p class="has-ink-muted-color has-text-color"><?php echo esc_html__( 'The questions people send us most often, each answered in a few sentences. Open one to read the answer.', 'leitvia-studio' ); ?></p>
 	<!-- /wp:paragraph -->
-	<!-- wp:leitvia/faq {"exclusive":true} -->
+	<!-- wp:leitvia/faq {"exclusive":true,"leitviaAnimation":"fade"} -->
 	<div class="wp-block-leitvia-faq"><!-- wp:details {"showContent":true} -->
 	<details class="wp-block-details" open><summary><?php echo esc_html__( 'How soon will I hear back?', 'leitvia-studio' ); ?></summary><!-- wp:paragraph -->
 	<p><?php echo esc_html__( 'Within one working day. Messages that arrive on a weekend are answered on Monday morning.', 'leitvia-studio' ); ?></p>

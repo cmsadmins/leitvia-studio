@@ -1,4 +1,5 @@
-// Text size, high contrast and read aloud for the accessibility bar. Settings go to localStorage only after a click;
+// Text size, high contrast, motion off and read aloud for the accessibility bar. Motion off puts leitvia-motion-off on
+// html: the effects on scroll of Studio show at once and stay still, the theme drops its hover motion (WCAG 2.2.2, 2.3.3). Settings go to localStorage only after a click;
 // the inline script before the bar (class-easy-language.php) applies them on the next page before the first paint.
 // Read aloud only uses a voice of the device (localService) in the language of the page, never one from the cloud.
 const KEY = 'leitvia-a11y';
@@ -14,6 +15,7 @@ if ( controls ) {
 	} catch {}
 	const value = controls.querySelector( '.wp-block-leitvia-a11y-bar__value' );
 	const contrast = controls.querySelector( '[data-action="contrast"]' );
+	const motion = controls.querySelector( '[data-action="motion"]' );
 	const apply = () => {
 		const size = settings.size || 100;
 		root.style.fontSize = 100 === size ? '' : `${ size }%`;
@@ -23,6 +25,8 @@ if ( controls ) {
 			'aria-pressed',
 			String( !! settings.contrast )
 		);
+		root.classList.toggle( 'leitvia-motion-off', !! settings.motion );
+		motion?.setAttribute( 'aria-pressed', String( !! settings.motion ) );
 	};
 	const change = ( next ) => {
 		settings = { ...settings, ...next };
@@ -77,6 +81,7 @@ if ( controls ) {
 		larger: () => change( { size: step( 25 ) } ),
 		reset: () => change( { size: 100 } ),
 		contrast: () => change( { contrast: ! settings.contrast } ),
+		motion: () => change( { motion: ! settings.motion } ),
 		read,
 	};
 	controls.addEventListener( 'click', ( event ) =>
