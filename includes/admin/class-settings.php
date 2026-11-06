@@ -32,6 +32,12 @@ final class Settings {
 		'news_sitemap'               => true,
 		'editorial_page'             => 0,
 		'motion'                     => 'subtle',
+		'organization_street'        => '',
+		'organization_postal_code'   => '',
+		'organization_city'          => '',
+		'organization_country'       => '',
+		'organization_phone'         => '',
+		'organization_email'         => '',
 	);
 
 	/**
@@ -81,6 +87,10 @@ final class Settings {
 										'default' => $fallback,
 										'enum'    => \LeitviaStudio\Blocks\Animation::SITE,
 									),
+									str_starts_with( $key, 'organization_' ) => array(
+										'type'    => 'string',
+										'default' => $fallback,
+									),
 									default               => array(
 										'type'    => 'string',
 										'default' => $fallback,
@@ -100,7 +110,7 @@ final class Settings {
 
 	/**
 	 * Keeps the known keys as booleans, page IDs and lists of term IDs, the tile URL as a valid tile URL, motion as off,
-	 * subtle or bold (else the saved value or its default), and drops the rest. Missing keys and an invalid
+	 * subtle or bold (else the saved value or its default), the organization details as plain text, and drops the rest. Missing keys and an invalid
 	 * tile URL keep their saved value, so a partial update through /wp/v2/settings changes only the keys it sends;
 	 * without a saved value they get their default.
 	 *
@@ -117,6 +127,8 @@ final class Settings {
 				is_int( $fallback )   => absint( $given ),
 				is_array( $fallback ) => array_values( array_unique( array_filter( array_map( 'absint', (array) $given ) ) ) ),
 				'motion' === $key     => in_array( $given, \LeitviaStudio\Blocks\Animation::SITE, true ) ? $given : self::motion(),
+				'organization_email' === $key => sanitize_email( (string) $given ),
+				str_starts_with( $key, 'organization_' ) => sanitize_text_field( (string) $given ),
 				default               => self::tile_url( $given ),
 			};
 		}

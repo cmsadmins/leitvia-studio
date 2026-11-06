@@ -7,6 +7,11 @@
 	padding: var(--wp--preset--spacing--m, 1.5rem);
 	background: var(--wp--preset--color--surface-alt, transparent);
 
+	// A tile can be a quarter of the width: long German words break at a syllable, not at the edge. Headings stay manual.
+	&:lang(de) p {
+		hyphens: auto;
+	}
+
 	> * {
 		margin-block: 0;
 	}

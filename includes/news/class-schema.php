@@ -318,7 +318,8 @@ final class Schema {
 	}
 
 	/**
-	 * The site as publisher with its editorial principles (editorial_url()) when there are some. Logo: the custom logo when that is a raster image of at least LOGO_MIN pixels in both
+	 * The site as publisher with its editorial principles (editorial_url()) when there are some and its address, phone
+	 * and email from the settings when they are filled in. Logo: the custom logo when that is a raster image of at least LOGO_MIN pixels in both
 	 * directions, else the site icon in its 512 px size under the same rule, else none. An SVG has no pixel size and
 	 * never qualifies.
 	 *
@@ -334,6 +335,25 @@ final class Schema {
 		if ( '' !== $principles ) {
 			$organization['publishingPrinciples'] = $principles;
 		}
+		$details = self::organization_details();
+		$address = array_filter(
+			array(
+				'streetAddress'   => $details['street'],
+				'postalCode'      => $details['postal_code'],
+				'addressLocality' => $details['city'],
+				'addressCountry'  => $details['country'],
+			)
+		);
+		if ( $address ) {
+			$organization['address'] = array( '@type' => 'PostalAddress' ) + $address;
+		}
+		$organization += array_filter(
+			array(
+				'telephone' => $details['phone'],
+				'email'     => $details['email'],
+			)
+		);
+
 		$icon_url = get_site_icon_url( 512 );
 		$icon     = $icon_url ? wp_get_attachment_image_src( (int) get_option( 'site_icon' ), array( 512, 512 ) ) : false;
 		if ( $icon ) {
@@ -351,6 +371,19 @@ final class Schema {
 			}
 		}
 		return $organization;
+	}
+
+	/**
+	 * Address, phone and email of the organization from the settings, empty strings where none is set.
+	 *
+	 * @return array<string, string>
+	 */
+	public static function organization_details(): array {
+		$details = array();
+		foreach ( array( 'street', 'postal_code', 'city', 'country', 'phone', 'email' ) as $field ) {
+			$details[ $field ] = (string) leitvia_studio_setting( 'organization_' . $field );
+		}
+		return $details;
 	}
 
 	/**

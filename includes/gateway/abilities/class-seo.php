@@ -39,7 +39,8 @@ final class Seo {
 	/**
 	 * Supported SEO plugins: constant that marks them active, name, meta key per field and the value that switches
 	 * noindex or nofollow on. Rank Math keeps robots as one list. All in One SEO keeps its data in a table of its own;
-	 * it is detected so nothing writes beside it, but not read.
+	 * it is detected so nothing writes beside it, but not read. leitvia is no plugin: without an SEO plugin Studio keeps
+	 * the fields itself and News\Head prints them.
 	 */
 	public const PLUGINS = array(
 		'yoast'     => array(
@@ -112,6 +113,17 @@ final class Seo {
 			'on'       => '',
 			'meta'     => array(),
 		),
+		'leitvia'   => array(
+			'constant' => 'LEITVIA_STUDIO_NO_SEO_PLUGIN',
+			'name'     => 'Leitvia Studio',
+			'on'       => '1',
+			'meta'     => array(
+				'title'       => '_leitvia_seo_title',
+				'description' => '_leitvia_seo_description',
+				'noindex'     => '_leitvia_seo_noindex',
+				'nofollow'    => '_leitvia_seo_nofollow',
+			),
+		),
 	);
 
 	/**
@@ -128,7 +140,7 @@ final class Seo {
 		Abilities::read(
 			'leitvia/get-seo',
 			__( 'Get SEO data', 'leitvia-studio' ),
-			__( 'Returns the SEO data of posts, pages and entries from the active SEO plugin. Supported are Yoast SEO, Rank Math, SEOPress and The SEO Framework. Per item: title, meta description, canonical, noindex, nofollow, Open Graph title, description and image, focus keyword and schema type. schema_type is the article type Leitvia Studio prints for a post (NewsArticle or BlogPosting), null where it prints none. indexable says whether the site is open to search engines, news_sitemap is the address of the news sitemap of Leitvia Studio or null. An empty value means the plugin falls back to its template. defaults holds what WordPress itself would print and a description suggested from the excerpt; without a supported plugin seo is null and notice says why. hash is the base_hash of leitvia/update-seo. IDs that are no readable content come back under skipped.', 'leitvia-studio' ),
+			__( 'Returns the SEO data of posts, pages and entries from the active SEO plugin. Supported are Yoast SEO, Rank Math, SEOPress and The SEO Framework. Per item: title, meta description, canonical, noindex, nofollow, Open Graph title, description and image, focus keyword and schema type. schema_type is the article type Leitvia Studio prints for a post (NewsArticle or BlogPosting), null where it prints none. indexable says whether the site is open to search engines, news_sitemap is the address of the news sitemap of Leitvia Studio or null, organization holds the address, phone and email of leitvia/set-organization. An empty value means the plugin falls back to its template. defaults holds what WordPress itself would print and a description suggested from the excerpt; without an SEO plugin plugin names Leitvia Studio, with an unsupported one seo is null, and notice says why. hash is the base_hash of leitvia/update-seo. IDs that are no readable content come back under skipped.', 'leitvia-studio' ),
 			array(
 				'type'                 => 'object',
 				'properties'           => array(
@@ -191,7 +203,7 @@ final class Seo {
 			'leitvia/update-seo',
 			__( 'Update SEO data', 'leitvia-studio' ),
 			/* translators: 1: most characters of a title, 2: fewest characters of a description, 3: most characters of a description */
-			sprintf( __( 'Writes SEO title, meta description and robots of one post through the active SEO plugin. It covers posts, pages and entries in Yoast SEO, Rank Math, SEOPress or The SEO Framework; without one of them it is rejected with leitvia_no_seo_plugin. Read the post with leitvia/get-seo first and send its hash as base_hash. A title has at most %1$d characters, a description %2$d to %3$d; an empty string hands the field back to the template of the plugin. Say only what the page says: every number in title or description must appear in the title, excerpt or content of the post. Autonomy and change packages work as for leitvia/update-content; a live write gets a change package for leitvia/rollback.', 'leitvia-studio' ), self::TITLE_MAX, self::DESCRIPTION_MIN, self::DESCRIPTION_MAX ),
+			sprintf( __( 'Writes SEO title, meta description and robots of one post through the active SEO plugin. The heading of the page stays. It covers posts, pages and entries in Yoast SEO, Rank Math, SEOPress or The SEO Framework; without an SEO plugin Leitvia Studio stores them and prints them in the head, the title as written, without the site name; with another SEO plugin it is rejected with leitvia_no_seo_plugin. Read the post with leitvia/get-seo first and send its hash as base_hash. A title has at most %1$d characters, a description %2$d to %3$d; an empty string hands the field back to the template of the plugin, without a plugin to what WordPress prints. Say only what the page says: every number in title or description must appear in the title, excerpt or content of the post. Autonomy and change packages work as for leitvia/update-content; a live write gets a change package for leitvia/rollback.', 'leitvia-studio' ), self::TITLE_MAX, self::DESCRIPTION_MIN, self::DESCRIPTION_MAX ),
 			'maintain',
 			array(
 				'destructive' => true,
@@ -228,7 +240,7 @@ final class Seo {
 	}
 
 	/**
-	 * Key of the active SEO plugin, '' for none.
+	 * Key of the active SEO plugin, leitvia without one, '' when an SEO plugin is active that Studio does not know.
 	 */
 	public static function plugin(): string {
 		$found = '';
@@ -240,12 +252,15 @@ final class Seo {
 		}
 		/**
 		 * Filters the SEO plugin whose meta Leitvia Studio reads and writes: yoast, rank-math, seopress, tsf, aioseo, or
-		 * '' for none.
+		 * '' for none, which means Studio itself unless an SEO plugin it does not know is active.
 		 *
 		 * @param string $found Key of the detected plugin.
 		 */
 		$key = (string) apply_filters( 'leitvia_studio_seo_adapter', $found );
-		return isset( self::PLUGINS[ $key ] ) ? $key : '';
+		if ( isset( self::PLUGINS[ $key ] ) ) {
+			return $key;
+		}
+		return leitvia_studio_seo_plugin_active() ? '' : 'leitvia';
 	}
 
 	/**
@@ -298,7 +313,8 @@ final class Seo {
 			);
 		}
 		$notice = match ( true ) {
-			'' === $key => __( 'No supported SEO plugin is active. defaults shows what WordPress prints; the description is only a suggestion from the excerpt, WordPress prints no meta description. leitvia/update-seo needs Yoast SEO, Rank Math, SEOPress or The SEO Framework.', 'leitvia-studio' ),
+			'' === $key => __( 'The active SEO plugin is not supported. defaults shows what WordPress prints; the description is only a suggestion from the excerpt. leitvia/update-seo needs Yoast SEO, Rank Math, SEOPress or The SEO Framework.', 'leitvia-studio' ),
+			'leitvia' === $key => __( 'No SEO plugin is active. Leitvia Studio stores title, description and robots from leitvia/update-seo and prints them; an empty title means page title and site name. Canonical, Open Graph and focus keyword need an SEO plugin.', 'leitvia-studio' ),
 			! $writable => __( 'All in One SEO keeps its data in a table of its own, which Leitvia Studio does not read or write. defaults shows what WordPress would print.', 'leitvia-studio' ),
 			default     => '',
 		};
@@ -313,6 +329,7 @@ final class Seo {
 			'skipped'      => $skipped,
 			'indexable'    => (bool) get_option( 'blog_public' ),
 			'news_sitemap' => \LeitviaStudio\News\Sitemap::enabled() ? \LeitviaStudio\News\Sitemap::url() : null,
+			'organization' => \LeitviaStudio\News\Schema::organization_details(),
 		);
 	}
 

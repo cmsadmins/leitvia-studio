@@ -8,6 +8,7 @@
 use LeitviaStudio\Gateway\Gateway;
 use LeitviaStudio\Gateway\Hashes;
 use LeitviaStudio\Gateway\Packages;
+use LeitviaStudio\News\Head;
 
 /**
  * Abilities get-seo and update-seo: core defaults without an SEO plugin, the meta of Yoast SEO and Rank Math through
@@ -109,26 +110,77 @@ class Test_Gateway_Seo extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Without an SEO plugin: seo is null, defaults hold the document title, permalink and a description from the
-	 * excerpt, and unreadable IDs are skipped; update-seo is rejected for good.
+	 * Without an SEO plugin: Leitvia Studio keeps the fields, defaults hold the document title, permalink and a description
+	 * from the excerpt, and unreadable IDs are skipped. An SEO plugin Studio cannot write to rejects update-seo for good.
 	 */
 	public function test_without_plugin(): void {
 		$page    = $this->page();
 		$private = self::factory()->post->create( array( 'post_status' => 'private' ) );
 		$result  = wp_get_ability( 'leitvia/get-seo' )->execute( array( 'posts' => array( $page, $private, 999999 ) ) );
-		$this->assertNull( $result['plugin'] );
+		$this->assertSame( 'leitvia', $result['plugin']['key'] );
 		$this->assertNotSame( '', $result['notice'] );
 		$this->assertSame( array( $private, 999999 ), $result['skipped'] );
 		$item = $result['items'][0];
-		$this->assertNull( $item['seo'] );
+		$this->assertSame( '', $item['seo']['title'] );
 		$this->assertSame( Hashes::document( $page ), $item['hash'] );
 		$this->assertSame( 'Repairs - Bike Shop', $item['defaults']['title'] );
 		$this->assertSame( 'We repair city bikes and e-bikes in 2 days, from 40 euros.', $item['defaults']['description'] );
 		$this->assertSame( get_permalink( $page ), $item['defaults']['canonical'] );
+		add_filter( 'leitvia_studio_seo_plugin_active', '__return_true' );
+		$this->assertNull( wp_get_ability( 'leitvia/get-seo' )->execute( array( 'posts' => array( $page ) ) )['plugin'] );
 		$this->assert_rejected( 'leitvia_no_seo_plugin', 'seo_plugin', self::update( $page, array( 'title' => 'Bike repairs' ) ) );
+		remove_filter( 'leitvia_studio_seo_plugin_active', '__return_true' );
 		self::adapter( 'aioseo' );
 		$this->assertFalse( wp_get_ability( 'leitvia/get-seo' )->execute( array( 'posts' => array( $page ) ) )['plugin']['writable'] );
 		$this->assert_rejected( 'leitvia_no_seo_plugin', 'seo_plugin', self::update( $page, array( 'title' => 'Bike repairs' ) ) );
+	}
+
+	/**
+	 * Without an SEO plugin a stored title replaces the document title as written, the heading stays, and description
+	 * and robots reach the head. An SEO plugin takes over all of it.
+	 */
+	public function test_head_without_plugin(): void {
+		update_option( Gateway::OPTION, array( 'profile' => 'full' ) + Gateway::DEFAULTS );
+		$page = $this->page();
+		$this->go_to( get_permalink( $page ) );
+		$result = self::update(
+			$page,
+			array(
+				'title'       => 'Bike repairs in 2 days',
+				'description' => 'We repair city bikes and e-bikes in 2 days, from 40 euros. Bring your bike on weekdays.',
+				'noindex'     => true,
+			)
+		);
+		$this->assertIsArray( $result, $result instanceof WP_Error ? $result->get_error_message() : '' );
+		$this->assertSame( 'Repairs', get_post( $page )->post_title );
+		$this->assertSame( 'Bike repairs in 2 days', wp_get_document_title() );
+		$this->assertTrue( apply_filters( 'wp_robots', array() )['noindex'] );
+		$this->assertStringContainsString( '<meta name="description" content="We repair city bikes', get_echo( array( Head::class, 'print' ) ) );
+
+		add_filter( 'leitvia_studio_seo_plugin_active', '__return_true' );
+		$this->assertStringContainsString( 'Repairs', wp_get_document_title() );
+		$this->assertStringNotContainsString( 'in 2 days', wp_get_document_title() );
+		$this->assertArrayNotHasKey( 'noindex', apply_filters( 'wp_robots', array() ) );
+		$this->assertSame( '', get_echo( array( Head::class, 'print' ) ) );
+		remove_filter( 'leitvia_studio_seo_plugin_active', '__return_true' );
+	}
+
+	/**
+	 * Archives get a canonical address with their page number, single pages stay with core.
+	 */
+	public function test_canonical_of_archives(): void {
+		// The default category: a new term would shift the term IDs in the fixtures of Test_News_Schema.
+		$term = (int) get_option( 'default_category' );
+		self::factory()->post->create_many( 3 );
+		update_option( 'posts_per_page', 1 );
+		$this->go_to( get_term_link( $term ) );
+		$this->assertSame( get_term_link( $term ), Head::canonical() );
+		$this->go_to( add_query_arg( 'paged', 2, get_term_link( $term ) ) );
+		$this->assertMatchesRegularExpression( '#(/page/2/|paged=2)$#', Head::canonical() );
+		$this->go_to( get_permalink( $this->page() ) );
+		$this->assertSame( '', Head::canonical() );
+		$this->go_to( '/?s=bike' );
+		$this->assertSame( '', Head::canonical() );
 	}
 
 	/**
@@ -235,7 +287,7 @@ class Test_Gateway_Seo extends WP_UnitTestCase {
 
 	/**
 	 * Create-content takes SEO title and description with the checks of update-seo and writes them through the
-	 * adapter; without a writable SEO plugin they are left out and notice says so.
+	 * adapter; with an SEO plugin Studio cannot write to they are left out and notice says so.
 	 */
 	public function test_create_content_with_seo(): void {
 		update_option( Gateway::OPTION, array( 'profile' => 'full' ) + Gateway::DEFAULTS );
@@ -254,6 +306,11 @@ class Test_Gateway_Seo extends WP_UnitTestCase {
 			'description' => 'We repair city bikes and e-bikes in 2 days, from 40 euros. Bring your bike on weekdays.',
 		);
 
+		$result = $create( $texts );
+		$this->assertIsArray( $result, $result instanceof WP_Error ? $result->get_error_message() : '' );
+		$this->assertSame( $texts['title'], get_post_meta( $result['target']['post'], '_leitvia_seo_title', true ) );
+
+		self::adapter( 'aioseo' );
 		$result = $create( $texts );
 		$this->assertIsArray( $result, $result instanceof WP_Error ? $result->get_error_message() : '' );
 		$this->assertNotSame( '', $result['notice'] ?? '' );

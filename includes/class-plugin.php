@@ -140,6 +140,9 @@ final class Plugin {
 		add_action( 'init', array( Admin\Admin::class, 'register_status_column' ), 20 );
 		add_action( 'after_setup_theme', array( News\Image_Sizes::class, 'register' ) );
 		add_action( 'wp_head', array( News\Schema::class, 'print' ) );
+		add_action( 'wp_head', array( News\Head::class, 'print' ), 5 );
+		add_filter( 'pre_get_document_title', array( News\Head::class, 'title' ) );
+		add_filter( 'wp_robots', array( News\Head::class, 'robots' ) );
 		add_action( 'wp_head', array( Blocks\Schema_Nodes::class, 'print' ) );
 		add_action( 'wp_head', array( self::class, 'defer_modules' ), 1 );
 		add_filter( 'leitvia_editorial_url', static fn( $url ): string => '' !== (string) $url ? (string) $url : News\Schema::editorial_url() );

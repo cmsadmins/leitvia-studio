@@ -77,6 +77,30 @@ class Test_Settings extends WP_UnitTestCase {
 					'default' => 'subtle',
 					'enum'    => array( 'off', 'subtle', 'bold' ),
 				),
+				'organization_street'        => array(
+					'type'    => 'string',
+					'default' => '',
+				),
+				'organization_postal_code'   => array(
+					'type'    => 'string',
+					'default' => '',
+				),
+				'organization_city'          => array(
+					'type'    => 'string',
+					'default' => '',
+				),
+				'organization_country'       => array(
+					'type'    => 'string',
+					'default' => '',
+				),
+				'organization_phone'         => array(
+					'type'    => 'string',
+					'default' => '',
+				),
+				'organization_email'         => array(
+					'type'    => 'string',
+					'default' => '',
+				),
 			),
 			$schema['properties']
 		);
@@ -140,6 +164,12 @@ class Test_Settings extends WP_UnitTestCase {
 				'news_sitemap'               => true,
 				'editorial_page'             => 0,
 				'motion'                     => 'subtle',
+				'organization_street'        => '',
+				'organization_postal_code'   => '',
+				'organization_city'          => '',
+				'organization_country'       => '',
+				'organization_phone'         => '',
+				'organization_email'         => '',
 			),
 			get_option( 'leitvia_studio_settings' )
 		);
@@ -227,6 +257,12 @@ class Test_Settings extends WP_UnitTestCase {
 				'news_sitemap'               => true,
 				'editorial_page'             => 0,
 				'motion'                     => 'subtle',
+				'organization_street'        => '',
+				'organization_postal_code'   => '',
+				'organization_city'          => '',
+				'organization_country'       => '',
+				'organization_phone'         => '',
+				'organization_email'         => '',
 			),
 			$response->get_data()['leitvia_studio_settings']
 		);
@@ -248,6 +284,12 @@ class Test_Settings extends WP_UnitTestCase {
 				'news_sitemap'               => true,
 				'editorial_page'             => 0,
 				'motion'                     => 'subtle',
+				'organization_street'        => '',
+				'organization_postal_code'   => '',
+				'organization_city'          => '',
+				'organization_country'       => '',
+				'organization_phone'         => '',
+				'organization_email'         => '',
 			),
 			rest_do_request( $request )->get_data()['leitvia_studio_settings']
 		);

@@ -285,6 +285,19 @@ class Test_Gateway_Person_Decides extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Set-organization waits for a person; get-seo shows the saved details; without a field it is rejected.
+	 */
+	public function test_organization(): void {
+		$result = self::call( 'leitvia/set-organization', array( 'city' => 'Kassel' ) );
+		$this->assert_package( $result );
+		$this->assertSame( '', leitvia_studio_setting( 'organization_city' ) );
+		wp_set_current_user( $this->admin );
+		update_option( \LeitviaStudio\Admin\Settings::OPTION, array( 'organization_city' => 'Kassel' ) + \LeitviaStudio\Admin\Settings::DEFAULTS );
+		$this->assertSame( 'Kassel', wp_get_ability( 'leitvia/get-seo' )->execute( array( 'posts' => array( self::factory()->post->create() ) ) )['organization']['city'] );
+		$this->assertWPError( self::call( 'leitvia/set-organization', array() ) );
+	}
+
+	/**
 	 * The posts page is a setting like the others: an agent proposes an existing page, a person applies it, and the
 	 * front page or a page that does not exist are refused.
 	 */

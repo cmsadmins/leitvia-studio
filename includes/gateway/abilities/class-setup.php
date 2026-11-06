@@ -11,6 +11,7 @@ use LeitviaStudio\Gateway\Abilities;
 use LeitviaStudio\Gateway\Block_Edit;
 use LeitviaStudio\Gateway\Content_Checks;
 use LeitviaStudio\Gateway\Hashes;
+use LeitviaStudio\Admin\Settings;
 use LeitviaStudio\Gateway\Pipeline;
 use LeitviaStudio\Gateway\Rejection;
 use LeitviaStudio\Gateway\Scope;
@@ -121,6 +122,27 @@ final class Setup {
 				'required'   => array( 'page' ),
 			) + $object,
 			array( self::class, 'describe_set_posts_page' )
+		);
+		Abilities::write(
+			'leitvia/set-organization',
+			__( 'Set organization details', 'leitvia-studio' ),
+			__( 'Sets address, phone and email of the organization. Leitvia Studio adds them to its structured data while no SEO plugin is active; the name and the logo stay those of the site. Only the fields you send change, an empty string clears one. leitvia/get-seo returns the current values. base_hash is empty. Use only facts the person gave or the site shows. Like every setting it waits in a change package for a person.', 'leitvia-studio' ),
+			'setup',
+			$replace,
+			array(
+				'properties' => array(
+					'street'      => array( 'type' => 'string' ),
+					'postal_code' => array( 'type' => 'string' ),
+					'city'        => array( 'type' => 'string' ),
+					'country'     => array(
+						'type'    => 'string',
+						'pattern' => '^([A-Z]{2})?$',
+					),
+					'phone'       => array( 'type' => 'string' ),
+					'email'       => array( 'type' => 'string' ),
+				),
+			) + $object,
+			array( self::class, 'describe_set_organization' )
 		);
 		Abilities::write(
 			'leitvia/define-content-type',
@@ -356,6 +378,31 @@ final class Setup {
 			'base_hash' => Hashes::of( (string) wp_json_encode( get_option( 'page_for_posts' ) ) ),
 			'notice'    => implode( ' ', array_filter( $notices ) ),
 			'change'    => static fn(): array => array( 'value' => (string) $page ),
+		);
+	}
+
+	/**
+	 * Operation of set-organization: the fields of the input over the saved Studio settings, which sanitize them.
+	 *
+	 * @param array<string, mixed> $input Input.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public static function describe_set_organization( array $input ) {
+		$fields = array();
+		foreach ( array( 'street', 'postal_code', 'city', 'country', 'phone', 'email' ) as $field ) {
+			if ( isset( $input[ $field ] ) ) {
+				$fields[ 'organization_' . $field ] = (string) $input[ $field ];
+			}
+		}
+		$target = array( 'option' => Settings::OPTION );
+		if ( ! $fields ) {
+			return Block_Edit::invalid( 'change', __( 'Name what to change: street, postal_code, city, country, phone or email.', 'leitvia-studio' ), $target );
+		}
+		return array(
+			'area'      => 'structure',
+			'target'    => $target,
+			'base_hash' => Hashes::of( (string) wp_json_encode( get_option( Settings::OPTION ) ) ),
+			'change'    => static fn( array $state ): array => array( 'value' => $fields + (array) $state['value'] ),
 		);
 	}
 

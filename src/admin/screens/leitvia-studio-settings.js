@@ -227,6 +227,44 @@ const FIELDS = [
 		],
 	},
 	{
+		id: 'organization_street',
+		label: __( 'Street and number', 'leitvia-studio' ),
+		description: __(
+			'Address, phone and email go into the structured data of the organization, unless an SEO plugin is active. Empty fields stay out.',
+			'leitvia-studio'
+		),
+		type: 'text',
+	},
+	{
+		id: 'organization_postal_code',
+		label: __( 'Postal code', 'leitvia-studio' ),
+		type: 'text',
+	},
+	{
+		id: 'organization_city',
+		label: __( 'City', 'leitvia-studio' ),
+		type: 'text',
+	},
+	{
+		id: 'organization_country',
+		label: __( 'Country code', 'leitvia-studio' ),
+		description: __(
+			'Two letters, such as DE, AT or CH.',
+			'leitvia-studio'
+		),
+		type: 'text',
+	},
+	{
+		id: 'organization_phone',
+		label: __( 'Phone', 'leitvia-studio' ),
+		type: 'text',
+	},
+	{
+		id: 'organization_email',
+		label: __( 'Email', 'leitvia-studio' ),
+		type: 'email',
+	},
+	{
 		id: 'news_schema',
 		label: __(
 			'Add structured data to posts and author pages',
@@ -487,6 +525,12 @@ function DesignAndSearch( { form } ) {
 				'guard_site_editor_contrast',
 				'motion',
 				'news_schema',
+				'organization_street',
+				'organization_postal_code',
+				'organization_city',
+				'organization_country',
+				'organization_phone',
+				'organization_email',
 				'news_categories',
 				'news_sitemap',
 				'editorial_page',

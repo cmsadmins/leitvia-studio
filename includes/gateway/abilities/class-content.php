@@ -169,7 +169,7 @@ final class Content {
 							),
 						),
 						'additionalProperties' => false,
-						'description'          => __( 'SEO title and meta description, checked and written as by leitvia/update-seo. Without a supported SEO plugin they are left out and notice says so.', 'leitvia-studio' ),
+						'description'          => __( 'SEO title and meta description, checked and written as by leitvia/update-seo. With an unsupported SEO plugin they are left out and notice says so.', 'leitvia-studio' ),
 					),
 				),
 				'required'             => array( 'post_type', 'title' ),

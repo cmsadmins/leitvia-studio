@@ -48,6 +48,9 @@ $leitvia_studio_uninstall_site = static function (): void {
 		}
 		// Pattern usage index of every post.
 		delete_metadata( 'post', 0, '_leitvia_uses', '', true );
+		foreach ( array( 'title', 'description', 'noindex', 'nofollow' ) as $field ) {
+			delete_metadata( 'post', 0, '_leitvia_seo_' . $field, '', true );
+		}
 		// Profile picture assignments of this site (user option, key with the site's table prefix).
 		delete_metadata( 'user', 0, $wpdb->get_blog_prefix() . 'leitvia_avatar', '', true );
 		// The declaration of the Model screen; posts, terms, meta and leitvia_site_* options created with it stay.

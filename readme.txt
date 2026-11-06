@@ -4,7 +4,7 @@ Tags: ai, mcp, block theme, accessibility, design tokens
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.27
+Stable tag: 1.3.28
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -62,7 +62,7 @@ An agent such as Claude Code, Codex or Cursor connects to your site over MCP or 
 
 = Does the plugin change my front end? =
 
-Only where you use its features. It loads scripts and styles for visitors only on pages with its blocks or an embed placeholder. It does change front end output in seven places: structured data in the head of posts, archives and author pages with the news sitemap and its line in robots.txt, profile pictures and the placeholder replace Gravatar images wherever WordPress shows avatars, embeds from other sites wait behind a consent placeholder, a scheduled token overlay changes the styles while it runs, the "Child entries" query lists the rows of a content model entry, code blocks get a "Copy code" button that shows once JavaScript runs, and the emoji script of WordPress is left out (see below). The Lab preview, which logged-in editors open from the admin, loads its own scripts, and axe-core only while an accessibility check runs.
+Only where you use its features. It loads scripts and styles for visitors only on pages with its blocks or an embed placeholder. It does change front end output in eight places: structured data in the head of posts, archives and author pages with the news sitemap and its line in robots.txt, while no SEO plugin is active the canonical link of archives and a stored SEO title, description and robots, profile pictures and the placeholder replace Gravatar images wherever WordPress shows avatars, embeds from other sites wait behind a consent placeholder, a scheduled token overlay changes the styles while it runs, the "Child entries" query lists the rows of a content model entry, code blocks get a "Copy code" button that shows once JavaScript runs, and the emoji script of WordPress is left out (see below). The Lab preview, which logged-in editors open from the admin, loads its own scripts, and axe-core only while an accessibility check runs.
 
 = What happens to blocks connected to content model fields when I deactivate the plugin? =
 
@@ -212,6 +212,13 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * Privacy policy: https://leitvia.com/privacy-policy/
 
 == Changelog ==
+
+= 1.3.28 =
+* Without an SEO plugin Leitvia Studio takes its place: leitvia/update-seo and the seo field of leitvia/create-content store title, description and robots and print them in the head, without changing the heading of the page.
+* Category, tag, author, posts and post type archives get a canonical address with their page number while no SEO plugin is active.
+* The structured data of the organization carries address, phone and email from the new fields of the settings or the new ability leitvia/set-organization. With an SEO plugin Studio prints none of it.
+* German variants such as de_DE_formal, de_AT and de_CH use the German translation of the zip.
+* German paragraphs in bento tiles hyphenate. Consent placeholder, Consent settings and the saving line of pricing plans use neither du nor Sie in German.
 
 = 1.3.27 =
 * German on every site: the plugin header names the languages folder. Since WordPress 6.7 core ignored the former path, so PHP texts of blocks and the plugin stayed English on sites without a language pack, such as Name, Email address and the result count of the filter.

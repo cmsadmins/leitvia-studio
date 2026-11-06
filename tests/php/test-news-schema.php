@@ -5,6 +5,7 @@
  * @package LeitviaStudio
  */
 
+use LeitviaStudio\Admin\Settings;
 use LeitviaStudio\News\Image_Sizes;
 use LeitviaStudio\News\Schema;
 
@@ -139,6 +140,34 @@ class Test_News_Schema extends WP_UnitTestCase {
 		$this->assertSame( 200, $data['publisher']['logo']['width'] );
 
 		$this->assertMatchesFixture( 'blog-posting', $head );
+	}
+
+	/**
+	 * Address, phone and email from the settings join the publisher; empty fields stay out.
+	 */
+	public function test_organization_details(): void {
+		$this->assertArrayNotHasKey( 'address', Schema::website()['publisher'] );
+		update_option(
+			Settings::OPTION,
+			array(
+				'organization_street'      => 'Lindenweg 4',
+				'organization_city'        => 'Kassel',
+				'organization_phone'       => '+49 561 000',
+				'organization_email'       => 'post@example.org',
+				'organization_postal_code' => '',
+			) + Settings::DEFAULTS
+		);
+		$publisher = Schema::website()['publisher'];
+		$this->assertSame(
+			array(
+				'@type'           => 'PostalAddress',
+				'streetAddress'   => 'Lindenweg 4',
+				'addressLocality' => 'Kassel',
+			),
+			$publisher['address']
+		);
+		$this->assertSame( '+49 561 000', $publisher['telephone'] );
+		$this->assertSame( 'post@example.org', $publisher['email'] );
 	}
 
 	/**

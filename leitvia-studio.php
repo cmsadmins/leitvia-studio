@@ -3,7 +3,7 @@
  * Plugin Name:       Leitvia Studio
  * Plugin URI:        https://leitvia.com
  * Description:       Pattern lab, design tokens and a content model for block themes, stored in WordPress core structures.
- * Version:           1.3.27
+ * Version:           1.3.28
  * Requires at least: 7.1
  * Requires PHP:      8.2
  * Author:            CMS ADMINS
@@ -18,7 +18,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-const LEITVIA_STUDIO_VERSION = '1.3.27';
+const LEITVIA_STUDIO_VERSION = '1.3.28';
 const LEITVIA_STUDIO_API     = 1;
 // Oldest Extension API version add-ons may still declare; raised two major Studio versions after a breaking change.
 const LEITVIA_STUDIO_API_MIN = 1;
@@ -45,15 +45,28 @@ require __DIR__ . '/includes/functions.php';
 
 // Translations of the release zip in languages/, for sites without a language pack of WordPress.org. A pack in
 // WP_LANG_DIR wins. PHP strings need only the header Domain Path, which core registers on every request; scripts
-// are looked up in WP_LANG_DIR alone, so they go through this filter.
+// are looked up in WP_LANG_DIR alone, so they go through this filter. The zip holds de_DE only: de_DE_formal, de_AT,
+// de_CH and the other German variants read that file instead of showing English.
 add_filter(
 	'load_script_translation_file',
 	static function ( $file, $handle, $domain ) {
-		$own = __DIR__ . '/languages/' . basename( (string) $file );
+		$own = __DIR__ . '/languages/' . preg_replace( '/-de_\w+-/', '-de_DE-', basename( (string) $file ), 1 );
 		return 'leitvia-studio' === $domain && $file && ! is_readable( $file ) && is_readable( $own ) ? $own : $file;
 	},
 	10,
 	3
+);
+
+add_action(
+	'after_setup_theme',
+	static function (): void {
+		if ( preg_match( '/^de_(?!DE$)/', determine_locale() ) ) {
+			get_translations_for_domain( 'leitvia-studio' ); // Loads a language pack of the variant when there is one.
+			if ( ! is_textdomain_loaded( 'leitvia-studio' ) ) {
+				load_textdomain( 'leitvia-studio', __DIR__ . '/languages/leitvia-studio-de_DE.mo' );
+			}
+		}
+	}
 );
 
 add_action( 'plugins_loaded', array( \LeitviaStudio\Plugin::class, 'boot' ) );
