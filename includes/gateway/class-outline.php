@@ -139,19 +139,28 @@ final class Outline {
 			$here       = $path . $index;
 			$serialized = serialize_block( $block );
 			$attrs      = (array) $block['attrs'];
+			$text       = trim( (string) preg_replace( '/\s+/u', ' ', html_entity_decode( wp_strip_all_tags( (string) $block['innerHTML'] ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) ) );
 			$node       = array(
 				'id'        => self::key( $block, $here ),
 				'id_stable' => '' !== Block_Ids::id( $block ),
 				'name'      => self::name( $block ),
 				'pattern'   => self::pattern( $block ),
-				'text'      => mb_substr( trim( (string) preg_replace( '/\s+/u', ' ', html_entity_decode( wp_strip_all_tags( (string) $block['innerHTML'] ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) ) ), 0, self::TEXT_LENGTH ),
+				'text'      => mb_substr( $text, 0, self::TEXT_LENGTH ),
 				'bytes'     => strlen( $serialized ),
 				'hash'      => Hashes::of( $serialized ),
 				'children'  => self::tree( Block_Ids::blocks( (array) $block['innerBlocks'] ), $here . '.' ),
 			);
-			$links      = self::links( $block );
+			// A text cut at TEXT_LENGTH carries the hash of the whole text, so an agent can tell which block holds it.
+			if ( mb_strlen( $text ) > self::TEXT_LENGTH ) {
+				$node['text_hash'] = Hashes::of( $text );
+			}
+			$links = self::links( $block );
 			if ( $links ) {
 				$node['links'] = $links;
+			}
+			$image = self::image( $block );
+			if ( $image ) {
+				$node['image'] = $image;
 			}
 			if ( 'core/template-part' === $block['blockName'] && ! empty( $attrs['slug'] ) ) {
 				$node['ref'] = ( $attrs['theme'] ?? get_stylesheet() ) . '//' . $attrs['slug'];
@@ -181,6 +190,31 @@ final class Outline {
 			}
 		}
 		return $links;
+	}
+
+	/**
+	 * The image of an image or cover block: attachment ID (0 for an image outside the media library), alt text (null
+	 * when the img has no alt attribute) and the decorative mark metadata.leitviaDecorative; null for other blocks and
+	 * for a cover without an image.
+	 *
+	 * @param array<string, mixed> $block Parsed block.
+	 * @return array{id: int, alt: ?string, decorative: bool}|null
+	 */
+	private static function image( array $block ): ?array {
+		if ( ! in_array( $block['blockName'], array( 'core/image', 'core/cover' ), true ) ) {
+			return null;
+		}
+		$tags = new \WP_HTML_Tag_Processor( (string) $block['innerHTML'] );
+		if ( ! $tags->next_tag( array( 'tag_name' => 'img' ) ) ) {
+			return null;
+		}
+		$alt = $tags->get_attribute( 'alt' );
+		$id  = (int) ( $block['attrs']['id'] ?? 0 );
+		return array(
+			'id'         => $id ? $id : (int) ( self::attachments( (string) $block['innerHTML'] )[0]['id'] ?? 0 ),
+			'alt'        => null === $alt ? null : ( is_string( $alt ) ? $alt : '' ),
+			'decorative' => true === ( $block['attrs']['metadata']['leitviaDecorative'] ?? null ),
+		);
 	}
 
 	/**

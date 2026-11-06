@@ -28,13 +28,30 @@ final class Read_Structure {
 		$hash   = array( 'type' => 'string' );
 		$nodes  = array(
 			'type'  => 'array',
-			'items' => array( 'type' => 'object' ),
+			'items' => array(
+				'type'       => 'object',
+				'properties' => array(
+					'text_hash' => array(
+						'type'        => 'string',
+						'description' => __( 'Only when text was cut: the first 16 hex characters of the SHA-256 of the whole text, tags stripped, entities decoded, white space collapsed to single spaces and trimmed.', 'leitvia-studio' ),
+					),
+					'image'     => array(
+						'type'        => 'object',
+						'description' => __( 'Image of an image or cover block: attachment ID (0 outside the media library), alt text (null without alt attribute) and the decorative mark.', 'leitvia-studio' ),
+						'properties'  => array(
+							'id'         => array( 'type' => 'integer' ),
+							'alt'        => array( 'type' => array( 'string', 'null' ) ),
+							'decorative' => array( 'type' => 'boolean' ),
+						),
+					),
+				),
+			),
 		);
 		$string = array( 'type' => 'string' );
 		Gateway\Abilities::read(
 			'leitvia/get-page-outline',
 			__( 'Get page outline', 'leitvia-studio' ),
-			__( 'Returns a post as a compact block tree: per block the ID, name, pattern, the first 80 characters of text, the link targets of the block itself (links, only when it has any), size, hash and children. Blocks without a stable ID have a path ID such as p:0.2.1 until the next save. Use the document hash as base_hash for changes and get-block for full attributes.', 'leitvia-studio' ),
+			__( 'Returns a post as a compact block tree: per block the ID, name, pattern, the first 80 characters of text (with text_hash of the whole text when it is longer), the link targets of the block itself (links, only when it has any), for image and cover blocks the image with attachment ID, alt text and decorative mark, size, hash and children. Blocks without a stable ID have a path ID such as p:0.2.1 until the next save. Use the document hash as base_hash for changes and get-block for full attributes.', 'leitvia-studio' ),
 			array(
 				'type'                 => 'object',
 				'properties'           => array( 'post' => $post ),

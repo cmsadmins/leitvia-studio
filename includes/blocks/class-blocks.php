@@ -187,6 +187,7 @@ final class Blocks {
 			'leitvia/icon'              => static fn( array $attributes ): string => Icon::render( $attributes ),
 			'leitvia/icon-list-item'    => static fn( array $attributes, string $content, \WP_Block $block ): string => Icon::render_item( $attributes, $content, $block ),
 			'leitvia/rating'            => static fn( array $attributes ): string => Rating::render( $attributes ),
+			'leitvia/contact-form'      => static fn( array $attributes ): string => Contact_Form::render( $attributes ),
 			'leitvia/share'             => static fn( array $attributes, string $content, \WP_Block $block ): string => Share::render( $attributes, $block ),
 			default                     => null,
 		};

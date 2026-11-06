@@ -1,0 +1,11 @@
+{
+	"name": "intro-article",
+	"template": "single",
+	"sections": [
+		"core/paragraph",
+		"leitvia/table-of-contents",
+		"leitvia/content-quote"
+	],
+	"issues": [],
+	"score": 100
+}

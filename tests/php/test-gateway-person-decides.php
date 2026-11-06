@@ -283,4 +283,31 @@ class Test_Gateway_Person_Decides extends WP_UnitTestCase {
 		$this->assertSame( 'page', get_option( 'show_on_front' ) );
 		$this->assertGreaterThan( 0, self::styles_id() );
 	}
+
+	/**
+	 * The posts page is a setting like the others: an agent proposes an existing page, a person applies it, and the
+	 * front page or a page that does not exist are refused.
+	 */
+	public function test_posts_page(): void {
+		$page  = self::factory()->post->create( array( 'post_type' => 'page' ) );
+		$front = self::factory()->post->create( array( 'post_type' => 'page' ) );
+		update_option( 'show_on_front', 'page' );
+		update_option( 'page_on_front', $front );
+		update_option( 'page_for_posts', 0 );
+		$result = self::call( 'leitvia/set-posts-page', array( 'page' => $page ) );
+		$this->assert_package( $result );
+		$this->assertSame( 0, (int) get_option( 'page_for_posts' ) );
+		wp_set_current_user( $this->admin );
+		$report = Packages::apply( (int) $result['package'] );
+		$this->assertSame( 'applied', $report['state'], wp_json_encode( $report ) );
+		$this->assertSame( $page, (int) get_option( 'page_for_posts' ) );
+		wp_set_current_user( $this->agent );
+		foreach ( array( $front, 999999 ) as $wrong ) {
+			$rejected = self::call( 'leitvia/set-posts-page', array( 'page' => $wrong ) );
+			$this->assertWPError( $rejected );
+			$this->assertSame( 'page', $rejected->get_error_data()['reason'] );
+		}
+		update_option( 'show_on_front', 'posts' );
+		$this->assertStringContainsString( 'static front page', (string) self::call( 'leitvia/set-posts-page', array( 'page' => $page ) )['notice'] );
+	}
 }

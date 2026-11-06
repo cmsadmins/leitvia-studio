@@ -111,6 +111,44 @@ final class Bindings {
 	}
 
 	/**
+	 * A list bound like a paragraph, metadata.bindings.content on core/list: one item per line of the value, so a
+	 * textarea field is a list field, kept and edited as text. No line, no list: visitors get no empty ul. Core has no
+	 * binding for a whole list, since it would have to write inner blocks, so the markup comes from here; the editor
+	 * shows the saved items. Runs on render_block_core/list.
+	 *
+	 * @param string               $html     Block HTML.
+	 * @param array<string, mixed> $block    Parsed block.
+	 * @param \WP_Block            $instance Block instance.
+	 */
+	public static function list_items( string $html, array $block, \WP_Block $instance ): string {
+		$binding = $block['attrs']['metadata']['bindings']['content'] ?? null;
+		$source  = is_array( $binding ) ? get_block_bindings_source( (string) ( $binding['source'] ?? '' ) ) : null;
+		if ( ! $source || ! preg_match( '/^\s*<(ul|ol)\b[^>]*>/i', $html, $open ) ) {
+			return $html;
+		}
+		$value = $source->get_value( (array) ( $binding['args'] ?? array() ), $instance, 'content' );
+		if ( null === $value ) {
+			return $html;
+		}
+		$lines = preg_split( '/\R/u', (string) $value );
+		$lines = array_filter( array_map( 'trim', false === $lines ? array() : $lines ), static fn( string $line ): bool => '' !== $line );
+		$items = implode( '', array_map( static fn( string $line ): string => '<li>' . esc_html( $line ) . '</li>', $lines ) );
+		return '' === $items ? '' : $open[0] . $items . '</' . strtolower( $open[1] ) . '>';
+	}
+
+	/**
+	 * Gives core/list the context the sources read the entry from, as core does for the blocks it binds. Runs on
+	 * get_block_type_uses_context.
+	 *
+	 * @param string[]       $uses_context Context the block type uses.
+	 * @param \WP_Block_Type $block_type   Block type.
+	 * @return string[]
+	 */
+	public static function list_context( array $uses_context, \WP_Block_Type $block_type ): array {
+		return 'core/list' === $block_type->name ? array_values( array_unique( array_merge( $uses_context, array( 'postId', 'postType' ) ) ) ) : $uses_context;
+	}
+
+	/**
 	 * What the editor side of the sources needs: declared fields by post type, relations, and the bindable site
 	 * settings with their stored value, which the sources show on the front end anyway. Null when the model declares
 	 * nothing to bind.
@@ -187,8 +225,10 @@ final class Bindings {
 		if ( ! $entry ) {
 			return null;
 		}
-		$type     = get_post_type_object( $entry->post_type );
+		$type = get_post_type_object( $entry->post_type );
+		// A public type without single pages (singlePages) shows published entries on pages.
 		$readable = is_post_publicly_viewable( $entry )
+			|| ( $type && $type->public && 'publish' === $entry->post_status )
 			|| ( $type && current_user_can( $type->cap->edit_posts ) && current_user_can( 'read_post', $entry->ID ) );
 		return $readable && ! post_password_required( $entry ) && ! in_array( 'trash', array( $post->post_status, $entry->post_status ), true ) ? $post : null;
 	}

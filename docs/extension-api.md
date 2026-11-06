@@ -69,7 +69,7 @@ Checks with the scope `pattern` receive the block markup of a pattern and return
 
 Checks with the scope `content` or `page` run before every write of an agent (Gateway pipeline, step Checks) and in the ability `leitvia/audit-site`. The callback gets `( string $content, array $context )`: the new block markup and a context with `post` (0 for a new post), `post_type` and `ability`. It returns a list of findings, each an array with `severity` (`error` rejects the write with `leitvia_check_failed`, `warning` turns a live write into a change package), `block` (a `metadata.leitviaId` or a path ID such as `p:0.2.1`, empty for the whole page), `message` and `fix`; `check` defaults to the entry name. `content` checks look at the markup alone, `page` checks at the page as visitors get it: Studio's `leitvia/page-structure` renders the block template with `do_blocks()`, the content in place of the post content block, without an HTTP request. A check that needs another plugin is registered only when that plugin is active; it is missing without it, never failing.
 
-Studio's own entries: `leitvia/headings`, `leitvia/alt-text`, `leitvia/link-text`, `leitvia/block-validity`, `leitvia/content-tokens`, `leitvia/content-contrast` (scope `content`), `leitvia/page-structure` and `leitvia/composition` (scope `page`). They skip post types without the editor. `leitvia/composition` scores pages built from patterns (`metadata.patternName` of the root blocks) and warns below the minimum score of the gateway settings when the write also lowers the saved score. An image with an empty `alt` counts as decorative only with `metadata.leitviaDecorative` set to `true` on its block; without the mark it is a warning.
+Studio's own entries: `leitvia/headings`, `leitvia/alt-text`, `leitvia/link-text`, `leitvia/block-validity`, `leitvia/content-tokens`, `leitvia/content-contrast`, `leitvia/query-context` (scope `content`), `leitvia/page-structure` and `leitvia/composition` (scope `page`). They skip post types without the editor. `leitvia/composition` scores pages built from patterns (`metadata.patternName` of the root blocks) and warns below the minimum score of the gateway settings when the write also lowers the saved score. An image with an empty `alt` counts as decorative only with `metadata.leitviaDecorative` set to `true` on its block; without the mark it is a warning.
 
 A field spec is one of `string` (not empty), `int`, `array`, `callable` or a list of allowed values. Additional fields are kept as they are.
 
@@ -270,6 +270,7 @@ Add-ons dock onto the gateway through hooks, for example to run one workflow on 
 | `leitvia_studio_gateway_areas` | filter | `array $levels` (level by area), `array $settings` | When the autonomy level of an area is read. Add the area of an add-on or cap levels with a policy shared by several sites. `admin` and areas without a valid level (`locked`, `suggest`, `draft`, `autonomous`) stay locked. |
 | `leitvia_studio_gateway_post_types` | filter | `list<string> $post_types` | Post types open to agents; blocked types are dropped whatever the filter returns. |
 | `leitvia_studio_ai_note` | filter | `string $note`, `int $post_id` | Text of the note shown before content that `leitvia/create-content` marked with `ai_generated` (meta `leitvia_ai_generated`); an empty string hides it. Deleting the meta in the custom fields of a post removes the note for that post. |
+| `leitvia_studio_public_author_name` | filter | `string $name`, `int $user_id` | Name visitors see for an author whose display name is still the login, and for agent users: first and last name, else the name of the site. |
 | `leitvia_studio_gateway_content_kind` | filter | `string[] $kinds`, `Operation $op`, `array $before`, `array $after` | Content kinds of an operation; each caps the level at `suggest` unless unlocked. |
 | `leitvia_studio_recipe_unavailable` | filter | `string $reason`, `string $name`, `array $recipe` | Why a recipe cannot be applied on this site, `''` when it can. A non-empty reason lists the recipe with `available: false` and makes `leitvia/apply-recipe` refuse it with `leitvia_recipe_unavailable`. An add-on locks its own recipes here. |
 | `leitvia_studio_recipe_steps` | filter | `array $steps`, `string $name`, `array $recipe`, `string $key` (package key), `array $pages` (page ID by recipe slug, 0 while not on the site), `array $selection` (`parts`, `pages`, `buildingBlocks`, `contentModel`, `dryRun`; register with 6 accepted arguments to get it) | After the steps of a recipe run, before the report. An add-on adds the steps of its own recipes (for example sample content), each written through an ability or `Pipeline::run()` with the package key and reported in the shape of the other steps, and skips the steps whose part is not in `$selection['parts']` (an activated token set belongs to `design`). |
@@ -330,6 +331,14 @@ document.addEventListener( 'leitvia:consent-request', ( event ) => {
 myCmp.onConsent( ( service ) =>
 	document.dispatchEvent( new CustomEvent( 'leitvia:consent-granted', { detail: { service } } ) )
 );
+```
+
+## Contact form
+
+The block `leitvia/contact-form` allows 5 messages per connection and hour. All visitors of a site behind a proxy that hides `REMOTE_ADDR` share one counter; such a site raises the limit:
+
+```php
+add_filter( 'leitvia_studio_contact_form_limit', static fn() => 50 );
 ```
 
 ## Brand

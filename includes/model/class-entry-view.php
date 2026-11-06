@@ -40,7 +40,7 @@ final class Entry_View {
 			)
 		);
 		foreach ( (array) ( Model::current()['postTypes'] ?? array() ) as $key => $type ) {
-			if ( empty( $type['public'] ) || ! Registrar::owns_post_type( (string) $key ) ) {
+			if ( empty( $type['public'] ) || false === ( $type['singlePages'] ?? true ) || ! Registrar::owns_post_type( (string) $key ) ) {
 				continue;
 			}
 			register_block_template(

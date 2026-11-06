@@ -413,7 +413,19 @@ class Test_Pattern_Meta extends WP_UnitTestCase {
 		wp_set_current_user( self::$editor );
 		$response = $this->request( 'GET', '/leitvia-studio/v1/patterns', array( 'per_page' => 100 ) );
 		$this->assertSame( 200, $response->get_status() );
-		$items = array_column( $response->get_data(), null, 'ref' );
+		$items  = array_column( $response->get_data(), null, 'ref' );
+		$items += array_column(
+			$this->request(
+				'GET',
+				'/leitvia-studio/v1/patterns',
+				array(
+					'per_page' => 100,
+					'page'     => 2,
+				)
+			)->get_data(),
+			null,
+			'ref'
+		);
 		foreach ( leitvia_studio_contract()->patterns() as $pattern ) {
 			$this->assertArrayHasKey( 'pattern:' . $pattern['slug'], $items );
 		}

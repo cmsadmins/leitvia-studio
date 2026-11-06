@@ -399,6 +399,7 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 				)['target']['post'],
 			),
 			'leitvia/set-variation'        => static fn(): array => array( 'variation' => 'corporate-light' ),
+			'leitvia/set-posts-page'       => static fn(): array => array( 'page' => self::factory()->post->create( array( 'post_type' => 'page' ) ) ),
 			'leitvia/define-content-type'  => static fn(): array => array(
 				'declaration' => array(
 					'version'   => 1,

@@ -285,7 +285,8 @@ final class Recipes {
 	 *
 	 * @param string               $name      Registry name of the recipe.
 	 * @param string               $package   Package key, '' for recipe-<name>.
-	 * @param array<string, mixed> $selection Optional parts, pages, buildingBlocks and dryRun, see selection().
+	 * @param array<string, mixed> $selection Optional parts, pages, buildingBlocks and dryRun, see selection(), and slugs,
+	 *                                        see renamed().
 	 * @param bool                 $settle    Apply what collects at once where may_settle() allows it.
 	 * @return array<string, mixed>|\WP_Error Recipe name, package ID (0 when everything went live) and the steps with
 	 *                                        their status (live, draft, package, unchanged, exists, waiting,
@@ -305,6 +306,14 @@ final class Recipes {
 		$missing = self::unavailable( $name, $recipe );
 		if ( '' !== $missing ) {
 			return Rejection::make( 'leitvia_recipe_unavailable', $missing, 422, 'requires', array( 'recipe' => $name ), 'leitvia/list-recipes', 'never' );
+		}
+		$slugs  = array_map( 'strval', (array) ( $selection['slugs'] ?? array() ) );
+		$recipe = self::renamed( $recipe, $slugs );
+		if ( is_wp_error( $recipe ) ) {
+			return $recipe;
+		}
+		if ( isset( $selection['pages'] ) ) {
+			$selection['pages'] = array_map( static fn( $slug ): string => $slugs[ (string) $slug ] ?? (string) $slug, (array) $selection['pages'] );
 		}
 		$key = '' !== $package ? $package : substr( 'recipe-' . str_replace( '/', '-', $name ), 0, 64 );
 		$sel = self::selection( $selection, $recipe );
@@ -408,6 +417,71 @@ final class Recipes {
 			);
 		}
 		return $out;
+	}
+
+	/**
+	 * The recipe with other slugs for its pages: every place that names a page follows (parents, navigation, footer,
+	 * reading settings, connections and links of edits that start with /), so the run needs no other change. A page
+	 * that has no kind is found by its slug, so a later run sends the same slugs.
+	 *
+	 * @param array<string, mixed>  $recipe Recipe.
+	 * @param array<string, string> $slugs  New slug by slug of the recipe.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private static function renamed( array $recipe, array $slugs ) {
+		if ( ! $slugs ) {
+			return $recipe;
+		}
+		$known = array_map( 'strval', array_column( (array) $recipe['pages'], 'slug' ) );
+		$after = array_map( static fn( string $slug ): string => $slugs[ $slug ] ?? $slug, $known );
+		if ( array_diff( array_keys( $slugs ), $known ) ) {
+			return Block_Edit::invalid( 'slugs', __( 'slugs names a page the recipe does not have. Use the page slugs of leitvia/list-recipes as keys.', 'leitvia-studio' ), array(), 'leitvia/list-recipes' );
+		}
+		if ( count( $after ) !== count( array_unique( $after ) ) ) {
+			return Block_Edit::invalid( 'slugs', __( 'Two pages of the recipe would get the same slug.', 'leitvia-studio' ) );
+		}
+		$page = static fn( $slug ): string => $slugs[ (string) $slug ] ?? (string) $slug;
+		$link = static function ( string $url ) use ( $slugs ): string {
+			foreach ( str_starts_with( $url, '/' ) ? $slugs : array() as $old => $new ) {
+				$url = (string) preg_replace( '~(?<=/)' . preg_quote( (string) $old, '~' ) . '(?=[/?#]|$)~', $new, $url );
+			}
+			return $url;
+		};
+		$edit = static function ( array $edits ) use ( $link ): array {
+			foreach ( $edits as $index => $change ) {
+				if ( isset( $change['url'] ) ) {
+					$edits[ $index ]['url'] = $link( (string) $change['url'] );
+				}
+			}
+			return $edits;
+		};
+		foreach ( (array) $recipe['pages'] as $index => $entry ) {
+			$recipe['pages'][ $index ]['slug'] = $page( $entry['slug'] );
+			if ( isset( $entry['parent'] ) ) {
+				$recipe['pages'][ $index ]['parent'] = $page( $entry['parent'] );
+			}
+			foreach ( (array) $entry['sections'] as $number => $section ) {
+				if ( is_array( $section ) && isset( $section['edits'] ) ) {
+					$recipe['pages'][ $index ]['sections'][ $number ]['edits'] = $edit( (array) $section['edits'] );
+				}
+			}
+		}
+		foreach ( (array) ( $recipe['templateParts'] ?? array() ) as $part => $pattern ) {
+			if ( is_array( $pattern ) && isset( $pattern['edits'] ) ) {
+				$recipe['templateParts'][ $part ]['edits'] = $edit( (array) $pattern['edits'] );
+			}
+		}
+		foreach ( array( 'navigation', 'footerNavigation', 'connect' ) as $list ) {
+			if ( isset( $recipe[ $list ] ) ) {
+				$recipe[ $list ] = array_map( $page, (array) $recipe[ $list ] );
+			}
+		}
+		foreach ( array( 'page_on_front', 'page_for_posts' ) as $option ) {
+			if ( isset( $recipe['reading'][ $option ] ) ) {
+				$recipe['reading'][ $option ] = $page( $recipe['reading'][ $option ] );
+			}
+		}
+		return $recipe;
 	}
 
 	/**
@@ -914,7 +988,7 @@ final class Recipes {
 			return self::step( $step, $ability, 'rejected', $target, (string) $result->get_error_code() ) + array( 'message' => $result->get_error_message() );
 		}
 		$result = (array) $result;
-		return array( 'package' => (int) ( $result['package'] ?? 0 ) ) + self::step( $step, $ability, (string) ( $result['mode'] ?? 'live' ), (array) ( $result['target'] ?? array() ) + $target );
+		return array( 'package' => (int) ( $result['package'] ?? 0 ) ) + self::step( $step, $ability, (string) ( $result['mode'] ?? 'live' ), (array) ( $result['target'] ?? array() ) + $target ) + array_intersect_key( $result, array( 'slug_changed' => true ) );
 	}
 
 	/**

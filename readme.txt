@@ -4,7 +4,7 @@ Tags: ai, mcp, block theme, accessibility, design tokens
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.25
+Stable tag: 1.3.26
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -20,17 +20,17 @@ Leitvia Studio lets people and AI agents build and maintain sites with block the
 
 **MCP, REST and WP-CLI.** With the plugin MCP Adapter active, Studio adds its own MCP server "leitvia" with exactly the Leitvia abilities as tools. Without it, every ability is available over the REST API. `wp leitvia` runs the same abilities from the command line: token sets, patterns, content model, site audit, change packages and recipes.
 
-**Site recipes.** One command or one agent call sets up a site from a bundle of style variation, header, footer, pages from patterns, navigation and settings that send less data: Blog, Company, Publication, Documentation and, with WooCommerce, Shop. A second run adds nothing. Take only some parts if you like (content, look, single pages, front page): a summary first shows what is new, replaced or kept, and the Inbox keeps a rollback.
+**Site recipes.** One command or one agent call sets up a site from a bundle of style variation, header, footer, pages from patterns, navigation and settings that send less data: Blog, Company, Publication, Documentation and, with WooCommerce, Shop. A second run adds nothing, a summary first shows what changes, and the Inbox keeps a rollback.
 
 **Building blocks.** One content feature of an add-on, such as events or a team: content types, the sections that show them and sample drafts. Adding one leaves design and pages alone. A section whose building block is missing says so in the editor and sets it up in one click; visitors never see it empty. Developers use the registry building_blocks, agents leitvia/add-building-block.
 
 **Pattern Lab, tokens and content model.** The Pattern Lab under Leitvia Studio shows all theme and own patterns with live previews in every style variation at 390, 782 and 1440 px, state variants (long text, empty, error, disabled) and an axe check per preview. Token sets are imported, exported, checked for contrast and scheduled as overlays. The content model declares post types and fields that blocks can show through block bindings.
 
-Posts, archives and author pages get structured data for search engines (JSON-LD): a NewsArticle, or a BlogPosting outside the categories you mark as news, with headline, dates, language, authors, publisher, logo and breadcrumbs, a CollectionPage on the posts page and on category and tag archives, and a ProfilePage on author pages, with three image sizes of 1200 px (16:9, 4:3 and 1:1) made on upload. A news sitemap for Google News lists the news of the last 48 hours at /news.xml. While an SEO plugin such as Yoast SEO, Rank Math, SEOPress, All in One SEO or The SEO Framework is active, Leitvia Studio prints none, so that plugin stays the only source.
+Posts, archives and author pages get structured data for search engines (JSON-LD): NewsArticle or BlogPosting, CollectionPage and ProfilePage, with three image sizes of 1200 px made on upload. A news sitemap for Google News lists the last 48 hours at /news.xml. While an SEO plugin such as Yoast SEO or Rank Math is active, Leitvia Studio prints none, so that plugin stays the only source.
 
 Embedded videos, posts and other content from sites such as YouTube, Vimeo or X load nothing from the provider until the visitor agrees. A placeholder names the provider, links to its privacy policy and to the content and offers to load it; the Consent Settings block, best placed on your privacy policy page, lists and revokes what a visitor always allows.
 
-Pages in easy language (Leichte Sprache), which public bodies offer under BITV 2.0, are normal pages: the page sidebar marks one as the easy language version of another, and the block "Easy language switch" links both once they are published. The block "Accessibility bar" for the header collects the links to easy language, the accessibility statement and sign language and, with JavaScript, adds text size (100 to 200 %), high contrast and read aloud. It is an extra, not a fix: pages must be accessible without it.
+Pages in easy language (Leichte Sprache), which public bodies offer under BITV 2.0, are normal pages: the page sidebar marks one as the easy language version of another, and the block "Easy language switch" links both. The block "Accessibility bar" for the header collects the links to easy language, the accessibility statement and sign language and, with JavaScript, adds text size, high contrast and read aloud. It is an extra, not a fix: pages must be accessible without it.
 
 Profile pictures come from your own media library; everyone without one, people who comment included, gets a neutral placeholder that ships with the plugin. Gravatar stays off unless an administrator switches it on.
 
@@ -143,6 +143,8 @@ The list carries the path of the site in its key (`leitvia-consent:/` for a site
 
 The Accessibility bar stores text size and high contrast in the visitor's browser (localStorage, key `leitvia-a11y`), only after the visitor changes one of them. Read aloud uses the speech synthesis of the browser with a voice installed on the device; the button only appears when such a voice exists for the language of the page, and voices from online services are never used.
 
+The Contact form block sends the name, email address and message a visitor enters by email to the address set in the block, or to the administration address of the site, and stores none of it on the site. To limit the messages per connection it keeps a counter for one hour under a salted hash of the IP address; the address itself is not stored. It sets no cookies and contacts no other service. Name the form in your privacy policy.
+
 == External services ==
 
 This plugin does not connect to any external service by default. The check after an agent changed a page live loads that page from your own site (a loopback request, see the question on requests from your server); it contacts no other host.
@@ -210,6 +212,25 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * Privacy policy: https://leitvia.com/privacy-policy/
 
 == Changelog ==
+
+= 1.3.26 =
+* New block Contact form: name, email address and message, sent on the server with wp_mail, without JavaScript and without another plugin. Recipient and subject stay in the block attributes and never reach the page. It stores nothing; spam protection uses a honeypot, a signed time field and a rate limit per salted IP hash. New pattern cta-contact-form.
+* New ability leitvia/set-posts-page makes an existing page the posts page. Like every setting it goes through a change package; the front page and unknown pages are rejected.
+* Author as input: leitvia/create-content and leitvia/update-content take author, leitvia/list-content shows it. No login name reaches the public any more: an author whose display name is the login, or an agent, appears with first and last name, otherwise with the site name, in the byline, author box, feed, schema and REST, and has no author page. The inbox and the review keep showing the stored display name.
+* Update note: post_author now counts into the document hash of a post. Change packages that are open during the update report a conflict; review them or create them again.
+* Update note: content types and their taxonomies no longer inherit the front of the permalink structure. Addresses like /blog/<type>/... lose the prefix once after the update, the rewrite rules are built again. The content model option withFront keeps the old address.
+* New content model option singlePages: false gives the entries of a public type no address of their own, lists and bindings keep showing them.
+* leitvia/compose-page removes and repeats blocks of a pattern with the edits remove and repeat, so a section fits fewer or more entries without own markup. Locks, the last child, the outer block and duplicate HTML IDs are rejected.
+* leitvia/apply-recipe takes slugs per recipe page. Parents, navigation, footer, reading settings and the links of the edits follow.
+* leitvia/create-content and leitvia/update-content take the names of new terms in hierarchical taxonomies too. In a change package the name stays visible, the term is created when it is applied. Agents get manage_categories for this.
+* Token sets use the fonts of the Font Library of WordPress, whose files lie on the site. The warning font_not_bundled names the way.
+* A textarea field binds to core/list, one item per line; an empty field shows no list.
+* Query filter works without a page reload and without an Apply button; without JavaScript it stays a form.
+* New check leitvia/query-context: a filter outside a query, in a query that inherits or without queryId is an error, a duplicate queryId a warning. Query filter and Load more report a missing query, the editor warns on an inheriting query. Query filter has the attributes applyLabel and resetLabel.
+* The zip brings its translations: .mo and script JSON in languages/, loaded through lang_dir_for_domain and load_script_translation_file. A language pack in WP_LANG_DIR wins.
+* leitvia/list-content counts what it shows: the draft of the privacy page is listed for agents, drafts they may not read are missing from items, total and pages alike. Writes return slug_changed when WordPress gives another address, at the latest on publishing.
+* leitvia/check-composition no longer counts the introduction before the first pattern as a section on templates that show the title themselves.
+* The check content-tokens names a px value in rem and points to leitvia/get-tokens.
 
 = 1.3.25 =
 * Security: the stored role Leitvia Agent holds no capability any more. Studio gives an agent its rights only while it runs, so with a deactivated plugin or a removed plugin folder the agent has the rights of a user without a role: it can change its own profile and nothing on the site, also over the REST routes of core. A role from an older version is emptied on the next load.

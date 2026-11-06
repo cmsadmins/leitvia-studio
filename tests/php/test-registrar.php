@@ -87,6 +87,94 @@ class Test_Registrar extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Addresses of entries and terms leave out the prefix of the post permalinks unless the declaration asks for it.
+	 */
+	public function test_with_front(): void {
+		$this->set_permalink_structure( '/blog/%postname%/' );
+		$declare = static function ( array $change ): void {
+			$model                        = get_option( Model::OPTION );
+			$model['postTypes']['walk']   = $change + array(
+				'label'         => 'Walks',
+				'singularLabel' => 'Walk',
+				'public'        => true,
+			);
+			$model['taxonomies']['route'] = $change + array(
+				'label'         => 'Routes',
+				'singularLabel' => 'Route',
+				'public'        => true,
+				'postTypes'     => array( 'walk' ),
+			);
+			update_option( Model::OPTION, $model );
+			Model::forget();
+			unregister_taxonomy( 'route' );
+			unregister_post_type( 'walk' );
+			Registrar::register();
+			flush_rewrite_rules( false );
+		};
+		$declare( array() );
+		$post = self::factory()->post->create(
+			array(
+				'post_type' => 'walk',
+				'post_name' => 'ridge',
+			)
+		);
+		$this->assertSame( home_url( '/walk/ridge/' ), get_permalink( $post ) );
+		$this->assertFalse( get_taxonomy( 'route' )->rewrite['with_front'] );
+		$declare( array( 'withFront' => true ) );
+		$this->assertSame( home_url( '/blog/walk/ridge/' ), get_permalink( $post ) );
+		$this->assertTrue( get_taxonomy( 'route' )->rewrite['with_front'] );
+		unregister_taxonomy( 'route' );
+		unregister_post_type( 'walk' );
+	}
+
+	/**
+	 * A type without single pages stays public for lists and bindings, with no address, archive or single template.
+	 */
+	public function test_type_without_single_pages(): void {
+		$model                       = get_option( Model::OPTION );
+		$model['postTypes']['quote'] = array(
+			'label'         => 'Quotes',
+			'singularLabel' => 'Quote',
+			'public'        => true,
+			'hasArchive'    => true,
+			'singlePages'   => false,
+			'fields'        => array(
+				'quote_source' => array(
+					'type'  => 'text',
+					'label' => 'Source',
+				),
+			),
+		);
+		$this->assertTrue( Model::validate( $model ) );
+		update_option( Model::OPTION, $model );
+		Model::forget();
+		Registrar::register();
+		\LeitviaStudio\Model\Entry_View::register();
+		$type = get_post_type_object( 'quote' );
+		$this->assertTrue( $type->public );
+		$this->assertFalse( $type->publicly_queryable );
+		$this->assertFalse( $type->rewrite );
+		$this->assertFalse( $type->has_archive );
+		$this->assertTrue( $type->exclude_from_search );
+		$this->assertFalse( is_post_type_viewable( $type ) );
+		$this->assertNull( get_block_template( 'leitvia-studio//single-quote' ) );
+
+		$post  = self::factory()->post->create(
+			array(
+				'post_type'   => 'quote',
+				'post_status' => 'publish',
+				'meta_input'  => array( 'quote_source' => 'A visitor' ),
+			)
+		);
+		$block = new WP_Block( parse_blocks( '<!-- wp:paragraph --><p></p><!-- /wp:paragraph -->' )[0] );
+		// Here the block type has no context of the sources, which this test does not register again.
+		$block->context = array( 'postId' => $post );
+		wp_set_current_user( 0 );
+		$this->assertSame( 'A visitor', \LeitviaStudio\Model\Bindings::meta_value( array( 'key' => 'quote_source' ), $block, 'content' ) );
+		unregister_post_type( 'quote' );
+	}
+
+	/**
 	 * Fields and relations are post meta with type and schema.
 	 */
 	public function test_meta(): void {

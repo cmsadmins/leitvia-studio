@@ -3,6 +3,7 @@ import { InspectorControls, useBlockProps } from '@wordpress/block-editor';
 import {
 	CheckboxControl,
 	FormTokenField,
+	Notice,
 	PanelBody,
 	SelectControl,
 	TextControl,
@@ -13,7 +14,7 @@ import { store as coreStore } from '@wordpress/core-data';
 // The server decides which facets are allowed (includes/blocks/class-query-filter.php): public taxonomies and
 // registered meta keys of the types string, integer and boolean. Other keys stay in the attributes but render nothing.
 export default function Edit( {
-	attributes: { label, facets },
+	attributes: { label, applyLabel, resetLabel, facets },
 	setAttributes,
 	context: { query },
 } ) {
@@ -74,6 +75,26 @@ export default function Edit( {
 							setAttributes( { label: value } )
 						}
 					/>
+					<TextControl
+						__next40pxDefaultSize
+						label={ __( 'Button text', 'leitvia-studio' ) }
+						help={ __(
+							'Shown only without JavaScript; with it, every change filters at once. Empty: the standard text in the language of the site.',
+							'leitvia-studio'
+						) }
+						value={ applyLabel }
+						onChange={ ( value ) =>
+							setAttributes( { applyLabel: value } )
+						}
+					/>
+					<TextControl
+						__next40pxDefaultSize
+						label={ __( 'Reset link text', 'leitvia-studio' ) }
+						value={ resetLabel }
+						onChange={ ( value ) =>
+							setAttributes( { resetLabel: value } )
+						}
+					/>
 					{ taxonomies.map( ( taxonomy ) => (
 						<CheckboxControl
 							key={ taxonomy.slug }
@@ -119,6 +140,14 @@ export default function Edit( {
 				</PanelBody>
 			</InspectorControls>
 			<div { ...useBlockProps() }>
+				{ query?.inherit && (
+					<Notice status="warning" isDismissible={ false }>
+						{ __(
+							'This filter stays empty on the site: it needs a query with its own settings, not one that inherits the template.',
+							'leitvia-studio'
+						) }
+					</Notice>
+				) }
 				<form>
 					{ facets.map( ( facet ) => (
 						<fieldset key={ facet.key } disabled>
@@ -127,7 +156,8 @@ export default function Edit( {
 					) ) }
 					<p className="wp-block-leitvia-query-filter__actions">
 						<span className="wp-element-button">
-							{ __( 'Apply filters', 'leitvia-studio' ) }
+							{ applyLabel ||
+								__( 'Apply filters', 'leitvia-studio' ) }
 						</span>
 					</p>
 				</form>

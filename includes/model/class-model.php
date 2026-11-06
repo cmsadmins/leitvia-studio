@@ -23,6 +23,11 @@ final class Model {
 	public const FLUSH_OPTION = 'leitvia_studio_flush_rewrite';
 
 	/**
+	 * Option that says the rewrite rules were built without the prefix of the post permalinks, see Registrar::maybe_flush().
+	 */
+	public const FRONT_OPTION = 'leitvia_studio_rewrite_front';
+
+	/**
 	 * Option with the hash of the last declaration that passed the schema.
 	 */
 	public const CHECKED_OPTION = 'leitvia_studio_model_checked';
@@ -407,7 +412,7 @@ final class Model {
 		$slugs = array();
 		foreach ( array( 'postTypes', 'taxonomies' ) as $section ) {
 			foreach ( (array) ( $decl[ $section ] ?? array() ) as $key => $entry ) {
-				if ( empty( $entry['public'] ) ) {
+				if ( empty( $entry['public'] ) || false === ( $entry['singlePages'] ?? true ) ) {
 					continue;
 				}
 				$slug = $entry['slug'] ?? $key;

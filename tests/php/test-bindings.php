@@ -327,6 +327,25 @@ class Test_Bindings extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A list bound to a textarea field gets one item per line, escaped; an empty field leaves no list, a field the model
+	 * does not know keeps the saved items.
+	 */
+	public function test_list_from_a_textarea_field(): void {
+		$decl = get_option( Model::OPTION );
+		$decl['postTypes']['event']['fields']['event_scope'] = array(
+			'type'  => 'textarea',
+			'label' => 'Scope',
+		);
+		update_option( Model::OPTION, $decl );
+		Model::forget();
+		$event = $this->event( array( 'event_scope' => "Audit\r\n\r\n<Report>\nTalk" ) );
+		$list  = static fn( string $key ): string => '<!-- wp:list {"ordered":true,"className":"is-style-x","metadata":{"bindings":{"content":{"source":"leitvia/meta","args":{"key":"' . $key . '"}}}}} --><ol class="is-style-x wp-block-list"><!-- wp:list-item --><li>Sample</li><!-- /wp:list-item --></ol><!-- /wp:list -->';
+		$this->assertSame( '<ol class="is-style-x wp-block-list"><li>Audit</li><li>&lt;Report&gt;</li><li>Talk</li></ol>', trim( $this->render( $list( 'event_scope' ), $event ) ) );
+		$this->assertSame( '', trim( $this->render( $list( 'event_scope' ), $this->event( array() ) ) ) );
+		$this->assertStringContainsString( 'Sample', $this->render( $list( 'event_other' ), $event ) );
+	}
+
+	/**
 	 * A related draft stays closed to visitors.
 	 */
 	public function test_relation_to_unreadable_post_falls_back(): void {

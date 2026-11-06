@@ -95,6 +95,160 @@ final class Block_Edit {
 	}
 
 	/**
+	 * Content with one block removed from its parent or repeated right after itself, for sections with fewer or more
+	 * entries than the pattern. IDs of the blocks after it shift, so edits in one list build on each other: work from
+	 * the last block to the first. Copies lose their leitviaId; core gives them a new one on save.
+	 *
+	 * @param string               $content Block markup.
+	 * @param string               $id      leitviaId or path ID.
+	 * @param array<string, mixed> $change  remove (true) or repeat (number of copies).
+	 * @param array<string, mixed> $target  Target for rejections.
+	 * @return string|\WP_Error
+	 */
+	public static function structure( string $content, string $id, array $change, array $target = array() ) {
+		$blocks  = parse_blocks( $content );
+		$path    = self::path( $blocks, $id, 'p:' );
+		$target += array( 'block' => $id );
+		if ( '' === $path ) {
+			return Rejection::make( 'leitvia_not_found', __( 'There is no block with this ID. Read the outline for the current IDs.', 'leitvia-studio' ), 404, 'block', $target, 'leitvia/get-page-outline' );
+		}
+		$dot = strrpos( $path, '.' );
+		if ( false === $dot ) {
+			return self::invalid( 'structure', __( 'The outer block of a pattern stays. Leave a section out, or list it twice, in sections.', 'leitvia-studio' ), $target );
+		}
+		$index  = (int) substr( $path, $dot + 1 );
+		$found  = false;
+		$error  = null;
+		$blocks = self::map(
+			$blocks,
+			substr( $path, 0, $dot ),
+			'p:',
+			static function ( array $parent_block ) use ( $index, $change, $target, &$error ): array {
+				$changed = self::children( $parent_block, $index, $change, $target );
+				if ( is_wp_error( $changed ) ) {
+					$error = $changed;
+					return $parent_block;
+				}
+				return $changed;
+			},
+			$found
+		);
+		return $error ?? serialize_blocks( $blocks );
+	}
+
+	/**
+	 * Path ID of the block with the ID, '' when there is none.
+	 *
+	 * @param array<mixed> $blocks Parsed blocks.
+	 * @param string       $id     leitviaId or path ID.
+	 * @param string       $path   Path prefix.
+	 */
+	private static function path( array $blocks, string $id, string $path ): string {
+		$index = 0;
+		foreach ( $blocks as $block ) {
+			if ( null === $block['blockName'] && '' === trim( (string) $block['innerHTML'] ) ) {
+				continue;
+			}
+			$here = $path . ( $index++ );
+			if ( Block_Ids::id( $block ) === $id || $here === $id ) {
+				return $here;
+			}
+			$inner = self::path( (array) $block['innerBlocks'], $id, $here . '.' );
+			if ( '' !== $inner ) {
+				return $inner;
+			}
+		}
+		return '';
+	}
+
+	/**
+	 * Parent block with one child removed or repeated, inner blocks and their placeholders in innerContent in step. A
+	 * template lock, a lock against removing, the support multiple and the last child of a parent refuse, as in the
+	 * editor; so does a copy that would double an HTML ID.
+	 *
+	 * @param array<string, mixed> $parent_block Parsed parent block.
+	 * @param int                  $index        Index of the child.
+	 * @param array<string, mixed> $change       remove or repeat.
+	 * @param array<string, mixed> $target       Target with the block ID.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private static function children( array $parent_block, int $index, array $change, array $target ) {
+		$child = (array) $parent_block['innerBlocks'][ $index ];
+		if ( ! empty( $parent_block['attrs']['templateLock'] ) ) {
+			return self::invalid( 'structure', __( 'The parent block is locked; its blocks cannot be removed or repeated.', 'leitvia-studio' ), $target );
+		}
+		$slots   = array_keys( (array) $parent_block['innerContent'], null, true );
+		$at      = (int) $slots[ $index ];
+		$content = (array) $parent_block['innerContent'];
+		$prev    = $content[ $at - 1 ] ?? null;
+		$next    = $content[ $at + 1 ] ?? null;
+		// White space between two inner blocks, not the opening or closing markup of the parent.
+		$gap = static fn( $chunk, int $key ): bool => is_string( $chunk ) && '' === trim( $chunk ) && $key > 0 && $key < count( $content ) - 1;
+		if ( empty( $change['remove'] ) ) {
+			$type = \WP_Block_Type_Registry::get_instance()->get_registered( (string) $child['blockName'] );
+			if ( false === ( $type->supports['multiple'] ?? true ) ) {
+				return self::invalid( 'structure', __( 'This block may appear only once.', 'leitvia-studio' ), $target );
+			}
+			if ( self::has_html_id( $child ) ) {
+				return self::invalid( 'structure', __( 'This block has an HTML anchor, and a copy would double it. Choose a pattern with enough blocks.', 'leitvia-studio' ), $target );
+			}
+			$copies = (int) $change['repeat'];
+			$space  = $gap( $next, $at + 1 ) ? $next : ( $gap( $prev, $at - 1 ) ? $prev : '' );
+			array_splice( $content, $at + 1, 0, array_merge( ...array_fill( 0, $copies, '' !== $space ? array( $space, null ) : array( null ) ) ) );
+			array_splice( $parent_block['innerBlocks'], $index + 1, 0, array_fill( 0, $copies, self::copy( $child ) ) );
+		} else {
+			if ( ! empty( $child['attrs']['lock']['remove'] ) ) {
+				return self::invalid( 'structure', __( 'This block is locked against removing.', 'leitvia-studio' ), $target );
+			}
+			if ( 1 === count( $slots ) ) {
+				return self::invalid( 'structure', __( 'This is the only block of its parent. Remove the parent block instead.', 'leitvia-studio' ), $target );
+			}
+			array_splice( $parent_block['innerBlocks'], $index, 1 );
+			if ( $gap( $next, $at + 1 ) ) {
+				array_splice( $content, $at, 2 );
+			} elseif ( $gap( $prev, $at - 1 ) ) {
+				array_splice( $content, $at - 1, 2 );
+			} elseif ( is_string( $prev ) && is_string( $next ) ) {
+				array_splice( $content, $at - 1, 3, array( $prev . $next ) );
+			} else {
+				array_splice( $content, $at, 1 );
+			}
+		}
+		$parent_block['innerContent'] = $content;
+		return $parent_block;
+	}
+
+	/**
+	 * Whether a block or one of its inner blocks has an HTML ID.
+	 *
+	 * @param array<string, mixed> $block Parsed block.
+	 */
+	private static function has_html_id( array $block ): bool {
+		$tags = new \WP_HTML_Tag_Processor( implode( '', array_filter( (array) $block['innerContent'], 'is_string' ) ) );
+		while ( $tags->next_tag() ) {
+			if ( null !== $tags->get_attribute( 'id' ) ) {
+				return true;
+			}
+		}
+		return ! empty( $block['attrs']['anchor'] ) || array_filter( (array) $block['innerBlocks'], array( self::class, 'has_html_id' ) );
+	}
+
+	/**
+	 * Copy of a block without the leitviaId of the block and of its inner blocks.
+	 *
+	 * @param array<string, mixed> $block Parsed block.
+	 * @return array<string, mixed>
+	 */
+	private static function copy( array $block ): array {
+		unset( $block['attrs']['metadata']['leitviaId'] );
+		if ( array() === ( $block['attrs']['metadata'] ?? null ) ) {
+			unset( $block['attrs']['metadata'] );
+		}
+		$block['innerBlocks'] = array_map( array( self::class, 'copy' ), (array) $block['innerBlocks'] );
+		return $block;
+	}
+
+	/**
 	 * Replaces the block with the ID by the result of the callback; paths count without whitespace blocks, as in
 	 * Block_Ids::blocks(). Inner block lists keep their length, so the placeholders in innerContent stay in sync.
 	 *

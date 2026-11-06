@@ -21,7 +21,7 @@ final class Compiler {
 	public const HASH_OPTION   = 'leitvia_studio_applied_hash';
 
 	/**
-	 * Warns about font families that neither the theme nor its style variations bundle.
+	 * Warns about font families without font faces on this site: not bundled, not in the Font Library.
 	 *
 	 * @param array<string, mixed> $doc Token document.
 	 * @return list<array<string, mixed>>
@@ -39,6 +39,7 @@ final class Compiler {
 					'severity' => 'warning',
 					/* translators: %s: font family slug. */
 					'message'  => sprintf( __( 'Font family %s is not bundled, falls back to the system font.', 'leitvia-studio' ), $family['slug'] ),
+					'fix'      => __( 'Have the font files uploaded to the Font Library before the token set is activated, or name a bundled family.', 'leitvia-studio' ),
 					'data'     => array( 'slug' => $family['slug'] ),
 				);
 			}

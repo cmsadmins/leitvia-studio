@@ -31,6 +31,16 @@ final class Content_Checks {
 	public const IMAGE_BLOCKS = array( 'core/image', 'core/cover', 'core/media-text', 'core/gallery' );
 
 	/**
+	 * Blocks that render nothing without a core/query block with a queryId around them, see Query_Filter.
+	 */
+	private const QUERY_BLOCKS = array( 'leitvia/query-filter', 'leitvia/load-more' );
+
+	/**
+	 * Ability to call next by the check that rejected a write.
+	 */
+	public const NEXT_ABILITY = array( 'leitvia/content-tokens' => 'leitvia/get-tokens' );
+
+	/**
 	 * Studio checks: name => scope and callback.
 	 */
 	private const CHECKS = array(
@@ -40,6 +50,7 @@ final class Content_Checks {
 		'leitvia/block-validity'   => array( 'content', 'block_validity' ),
 		'leitvia/content-tokens'   => array( 'content', 'tokens' ),
 		'leitvia/content-contrast' => array( 'content', 'contrast' ),
+		'leitvia/query-context'    => array( 'content', 'query_context' ),
 		'leitvia/page-structure'   => array( 'page', 'page' ),
 	);
 
@@ -56,6 +67,7 @@ final class Content_Checks {
 			'leitvia/block-validity'   => __( 'Block validity', 'leitvia-studio' ),
 			'leitvia/content-tokens'   => __( 'Design tokens in content', 'leitvia-studio' ),
 			'leitvia/content-contrast' => __( 'Color pairs in content', 'leitvia-studio' ),
+			'leitvia/query-context'    => __( 'Filters inside a query', 'leitvia-studio' ),
 			'leitvia/page-structure'   => __( 'One h1 and landmarks', 'leitvia-studio' ),
 		);
 		foreach ( self::CHECKS as $name => [ $scope, $method ] ) {
@@ -259,7 +271,53 @@ final class Content_Checks {
 	}
 
 	/**
-	 * Check leitvia/content-tokens: Token_Lint per block (no hex, px, !important or digit presets).
+	 * Check leitvia/query-context: a query filter or Load more renders nothing, without any message, outside a query,
+	 * in a query that inherits the main query (core runs no filter for it) and in a query without queryId. Two queries
+	 * with the same queryId share the filter and the page of the URL. Markup of the editor always has a queryId; agents
+	 * write it themselves.
+	 *
+	 * @param string               $content Block markup.
+	 * @param array<string, mixed> $context Context.
+	 * @return list<array<string, mixed>>
+	 */
+	public static function query_context( string $content, array $context ): array {
+		if ( ! self::applies( $context ) ) {
+			return array();
+		}
+		$findings = array();
+		$queries  = array();
+		$filters  = array();
+		foreach ( self::walk( $content ) as [ $block, $id, $query ] ) {
+			if ( 'core/query' === $block['blockName'] && isset( $block['attrs']['queryId'] ) ) {
+				$key             = (int) $block['attrs']['queryId'];
+				$queries[ $key ] = ( $queries[ $key ] ?? 0 ) + 1;
+			}
+			if ( ! in_array( $block['blockName'], self::QUERY_BLOCKS, true ) ) {
+				continue;
+			}
+			$attrs = null === $query ? array() : (array) $query['attrs'];
+			// Core's default query inherits, and a query attribute replaces that default as a whole.
+			if ( null === $query ) {
+				$findings[] = self::finding( 'leitvia/query-context', 'error', $id, __( 'A query filter or Load more outside a query renders nothing.', 'leitvia-studio' ), __( 'Move the block into a core/query block.', 'leitvia-studio' ) );
+			} elseif ( ! empty( ( $attrs['query'] ?? array( 'inherit' => true ) )['inherit'] ) ) {
+				$findings[] = self::finding( 'leitvia/query-context', 'error', $id, __( 'A query filter or Load more in a query that inherits the main query renders nothing.', 'leitvia-studio' ), __( 'Set inherit to false and name postType and perPage in the query.', 'leitvia-studio' ) );
+			} elseif ( ! isset( $attrs['queryId'] ) ) {
+				$findings[] = self::finding( 'leitvia/query-context', 'error', $id, __( 'A query filter or Load more in a query without queryId renders nothing.', 'leitvia-studio' ), __( 'Give the core/query block a queryId that no other query on the page has.', 'leitvia-studio' ) );
+			} else {
+				$filters[ $id ] = (int) $attrs['queryId'];
+			}
+		}
+		foreach ( $filters as $id => $key ) {
+			if ( $queries[ $key ] > 1 ) {
+				$findings[] = self::finding( 'leitvia/query-context', 'warning', (string) $id, __( 'Several queries on this page have the same queryId, so a filter changes all of them.', 'leitvia-studio' ), __( 'Give each core/query block its own queryId.', 'leitvia-studio' ) );
+			}
+		}
+		return $findings;
+	}
+
+	/**
+	 * Check leitvia/content-tokens: Token_Lint per block (no hex, px, !important or digit presets). A raw px value gets
+	 * its size in rem in the message: the check takes rem, for a width without a preset.
 	 *
 	 * @param string               $content Block markup.
 	 * @param array<string, mixed> $context Context.
@@ -274,7 +332,12 @@ final class Content_Checks {
 			$markup = serialize_block_attributes( (array) $block['attrs'] ) . self::html( $block );
 			foreach ( Token_Lint::lint_markup( $markup ) as $lint ) {
 				/* translators: 1: raw value, 2: lint rule. */
-				$findings[] = self::finding( 'leitvia/content-tokens', 'error', $id, sprintf( __( 'Raw value "%1$s" (%2$s) instead of a design token.', 'leitvia-studio' ), $lint['match'], $lint['rule'] ), __( 'Use the presets from leitvia/get-tokens.', 'leitvia-studio' ) );
+				$message = sprintf( __( 'Raw value "%1$s" (%2$s) instead of a design token.', 'leitvia-studio' ), $lint['match'], $lint['rule'] );
+				if ( 'no-px' === $lint['rule'] ) {
+					/* translators: 1: value in px, 2: the same value in rem. */
+					$message = sprintf( __( 'px is no design token: use %2$s instead of %1$s, or a preset from leitvia/get-tokens.', 'leitvia-studio' ), $lint['match'], round( (float) $lint['match'] / 16, 3 ) . 'rem' );
+				}
+				$findings[] = self::finding( 'leitvia/content-tokens', 'error', $id, $message, __( 'Use the presets from leitvia/get-tokens.', 'leitvia-studio' ) );
 			}
 		}
 		return $findings;
@@ -472,10 +535,11 @@ final class Content_Checks {
 	}
 
 	/**
-	 * Blocks in document order with their IDs (leitviaId or path ID), inner blocks included, whitespace left out.
+	 * Blocks in document order with their IDs (leitviaId or path ID) and the nearest core/query around them, inner
+	 * blocks included, whitespace left out.
 	 *
 	 * @param string $content Block markup.
-	 * @return \Generator<array{0: array<string, mixed>, 1: string}>
+	 * @return \Generator<array{0: array<string, mixed>, 1: string, 2: array<string, mixed>|null}>
 	 */
 	private static function walk( string $content ): \Generator {
 		yield from self::walk_blocks( parse_blocks( $content ), 'p:' );
@@ -486,13 +550,14 @@ final class Content_Checks {
 	 *
 	 * @param array<int|string, array<string, mixed>> $blocks Parsed blocks.
 	 * @param string                                  $path   Path prefix.
-	 * @return \Generator<array{0: array<string, mixed>, 1: string}>
+	 * @param array<string, mixed>|null               $query  The nearest core/query around the blocks.
+	 * @return \Generator<array{0: array<string, mixed>, 1: string, 2: array<string, mixed>|null}>
 	 */
-	private static function walk_blocks( array $blocks, string $path ): \Generator {
+	private static function walk_blocks( array $blocks, string $path, ?array $query = null ): \Generator {
 		foreach ( Block_Ids::blocks( $blocks ) as $index => $block ) {
 			$id = Block_Ids::id( $block );
-			yield array( $block, '' !== $id ? $id : $path . $index );
-			yield from self::walk_blocks( (array) $block['innerBlocks'], $path . $index . '.' );
+			yield array( $block, '' !== $id ? $id : $path . $index, $query );
+			yield from self::walk_blocks( (array) $block['innerBlocks'], $path . $index . '.', 'core/query' === $block['blockName'] ? $block : $query );
 		}
 	}
 

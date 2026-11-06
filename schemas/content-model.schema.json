@@ -49,6 +49,14 @@
 						"hasArchive": {
 							"type": "boolean"
 						},
+						"singlePages": {
+							"type": "boolean",
+							"description": "Only with public; false gives entries no address of their own, pages list them."
+						},
+						"withFront": {
+							"type": "boolean",
+							"description": "Only with public: addresses start with the prefix of the post permalinks, such as /blog/. Off by default."
+						},
 						"hierarchical": {
 							"type": "boolean"
 						},
@@ -289,6 +297,10 @@
 						},
 						"hierarchical": {
 							"type": "boolean"
+						},
+						"withFront": {
+							"type": "boolean",
+							"description": "Only with public: addresses start with the prefix of the post permalinks, such as /blog/. Off by default."
 						},
 						"slug": {
 							"type": "string",

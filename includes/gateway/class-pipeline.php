@@ -31,9 +31,9 @@ final class Pipeline {
 	/**
 	 * Further fields an operation may set on a new post only: the MIME type and file of an attachment, meta (for
 	 * example the template or lab metadata), terms (the theme and area of a template part in tax_input, terms of a
-	 * content type in terms) and the date. A failed create deletes the post, so nothing of them needs restoring.
+	 * content type in terms), the date and the author. A failed create deletes the post, so nothing of them needs restoring.
 	 */
-	public const CREATE_FIELDS = array( 'post_mime_type', 'file', 'meta_input', 'tax_input', 'terms', 'post_date' );
+	public const CREATE_FIELDS = array( 'post_mime_type', 'file', 'meta_input', 'tax_input', 'terms', 'post_date', 'post_author' );
 
 	/**
 	 * Meta keys per post type that belong to the state of an existing post, under meta_input: hashed, snapshotted,
@@ -262,7 +262,7 @@ final class Pipeline {
 		$findings = $findings && ! $op->creates() ? self::introduced( $findings, self::check( $op, $before ) ) : $findings;
 		$errors   = array_values( array_filter( $findings, static fn( array $finding ): bool => 'warning' !== ( $finding['severity'] ?? 'error' ) ) );
 		if ( $errors ) {
-			return Rejection::make( 'leitvia_check_failed', __( 'Checks found problems. Fix them as each finding suggests and try again.', 'leitvia-studio' ), 422, 'checks', $target, '', 'once', array( 'findings' => $findings ) );
+			return Rejection::make( 'leitvia_check_failed', __( 'Checks found problems. Fix them as each finding suggests and try again.', 'leitvia-studio' ), 422, 'checks', $target, Content_Checks::NEXT_ABILITY[ $errors[0]['check'] ?? '' ] ?? '', 'once', array( 'findings' => $findings ) );
 		}
 		// 7. Execution.
 		// A package key from the caller always means a package: an agent may hold itself to more than the autonomy asks.
@@ -283,7 +283,7 @@ final class Pipeline {
 			'package'  => $package,
 			'snapshot' => 0,
 			'findings' => $findings,
-		);
+		) + self::slug_change( $op, $after );
 		if ( 'package' === $mode ) {
 			$queued = self::queued( $op, $after );
 			if ( $queued ) {
@@ -318,6 +318,30 @@ final class Pipeline {
 		}
 		// 8. Snapshot, write; on any failure the previous state comes back.
 		return self::execute( $op, $before, $after, $result, $rollback && ! empty( $op->target['delete'] ), $rollback );
+	}
+
+	/**
+	 * The field slug_changed with requested and slug when the post cannot have the slug of the state because another post uses it
+	 * or core reserves it: slug is the address it gets, or gets on publishing, since core keeps duplicates in drafts.
+	 * Empty otherwise, also for what has no address.
+	 *
+	 * @param Operation            $op    Operation.
+	 * @param array<string, mixed> $after State after.
+	 * @return array<string, array{requested: string, slug: string}>
+	 */
+	private static function slug_change( Operation $op, array $after ): array {
+		$wanted = (string) ( $after['post_name'] ?? '' );
+		$type   = (string) ( $after['post_type'] ?? '' );
+		if ( '' === $wanted || 'attachment' === $type || ! is_post_type_viewable( $type ) ) {
+			return array();
+		}
+		$slug = wp_unique_post_slug( $wanted, $op->post_id(), 'publish', $type, (int) ( $after['post_parent'] ?? 0 ) );
+		return $slug === $wanted ? array() : array(
+			'slug_changed' => array(
+				'requested' => $wanted,
+				'slug'      => $slug,
+			),
+		);
 	}
 
 	/**

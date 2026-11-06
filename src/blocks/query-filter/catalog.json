@@ -2,6 +2,6 @@
 	"usage": {
 		"useWhen": "Inside a Query Loop with many posts that visitors narrow down by category, tag or custom fields.",
 		"avoidWhen": "Short lists or outside a Query Loop; use a list of category links instead.",
-		"a11y": "Filters are native form controls with labels and live in the URL, so results can be bookmarked and work without JavaScript."
+		"a11y": "Filters are native form controls with labels and live in the URL, so results can be bookmarked and work without JavaScript. With JavaScript a change filters in place: focus stays on the control, the status region announces the result count, and Back restores the previous state."
 	}
 }

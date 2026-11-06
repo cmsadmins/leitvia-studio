@@ -19,6 +19,11 @@ defined( 'ABSPATH' ) || exit;
 final class Form_Errors {
 
 	/**
+	 * The empty summary as the block saves it, for blocks that render a form of their own (Contact_Form).
+	 */
+	public const SUMMARY = '<div class="wp-block-leitvia-form-errors__summary" role="region" tabindex="-1" hidden><h2 class="wp-block-leitvia-form-errors__title"></h2><ul class="wp-block-leitvia-form-errors__list"></ul></div>';
+
+	/**
 	 * Runs on render_block_leitvia/form-errors.
 	 *
 	 * @param string $html Block markup with the rendered inner blocks.
@@ -40,6 +45,8 @@ final class Form_Errors {
 		}
 		$title_id = wp_unique_id( 'wp-block-leitvia-form-errors-title-' );
 		$tags->remove_attribute( 'hidden' );
+		// The browser moves the focus here, so a summary from the server gets it without JavaScript too.
+		$tags->set_attribute( 'autofocus', true );
 		$tags->set_attribute( 'aria-labelledby', $title_id );
 		$items = '';
 		foreach ( $errors as $id => $text ) {

@@ -131,6 +131,9 @@ final class Plugin {
 		add_filter( 'rest_request_before_callbacks', array( Model\Building_Block_Views::class, 'pattern_request' ), 10, 3 );
 		add_action( 'admin_enqueue_scripts', array( self::class, 'enqueue_model_editor' ), 21 );
 		add_action( 'init', array( Model\Bindings::class, 'register' ) );
+		Model\Author_Name::boot();
+		add_filter( 'render_block_core/list', array( Model\Bindings::class, 'list_items' ), 10, 3 );
+		add_filter( 'get_block_type_uses_context', array( Model\Bindings::class, 'list_context' ), 10, 2 );
 		add_action( 'save_post', array( Lab\Usage_Index::class, 'index' ), 10, 2 );
 		add_action( 'init', array( Admin\Admin::class, 'register_status_column' ), 20 );
 		add_action( 'after_setup_theme', array( News\Image_Sizes::class, 'register' ) );

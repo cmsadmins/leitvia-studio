@@ -98,6 +98,7 @@ class Test_Gateway_Outline extends WP_UnitTestCase {
 		$this->assertTrue( $paragraph['id_stable'] );
 		$this->assertSame( 'core/paragraph', $paragraph['name'] );
 		$this->assertSame( mb_substr( 'Bold & ' . trim( $long ), 0, 80 ), $paragraph['text'] );
+		$this->assertSame( substr( hash( 'sha256', 'Bold & ' . trim( $long ) ), 0, 16 ), $paragraph['text_hash'], 'a cut text carries the hash of the whole text' );
 		$this->assertSame( strlen( serialize_block( $block ) ), $paragraph['bytes'] );
 		$this->assertSame( Hashes::block( $block ), $paragraph['hash'] );
 		$this->assertSame( array(), $paragraph['children'] );
@@ -117,6 +118,50 @@ class Test_Gateway_Outline extends WP_UnitTestCase {
 		$this->assertSame( array( 'https://example.org/about/' ), $outline['blocks'][0]['children'][1]['links'] );
 		$this->assertSame( array( 'mailto:hello@example.org', '/contact/' ), $outline['blocks'][1]['links'] );
 		$this->assertArrayNotHasKey( 'links', $outline['blocks'][2] );
+		$this->assertArrayNotHasKey( 'text_hash', $outline['blocks'][2], 'a text that is not cut has no hash' );
+	}
+
+	/**
+	 * Image and cover blocks name their image: attachment ID from the attributes, else from wp-image-<id>, alt text or
+	 * null without alt attribute, and the decorative mark. A cover without an image and other blocks have no key image.
+	 */
+	public function test_outline_images(): void {
+		$loaf    = self::factory()->attachment->create_object( 'loaf.png', 0, array( 'post_mime_type' => 'image/png' ) );
+		$content = '<!-- wp:image {"id":' . $loaf . '} --><figure class="wp-block-image"><img src="/loaf.png" alt="A loaf" class="wp-image-' . $loaf . '"/></figure><!-- /wp:image -->'
+			. '<!-- wp:image {"metadata":{"leitviaDecorative":true}} --><figure class="wp-block-image"><img src="/a.png" alt="" class="wp-image-' . $loaf . '"/></figure><!-- /wp:image -->'
+			. '<!-- wp:image --><figure class="wp-block-image"><img src="https://elsewhere.example/b.png"/></figure><!-- /wp:image -->'
+			. '<!-- wp:cover {"url":"/loaf.png","id":' . $loaf . '} --><div class="wp-block-cover"><img class="wp-block-cover__image-background wp-image-' . $loaf . '" alt="Bakery" src="/loaf.png" data-object-fit="cover"/><div class="wp-block-cover__inner-container"><!-- wp:paragraph --><p>Hi</p><!-- /wp:paragraph --></div></div><!-- /wp:cover -->'
+			. '<!-- wp:cover {"customOverlayColor":"#000"} --><div class="wp-block-cover"><span aria-hidden="true" class="wp-block-cover__background"></span><div class="wp-block-cover__inner-container"></div></div><!-- /wp:cover -->'
+			. '<!-- wp:paragraph --><p>No image.</p><!-- /wp:paragraph -->';
+		$outline = self::ability( 'leitvia/get-page-outline', array( 'post' => $this->page( $content, false ) ) );
+		$images  = array_map( static fn( array $node ) => $node['image'] ?? null, $outline['blocks'] );
+		$this->assertSame(
+			array(
+				array(
+					'id'         => $loaf,
+					'alt'        => 'A loaf',
+					'decorative' => false,
+				),
+				array(
+					'id'         => $loaf,
+					'alt'        => '',
+					'decorative' => true,
+				),
+				array(
+					'id'         => 0,
+					'alt'        => null,
+					'decorative' => false,
+				),
+				array(
+					'id'         => $loaf,
+					'alt'        => 'Bakery',
+					'decorative' => false,
+				),
+				null,
+				null,
+			),
+			$images
+		);
 	}
 
 	/**

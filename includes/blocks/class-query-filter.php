@@ -223,7 +223,8 @@ final class Query_Filter {
 
 	/**
 	 * Renders leitvia/query-filter: a GET form with one group per facet, Apply filters, Reset filters and the number
-	 * of results in a status region, which view.js keeps up to date through the router.
+	 * of results in a status region. view.js takes over from this form: it fetches the same address and replaces the
+	 * results in place, and hides Apply filters.
 	 *
 	 * @param array<string, mixed> $attributes Block attributes.
 	 * @param \WP_Block            $block      Block instance.
@@ -282,6 +283,10 @@ final class Query_Filter {
 		$reset = remove_query_arg( array_merge( $own, array_map( static fn( $key ) => $prefix . $key, array_keys( $selected ) ) ) );
 		$total = (int) $found[0]->found_posts;
 		$label = (string) ( $attributes['label'] ?? '' );
+		$apply = (string) ( $attributes['applyLabel'] ?? '' );
+		$clear = (string) ( $attributes['resetLabel'] ?? '' );
+		/* translators: %s: number of posts that match the filters. */
+		$count = sprintf( _n( '%s result', '%s results', $total, 'leitvia-studio' ), number_format_i18n( $total ) );
 
 		return sprintf(
 			'<div %1$s><form method="get" role="search" aria-label="%2$s" data-leitvia-query="%3$d">%4$s%5$s<p class="wp-block-leitvia-query-filter__actions"><button type="submit" class="wp-element-button">%6$s</button> <a href="%7$s">%8$s</a></p><p class="wp-block-leitvia-query-filter__count" role="status">%9$s</p></form></div>',
@@ -290,11 +295,10 @@ final class Query_Filter {
 			$query_id,
 			$groups,
 			$hidden,
-			esc_html__( 'Apply filters', 'leitvia-studio' ),
+			esc_html( '' !== $apply ? $apply : __( 'Apply filters', 'leitvia-studio' ) ),
 			esc_url( $reset ),
-			esc_html__( 'Reset filters', 'leitvia-studio' ),
-			/* translators: %s: number of posts that match the filters. */
-			esc_html( sprintf( _n( '%s result', '%s results', $total, 'leitvia-studio' ), number_format_i18n( $total ) ) )
+			esc_html( '' !== $clear ? $clear : __( 'Reset filters', 'leitvia-studio' ) ),
+			esc_html( 0 === $total && $selected ? __( 'No results for these filters.', 'leitvia-studio' ) : $count )
 		);
 	}
 

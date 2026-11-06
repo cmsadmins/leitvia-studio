@@ -1,0 +1,13 @@
+{
+	"name": "intro-contact",
+	"template": "page",
+	"sections": [
+		"core/paragraph",
+		"core/heading",
+		"core/list",
+		"leitvia/cta-contact",
+		"leitvia/content-faq"
+	],
+	"issues": [],
+	"score": 100
+}

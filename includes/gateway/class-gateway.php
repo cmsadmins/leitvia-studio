@@ -22,7 +22,8 @@ final class Gateway {
 	 * Capabilities of an agent, given by grant_caps() only while Studio runs: the stored role holds none, so an agent
 	 * has no right on the site once Studio is deactivated or its folder removed, when the guards below no longer run. No
 	 * unfiltered_html, manage_options, edit_users or install_plugins. Others' posts and pages are open because agents
-	 * maintain what people wrote; autonomy, area and content kind draw the line, not the role.
+	 * maintain what people wrote; autonomy, area and content kind draw the line, not the role. manage_categories lets
+	 * create-content and update-content add a category with the post; the guards keep agents out of every other way to it.
 	 * Products and their categories and tags of WooCommerce likewise; no capability of orders, coupons, reports or
 	 * WooCommerce settings.
 	 */
@@ -38,6 +39,7 @@ final class Gateway {
 		'publish_pages',
 		'upload_files',
 		'edit_theme_options',
+		'manage_categories',
 		'edit_products',
 		'edit_others_products',
 		'edit_published_products',

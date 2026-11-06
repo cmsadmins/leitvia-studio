@@ -140,6 +140,20 @@ class Test_Gateway_Composition extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A page on the template page with its intro as paragraphs scores like its patterns, as a saved page too.
+	 */
+	public function test_intro_of_a_saved_page(): void {
+		$text = '<!-- wp:paragraph --><p>How to reach us.</p><!-- /wp:paragraph -->';
+		$post = self::factory()->post->create(
+			array(
+				'post_type'    => 'page',
+				'post_content' => $text . $text . '<!-- wp:group {"metadata":{"patternName":"leitvia/cta-contact"}} --><div class="wp-block-group"></div><!-- /wp:group -->',
+			)
+		);
+		$this->assertSame( 100, Read_Composition::check( array( 'post' => $post ) )['score'] );
+	}
+
+	/**
 	 * The ability scores slugs or a saved page and names patterns that fix a finding.
 	 */
 	public function test_ability(): void {

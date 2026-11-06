@@ -108,12 +108,33 @@ class Test_Gateway_Content_Checks extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A query filter or Load more outside a query, in an inheriting query or without queryId is an error; two queries
+	 * with the same queryId and a filter are a warning.
+	 */
+	public function test_query_context(): void {
+		$filter = '<!-- wp:leitvia/query-filter /-->';
+		$query  = static fn( string $attrs, string $inner = '' ): string => '<!-- wp:query ' . $attrs . ' -->' . $inner . '<!-- /wp:query -->';
+		$own    = '"query":{"perPage":3,"postType":"post","inherit":false}';
+		$found  = static fn( string $content ): array => array_map(
+			static fn( array $finding ): string => $finding['severity'] . ':' . $finding['block'],
+			Content_Checks::query_context( $content, array( 'post_type' => 'page' ) )
+		);
+
+		$this->assertSame( array(), $found( $query( '{"queryId":7,' . $own . '}', $filter ) ) );
+		$this->assertSame( array( 'error:p:0' ), $found( $filter ), 'outside a query' );
+		$this->assertSame( array( 'error:p:0.0' ), $found( $query( '{' . $own . '}', $filter ) ), 'no queryId' );
+		$this->assertSame( array( 'error:p:0.0' ), $found( $query( '{"queryId":7,"query":{"inherit":true}}', $filter ) ), 'inherits' );
+		$this->assertSame( array( 'error:p:0.0' ), $found( $query( '{"queryId":7}', '<!-- wp:leitvia/load-more /-->' ) ), 'the default query inherits' );
+		$this->assertSame( array( 'warning:p:0.0' ), $found( $query( '{"queryId":7,' . $own . '}', $filter ) . $query( '{"queryId":7,' . $own . '}' ) ), 'same queryId twice' );
+	}
+
+	/**
 	 * Studio registers its checks with the scopes content and page; post types without the editor are skipped.
 	 */
 	public function test_registry(): void {
 		$checks = leitvia_studio()->registry( 'checks' );
 		$this->assertSame(
-			array( 'leitvia/headings', 'leitvia/alt-text', 'leitvia/link-text', 'leitvia/block-validity', 'leitvia/content-tokens', 'leitvia/content-contrast' ),
+			array( 'leitvia/headings', 'leitvia/alt-text', 'leitvia/link-text', 'leitvia/block-validity', 'leitvia/content-tokens', 'leitvia/content-contrast', 'leitvia/query-context' ),
 			array_keys( $checks->all( array( 'scope' => 'content' ) ) )
 		);
 		$this->assertSame( array( 'leitvia/page-structure', 'leitvia/composition' ), array_keys( $checks->all( array( 'scope' => 'page' ) ) ) );
@@ -432,5 +453,57 @@ class Test_Gateway_Content_Checks extends WP_UnitTestCase {
 		update_option( 'leitvia_studio_settings', array( 'news_categories' => array( self::factory()->category->create() ) ) );
 		$this->assertSame( array(), $site() );
 		$this->assertArrayNotHasKey( 'site', wp_get_ability( 'leitvia/audit-site' )->execute( array( 'after' => $post ) ) );
+	}
+
+	/**
+	 * The empty part post-closing of the template single leaves no element; with content it keeps its wrapper.
+	 */
+	public function test_empty_template_part(): void {
+		// The tests site starts with another theme, so functions.php of Leitvia is not loaded; the hooks end with the test.
+		switch_theme( 'leitvia' );
+		require_once get_theme_file_path( 'functions.php' );
+		add_filter( 'render_block_core/template-part', 'Leitvia\drop_empty_template_part' );
+		$this->assertSame( '', do_blocks( '<!-- wp:template-part {"slug":"post-closing","theme":"leitvia"} /-->' ) );
+		$this->assertSame( '<div class="x"><p>Text</p></div>', \Leitvia\drop_empty_template_part( '<div class="x"><p>Text</p></div>' ) );
+	}
+
+	/**
+	 * A page list inside a navigation, the fallback of a site without a menu, leaves no list inside the list of the
+	 * navigation; outside a navigation it keeps its own.
+	 */
+	public function test_page_list_in_navigation(): void {
+		switch_theme( 'leitvia' );
+		require_once get_theme_file_path( 'functions.php' );
+		add_filter( 'render_block_core/page-list', 'Leitvia\page_list_items_in_navigation', 10, 3 );
+		self::factory()->post->create(
+			array(
+				'post_type'   => 'page',
+				'post_status' => 'publish',
+				'post_title'  => 'Kontakt',
+			)
+		);
+		$navigation = do_blocks( '<!-- wp:navigation --><!-- wp:page-list /--><!-- /wp:navigation -->' );
+		$this->assertStringContainsString( 'Kontakt', $navigation );
+		$this->assertStringNotContainsString( 'wp-block-page-list', $navigation );
+		$this->assertStringContainsString( '<ul class="wp-block-page-list', do_blocks( '<!-- wp:page-list /-->' ) );
+	}
+
+	/**
+	 * A raw px value names its size in rem, which passes, and the rejection points to the tokens.
+	 */
+	public function test_px_finding_names_the_solution(): void {
+		$image = static fn( string $width ): string => '<!-- wp:image {"width":"' . $width . '"} --><figure class="wp-block-image is-resized"><img src="https://example.org/a.png" alt="A map" style="width:' . $width . '"/></figure><!-- /wp:image -->';
+		$found = Content_Checks::tokens( $image( '320px' ), array( 'post_type' => 'page' ) );
+		$this->assertStringContainsString( '20rem', $found[0]['message'] );
+		$this->assertSame( array(), Content_Checks::tokens( $image( '20rem' ), array( 'post_type' => 'page' ) ) );
+		$rejected = wp_get_ability( 'leitvia/create-content' )->execute(
+			array(
+				'post_type' => 'page',
+				'title'     => 'Map',
+				'content'   => $image( '320px' ),
+				'base_hash' => '',
+			)
+		);
+		$this->assertSame( 'leitvia/get-tokens', $rejected->get_error_data()['next_ability'] );
 	}
 }

@@ -107,7 +107,8 @@ final class Scope {
 
 	/**
 	 * Whether the current user may read the post through the gateway: type and status in scope, no password, and
-	 * read_post granted.
+	 * read_post granted. Core asks manage_privacy_options to read a draft of the privacy policy page, the draft every new
+	 * site has; a user who may edit the pages of others reads it all the same and proposes changes, see Pipeline::before().
 	 *
 	 * @param \WP_Post|int $post Post or ID.
 	 */
@@ -116,7 +117,11 @@ final class Scope {
 		if ( ! $post || '' !== $post->post_password || ! in_array( $post->post_type, self::post_types(), true ) ) {
 			return false;
 		}
-		return in_array( $post->post_status, self::statuses( $post->post_type ), true ) && current_user_can( 'read_post', $post->ID );
+		if ( ! in_array( $post->post_status, self::statuses( $post->post_type ), true ) ) {
+			return false;
+		}
+		$privacy = 'page' === $post->post_type && (int) get_option( 'wp_page_for_privacy_policy' ) === $post->ID;
+		return current_user_can( 'read_post', $post->ID ) || ( $privacy && current_user_can( 'edit_others_pages' ) );
 	}
 
 	/**

@@ -1,0 +1,15 @@
+{
+	"name": "intro-not-on-landing",
+	"template": "page-landing",
+	"sections": [
+		"core/paragraph",
+		"leitvia/hero-editorial"
+	],
+	"issues": [
+		[
+			"unknownPattern",
+			0
+		]
+	],
+	"score": 75
+}

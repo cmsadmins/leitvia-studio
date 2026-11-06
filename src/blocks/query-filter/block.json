@@ -16,6 +16,14 @@
 			"type": "string",
 			"default": ""
 		},
+		"applyLabel": {
+			"type": "string",
+			"default": ""
+		},
+		"resetLabel": {
+			"type": "string",
+			"default": ""
+		},
 		"facets": {
 			"type": "array",
 			"default": [ { "key": "category", "control": "checkbox" } ],
@@ -31,9 +39,6 @@
 	"supports": {
 		"html": false,
 		"reusable": false,
-		"interactivity": {
-			"clientNavigation": true
-		},
 		"spacing": {
 			"margin": true,
 			"padding": true

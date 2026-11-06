@@ -1,0 +1,75 @@
+// Fields of the contact form in the roles of the contract. Summary, field messages and the focus ring of the fields come
+// from the stylesheet of leitvia/form-errors, which the block renders around itself (class-contact-form.php). There is
+// no motion to reduce. The fields take text and background from the section, so they fit every tone and the dark
+// variations; the border in ink-muted keeps 3:1 against those backgrounds (WCAG 1.4.11).
+.wp-block-leitvia-contact-form {
+
+	form {
+		display: grid;
+		gap: var(--wp--preset--spacing--s, 1rem);
+	}
+
+	p {
+		margin: 0;
+	}
+}
+
+.wp-block-leitvia-contact-form__field {
+	min-inline-size: 0;
+
+	label {
+		display: block;
+		font-weight: 600;
+	}
+
+	input,
+	textarea {
+		box-sizing: border-box;
+		inline-size: 100%;
+		min-block-size: 2.75rem;
+		padding: var(--wp--preset--spacing--xs, 0.5rem);
+		border: 1px solid var(--wp--preset--color--ink-muted, currentcolor);
+		color: inherit;
+		background: transparent;
+		font: inherit;
+	}
+
+	textarea {
+		display: block;
+		resize: vertical;
+	}
+}
+
+.wp-block-leitvia-contact-form__hint {
+	color: var(--wp--preset--color--ink-muted, inherit);
+	font-size: var(--wp--preset--font-size--meta, 0.875rem);
+}
+
+// Out of view and away from assistive technology, not display none: bots skip fields they recognise as hidden.
+.wp-block-leitvia-contact-form__trap {
+	position: absolute;
+	inline-size: 1px;
+	block-size: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+
+	// Its own width would reach past the right edge at 320 px.
+	input {
+		inline-size: 1px;
+	}
+}
+
+.wp-block-leitvia-contact-form__notice {
+	padding: var(--wp--preset--spacing--s, 1rem);
+	border: 0.125rem solid var(--wp--preset--color--success, currentcolor);
+
+	&.is-error {
+		border-color: var(--wp--preset--color--danger, currentcolor);
+	}
+
+	&:focus {
+		outline: 0.125rem solid var(--wp--preset--color--focus, currentcolor);
+		outline-offset: 0.125rem;
+	}
+}

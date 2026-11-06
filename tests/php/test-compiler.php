@@ -281,6 +281,36 @@ class Test_Compiler extends WP_UnitTestCase {
 		$this->assertSame( array( $face ), $mono['fontFace'] );
 		remove_all_filters( 'leitvia_studio_bundled_fonts' );
 
+		// A family in the Font Library counts as well, with the URL of its file on this site.
+		$family = self::factory()->post->create(
+			array(
+				'post_type'    => 'wp_font_family',
+				'post_name'    => 'comic-neue',
+				'post_status'  => 'publish',
+				'post_content' => wp_slash( wp_json_encode( array( 'fontFamily' => '"Comic Neue", sans-serif' ) ) ),
+			)
+		);
+		self::factory()->post->create(
+			array(
+				'post_type'    => 'wp_font_face',
+				'post_parent'  => $family,
+				'post_status'  => 'publish',
+				'post_content' => wp_slash(
+					wp_json_encode(
+						array(
+							'fontFamily' => 'Comic Neue',
+							'fontWeight' => '400',
+							'src'        => content_url( 'uploads/fonts/comic-neue.woff2' ),
+						)
+					)
+				),
+			)
+		);
+		$this->assertSame( array(), Compiler::check( $doc ) );
+		$mono = array_column( \LeitviaStudio\Tokens\Dtcg::to_settings( $doc, leitvia_studio_contract() )['typography']['fontFamilies']['theme'], null, 'slug' )['mono'];
+		$this->assertSame( array( content_url( 'uploads/fonts/comic-neue.woff2' ) ), $mono['fontFace'][0]['src'] );
+		wp_delete_post( $family, true );
+
 		add_action(
 			'leitvia_studio_init',
 			static function ( $studio ): void {

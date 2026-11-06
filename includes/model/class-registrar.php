@@ -120,6 +120,8 @@ final class Registrar {
 		}
 		foreach ( $model['postTypes'] ?? array() as $key => $post_type ) {
 			$public = $post_type['public'] ?? false;
+			// A public type without single pages lists its entries on pages (query loop, bindings) and has no address.
+			$single = $public && ( $post_type['singlePages'] ?? true );
 			$args   = array(
 				'labels'            => self::post_type_labels( $post_type['label'], $post_type['singularLabel'] ),
 				'description'       => esc_html( $post_type['description'] ?? '' ),
@@ -127,8 +129,8 @@ final class Registrar {
 				'show_ui'           => true,
 				'show_in_rest'      => true,
 				'hierarchical'      => $post_type['hierarchical'] ?? false,
-				'has_archive'       => $public && ( $post_type['hasArchive'] ?? false ),
-				'rewrite'           => $public ? array( 'slug' => $post_type['slug'] ?? $key ) : false,
+				'has_archive'       => $single && ( $post_type['hasArchive'] ?? false ),
+				'rewrite'           => $single ? self::rewrite( $post_type, (string) $key ) : false,
 				'supports'          => array_merge( $post_type['supports'] ?? array( 'title', 'editor' ), array( 'custom-fields' ) ),
 				'menu_icon'         => $post_type['icon'] ?? 'dashicons-admin-post',
 				'show_in_abilities' => $post_type['showInAbilities'] ?? false,
@@ -136,6 +138,10 @@ final class Registrar {
 			// Without a public flag only users who may edit the type read it over REST.
 			if ( ! $public ) {
 				$args['rest_controller_class'] = Posts_Controller::class;
+			}
+			if ( $public && ! $single ) {
+				$args['publicly_queryable']  = false;
+				$args['exclude_from_search'] = true;
 			}
 			self::add_post_type( $key, $args );
 			self::register_fields( $key, (array) ( $post_type['fields'] ?? array() ) );
@@ -173,7 +179,7 @@ final class Registrar {
 				'show_in_rest'      => true,
 				'show_admin_column' => true,
 				'hierarchical'      => $taxonomy['hierarchical'] ?? false,
-				'rewrite'           => $public ? array( 'slug' => $taxonomy['slug'] ?? $key ) : false,
+				'rewrite'           => $public ? self::rewrite( $taxonomy, (string) $key ) : false,
 				'show_in_abilities' => $taxonomy['showInAbilities'] ?? false,
 			);
 			if ( ! $public ) {
@@ -400,11 +406,29 @@ final class Registrar {
 	}
 
 	/**
-	 * Flushes the rewrite rules once after the declaration changed. Runs on init, late.
+	 * Rewrite arguments of a public post type or taxonomy: its slug, without the prefix of the post permalinks (/blog/)
+	 * unless the declaration asks for it with withFront, since entries are no blog posts.
+	 *
+	 * @param array<string, mixed> $entry Declaration of the post type or taxonomy.
+	 * @param string               $key   Its key.
+	 * @return array{slug: string, with_front: bool}
+	 */
+	private static function rewrite( array $entry, string $key ): array {
+		return array(
+			'slug'       => (string) ( $entry['slug'] ?? $key ),
+			'with_front' => ! empty( $entry['withFront'] ),
+		);
+	}
+
+	/**
+	 * Flushes the rewrite rules once after the declaration changed, and once on sites from before with_front was off by
+	 * default. Runs on init, late.
 	 */
 	public static function maybe_flush(): void {
-		if ( get_option( Model::FLUSH_OPTION ) ) {
+		$front = get_option( Model::FRONT_OPTION );
+		if ( get_option( Model::FLUSH_OPTION ) || ! $front ) {
 			delete_option( Model::FLUSH_OPTION );
+			update_option( Model::FRONT_OPTION, 1, true );
 			flush_rewrite_rules();
 		}
 	}

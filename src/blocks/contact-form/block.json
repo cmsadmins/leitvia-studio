@@ -1,0 +1,51 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "leitvia/contact-form",
+	"version": "0.1.0",
+	"title": "Contact form",
+	"category": "leitvia",
+	"icon": "email-alt",
+	"description": "Name, email and message, sent by email from this site. Works without JavaScript and stores nothing on the site.",
+	"keywords": [ "contact", "form", "email", "message", "enquiry" ],
+	"textdomain": "leitvia-studio",
+	"attributes": {
+		"buttonText": {
+			"type": "string",
+			"default": ""
+		},
+		"successMessage": {
+			"type": "string",
+			"default": ""
+		},
+		"recipient": {
+			"type": "string",
+			"default": ""
+		},
+		"subject": {
+			"type": "string",
+			"default": ""
+		},
+		"privacyNote": {
+			"type": "boolean",
+			"default": true
+		},
+		"privacyText": {
+			"type": "string",
+			"default": ""
+		}
+	},
+	"supports": {
+		"html": false,
+		"align": [ "wide" ],
+		"spacing": {
+			"margin": true,
+			"padding": true
+		}
+	},
+	"example": {
+		"attributes": { "buttonText": "Send message" }
+	},
+	"editorScript": "file:./index.js",
+	"style": "file:./style-index.css"
+}

@@ -769,6 +769,50 @@ class Test_Gateway_Setup extends WP_UnitTestCase {
 	}
 
 	/**
+	 * With Polylang a part <part>-<language> of a language of the site is created in the area of its part; a suffix
+	 * that is no language of the site, and any suffix without Polylang, stays refused.
+	 */
+	public function test_update_template_part_of_a_language(): void {
+		$this->sign_in( 'full' );
+		$input = array(
+			'part'    => 'header-de',
+			'pattern' => 'leitvia/header-search',
+		);
+		$this->assert_rejected( 'leitvia_invalid_input', self::call( 'leitvia/update-template-part', $input ) );
+
+		if ( ! function_exists( 'pll_languages_list' ) ) {
+			/**
+			 * Languages of Polylang for this test: the slugs in the global leitvia_test_languages.
+			 *
+			 * @param array<string, mixed> $args Arguments.
+			 * @return list<string>
+			 */
+			function pll_languages_list( array $args = array() ): array { // phpcs:ignore Universal.Files.SeparateFunctionsFromOO.Mixed -- Stand-in for Polylang.
+				unset( $args );
+				return (array) ( $GLOBALS['leitvia_test_languages'] ?? array() );
+			}
+		}
+		$GLOBALS['leitvia_test_languages'] = array( 'en', 'de' );
+		$result                            = $this->assert_mode( 'live', self::call( 'leitvia/update-template-part', $input ) );
+		$template                          = get_block_template( get_stylesheet() . '//header-de', 'wp_template_part' );
+		$this->assertSame( $result['target']['post'], $template->wp_id );
+		$this->assertSame( 'header', $template->area );
+		$this->assertSame( 'Header (de)', $template->title );
+		$this->assertStringContainsString( 'wp:search', $template->content );
+		$this->assert_rejected(
+			'leitvia_invalid_input',
+			self::call(
+				'leitvia/update-template-part',
+				array(
+					'part'    => 'header-fr',
+					'pattern' => 'leitvia/header-search',
+				)
+			)
+		);
+		unset( $GLOBALS['leitvia_test_languages'] );
+	}
+
+	/**
 	 * A part left as a draft by an earlier run (core renders it nowhere) with the content of the pattern already: the
 	 * same pattern with a package key still proposes it, and applying the package publishes it. Same for a draft menu.
 	 */

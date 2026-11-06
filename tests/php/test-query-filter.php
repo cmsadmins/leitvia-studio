@@ -241,6 +241,27 @@ class Test_Query_Filter extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Filters that match nothing say so in the status region; the reset link stays. Without filters the count stands.
+	 */
+	public function test_no_results_for_the_filters(): void {
+		$_GET = array( 'qf-1-category' => array( 'gamma' ) );
+		$html = self::render( 'leitvia/query-filter', array() );
+		$this->assertStringContainsString( 'role="status">No results for these filters.</p>', $html );
+		$this->assertStringContainsString( '>Reset filters</a>', $html );
+
+		$_GET = array();
+		wp_delete_post( $this->posts['alpha'][0], true );
+		$this->assertStringContainsString( 'role="status">3 results</p>', self::render( 'leitvia/query-filter', array() ) );
+	}
+
+	/**
+	 * Client navigation stays off: view.js replaces the results itself, and a router would fight it over the same markup.
+	 */
+	public function test_the_filter_keeps_the_router_out_of_its_query(): void {
+		$this->assertArrayNotHasKey( 'interactivity', WP_Block_Type_Registry::get_instance()->get_registered( 'leitvia/query-filter' )->supports );
+	}
+
+	/**
 	 * Parameters of other blocks are carried over only with a clean key and as plain text.
 	 */
 	public function test_carries_over_only_clean_parameters(): void {
@@ -286,5 +307,36 @@ class Test_Query_Filter extends WP_UnitTestCase {
 
 		$_GET['query-1-page'] = '2';
 		$this->assertSame( '', self::render( 'leitvia/load-more', array(), 3 ) );
+	}
+
+	/**
+	 * The pattern for overviews takes a filter without changes: its query has a queryId of its own.
+	 */
+	public function test_filter_in_the_entries_pattern(): void {
+		$pattern = WP_Block_Patterns_Registry::get_instance()->get_registered( 'leitvia-studio/teaser-type-entries' );
+		$markup  = str_replace( '<!-- wp:post-template', '<!-- wp:leitvia/query-filter /--><!-- wp:post-template', $pattern['content'] );
+		$this->assertStringContainsString( 'wp-block-leitvia-query-filter', do_blocks( $markup ) );
+	}
+
+	/**
+	 * Own texts replace the two standard texts, empty attributes keep them.
+	 */
+	public function test_button_texts(): void {
+		$markup = static fn( string $attrs ): string => do_blocks( '<!-- wp:query {"queryId":3,"query":{"perPage":2,"postType":"post","inherit":false}} --><!-- wp:leitvia/query-filter ' . $attrs . ' /--><!-- /wp:query -->' );
+		$this->assertStringContainsString( '>Apply filters</button>', $markup( '{}' ) );
+		$this->assertStringContainsString( '>Reset filters</a>', $markup( '{}' ) );
+		$html = $markup( '{"applyLabel":"Anzeigen","resetLabel":"Alle zeigen"}' );
+		$this->assertStringContainsString( '>Anzeigen</button>', $html );
+		$this->assertStringContainsString( '>Alle zeigen</a>', $html );
+	}
+
+	/**
+	 * Studio finds its translations in the plugin as long as no language pack exists; a pack wins.
+	 */
+	public function test_translations_in_the_plugin(): void {
+		$own = dirname( LEITVIA_STUDIO_FILE ) . '/languages/';
+		$this->assertSame( $own, apply_filters( 'lang_dir_for_domain', false, 'leitvia-studio', 'de_DE' ) );
+		$this->assertSame( '/pack/', apply_filters( 'lang_dir_for_domain', '/pack/', 'leitvia-studio', 'de_DE' ) );
+		$this->assertFalse( apply_filters( 'lang_dir_for_domain', false, 'other', 'de_DE' ) );
 	}
 }

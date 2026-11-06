@@ -1,0 +1,9 @@
+{
+	"name": "intro-default-template",
+	"sections": [
+		"core/paragraph",
+		"leitvia/cta-contact"
+	],
+	"issues": [],
+	"score": 100
+}

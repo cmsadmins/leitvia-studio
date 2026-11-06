@@ -10,6 +10,7 @@ namespace LeitviaStudio\Gateway\Abilities;
 use LeitviaStudio\Gateway\Abilities;
 use LeitviaStudio\Gateway\Block_Edit;
 use LeitviaStudio\Gateway\Content_Checks;
+use LeitviaStudio\Gateway\Hashes;
 use LeitviaStudio\Gateway\Pipeline;
 use LeitviaStudio\Gateway\Rejection;
 use LeitviaStudio\Gateway\Scope;
@@ -105,6 +106,23 @@ final class Setup {
 			array( self::class, 'describe_set_variation' )
 		);
 		Abilities::write(
+			'leitvia/set-posts-page',
+			__( 'Set posts page', 'leitvia-studio' ),
+			__( 'Makes an existing page the posts page of the reading settings, the address that lists all posts; 0 clears it. base_hash is empty. The page must exist, so create it first and wait until a package with it is applied. Like every setting it waits in a change package for a person. It takes effect with a static front page; notice says so while the site has none, or while the page is not published.', 'leitvia-studio' ),
+			'setup',
+			$replace,
+			array(
+				'properties' => array(
+					'page' => array(
+						'type'    => 'integer',
+						'minimum' => 0,
+					),
+				),
+				'required'   => array( 'page' ),
+			) + $object,
+			array( self::class, 'describe_set_posts_page' )
+		);
+		Abilities::write(
 			'leitvia/define-content-type',
 			__( 'Define content type', 'leitvia-studio' ),
 			__( 'Adds entries to the content model (postTypes, taxonomies, relations, settings) and keeps the others. An entry that exists is merged: the input sets its own keys and fields, fields, repeaters and supports it does not name stay, and the postTypes of a taxonomy are joined; relations and settings are replaced whole. Nothing is removed through this ability: an entry, field, repeater or supports value can only be removed by a person on the Model screen. Read the declaration with leitvia/get-content-model first. The base hash is the hash of the content model. No ability returns this hash: send base_hash empty and repeat the call once with current_hash from leitvia_stale_hash. showInAbilities stays a decision of a person: agents may not set it.', 'leitvia-studio' ),
@@ -188,7 +206,7 @@ final class Setup {
 		Abilities::write(
 			'leitvia/update-template-part',
 			__( 'Update template part', 'leitvia-studio' ),
-			__( 'Replaces a template part of the contract, such as header, footer or sidebar, with a pattern made for its area or with changed block markup. Part names come from leitvia/get-contract, patterns from leitvia/list-patterns. The change publishes the part, a draft one too: core shows no draft part, so where the area level is draft it waits in a change package. The base hash is the hash of the template part. No ability returns this hash: send base_hash empty and repeat the call once with current_hash from leitvia_stale_hash.', 'leitvia-studio' ),
+			__( 'Replaces a template part of the contract, such as header, footer or sidebar, with a pattern made for its area or with changed block markup. Part names come from leitvia/get-contract; with Polylang <part>-<language> (header-de) is the part the theme shows for that language and is created in the area of its part. Patterns come from leitvia/list-patterns. The change publishes the part, a draft one too: core shows no draft part, so where the area level is draft it waits in a change package. The base hash is the hash of the template part. No ability returns this hash: send base_hash empty and repeat the call once with current_hash from leitvia_stale_hash.', 'leitvia-studio' ),
 			'setup',
 			$replace,
 			array(
@@ -310,6 +328,34 @@ final class Setup {
 				'version'                     => \WP_Theme_JSON::LATEST_SCHEMA,
 				'isGlobalStylesUserThemeJSON' => true,
 			) + ( 'full' === $kind ? $data : self::merge( $current, $data ) )
+		);
+	}
+
+	/**
+	 * Operation of set-posts-page: the option page_for_posts, a page of the site or 0.
+	 *
+	 * @param array<string, mixed> $input Input.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public static function describe_set_posts_page( array $input ) {
+		$page   = (int) ( $input['page'] ?? 0 );
+		$target = array( 'option' => 'page_for_posts' );
+		if ( $page && ( 'page' !== get_post_type( $page ) || ! Scope::readable( $page ) ) ) {
+			return Block_Edit::invalid( 'page', __( 'There is no page with this ID that agents can read. Take the ID from leitvia/list-content.', 'leitvia-studio' ), $target + array( 'page' => $page ), 'leitvia/list-content' );
+		}
+		if ( $page && (int) get_option( 'page_on_front' ) === $page ) {
+			return Block_Edit::invalid( 'page', __( 'The front page cannot be the posts page as well. Use another page.', 'leitvia-studio' ), $target + array( 'page' => $page ) );
+		}
+		$notices = array(
+			$page && 'page' !== get_option( 'show_on_front' ) ? __( 'The posts page takes effect once the site has a static front page.', 'leitvia-studio' ) : '',
+			$page && 'publish' !== get_post_status( $page ) ? __( 'The page is not published yet, so its address shows nothing to visitors.', 'leitvia-studio' ) : '',
+		);
+		return array(
+			'area'      => 'structure',
+			'target'    => $target,
+			'base_hash' => Hashes::of( (string) wp_json_encode( get_option( 'page_for_posts' ) ) ),
+			'notice'    => implode( ' ', array_filter( $notices ) ),
+			'change'    => static fn(): array => array( 'value' => (string) $page ),
 		);
 	}
 
@@ -462,11 +508,19 @@ final class Setup {
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	public static function describe_update_template_part( array $input ) {
-		$name = (string) ( $input['part'] ?? '' );
-		$area = null;
+		$name  = (string) ( $input['part'] ?? '' );
+		$area  = null;
+		$title = '';
+		// With Polylang the theme shows <part>-<language> (header-de) in place of <part> while that language is shown.
+		$languages = function_exists( 'pll_languages_list' ) ? (array) pll_languages_list( array( 'fields' => 'slug' ) ) : array();
 		foreach ( (array) ( leitvia_studio_contract()->data()['templateParts'] ?? array() ) as $part ) {
-			if ( ( $part['name'] ?? null ) === $name ) {
-				$area = (string) ( $part['area'] ?? 'uncategorized' );
+			$base = (string) ( $part['name'] ?? '' );
+			if ( $base === $name || ( str_starts_with( $name, $base . '-' ) && in_array( substr( $name, strlen( $base ) + 1 ), $languages, true ) ) ) {
+				$area  = (string) ( $part['area'] ?? 'uncategorized' );
+				$title = $base === $name ? '' : ucfirst( $base ) . ' (' . substr( $name, strlen( $base ) + 1 ) . ')';
+			}
+			if ( $base === $name ) {
+				break;
 			}
 		}
 		if ( null === $area ) {
@@ -492,7 +546,7 @@ final class Setup {
 		);
 		// A part the theme ships as a file only gets a post with the terms core finds it by.
 		$new = $id ? array() : array(
-			'post_title' => $template ? (string) $template->title : $name,
+			'post_title' => $template ? (string) $template->title : ( '' !== $title ? $title : $name ),
 			'post_name'  => $name,
 			'tax_input'  => array(
 				'wp_theme'              => array( get_stylesheet() ),

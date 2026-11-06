@@ -51,7 +51,7 @@ final class Build {
 		Abilities::write(
 			'leitvia/compose-page',
 			__( 'Compose page', 'leitvia-studio' ),
-			__( 'Creates a page from patterns in the order of a page frame of the contract. Plan it with leitvia/plan-page first; base_hash is empty for the new page. Per section only texts (also quote citations and details summaries), links and images at block IDs of the pattern outline can change; a text that would drop a link is refused. Each section keeps metadata.patternName (core/block/<ID> for a Lab pattern). Unknown patterns are rejected with a pointer to leitvia/list-patterns, deprecated ones with their replacement, Lab patterns that are not approved (also through a part) with leitvia_pattern_not_approved. Later changes go through leitvia/update-content and leitvia/update-block.', 'leitvia-studio' ),
+			__( 'Creates a page from patterns in the order of a page frame of the contract. Plan it with leitvia/plan-page first; base_hash is empty for the new page. Per section texts (also quote citations and details summaries), links and images at block IDs of the pattern outline can change, and remove and repeat take blocks from a parent or add copies, for fewer or more entries than the pattern; a text that would drop a link is refused. Edits apply in order. Each section keeps metadata.patternName (core/block/<ID> for a Lab pattern). Unknown patterns are rejected with a pointer to leitvia/list-patterns, deprecated ones with their replacement, Lab patterns that are not approved (also through a part) with leitvia_pattern_not_approved. Later changes go through leitvia/update-content and leitvia/update-block.', 'leitvia-studio' ),
 			'build',
 			$create,
 			array(
@@ -275,6 +275,18 @@ final class Build {
 			'required'             => array( 'block' ),
 			'additionalProperties' => false,
 		);
+		if ( ! $attributes ) {
+			$schema['properties']['remove'] = array(
+				'type'        => 'boolean',
+				'description' => __( 'Removes the block from its parent, for a section with fewer entries than the pattern. Later edits of the list count from the result, so work from the last block to the first.', 'leitvia-studio' ),
+			);
+			$schema['properties']['repeat'] = array(
+				'type'        => 'integer',
+				'minimum'     => 1,
+				'maximum'     => 20,
+				'description' => __( 'Number of copies to add right after the block, for a section with more entries than the pattern. Later edits reach the copies by the IDs they get.', 'leitvia-studio' ),
+			);
+		}
 		if ( $attributes ) {
 			$schema['properties']['attributes'] = array(
 				'type'        => 'object',
@@ -593,7 +605,13 @@ final class Build {
 	 */
 	public static function edit( string $content, array $edits, array $target ) {
 		foreach ( $edits as $edit ) {
-			$content = Block_Edit::apply( $content, (string) ( $edit['block'] ?? '' ), array_intersect_key( (array) $edit, array_flip( array( 'text', 'link_text', 'url', 'image' ) ) ), $target );
+			$block     = (string) ( $edit['block'] ?? '' );
+			$change    = array_intersect_key( (array) $edit, array_flip( array( 'text', 'link_text', 'url', 'image' ) ) );
+			$structure = array_filter( array_intersect_key( (array) $edit, array_flip( array( 'remove', 'repeat' ) ) ) );
+			if ( $structure && ( $change || 2 === count( $structure ) ) ) {
+				return Block_Edit::invalid( 'structure', __( 'An edit with remove or repeat changes nothing else. Send remove, repeat and text changes as edits of their own.', 'leitvia-studio' ), $target + array( 'block' => $block ) );
+			}
+			$content = $structure ? Block_Edit::structure( $content, $block, $structure, $target ) : Block_Edit::apply( $content, $block, $change, $target );
 			if ( is_wp_error( $content ) ) {
 				return $content;
 			}

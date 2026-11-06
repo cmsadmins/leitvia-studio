@@ -329,7 +329,7 @@ final class Packages {
 			'title'      => (string) get_post_field( 'post_title', $id, 'raw' ),
 			'key'        => (string) get_post_meta( $id, self::KEY_META, true ),
 			'author'     => $author,
-			'agent'      => (string) get_the_author_meta( 'display_name', $author ),
+			'agent'      => \LeitviaStudio\Model\Author_Name::stored( $author ),
 			'created'    => (string) get_post_field( 'post_date_gmt', $id ),
 			'state'      => self::state( $id ),
 			'operations' => $counts + array_fill_keys( array( 'open', 'conflict', 'applied', 'rolled_back' ), 0 ),
@@ -361,13 +361,13 @@ final class Packages {
 			$item = array_intersect_key( $entry, array_flip( array( 'id', 'ability', 'area', 'target', 'level', 'kinds', 'findings', 'conflict', 'error' ) ) );
 			// The post an applied operation wrote: the ID a new post got, and the hash it left.
 			if ( isset( $entry['applied'] ) ) {
-				$item['applied'] = array_intersect_key( (array) $entry['applied'], array_flip( array( 'post', 'hash' ) ) );
+				$item['applied'] = array_intersect_key( (array) $entry['applied'], array_flip( array( 'post', 'hash', 'slug_changed' ) ) );
 			}
 			$item['status'] = self::status( $entry );
 			// Who saved the target last, so a conflict can name the person who changed it.
 			$post                = (int) ( $entry['applied']['post'] ?? $entry['target']['post'] ?? 0 );
 			$editor              = $post ? (int) get_post_meta( $post, '_edit_last', true ) : 0;
-			$item['modified_by'] = $editor ? (string) get_the_author_meta( 'display_name', $editor ) : '';
+			$item['modified_by'] = $editor ? \LeitviaStudio\Model\Author_Name::stored( $editor ) : '';
 			if ( ! isset( $entry['applied'] ) && ! isset( $entry['rolled_back'] ) ) {
 				// An operation that builds on an earlier one shows only its own change.
 				$earlier      = $states[ $entry['follows'] ?? 0 ] ?? null;
@@ -464,7 +464,7 @@ final class Packages {
 				'post'     => (int) ( $result['target']['post'] ?? $result['target']['term'] ?? 0 ),
 				'hash'     => (string) $result['hash'],
 				'snapshot' => (int) $result['snapshot'],
-			);
+			) + array_intersect_key( $result, array( 'slug_changed' => true ) );
 			$report['applied'][]             = (int) $entry['id'];
 		}
 		$open            = count( array_filter( $operations, static fn( array $entry ): bool => ! isset( $entry['applied'] ) ) );

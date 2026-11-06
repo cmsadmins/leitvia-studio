@@ -289,7 +289,7 @@ final class Read_Audit {
 			if ( ! isset( $authors[ $author ] ) && '' === trim( (string) get_the_author_meta( 'description', $author ) ) ) {
 				$authors[ $author ] = true;
 				/* translators: %s: author name. */
-				$findings[] = self::finding( 'leitvia/author-bio', sprintf( __( 'The author %s writes news but has no biography; readers and search engines cannot see who they are.', 'leitvia-studio' ), get_the_author_meta( 'display_name', $author ) ), __( 'The author adds a short biography in their profile.', 'leitvia-studio' ) );
+				$findings[] = self::finding( 'leitvia/author-bio', sprintf( __( 'The author %s writes news but has no biography; readers and search engines cannot see who they are.', 'leitvia-studio' ), \LeitviaStudio\Model\Author_Name::stored( (int) $author ) ), __( 'The author adds a short biography in their profile.', 'leitvia-studio' ) );
 			}
 		}
 		return $findings;

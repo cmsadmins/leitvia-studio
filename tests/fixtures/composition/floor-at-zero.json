@@ -1,5 +1,6 @@
 {
 	"name": "floor-at-zero",
+	"template": "page-landing",
 	"sections": [
 		"core/paragraph",
 		"core/heading",

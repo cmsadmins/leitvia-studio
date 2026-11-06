@@ -684,7 +684,8 @@ final class Dtcg {
 	}
 
 	/**
-	 * Font faces bundled with the theme or its style variations, by lowercased first family name.
+	 * Font faces bundled with the theme, its style variations or Leitvia Studio, or uploaded to the Font Library of
+	 * this site, by lowercased first family name.
 	 *
 	 * @return array<string, array<mixed>>
 	 */
@@ -704,7 +705,7 @@ final class Dtcg {
 				}
 			}
 		}
-		$fonts += self::studio_fonts();
+		$fonts += self::studio_fonts() + self::library_fonts();
 		/**
 		 * Filters the font faces a token set can use, by lowercased first family name. An add-on that ships its own
 		 * fonts adds them here with absolute URLs of this site, so a token set that names the family gets the font
@@ -733,6 +734,46 @@ final class Dtcg {
 				},
 				(array) $faces
 			);
+		}
+		return $fonts;
+	}
+
+	/**
+	 * Font faces of the Font Library of WordPress: files on this site (wp_font_dir()), so a brand font a person or
+	 * operator uploaded needs no other host. By lowercased first family name; families without a face are left out.
+	 *
+	 * @return array<string, array<mixed>>
+	 */
+	private static function library_fonts(): array {
+		$posts = static fn( array $args ): array => array_filter(
+			get_posts(
+				$args + array(
+					'post_status' => 'publish',
+					'numberposts' => -1,
+				)
+			),
+			static fn( $post ): bool => $post instanceof \WP_Post
+		);
+		$fonts = array();
+		foreach ( $posts( array( 'post_type' => 'wp_font_family' ) ) as $family ) {
+			$settings = json_decode( $family->post_content, true );
+			$first    = strtolower( self::split( (string) ( $settings['fontFamily'] ?? '' ) )[0] ?? '' );
+			$faces    = array();
+			foreach ( $posts(
+				array(
+					'post_type'   => 'wp_font_face',
+					'post_parent' => $family->ID,
+				)
+			) as $face ) {
+				$face = json_decode( $face->post_content, true );
+				if ( ! empty( $face['src'] ) ) {
+					$face['src'] = (array) $face['src'];
+					$faces[]     = $face;
+				}
+			}
+			if ( '' !== $first && $faces ) {
+				$fonts[ $first ] = $faces;
+			}
 		}
 		return $fonts;
 	}

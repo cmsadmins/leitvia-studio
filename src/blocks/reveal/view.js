@@ -9,6 +9,10 @@
 // phone come one by one; children that come into view together start 100 ms apart (--leitvia-reveal-step).
 // Keyboard focus inside a hidden block and a jump to an anchor show the block at once, without the effect: the target
 // and everything above it.
+//
+// Blocks that swap content in without a page load name the new elements in the event leitvia:content on the document
+// (query-filter, load-more); those below the visible area appear the same way.
+const ANIMATED = '.wp-block-leitvia-reveal, .has-lv-animation';
 const PENDING = 'is-lv-pending';
 const STAGGER =
 	'.wp-block-leitvia-reveal.is-effect-stagger, .has-lv-animation.is-lv-animation-stagger';
@@ -54,21 +58,28 @@ if ( ! window.matchMedia( '(prefers-reduced-motion: reduce)' ).matches ) {
 		el.classList.remove( PENDING );
 	};
 	// Measure all first, then write, so the page lays out once.
-	const below = [
-		...document.querySelectorAll(
-			'.wp-block-leitvia-reveal, .has-lv-animation'
-		),
-	]
-		.flatMap( ( el ) =>
-			el.matches( STAGGER ) ? [ ...el.children ] : el
-		)
-		.filter(
-			( el ) => el.getBoundingClientRect().top >= window.innerHeight
-		);
-	for ( const el of below ) {
-		el.classList.add( PENDING );
-		observer.observe( el );
-	}
+	const hide = ( roots ) => {
+		const below = roots
+			.flatMap( ( root ) => [
+				...root.querySelectorAll( ANIMATED ),
+				...( root.matches?.( ANIMATED ) ? [ root ] : [] ),
+				...( root.parentElement?.matches( STAGGER ) ? [ root ] : [] ),
+			] )
+			.flatMap( ( el ) =>
+				el.matches( STAGGER ) ? [ ...el.children ] : el
+			)
+			.filter(
+				( el ) => el.getBoundingClientRect().top >= window.innerHeight
+			);
+		for ( const el of below ) {
+			el.classList.add( PENDING );
+			observer.observe( el );
+		}
+	};
+	hide( [ document ] );
+	document.addEventListener( 'leitvia:content', ( { detail } ) =>
+		hide( detail )
+	);
 	// A jump to an anchor (link in the page, hash in the address) shows the target and every hidden block that starts
 	// above its end: the blocks above it, those inside it and those beside it in a row. Measured before the browser
 	// scrolls, so they never fade in.

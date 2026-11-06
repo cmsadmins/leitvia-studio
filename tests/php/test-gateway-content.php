@@ -199,7 +199,7 @@ class Test_Gateway_Content extends WP_UnitTestCase {
 			'unknown field'         => array( 'fields' => array( 'event_colour' => 'red' ) ),
 			'option'                => array( 'fields' => array( 'event_level' => 'expert' ) ),
 			'relation'              => array( 'fields' => array( 'event_speakers' => array( $poster ) ) ),
-			'unknown term'          => array( 'terms' => array( 'event_type' => array( 'Night walk' ) ) ),
+			'unknown term ID'       => array( 'terms' => array( 'event_type' => array( 999999 ) ) ),
 			'foreign taxonomy'      => array( 'terms' => array( 'post_tag' => array( 'walks' ) ) ),
 			'kind on an entry'      => array( 'kind' => 'imprint' ),
 			'content + sections'    => array( 'content' => self::TEXT ),
@@ -214,6 +214,185 @@ class Test_Gateway_Content extends WP_UnitTestCase {
 			$this->assertWPError( $result, $name );
 			$this->assertSame( 'leitvia_invalid_input', $result->get_error_code(), $name . ': ' . $result->get_error_message() );
 		}
+	}
+
+	/**
+	 * The draft of the privacy policy page every new site has shows up for an agent; a draft the user may not read is
+	 * left out of items, total and pages alike.
+	 */
+	public function test_list_counts_what_it_shows(): void {
+		$privacy = self::factory()->post->create(
+			array(
+				'post_type'   => 'page',
+				'post_status' => 'draft',
+			)
+		);
+		update_option( 'wp_page_for_privacy_policy', $privacy );
+		$list = Content::list(
+			array(
+				'post_type' => 'page',
+				'status'    => 'any',
+			)
+		);
+		$this->assertSame( array( $privacy ), array_column( $list['items'], 'id' ) );
+		$this->assertSame( 1, $list['total'] );
+
+		$own = self::factory()->post->create(
+			array(
+				'post_status' => 'draft',
+				'post_author' => self::factory()->user->create( array( 'role' => 'author' ) ),
+			)
+		);
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'author' ) ) );
+		self::factory()->post->create(
+			array(
+				'post_status' => 'draft',
+				'post_author' => get_current_user_id(),
+				'post_title'  => 'Mine',
+			)
+		);
+		$list = Content::list(
+			array(
+				'post_type' => 'post',
+				'status'    => 'draft',
+				'limit'     => 1,
+			)
+		);
+		$this->assertSame( array( 'Mine' ), array_column( $list['items'], 'title' ) );
+		$this->assertSame( array( 1, 1 ), array( $list['total'], $list['pages'] ), 'The draft of the other author ' . $own . ' does not count.' );
+	}
+
+	/**
+	 * A slug WordPress cannot give stands in the result at once, in a package, as a draft and after applying.
+	 */
+	public function test_slug_changed(): void {
+		self::factory()->post->create(
+			array(
+				'post_type'   => 'page',
+				'post_status' => 'publish',
+				'post_name'   => 'kontakt',
+			)
+		);
+		$input = array(
+			'post_type' => 'page',
+			'title'     => 'Kontakt',
+			'content'   => self::TEXT,
+			'slug'      => 'kontakt',
+			'status'    => 'publish',
+		);
+		$live  = self::call( 'leitvia/create-content', $input );
+		$this->assertSame(
+			array(
+				'requested' => 'kontakt',
+				'slug'      => 'kontakt-2',
+			),
+			$live['slug_changed']
+		);
+		$this->assertSame( 'kontakt-2', get_post_field( 'post_name', $live['target']['post'] ) );
+
+		$draft = self::call( 'leitvia/create-content', array( 'status' => 'draft' ) + $input );
+		$this->assertSame( 'kontakt-3', $draft['slug_changed']['slug'], 'A draft says what it gets on publishing.' );
+
+		$queued = self::call( 'leitvia/create-content', array( 'package' => 'slug' ) + $input );
+		$this->assertArrayHasKey( 'slug_changed', $queued );
+		Packages::apply( $queued['package'] );
+		$this->assertArrayHasKey( 'slug_changed', Packages::detail( $queued['package'] )['items'][0]['applied'] );
+
+		$free = self::call( 'leitvia/create-content', array( 'slug' => 'frei' ) + $input );
+		$this->assertArrayNotHasKey( 'slug_changed', $free );
+	}
+
+	/**
+	 * Create-content and update-content set the author, list-content names it, and a rollback brings it back.
+	 */
+	public function test_author(): void {
+		$editor = self::factory()->user->create(
+			array(
+				'role'         => 'editor',
+				'display_name' => 'Ada Lovelace',
+			)
+		);
+		$input  = array(
+			'post_type' => 'post',
+			'title'     => 'Signed',
+			'content'   => self::TEXT,
+			'status'    => 'draft',
+			'author'    => $editor,
+		);
+		$post   = (int) self::call( 'leitvia/create-content', $input )['target']['post'];
+		$this->assertSame( $editor, (int) get_post_field( 'post_author', $post ) );
+		$item = Content::list( array( 'post_type' => 'post' ) )['items'][0];
+		$this->assertSame( array( $editor, 'Ada Lovelace' ), array( $item['author'], $item['author_name'] ) );
+
+		$me     = get_current_user_id();
+		$update = self::call(
+			'leitvia/update-content',
+			array(
+				'post'      => $post,
+				'base_hash' => Hashes::document( $post ),
+				'author'    => $me,
+			)
+		);
+		$this->assertSame( $me, (int) get_post_field( 'post_author', $post ) );
+		$this->assertIsArray( Packages::rollback( $update['package'] ) );
+		$this->assertSame( $editor, (int) get_post_field( 'post_author', $post ) );
+
+		$subscriber = self::factory()->user->create( array( 'role' => 'subscriber' ) );
+		foreach ( array( $subscriber, 999999 ) as $wrong ) {
+			$this->assertSame( 'author', $this->assert_rejected( 'leitvia_invalid_input', self::call( 'leitvia/create-content', array( 'author' => $wrong ) + $input ) )['reason'] );
+		}
+	}
+
+	/**
+	 * A name no category has yet creates it with the post: live for an autonomous agent, by name in a change package and
+	 * only when the package is applied otherwise. Needs edit_terms, as in core; update-content takes the same way.
+	 */
+	public function test_new_categories(): void {
+		$input = array(
+			'post_type' => 'post',
+			'title'     => 'Notes',
+			'content'   => self::TEXT,
+			'status'    => 'draft',
+			'terms'     => array( 'category' => array( 'Field notes' ) ),
+		);
+		$live  = self::call( 'leitvia/create-content', $input );
+		$this->assertIsArray( $live );
+		$term = get_term_by( 'name', 'Field notes', 'category' );
+		$this->assertInstanceOf( WP_Term::class, $term );
+		$this->assertSame( array( $term->term_id ), wp_get_post_categories( $live['target']['post'] ) );
+
+		$queued = self::call(
+			'leitvia/create-content',
+			array(
+				'terms'   => array( 'category' => array( $term->term_id, 'Waits & sees' ) ),
+				'package' => 'cat',
+			) + $input
+		);
+		$this->assertSame( 'package', $queued['mode'] );
+		$this->assertFalse( get_term_by( 'name', 'Waits &amp; sees', 'category' ) );
+		$detail = Packages::detail( $queued['package'] );
+		$this->assertStringContainsString( 'Waits & sees', (string) wp_json_encode( $detail['items'][0]['diff'], JSON_UNESCAPED_UNICODE ) );
+		$report = Packages::apply( $queued['package'] );
+		$this->assertSame( 'applied', $report['state'], wp_json_encode( $report ) );
+		$post = (int) Packages::detail( $queued['package'] )['items'][0]['applied']['post'];
+		$this->assertCount( 2, wp_get_post_categories( $post ) );
+
+		$update = self::call(
+			'leitvia/update-content',
+			array(
+				'post'      => $post,
+				'base_hash' => Hashes::document( $post ),
+				'terms'     => array( 'category' => array( 'Second thoughts' ) ),
+			)
+		);
+		$this->assertIsArray( $update );
+		$this->assertSame( array( 'Second thoughts' ), wp_get_post_categories( $post, array( 'fields' => 'names' ) ) );
+
+		$deny = static fn( array $caps ): array => in_array( 'manage_categories', $caps, true ) ? array( 'do_not_allow' ) : $caps;
+		add_filter( 'map_meta_cap', $deny );
+		$this->assert_rejected( 'leitvia_forbidden', self::call( 'leitvia/create-content', array( 'terms' => array( 'category' => array( 'Not allowed' ) ) ) + $input ) ); // phpcs:ignore WordPress.Arrays.ArrayDeclarationSpacing.AssociativeArrayFound -- Short input.
+		remove_filter( 'map_meta_cap', $deny );
+		$this->assertFalse( get_term_by( 'name', 'Not allowed', 'category' ) );
 	}
 
 	/**

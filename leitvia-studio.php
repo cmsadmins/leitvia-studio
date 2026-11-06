@@ -3,7 +3,7 @@
  * Plugin Name:       Leitvia Studio
  * Plugin URI:        https://leitvia.com
  * Description:       Pattern lab, design tokens and a content model for block themes, stored in WordPress core structures.
- * Version:           1.3.25
+ * Version:           1.3.26
  * Requires at least: 7.1
  * Requires PHP:      8.2
  * Author:            CMS ADMINS
@@ -17,7 +17,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-const LEITVIA_STUDIO_VERSION = '1.3.25';
+const LEITVIA_STUDIO_VERSION = '1.3.26';
 const LEITVIA_STUDIO_API     = 1;
 // Oldest Extension API version add-ons may still declare; raised two major Studio versions after a breaking change.
 const LEITVIA_STUDIO_API_MIN = 1;
@@ -41,6 +41,24 @@ spl_autoload_register(
 );
 
 require __DIR__ . '/includes/functions.php';
+
+// Translations of the release zip in languages/, for sites without a language pack of WordPress.org. A pack in
+// WP_LANG_DIR wins. Plugin Check rejects load_plugin_textdomain() for plugins on WordPress.org.
+add_filter(
+	'lang_dir_for_domain',
+	static fn( $path, $domain ) => 'leitvia-studio' === $domain && ! $path ? __DIR__ . '/languages/' : $path,
+	10,
+	2
+);
+add_filter(
+	'load_script_translation_file',
+	static function ( $file, $handle, $domain ) {
+		$own = __DIR__ . '/languages/' . basename( (string) $file );
+		return 'leitvia-studio' === $domain && $file && ! is_readable( $file ) && is_readable( $own ) ? $own : $file;
+	},
+	10,
+	3
+);
 
 add_action( 'plugins_loaded', array( \LeitviaStudio\Plugin::class, 'boot' ) );
 // Gravatar stays off after a deactivation and the usage index counts as unbuilt (see LeitviaStudio\Avatars\Avatars::deactivate()).

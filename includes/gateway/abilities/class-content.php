@@ -87,7 +87,7 @@ final class Content {
 		Abilities::write(
 			'leitvia/create-content',
 			__( 'Create content', 'leitvia-studio' ),
-			__( 'Creates a post, a page or an entry of the content model from block markup or patterns; base_hash is empty. Post types come from leitvia/get-content-model, sections work as in leitvia/compose-page. The content runs through the same checks as leitvia/update-content. Terms take IDs, names or slugs; only tags and other flat taxonomies get new terms. Fields follow the content model; required fields must be set before publishing. The featured image needs alt text (leitvia/set-alt-text) or the decorative mark, or names the file of an image that waits in the same package from leitvia/add-media. The status is capped by the autonomy level. ai_generated adds a visible note to the text.', 'leitvia-studio' ),
+			__( 'Creates a post, a page or an entry of the content model from block markup or patterns; base_hash is empty. Post types come from leitvia/get-content-model, sections work as in leitvia/compose-page. The content runs through the same checks as leitvia/update-content. Terms take IDs, names or slugs; a name no term has yet creates the term with the content, in categories at the top level and only for a user who may manage them, and in a change package it stays a name until the package is applied. Fields follow the content model; required fields must be set before publishing. The featured image needs alt text (leitvia/set-alt-text) or the decorative mark, or names the file of an image that waits in the same package from leitvia/add-media. The status is capped by the autonomy level. ai_generated adds a visible note to the text.', 'leitvia-studio' ),
 			'build',
 			array(
 				'destructive' => false,
@@ -133,6 +133,7 @@ final class Content {
 						'enum'        => Build::PAGE_KINDS,
 						'description' => __( 'Kind of a page.', 'leitvia-studio' ),
 					),
+					'author'         => self::author_schema(),
 					'terms'          => self::terms_schema(),
 					'fields'         => self::fields_schema(),
 					'featured_image' => self::image_schema( true ),
@@ -179,7 +180,7 @@ final class Content {
 		Abilities::read(
 			'leitvia/list-content',
 			__( 'List content', 'leitvia-studio' ),
-			__( 'Lists posts, pages and entries of the content model, newest first, with hash, terms and the open package that waits for each. Per item: ID, type, status, title, slug, date, modified, excerpt, terms, fields, link, hash and package. Filter by type, status, search text, modified since and published after a date. Only content agents may read; no comments, users or form entries.', 'leitvia-studio' ),
+			__( 'Lists posts, pages and entries of the content model, newest first, with hash, terms and the open package that waits for each. Per item: ID, type, status, title, slug, date, modified, author (ID) and author_name as visitors see it, excerpt, terms, fields, link, hash and package. Filter by type, status, search text, modified since and published after a date. Only content agents may read; no comments, users or form entries.', 'leitvia-studio' ),
 			array(
 				'type'                 => 'object',
 				'properties'           => array(
@@ -256,6 +257,19 @@ final class Content {
 			'type'        => 'string',
 			'enum'        => array( 'open', 'closed' ),
 			'description' => __( 'Whether visitors may comment; without it a new post takes the default of the site.', 'leitvia-studio' ),
+		);
+	}
+
+	/**
+	 * Schema of the author, shared by create-content and update-content.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function author_schema(): array {
+		return array(
+			'type'        => 'integer',
+			'minimum'     => 1,
+			'description' => __( 'User ID of the author, as author in leitvia/list-content shows it; the user must be able to edit this post type. Without it a new post belongs to the user who writes it. An author without a display name of their own shows as the name of the site, never as the login.', 'leitvia-studio' ),
 		);
 	}
 
@@ -368,7 +382,7 @@ final class Content {
 	}
 
 	/**
-	 * Part of the state of a post of a content type: post_date, terms by taxonomy (IDs) and, under meta_input, the
+	 * Part of the state of a post of a content type: post_date, post_author, terms by taxonomy (IDs) and, under meta_input, the
 	 * featured image, the fields of the content model and the SEO meta update-seo writes (Seo::keys()). Empty for other
 	 * post types.
 	 *
@@ -380,7 +394,10 @@ final class Content {
 		if ( ! in_array( $type, self::types(), true ) ) {
 			return array();
 		}
-		$state = array( 'post_date' => (string) get_post_field( 'post_date', $id, 'raw' ) );
+		$state = array(
+			'post_date'   => (string) get_post_field( 'post_date', $id, 'raw' ),
+			'post_author' => (int) get_post_field( 'post_author', $id, 'raw' ),
+		);
 		foreach ( self::taxonomies( $type ) as $taxonomy ) {
 			$ids = wp_get_object_terms( $id, $taxonomy, array( 'fields' => 'ids' ) );
 			$ids = is_array( $ids ) ? array_map( 'intval', $ids ) : array();
@@ -419,14 +436,20 @@ final class Content {
 	}
 
 	/**
-	 * Writes the terms of a state. Categories without any get the default category, as core does.
+	 * Writes the terms of a state. Names of new terms of a hierarchical taxonomy become terms here; core adds those of a
+	 * flat taxonomy itself. Categories without any get the default category, as core does.
 	 *
 	 * @param int                  $id    Post ID.
 	 * @param array<string, mixed> $state State.
 	 */
 	public static function set_terms( int $id, array $state ): bool {
 		foreach ( (array) ( $state['terms'] ?? array() ) as $taxonomy => $terms ) {
-			$set = 'category' === $taxonomy ? wp_set_post_categories( $id, array_map( 'intval', (array) $terms ) ) : wp_set_post_terms( $id, (array) $terms, (string) $taxonomy );
+			$terms = is_taxonomy_hierarchical( (string) $taxonomy ) ? self::term_ids( (array) $terms, (string) $taxonomy ) : (array) $terms;
+			$set   = match ( true ) {
+				null === $terms          => false,
+				'category' === $taxonomy => wp_set_post_categories( $id, $terms ),
+				default                  => wp_set_post_terms( $id, $terms, (string) $taxonomy ),
+			};
 			if ( ! is_array( $set ) ) {
 				return false;
 			}
@@ -435,11 +458,32 @@ final class Content {
 	}
 
 	/**
+	 * IDs of the terms of a state of a hierarchical taxonomy: a name stays a name until the write, so it finds the term
+	 * a person added while the package waited, else it adds the term. Null when a term cannot be added.
+	 *
+	 * @param array<mixed> $terms    IDs and names.
+	 * @param string       $taxonomy Taxonomy.
+	 * @return list<int>|null
+	 */
+	private static function term_ids( array $terms, string $taxonomy ): ?array {
+		$ids = array();
+		foreach ( $terms as $term ) {
+			$found = is_string( $term ) ? get_term_by( 'name', $term, $taxonomy ) : false;
+			$made  = is_string( $term ) && ! $found ? wp_insert_term( wp_slash( $term ), $taxonomy ) : null;
+			if ( is_wp_error( $made ) ) {
+				return null;
+			}
+			$ids[] = (int) ( $found ? $found->term_id : ( $made['term_id'] ?? $term ) );
+		}
+		return $ids;
+	}
+
+	/**
 	 * State with date, terms, fields and featured image of the input: each checked, a key the state of the post type
 	 * does not have is invalid. Shared by create-content and update-content.
 	 *
 	 * @param array<string, mixed> $state  State, see state().
-	 * @param array<string, mixed> $input  Input with date, terms, fields and featured_image.
+	 * @param array<string, mixed> $input  Input with date, author, terms, fields and featured_image.
 	 * @param array<string, mixed> $target Target for rejections.
 	 * @return array<string, mixed>|\WP_Error
 	 */
@@ -451,6 +495,13 @@ final class Content {
 				return Block_Edit::invalid( 'date', __( 'Use a valid date, YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS, on a post, page or entry.', 'leitvia-studio' ), $target );
 			}
 			$state['post_date'] = $date;
+		}
+		if ( isset( $input['author'] ) ) {
+			$author = self::author( $type, (int) $input['author'], $target );
+			if ( is_wp_error( $author ) ) {
+				return $author;
+			}
+			$state['post_author'] = $author;
 		}
 		foreach ( (array) ( $input['terms'] ?? array() ) as $taxonomy => $values ) {
 			$terms = self::terms( (string) $taxonomy, (array) $values, $state, $target );
@@ -630,7 +681,31 @@ final class Content {
 	}
 
 	/**
-	 * Term IDs, and names of new terms of a flat taxonomy, for a taxonomy of the state.
+	 * The user as author of a post of the type: someone who may edit the type, on a type with authors. Giving a post to
+	 * someone else takes edit_others_posts, as in the editor.
+	 *
+	 * @param string               $type   Post type.
+	 * @param int                  $user   User ID.
+	 * @param array<string, mixed> $target Target for rejections.
+	 * @return int|\WP_Error
+	 */
+	private static function author( string $type, int $user, array $target ) {
+		$object = get_post_type_object( $type );
+		if ( ! $object || ! post_type_supports( $type, 'author' ) ) {
+			return Block_Edit::invalid( 'author', __( 'This post type has no author.', 'leitvia-studio' ), $target );
+		}
+		if ( ! get_userdata( $user ) || ! user_can( $user, $object->cap->edit_posts ) ) {
+			return Block_Edit::invalid( 'author', __( 'The author must be a user of this site who may edit this post type. Take the ID from author in leitvia/list-content.', 'leitvia-studio' ), $target + array( 'author' => $user ), 'leitvia/list-content' );
+		}
+		if ( get_current_user_id() !== $user && ! current_user_can( $object->cap->edit_others_posts ) ) {
+			return Rejection::make( 'leitvia_forbidden', __( 'Your user may not give content to another author.', 'leitvia-studio' ), 403, 'capability', $target, '', 'never' );
+		}
+		return $user;
+	}
+
+	/**
+	 * Term IDs, and names of new terms, for a taxonomy of the state. New terms of a hierarchical taxonomy need edit_terms,
+	 * as in core; they are added when the post is written, see set_terms(), so a change package shows them by name.
 	 *
 	 * @param string               $taxonomy Taxonomy.
 	 * @param array<mixed>         $values   IDs, names or slugs.
@@ -653,9 +728,12 @@ final class Content {
 			$term = $term instanceof \WP_Term || is_int( $value ) ? $term : get_term_by( 'slug', sanitize_title( (string) $value ), $taxonomy );
 			if ( $term instanceof \WP_Term ) {
 				$ids[] = $term->term_id;
-			} elseif ( is_int( $value ) || $object->hierarchical ) {
+			} elseif ( is_int( $value ) ) {
+				/* translators: %d: term ID */
+				return Block_Edit::invalid( 'term', sprintf( __( 'There is no term with the ID %d. Send a name to create a new term.', 'leitvia-studio' ), $value ), $target + array( 'taxonomy' => $taxonomy ) );
+			} elseif ( $object->hierarchical && ! current_user_can( $object->cap->edit_terms ) ) {
 				/* translators: %s: term as sent */
-				return Block_Edit::invalid( 'term', sprintf( __( 'There is no term %s. Hierarchical taxonomies such as categories take existing terms only.', 'leitvia-studio' ), (string) $value ), $target + array( 'taxonomy' => $taxonomy ) );
+				return Rejection::make( 'leitvia_forbidden', sprintf( __( 'Your user may not create the term %s. Use an existing term.', 'leitvia-studio' ), (string) $value ), 403, 'capability', $target + array( 'taxonomy' => $taxonomy ), '', 'never' );
 			} else {
 				$new[] = trim( (string) $value );
 			}
@@ -775,18 +853,20 @@ final class Content {
 			$fields  = array_intersect_key( (array) ( self::state( $post->ID, $post->post_type )['meta_input'] ?? array() ), self::fields( $post->post_type ) );
 			$excerpt = '' !== $post->post_excerpt ? $post->post_excerpt : wp_strip_all_tags( excerpt_remove_blocks( strip_shortcodes( $post->post_content ) ) );
 			$items[] = array(
-				'id'       => $post->ID,
-				'type'     => $post->post_type,
-				'status'   => $post->post_status,
-				'title'    => $post->post_title,
-				'slug'     => $post->post_name,
-				'date'     => $post->post_date,
-				'modified' => $post->post_modified,
-				'excerpt'  => wp_trim_words( $excerpt, 40, '…' ),
-				'terms'    => (object) $terms,
-				'link'     => (string) get_permalink( $post ),
-				'hash'     => Hashes::document( $post->ID ),
-				'package'  => $waits[ $post->ID ] ?? null,
+				'id'          => $post->ID,
+				'type'        => $post->post_type,
+				'status'      => $post->post_status,
+				'title'       => $post->post_title,
+				'slug'        => $post->post_name,
+				'date'        => $post->post_date,
+				'modified'    => $post->post_modified,
+				'author'      => (int) $post->post_author,
+				'author_name' => \LeitviaStudio\Model\Author_Name::of( (int) $post->post_author ),
+				'excerpt'     => wp_trim_words( $excerpt, 40, '…' ),
+				'terms'       => (object) $terms,
+				'link'        => (string) get_permalink( $post ),
+				'hash'        => Hashes::document( $post->ID ),
+				'package'     => $waits[ $post->ID ] ?? null,
 			) + ( $fields ? array( 'fields' => $fields ) : array() );
 		}
 		return array(
@@ -833,7 +913,10 @@ final class Content {
 	}
 
 	/**
-	 * Posts of a query, newest first, with search, limit and page of the input; only posts agents may read.
+	 * Posts of a query, newest first, with search, limit and page of the input; only posts agents may read, so items,
+	 * total and pages agree. Only unpublished posts can be closed to a user who may read at all, so the query leaves out
+	 * those one by one.
+	 * ponytail: an attachment of an unreadable draft still counts in total; probe the library too if that ever matters.
 	 *
 	 * @param array<string, mixed> $args  Query arguments.
 	 * @param array<string, mixed> $input Input.
@@ -853,6 +936,18 @@ final class Content {
 		);
 		if ( '' !== (string) ( $input['search'] ?? '' ) ) {
 			$args['s'] = (string) $input['search'];
+		}
+		$open = array_values( array_diff( (array) ( $args['post_status'] ?? array() ), array( 'publish', 'inherit' ) ) );
+		if ( $open ) {
+			$probe                = new \WP_Query(
+				array(
+					'post_status'    => $open,
+					'fields'         => 'ids',
+					'posts_per_page' => -1,
+					'no_found_rows'  => true,
+				) + $args
+			);
+			$args['post__not_in'] = array_values( array_filter( wp_parse_id_list( (array) $probe->posts ), static fn( int $id ): bool => ! Scope::readable( $id ) ) ); // phpcs:ignore WordPressVIPMinimum.Performance.WPQueryParams.PostNotIn_post__not_in
 		}
 		$query = new \WP_Query( $args );
 		$posts = array_values( array_filter( (array) $query->posts, static fn( $post ): bool => $post instanceof \WP_Post && Scope::readable( $post ) ) );

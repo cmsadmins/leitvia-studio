@@ -14,7 +14,8 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Port of scripts/lib/composition.mjs: same rules, same order of findings, same score. The fixtures in
  * tests/fixtures/composition keep PHP and Node equal. A page is the list of pattern slugs of its sections; patterns
- * with role frame are skipped, slugs the contract does not list count as unknownPattern. Approved Lab patterns
+ * with role frame are skipped, slugs the contract does not list count as unknownPattern, except the blocks of
+ * INTRO_BLOCKS before the first pattern on a template that shows the title itself. Approved Lab patterns
  * (block:<ID>) join the contract as labPatterns, see lab(); one without composition is known but outside the rhythm.
  *
  * Check leitvia/composition (scope page) warns when an agent write leaves a page below the minimum score of the
@@ -28,6 +29,12 @@ final class Composition {
 	 * Replacement candidates named per finding.
 	 */
 	private const MAX_SUGGESTIONS = 3;
+
+	/**
+	 * Blocks without a pattern that fill the slots without roles of the frames contact and article (intro, toc) before
+	 * the first section. Page frames on a template with a hero (hook in the intro slot) have no such slot.
+	 */
+	public const INTRO_BLOCKS = array( 'core/paragraph', 'core/heading', 'core/list', 'leitvia/table-of-contents' );
 
 	/**
 	 * Registers the check. Runs on leitvia_studio_init.
@@ -69,9 +76,22 @@ final class Composition {
 			);
 		};
 
+		$hero_templates = array();
+		foreach ( (array) ( $contract['pageFrames'] ?? array() ) as $frame ) {
+			foreach ( $frame['slots'] as $slot ) {
+				if ( 'intro' === $slot['name'] && in_array( 'hook', $slot['roles'], true ) ) {
+					$hero_templates[] = $frame['template'];
+				}
+			}
+		}
+		$intro    = ! in_array( $template, $hero_templates, true );
 		$sections = array();
 		foreach ( array_values( $slugs ) as $index => $slug ) {
 			$pattern = $by_slug[ $slug ] ?? null;
+			$intro   = $intro && ! $pattern && in_array( $slug, self::INTRO_BLOCKS, true );
+			if ( $intro ) {
+				continue;
+			}
 			if ( ! $pattern ) {
 				/* translators: 1: section number, 2: pattern slug. */
 				$add( 'unknownPattern', $index, sprintf( __( 'Section %1$d uses unknown pattern %2$s.', 'leitvia-studio' ), $index + 1, $slug ) );
@@ -96,16 +116,8 @@ final class Composition {
 		foreach ( $break_when as $key => $values ) {
 			$hints[] = ( 'patterns' === $key ? 'pattern' : $key ) . ' ' . self::or_list( (array) $values );
 		}
-		$break_hint     = implode( '; ', $hints );
-		$hero_templates = array();
-		foreach ( (array) ( $contract['pageFrames'] ?? array() ) as $frame ) {
-			foreach ( $frame['slots'] as $slot ) {
-				if ( 'intro' === $slot['name'] && in_array( 'hook', $slot['roles'], true ) ) {
-					$hero_templates[] = $frame['template'];
-				}
-			}
-		}
-		$repeat = (array) ( $rules['noAdjacentRepeat'] ?? array() );
+		$break_hint = implode( '; ', $hints );
+		$repeat     = (array) ( $rules['noAdjacentRepeat'] ?? array() );
 
 		$plain_run   = 0;
 		$run_start   = 0;

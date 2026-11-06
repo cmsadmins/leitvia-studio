@@ -823,6 +823,49 @@ class Test_Gateway_Recipes extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The input slugs gives recipe pages other addresses, and what names them follows; a later run finds them.
+	 */
+	public function test_page_slugs(): void {
+		$this->sign_in_live();
+		$input  = array(
+			'recipe' => 'leitvia/company',
+			'parts'  => array( 'pages', 'navigation', 'frontPage' ),
+			'pages'  => array( 'home', 'contact', 'imprint' ),
+			'slugs'  => array(
+				'imprint' => 'impressum',
+				'contact' => 'kontakt',
+				'home'    => 'start',
+			),
+		);
+		$result = $this->run_recipe( $input );
+		$this->assertInstanceOf( WP_Post::class, get_page_by_path( 'impressum' ) );
+		$this->assertNull( get_page_by_path( 'imprint' ) );
+		$this->assertSame( 'imprint', get_post_meta( get_page_by_path( 'impressum' )->ID, '_leitvia_page_kind', true ) );
+		$home = get_page_by_path( 'start' );
+		$this->assertSame( $home->ID, (int) get_option( 'page_on_front' ) );
+		$this->assertStringContainsString( '/kontakt/', $home->post_content, 'The link of the hero follows the page.' );
+		$this->assertStringNotContainsString( '"/contact/', $home->post_content );
+		$navigation = wp_list_filter( $result['steps'], array( 'step' => 'navigation' ) );
+		$this->assertNotSame( array(), $navigation );
+		$again = $this->run_recipe( $input );
+		$this->assertSame( array( 'exists', 'exists', 'exists' ), self::statuses( $again, 'pages' ) );
+
+		foreach ( array(
+			array( 'nope' => 'neu' ),
+			array( 'imprint' => 'about' ),
+		) as $slugs ) {
+			$rejected = wp_get_ability( 'leitvia/apply-recipe' )->execute(
+				array(
+					'recipe' => 'leitvia/company',
+					'slugs'  => $slugs,
+				)
+			);
+			$this->assertWPError( $rejected );
+			$this->assertSame( 'slugs', $rejected->get_error_data()['reason'] );
+		}
+	}
+
+	/**
 	 * Parts limit a run: only pages, and of them only home and contact, leave style, template parts, navigation and
 	 * reading settings alone; the part frontPage then sets the front page to the page that exists.
 	 */

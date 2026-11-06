@@ -68,7 +68,8 @@ final class Abilities {
 	 * The describe callback gets the input and returns array( 'area' => …, 'target' => …, 'change' => callable,
 	 * 'kinds' => list ) or a WP_Error, see Operation. Keep it cheap: it runs before the rate limit, the change runs
 	 * after scope and hash checks. Optional: 'record' => true gives a live write a change package so leitvia/rollback
-	 * can undo it; 'report' => callable adds what it returns after the write as report to the result.
+	 * can undo it; 'report' => callable adds what it returns after the write as report to the result; 'base_hash' stands
+	 * in for the input where the target is a single value no read ability returns a hash of.
 	 *
 	 * @param string               $name         Ability name, leitvia/<name>.
 	 * @param string               $label        Translated label.
@@ -133,7 +134,7 @@ final class Abilities {
 			$name,
 			(string) ( $parts['area'] ?? '' ),
 			(array) ( $parts['target'] ?? array() ),
-			(string) ( $input['base_hash'] ?? '' ),
+			(string) ( $parts['base_hash'] ?? $input['base_hash'] ?? '' ),
 			$parts['change'],
 			array_values( (array) ( $parts['kinds'] ?? array() ) ),
 			(string) ( $input['package'] ?? '' )
@@ -167,25 +168,29 @@ final class Abilities {
 		return array(
 			'type'       => 'object',
 			'properties' => array(
-				'mode'     => array(
+				'mode'         => array(
 					'type' => 'string',
 					'enum' => array( 'live', 'draft', 'package', 'unchanged' ),
 				),
-				'level'    => array(
+				'level'        => array(
 					'type' => 'string',
 					'enum' => Gateway::LEVELS,
 				),
-				'kinds'    => $strings,
-				'target'   => array( 'type' => 'object' ),
-				'hash'     => array( 'type' => 'string' ),
-				'package'  => array( 'type' => 'integer' ),
-				'snapshot' => array( 'type' => 'integer' ),
-				'findings' => array(
+				'kinds'        => $strings,
+				'target'       => array( 'type' => 'object' ),
+				'hash'         => array( 'type' => 'string' ),
+				'package'      => array( 'type' => 'integer' ),
+				'snapshot'     => array( 'type' => 'integer' ),
+				'findings'     => array(
 					'type'  => 'array',
 					'items' => array( 'type' => 'object' ),
 				),
-				'report'   => array( 'type' => 'object' ),
-				'notice'   => array( 'type' => 'string' ),
+				'report'       => array( 'type' => 'object' ),
+				'notice'       => array( 'type' => 'string' ),
+				'slug_changed' => array(
+					'type'        => 'object',
+					'description' => __( 'The slug asked for (requested) is taken or reserved, so the address uses slug instead, on publishing at the latest.', 'leitvia-studio' ),
+				),
 			),
 		);
 	}

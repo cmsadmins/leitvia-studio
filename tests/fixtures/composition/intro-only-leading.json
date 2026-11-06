@@ -1,0 +1,16 @@
+{
+	"name": "intro-only-leading",
+	"template": "page",
+	"sections": [
+		"core/paragraph",
+		"leitvia/cta-contact",
+		"core/paragraph"
+	],
+	"issues": [
+		[
+			"unknownPattern",
+			2
+		]
+	],
+	"score": 75
+}

@@ -201,6 +201,115 @@ class Test_Gateway_Build extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Edits take blocks from a pattern and add copies; the result keeps its pattern, valid placeholders and unique IDs.
+	 */
+	public function test_compose_page_removes_and_repeats_blocks(): void {
+		$grid   = 'p:0.1';
+		$result = self::call(
+			'leitvia/compose-page',
+			array(
+				'title'    => 'Three tiles',
+				'frame'    => 'contact',
+				'sections' => array(
+					array(
+						'pattern' => 'leitvia/content-feature-grid',
+						'edits'   => array(
+							array(
+								'block'  => $grid . '.5',
+								'remove' => true,
+							),
+							array(
+								'block'  => $grid . '.4',
+								'remove' => true,
+							),
+							array(
+								'block'  => $grid . '.3',
+								'remove' => true,
+							),
+							array(
+								'block'  => $grid . '.2',
+								'repeat' => 2,
+							),
+							array(
+								'block' => $grid . '.4.0',
+								'text'  => 'The second copy',
+							),
+						),
+					),
+				),
+			)
+		);
+		$this->assertIsArray( $result, is_wp_error( $result ) ? $result->get_error_message() : '' );
+		$blocks = parse_blocks( (string) get_post_field( 'post_content', $result['target']['post'], 'raw' ) );
+		$root   = array_values( array_filter( $blocks, static fn( array $block ): bool => null !== $block['blockName'] ) )[0];
+		$tiles  = $root['innerBlocks'][1]['innerBlocks'];
+		$this->assertCount( 5, $tiles );
+		$this->assertSame( 'leitvia/content-feature-grid', $root['attrs']['metadata']['patternName'] );
+		$this->assertStringContainsString( 'The second copy', serialize_block( $tiles[4] ) );
+		$this->assertSame( serialize_blocks( $blocks ), serialize_blocks( parse_blocks( serialize_blocks( $blocks ) ) ) );
+		$ids = array();
+		$all = static function ( array $blocks ) use ( &$all, &$ids ): void {
+			foreach ( $blocks as $block ) {
+				$ids[] = $block['attrs']['metadata']['leitviaId'] ?? null;
+				$all( $block['innerBlocks'] );
+			}
+		};
+		$all( $tiles );
+		$this->assertSame( count( $ids ), count( array_unique( array_filter( $ids ) ) ), 'Every tile and its blocks have an ID of their own.' );
+	}
+
+	/**
+	 * Remove and repeat keep the markup between the blocks in step, also without white space, and refuse what the
+	 * editor refuses.
+	 */
+	public function test_structure_edits(): void {
+		$item = static fn( string $text ): string => '<!-- wp:list-item --><li>' . $text . '</li><!-- /wp:list-item -->';
+		$list = '<!-- wp:list --><ul class="wp-block-list">' . $item( 'a' ) . $item( 'b' ) . $item( 'c' ) . '</ul><!-- /wp:list -->';
+		$this->assertSame( '<!-- wp:list --><ul class="wp-block-list">' . $item( 'a' ) . $item( 'c' ) . '</ul><!-- /wp:list -->', Block_Edit::structure( $list, 'p:0.1', array( 'remove' => true ) ) );
+		$this->assertSame( '<!-- wp:list --><ul class="wp-block-list">' . $item( 'a' ) . $item( 'b' ) . $item( 'b' ) . $item( 'c' ) . '</ul><!-- /wp:list -->', Block_Edit::structure( $list, 'p:0.1', array( 'repeat' => 1 ) ) );
+
+		$para  = static fn( string $text, string $attrs = '' ): string => '<!-- wp:paragraph ' . $attrs . '--><p>' . $text . '</p><!-- /wp:paragraph -->';
+		$group = static fn( string $inner, string $attrs = '' ): string => '<!-- wp:group ' . $attrs . '--><div class="wp-block-group">' . $inner . '</div><!-- /wp:group -->';
+		$both  = $group( "\n" . $para( 'a' ) . "\n\n" . $para( 'b' ) . "\n" );
+		$this->assertSame( $group( "\n" . $para( 'b' ) . "\n" ), Block_Edit::structure( $both, 'p:0.0', array( 'remove' => true ) ) );
+		$this->assertSame( $group( "\n" . $para( 'a' ) . "\n" ), Block_Edit::structure( $both, 'p:0.1', array( 'remove' => true ) ) );
+		$this->assertSame( $group( "\n" . $para( 'a' ) . "\n\n" . $para( 'b' ) . "\n\n" . $para( 'b' ) . "\n" ), Block_Edit::structure( $both, 'p:0.1', array( 'repeat' => 1 ) ) );
+
+		$refused = array(
+			'root'      => array( $list, 'p:0', array( 'remove' => true ) ),
+			'only one'  => array( $group( $para( 'a' ) ), 'p:0.0', array( 'remove' => true ) ),
+			'template'  => array( $group( $para( 'a' ) . $para( 'b' ), '{"templateLock":"all"} ' ), 'p:0.0', array( 'remove' => true ) ),
+			'lock'      => array( $group( $para( 'a', '{"lock":{"remove":true}} ' ) . $para( 'b' ) ), 'p:0.0', array( 'remove' => true ) ),
+			'anchor'    => array( $group( '<!-- wp:heading {"anchor":"x"} --><h2 id="x">a</h2><!-- /wp:heading -->' ), 'p:0.0', array( 'repeat' => 1 ) ),
+			'unchanged' => array( $list, 'p:0.9', array( 'remove' => true ) ),
+		);
+		foreach ( $refused as $name => [ $markup, $block, $change ] ) {
+			$this->assertWPError( Block_Edit::structure( $markup, $block, $change ), $name );
+		}
+		$mixed = self::call(
+			'leitvia/compose-page',
+			array(
+				'title'    => 'Mixed',
+				'frame'    => 'contact',
+				'sections' => array(
+					array(
+						'pattern' => 'leitvia/content-feature-grid',
+						'edits'   => array(
+							array(
+								'block'  => 'p:0.1.0',
+								'remove' => true,
+								'text'   => 'Both',
+							),
+						),
+					),
+				),
+			)
+		);
+		$this->assertWPError( $mixed );
+		$this->assertSame( 'structure', $mixed->get_error_data()['reason'] );
+	}
+
+	/**
 	 * Unknown patterns point to list-patterns, deprecated ones name the replacement, unknown frames are refused.
 	 */
 	public function test_compose_page_rejections(): void {

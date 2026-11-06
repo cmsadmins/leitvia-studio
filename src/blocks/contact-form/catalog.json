@@ -1,0 +1,7 @@
+{
+	"usage": {
+		"useWhen": "A page where visitors should write to the site owner without opening a mail program, usually the contact page. The fields are name, email and message.",
+		"avoidWhen": "Forms with other fields, uploads or stored entries; use a form plugin inside leitvia/form-errors. Not for a newsletter sign-up.",
+		"a11y": "Visible labels, an error summary that takes the focus and links to each field, messages at the fields with aria-invalid and aria-describedby. It works without JavaScript."
+	}
+}

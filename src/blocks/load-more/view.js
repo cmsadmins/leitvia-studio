@@ -43,6 +43,9 @@ async function more( block, link ) {
 	} else {
 		link.remove();
 	}
+	document.dispatchEvent(
+		new window.CustomEvent( 'leitvia:content', { detail: added } )
+	);
 }
 
 document.addEventListener( 'click', ( event ) => {

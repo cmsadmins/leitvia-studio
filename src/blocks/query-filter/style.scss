@@ -46,6 +46,11 @@
 		outline: 0.125rem solid var(--wp--preset--color--focus, currentcolor);
 		outline-offset: 0.125rem;
 	}
+
+	// view.js hides Apply filters. A theme button sets display, which would beat the hidden attribute.
+	[hidden] {
+		display: none;
+	}
 }
 
 .wp-block-leitvia-query-filter__select {
@@ -54,16 +59,32 @@
 	margin: 0;
 }
 
+// A row of its own, as tall as the button: when view.js hides Apply filters, nothing below it or beside it moves.
 .wp-block-leitvia-query-filter__actions {
 	display: flex;
+	flex-basis: 100%;
+	min-block-size: 3rem;
 	flex-wrap: wrap;
 	align-items: center;
 	gap: var(--wp--preset--spacing--s, 1rem);
 	margin: 0;
+
+	// A target of 44 px, also once Apply filters is gone.
+	a {
+		display: inline-flex;
+		align-items: center;
+		min-block-size: 2.75rem;
+	}
 }
 
 .wp-block-leitvia-query-filter__count {
 	flex-basis: 100%;
 	margin: 0;
 	font-variant-numeric: tabular-nums;
+}
+
+// Results while view.js loads the next ones. After a short delay, so a quick answer does not flicker; a step, no motion.
+.wp-block-query [aria-busy="true"] {
+	opacity: 0.6;
+	transition: opacity 0s 150ms;
 }

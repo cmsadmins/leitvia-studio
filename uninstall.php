@@ -77,6 +77,7 @@ $leitvia_studio_uninstall_site = static function (): void {
 	global $wpdb;
 	$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}leitvia_audit, {$wpdb->prefix}leitvia_snapshots" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.DirectDatabaseQuery.SchemaChange -- Own tables, removed on uninstall.
 	delete_option( 'leitvia_studio_db' );
+	delete_option( 'leitvia_studio_rewrite_front' );
 	delete_option( 'leitvia_studio_gateway' );
 	delete_option( 'leitvia_studio_recipe_writes' );
 	wp_clear_scheduled_hook( 'leitvia_studio_gateway_prune' );
