@@ -34,6 +34,9 @@ final class Blocks {
 	 * @param Studio $studio The Studio instance.
 	 */
 	public static function register( Studio $studio ): void {
+		// The counter saves min-inline-size; without it KSES cuts the style for users without unfiltered_html, and the
+		// gateway refuses the saved markup of the block.
+		add_filter( 'safe_style_css', static fn( array $properties ): array => array_merge( $properties, array( 'min-inline-size' ) ) );
 		$dir      = dirname( LEITVIA_STUDIO_FILE ) . '/build/blocks';
 		$manifest = dirname( LEITVIA_STUDIO_FILE ) . '/build/blocks-manifest.php';
 		if ( ! is_readable( $manifest ) ) {
@@ -259,7 +262,9 @@ final class Blocks {
 	 * the wizard steps. Only type, name, value, checked and required, and type only as radio or checkbox: an input
 	 * without one of these types is removed. Text and password fields would let such a user build a login form that
 	 * the browser's password manager fills in and that sends to another host (core allows form and button). Event
-	 * handlers, style, formaction and src stay out. Runs on wp_kses_allowed_html.
+	 * handlers, style, formaction and src stay out. The form of the wizard keeps its class, the list of the consent
+	 * settings its template element, which holds inert markup and only the data attributes of the Interactivity API.
+	 * Runs on wp_kses_allowed_html.
 	 *
 	 * @param array<string, mixed> $tags    Allowed tags and attributes.
 	 * @param string|mixed         $context Kses context.
@@ -277,6 +282,9 @@ final class Blocks {
 				'checked'  => true,
 				'required' => true,
 			);
+			// Core adds form itself only while no filter did, with these attributes; class is the one addition.
+			$tags['form']     = array_fill_keys( array( 'action', 'accept', 'accept-charset', 'enctype', 'method', 'name', 'target', 'class' ), true );
+			$tags['template'] = array( 'data-*' => true );
 		}
 		return $tags;
 	}

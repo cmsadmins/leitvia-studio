@@ -639,6 +639,50 @@ final class Packages {
 	 * @return array{type: string, name: non-empty-string}|null
 	 */
 	public static function image_type( string $bytes, string $name ): ?array {
+		$type = self::allowed_type( $bytes, $name );
+		return $type && str_starts_with( $type['type'], 'image/' ) ? $type : null;
+	}
+
+	/**
+	 * Type and name of a captions file: WebVTT by core's check of name and content, valid UTF-8 and with the signature
+	 * of the format, so nothing else passes under the extension; null otherwise. A browser reads it as text only.
+	 *
+	 * @param string $bytes File content.
+	 * @param string $name  File name.
+	 * @return array{type: string, name: non-empty-string}|null
+	 */
+	public static function track_type( string $bytes, string $name ): ?array {
+		$type = self::with_webvtt( fn() => self::allowed_type( $bytes, $name ) );
+		$safe = ! str_contains( $bytes, "\0" ) && wp_check_invalid_utf8( $bytes ) === $bytes && preg_match( '/^(?:\xEF\xBB\xBF)?WEBVTT(?:[ \t\r\n]|$)/D', $bytes );
+		return $type && 'text/vtt' === $type['type'] && $safe ? $type : null;
+	}
+
+	/**
+	 * Runs a check or upload of a captions file with .vtt allowed for a user who may upload files. Core allows it on a
+	 * single site, but a network allows only its list of file types. Only for this call: nothing else on the site can
+	 * upload such a file through it.
+	 *
+	 * @param callable $call Gets nothing.
+	 * @return mixed What the call returns.
+	 */
+	private static function with_webvtt( callable $call ) {
+		$allow = static fn( array $types ): array => current_user_can( 'upload_files' ) ? $types + array( 'vtt' => 'text/vtt' ) : $types;
+		add_filter( 'upload_mimes', $allow, 99 );
+		try {
+			return $call();
+		} finally {
+			remove_filter( 'upload_mimes', $allow, 99 );
+		}
+	}
+
+	/**
+	 * Type and name core's check gives a file, null when the site does not allow it.
+	 *
+	 * @param string $bytes File content.
+	 * @param string $name  File name.
+	 * @return array{type: string, name: non-empty-string}|null
+	 */
+	private static function allowed_type( string $bytes, string $name ): ?array {
 		$files = self::filesystem();
 		$temp  = $files ? wp_tempnam( $name ) : '';
 		if ( ! $files || ! $files->put_contents( $temp, $bytes ) ) {
@@ -649,7 +693,7 @@ final class Packages {
 		wp_delete_file( $temp );
 		$type = (string) $check['type'];
 		$name = $check['proper_filename'] ? (string) $check['proper_filename'] : $name;
-		if ( '' === $name || ! str_starts_with( $type, 'image/' ) || ! in_array( $type, get_allowed_mime_types(), true ) ) {
+		if ( '' === $name || '' === $type || ! in_array( $type, get_allowed_mime_types(), true ) ) {
 			return null;
 		}
 		return array(
@@ -659,7 +703,7 @@ final class Packages {
 	}
 
 	/**
-	 * Writes an image of an operation to the private area: a folder with a random name below uploads/leitvia-studio/private,
+	 * Writes an image or captions file of an operation to the private area: a folder with a random name below uploads/leitvia-studio/private,
 	 * which denies web access where the server reads .htaccess. The pipeline moves it into the uploads folder when it
 	 * writes the attachment; rejecting the package deletes it.
 	 *
@@ -668,8 +712,9 @@ final class Packages {
 	 * @return string Path, '' on failure.
 	 */
 	public static function stash_file( string $name, string $bytes ): string {
-		// Only images of a type the site allows, under the name core's check gives them; never a script or other file.
-		$type = self::image_type( $bytes, $name );
+		// Only images and captions of a type the site allows, under the name core's check gives them; never a script or
+		// other file.
+		$type = self::image_type( $bytes, $name ) ?? self::track_type( $bytes, $name );
 		if ( ! $type ) {
 			return '';
 		}
@@ -699,7 +744,7 @@ final class Packages {
 		if ( false === $bytes ) {
 			return null;
 		}
-		$upload = wp_upload_bits( $name, null, $bytes );
+		$upload = 'text/vtt' === ( $state['post_mime_type'] ?? '' ) ? self::with_webvtt( static fn() => wp_upload_bits( $name, null, $bytes ) ) : wp_upload_bits( $name, null, $bytes );
 		if ( ! empty( $upload['error'] ) ) {
 			return null;
 		}

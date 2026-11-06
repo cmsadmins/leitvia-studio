@@ -124,6 +124,23 @@ final class Setup {
 			array( self::class, 'describe_set_posts_page' )
 		);
 		Abilities::write(
+			'leitvia/set-privacy-page',
+			__( 'Set privacy policy page', 'leitvia-studio' ),
+			__( 'Makes an existing page the privacy policy page of the site; 0 clears it. Contact forms, comment forms and the footer link to it. base_hash is empty. The page must exist, so create it first and wait until a package with it is applied. Like every setting it waits in a change package for a person. notice says so while the page is not published, and leitvia/audit-site reports contact forms without such a page.', 'leitvia-studio' ),
+			'setup',
+			$replace,
+			array(
+				'properties' => array(
+					'page' => array(
+						'type'    => 'integer',
+						'minimum' => 0,
+					),
+				),
+				'required'   => array( 'page' ),
+			) + $object,
+			array( self::class, 'describe_set_privacy_page' )
+		);
+		Abilities::write(
 			'leitvia/set-organization',
 			__( 'Set organization details', 'leitvia-studio' ),
 			__( 'Sets address, phone and email of the organization. Leitvia Studio adds them to its structured data while no SEO plugin is active; the name and the logo stay those of the site. Only the fields you send change, an empty string clears one. leitvia/get-seo returns the current values. base_hash is empty. Use only facts the person gave or the site shows. Like every setting it waits in a change package for a person.', 'leitvia-studio' ),
@@ -377,6 +394,27 @@ final class Setup {
 			'target'    => $target,
 			'base_hash' => Hashes::of( (string) wp_json_encode( get_option( 'page_for_posts' ) ) ),
 			'notice'    => implode( ' ', array_filter( $notices ) ),
+			'change'    => static fn(): array => array( 'value' => (string) $page ),
+		);
+	}
+
+	/**
+	 * Operation of set-privacy-page: the option wp_page_for_privacy_policy, a page of the site or 0.
+	 *
+	 * @param array<string, mixed> $input Input.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public static function describe_set_privacy_page( array $input ) {
+		$page   = (int) ( $input['page'] ?? 0 );
+		$target = array( 'option' => 'wp_page_for_privacy_policy' );
+		if ( $page && ( 'page' !== get_post_type( $page ) || ! Scope::readable( $page ) ) ) {
+			return Block_Edit::invalid( 'page', __( 'There is no page with this ID that agents can read. Take the ID from leitvia/list-content.', 'leitvia-studio' ), $target + array( 'page' => $page ), 'leitvia/list-content' );
+		}
+		return array(
+			'area'      => 'structure',
+			'target'    => $target,
+			'base_hash' => Hashes::of( (string) wp_json_encode( get_option( 'wp_page_for_privacy_policy' ) ) ),
+			'notice'    => $page && 'publish' !== get_post_status( $page ) ? __( 'The page is not published yet, so forms show no link to it.', 'leitvia-studio' ) : '',
 			'change'    => static fn(): array => array( 'value' => (string) $page ),
 		);
 	}

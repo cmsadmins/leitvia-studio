@@ -533,6 +533,37 @@ final class Content {
 	}
 
 	/**
+	 * State with a new status, for update-content. A post that becomes public without a date of its own gets the date
+	 * of now, as in the editor, not the day its draft began; required fields must be set by then.
+	 *
+	 * @param array<string, mixed> $state  State.
+	 * @param string               $status New status.
+	 * @param bool                 $dated  Whether the input set the date.
+	 * @param array<string, mixed> $target Target for rejections.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public static function status( array $state, string $status, bool $dated, array $target ) {
+		if ( ! array_key_exists( 'post_date', $state ) ) {
+			return Block_Edit::invalid( 'status', __( 'Only posts, pages and entries have a status to change.', 'leitvia-studio' ), $target );
+		}
+		$now  = current_time( 'mysql' );
+		$date = (string) $state['post_date'];
+		if ( ( 'future' === $status && $date <= $now ) || ( 'publish' === $status && $dated && $date > $now ) ) {
+			return Block_Edit::invalid( 'date', __( 'Use a valid date. Status future needs a date in the future, a date in the future needs status future.', 'leitvia-studio' ), $target );
+		}
+		if ( 'publish' === $status && ! $dated && 'publish' !== $state['post_status'] ) {
+			$state['post_date'] = $now;
+		}
+		$state['post_status'] = $status;
+		$missing              = self::missing( (string) $state['post_type'], $state );
+		if ( $missing ) {
+			/* translators: %s: field labels */
+			return Block_Edit::invalid( 'required', sprintf( __( 'Set these required fields before publishing, or create a draft: %s.', 'leitvia-studio' ), implode( ', ', $missing ) ), $target, 'leitvia/get-content-model' );
+		}
+		return $state;
+	}
+
+	/**
 	 * Operation of create-content.
 	 *
 	 * @param array<string, mixed> $input Input.
@@ -673,7 +704,7 @@ final class Content {
 		}
 		$package = '' !== (string) ( $input['package'] ?? '' ) ? Packages::find( (string) $input['package'] ) : 0;
 		foreach ( $package ? Packages::operations( $package ) : array() as $entry ) {
-			if ( 'leitvia/add-media' === ( $entry['ability'] ?? '' ) && ! isset( $entry['applied'] ) && wp_basename( (string) ( $entry['state']['file'] ?? '' ) ) === $file ) {
+			if ( 'leitvia/add-media' === ( $entry['ability'] ?? '' ) && ! isset( $entry['applied'] ) && str_starts_with( (string) ( $entry['state']['post_mime_type'] ?? '' ), 'image/' ) && wp_basename( (string) ( $entry['state']['file'] ?? '' ) ) === $file ) {
 				return $file;
 			}
 		}

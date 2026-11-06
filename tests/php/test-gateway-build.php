@@ -491,7 +491,8 @@ class Test_Gateway_Build extends WP_UnitTestCase {
 
 		$data = $this->assert_rejected( 'leitvia_invalid_input', self::call( 'leitvia/update-block', $move( array( 'x' => 120 ) ) ) );
 		$this->assertSame( 'attributes', $data['reason'] );
-		$this->assert_rejected( 'leitvia_static_markup', self::call( 'leitvia/update-block', $move( array( 'label' => 'Moved' ) ) ) );
+		$this->assertIsArray( self::call( 'leitvia/update-block', $move( array( 'label' => 'Moved' ) ) ), 'its label is a text attribute with an element' );
+		$this->assertStringContainsString( '>Moved<', $point()['inner_html'] );
 	}
 
 	/**

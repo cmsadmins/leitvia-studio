@@ -60,12 +60,28 @@ final class Catalog {
 				'a11y'      => 'Give the embed a caption that says what it shows; the placeholder uses the provider name and keeps a direct link.',
 			),
 		),
+		'core/query' => array(
+			'extension' => 'Studio merges query into the settings of the block on leitvia/update-block, so perPage alone keeps the rest; the core default inherits the main query, where perPage has no effect.',
+			'usage'     => array(
+				'useWhen'   => 'Lists of posts or entries that stay current on their own, such as the latest news on the front page.',
+				'avoidWhen' => 'A fixed selection of content; link the pages or compose a pattern instead.',
+				'a11y'      => 'Give the list a heading. Query filters and Load more need inherit false and a queryId of their own.',
+			),
+		),
 		'core/tabs'  => array(
 			'extension' => 'Studio shows all tab panels one below the other with their labels when scripting is off; core keeps its tab logic otherwise.',
 			'usage'     => array(
 				'useWhen'   => 'Two to six parallel views of the same topic, such as plans or platforms, where readers need only one at a time.',
 				'avoidWhen' => 'Content everyone must read or sequential steps; use headings or the wizard block instead.',
 				'a11y'      => 'Keep tab labels short and unique. Content must make sense when all panels show at once.',
+			),
+		),
+		'core/video' => array(
+			'extension' => 'leitvia/add-media takes the WebVTT file; the attribute tracks of leitvia/update-block sets it with kind, srclang and label, and its field caption sets the figcaption.',
+			'usage'     => array(
+				'useWhen'   => 'A video file hosted on the site itself, which sends no data to a third party.',
+				'avoidWhen' => 'Videos of a third party; use the embed block with its consent placeholder.',
+				'a11y'      => 'Spoken content needs captions (WCAG 1.2.2): a track with kind captions. Do not autoplay with sound.',
 			),
 		),
 	);

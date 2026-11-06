@@ -400,6 +400,7 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 			),
 			'leitvia/set-variation'        => static fn(): array => array( 'variation' => 'corporate-light' ),
 			'leitvia/set-posts-page'       => static fn(): array => array( 'page' => self::factory()->post->create( array( 'post_type' => 'page' ) ) ),
+			'leitvia/set-privacy-page'     => static fn(): array => array( 'page' => self::factory()->post->create( array( 'post_type' => 'page' ) ) ),
 			'leitvia/set-organization'     => static fn(): array => array( 'city' => 'Berlin' ),
 			'leitvia/define-content-type'  => static fn(): array => array(
 				'declaration' => array(
@@ -542,7 +543,8 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 			}
 		}
 		$inputs = $this->write_inputs();
-		$this->assertEqualsCanonicalizing( $writes, array_keys( $inputs ), 'Every write ability has a fixture.' );
+		// Discarding a package writes no target, so there is nothing to run through the pipeline.
+		$this->assertEqualsCanonicalizing( array_diff( $writes, array( 'leitvia/reject-package' ) ), array_keys( $inputs ), 'Every write ability has a fixture.' );
 		foreach ( $inputs as $name => $input ) {
 			$before = $runs;
 			$result = self::call( $name, $input() );

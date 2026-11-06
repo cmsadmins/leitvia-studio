@@ -43,7 +43,7 @@ final class Maintain {
 		Abilities::write(
 			'leitvia/update-content',
 			__( 'Update content', 'leitvia-studio' ),
-			__( 'Updates title, excerpt, slug, date, author, terms, fields, featured image, comment status and the texts and button links of several blocks of one post in one operation, blocks found by their ID from the outline. Per block, url changes the one link of a text too and link_text names the part that stays linked, as in leitvia/update-block. Terms, fields and featured image follow the rules of leitvia/create-content; terms replace those of their taxonomy. Instead of blocks, content replaces the whole content with block markup, for example to turn classic content into blocks; the new content may hold no classic block. Read the post with leitvia/get-page-outline first and send its hash as base_hash. A slug change is a URL change and lands at most as a suggestion; after one, leitvia/repair-links with auto points the links of other posts to the new address. For attributes or images of a block use leitvia/update-block.', 'leitvia-studio' ),
+			__( 'Updates title, excerpt, slug, date, status, author, terms, fields, featured image, comment status and the texts and button links of several blocks of one post in one operation, blocks found by their ID from the outline. Per block, url changes the one link of a text too, link_text names the part that stays linked, add_link sets a new link on a passage and caption the caption of a figure, as in leitvia/update-block. status publishes a draft, schedules it (future, with a date) or takes a post back to draft or pending; like every change it follows the autonomy level, so at a lower level it waits in a change package, and publishing needs the right to publish when it is applied. Terms, fields and featured image follow the rules of leitvia/create-content; terms replace those of their taxonomy. Instead of blocks, content replaces the whole content with block markup, for example to turn classic content into blocks; the new content may hold no classic block. Read the post with leitvia/get-page-outline first and send its hash as base_hash. A slug change is a URL change and lands at most as a suggestion; after one, leitvia/repair-links with auto points the links of other posts to the new address. For attributes or images of a block use leitvia/update-block.', 'leitvia-studio' ),
 			'maintain',
 			$overwrite,
 			array(
@@ -90,6 +90,8 @@ final class Maintain {
 									'maxLength'   => 2000,
 									'description' => __( 'Link of a button, or of the one link in a paragraph, heading or list item (mailto: and tel: work too).', 'leitvia-studio' ),
 								),
+								'add_link'  => Build::add_link_schema(),
+								'caption'   => Build::caption_schema(),
 							),
 							'required'             => array( 'block' ),
 							'additionalProperties' => false,
@@ -101,6 +103,11 @@ final class Maintain {
 						'description' => __( 'Block markup that replaces the whole content; not together with blocks.', 'leitvia-studio' ),
 					),
 					'date'           => Content::date_schema(),
+					'status'         => array(
+						'type'        => 'string',
+						'enum'        => array( 'draft', 'pending', 'publish', 'future' ),
+						'description' => __( 'New status of the post; future needs a date in the future.', 'leitvia-studio' ),
+					),
 					'author'         => Content::author_schema(),
 					'terms'          => Content::terms_schema(),
 					'fields'         => Content::fields_schema(),
@@ -224,19 +231,21 @@ final class Maintain {
 			'is_string'
 		);
 		$extra   = array_intersect_key( $input, array_flip( array( 'date', 'author', 'terms', 'fields', 'featured_image' ) ) );
+		$status  = isset( $input['status'] ) ? (string) $input['status'] : null;
 		if ( null !== $replace && $edits ) {
 			return Block_Edit::invalid( 'change', __( 'Send either content or blocks, not both.', 'leitvia-studio' ), array( 'post' => $post ) );
 		}
-		if ( ! $fields && ! $edits && null === $replace && ! $extra ) {
-			return Block_Edit::invalid( 'change', __( 'Name what to change: title, excerpt, slug, date, author, terms, fields, featured image, comment status, blocks or content.', 'leitvia-studio' ), array( 'post' => $post ) );
+		if ( ! $fields && ! $edits && null === $replace && ! $extra && null === $status ) {
+			return Block_Edit::invalid( 'change', __( 'Name what to change: title, excerpt, slug, date, status, author, terms, fields, featured image, comment status, blocks or content.', 'leitvia-studio' ), array( 'post' => $post ) );
 		}
 		return array(
 			'area'   => 'content',
 			'target' => array( 'post' => $post ) + ( null === $replace ? array() : array( 'replace' => true ) ),
 			'record' => true,
-			'change' => static function ( array $state ) use ( $post, $edits, $fields, $replace, $extra ) {
+			'change' => static function ( array $state ) use ( $post, $edits, $fields, $replace, $extra, $status ) {
 				$content = $replace ?? Build::edit( (string) $state['post_content'], $edits, array( 'post' => $post ) );
-				return is_wp_error( $content ) ? $content : Content::change( array( 'post_content' => $content ) + $fields + $state, $extra, array( 'post' => $post ) );
+				$state   = is_wp_error( $content ) ? $content : Content::change( array( 'post_content' => $content ) + $fields + $state, $extra, array( 'post' => $post ) );
+				return is_wp_error( $state ) || null === $status ? $state : Content::status( $state, $status, isset( $extra['date'] ), array( 'post' => $post ) );
 			},
 		);
 	}

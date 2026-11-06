@@ -16,16 +16,17 @@ use LeitviaStudio\Gateway\Rejection;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Abilities leitvia/list-packages, leitvia/get-package, leitvia/apply-package and leitvia/rollback. Agents see and
+ * Abilities leitvia/list-packages, leitvia/get-package, leitvia/apply-package, leitvia/reject-package and
+ * leitvia/rollback. Agents see and
  * change their own packages (users with manage_options every package) and apply or roll back only operations whose
  * autonomy level is "autonomous" now; anything else is leitvia_needs_human with a link to the inbox. A person with
  * manage_options who is no agent decides like in the inbox, whatever the level (Gateway::is_person()). Applying and
- * rolling back replay each operation through Pipeline::run().
+ * rolling back replay each operation through Pipeline::run(). Discarding writes nothing, so it asks for no level.
  */
 final class Packages {
 
 	/**
-	 * Registers the four abilities. Runs on leitvia_studio_init.
+	 * Registers the five abilities. Runs on leitvia_studio_init.
 	 */
 	public static function register(): void {
 		$id     = array(
@@ -75,6 +76,14 @@ final class Packages {
 			}
 		);
 		self::write(
+			'leitvia/reject-package',
+			__( 'Discard change package', 'leitvia-studio' ),
+			__( 'Discards an open or partly applied change package. Its open operations stay unwritten and their waiting files are deleted, operations already applied stay. Use it for your own package when a run took a wrong turn; users with manage_options may discard any package. The package stays with the state rejected and the audit log keeps the call. It cannot be undone, so build the change again with a new package key.', 'leitvia-studio' ),
+			true,
+			$id,
+			static fn( array $input ) => self::own( (int) $input['id'] ) ?? Store::reject( (int) $input['id'] )
+		);
+		self::write(
 			'leitvia/rollback',
 			__( 'Roll back change package', 'leitvia-studio' ),
 			__( 'Rolls back the applied operations of a change package from their snapshots. Package IDs come from leitvia/list-packages. If anyone changed a target since, nothing is rolled back and leitvia_rollback_conflict lists both hashes and the diff. Agents may only roll back operations whose autonomy level is autonomous.', 'leitvia-studio' ),
@@ -85,7 +94,7 @@ final class Packages {
 	}
 
 	/**
-	 * Registers apply-package or rollback: not read-only, run after the rate limit with an audit entry.
+	 * Registers apply-package, reject-package or rollback: not read-only, run after the rate limit with an audit entry.
 	 *
 	 * @param string               $name        Ability name.
 	 * @param string               $label       Label.

@@ -12,8 +12,9 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Changes one block found by leitviaId or path ID: attributes from the block catalog and the level of a heading, the
  * text of paragraphs, headings, list items and buttons, the citation of a quote, the summary of a details block, the
- * link of a button or the one link in a text, and the image of an image or cover block. Static markup is rebuilt from
- * the new values with the HTML API on the block's own markup, never patched as a string (the HTML API cannot rename a
+ * link of a button or the one link in a text, a new link on a passage of a text, the caption of a figure, the text
+ * attributes of static blocks, the captions file of a video and the image of an image or cover block. Static markup is
+ * rebuilt from the new values with the HTML API on the block's own markup, never patched as a string (the HTML API cannot rename a
  * tag, so the level of a heading swaps the tag name of its one element); inner blocks and their placeholders in
  * innerContent stay as they are. What cannot be rebuilt safely is rejected with
  * leitvia_static_markup.
@@ -33,13 +34,26 @@ final class Block_Edit {
 	);
 
 	/**
+	 * Blocks with a caption in a figcaption at the end of their figure, with the classes core gives a new one.
+	 */
+	public const CAPTION_BLOCKS = array(
+		'core/audio'   => 'wp-element-caption',
+		'core/embed'   => 'wp-element-caption',
+		'core/gallery' => 'blocks-gallery-caption wp-element-caption',
+		'core/image'   => 'wp-element-caption',
+		'core/table'   => 'wp-element-caption',
+		'core/video'   => 'wp-element-caption',
+	);
+
+	/**
 	 * Blocks whose image can change.
 	 */
 	public const IMAGE_BLOCKS = array( 'core/image', 'core/cover' );
 
 	/**
 	 * Attributes of core blocks outside the block catalog that may change, as JSON schema; their markup is rebuilt
-	 * from the new value. The level of a heading is the tag name of its element.
+	 * from the new value. The level of a heading is the tag name of its element, the tracks of a video are its track
+	 * elements. A query keeps its markup: its settings live in the block comment, and query merges into what is set.
 	 */
 	public const CORE_ATTRIBUTES = array(
 		'core/heading' => array(
@@ -47,6 +61,69 @@ final class Block_Edit {
 				'type'    => 'integer',
 				'minimum' => 1,
 				'maximum' => 6,
+			),
+		),
+		'core/query'   => array(
+			'query'   => array(
+				'type'                 => 'object',
+				'properties'           => array(
+					'perPage'  => array(
+						'type'    => 'integer',
+						'minimum' => 1,
+						'maximum' => 100,
+					),
+					'pages'    => array(
+						'type'    => 'integer',
+						'minimum' => 0,
+					),
+					'offset'   => array(
+						'type'    => 'integer',
+						'minimum' => 0,
+					),
+					'postType' => array( 'type' => 'string' ),
+					'order'    => array(
+						'type' => 'string',
+						'enum' => array( 'asc', 'desc' ),
+					),
+					'orderBy'  => array( 'type' => 'string' ),
+					'sticky'   => array( 'type' => 'string' ),
+					'inherit'  => array( 'type' => 'boolean' ),
+				),
+				'additionalProperties' => false,
+			),
+			'queryId' => array(
+				'type'    => 'integer',
+				'minimum' => 1,
+			),
+		),
+		'core/video'   => array(
+			'tracks' => array(
+				'type'     => 'array',
+				'maxItems' => 10,
+				'items'    => array(
+					'type'                 => 'object',
+					'properties'           => array(
+						'id'      => array(
+							'type'    => 'integer',
+							'minimum' => 1,
+						),
+						'kind'    => array(
+							'type' => 'string',
+							'enum' => array( 'captions', 'subtitles', 'descriptions', 'chapters' ),
+						),
+						'srclang' => array(
+							'type'    => 'string',
+							'pattern' => '^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{2,8})*$',
+						),
+						'label'   => array(
+							'type'      => 'string',
+							'minLength' => 1,
+							'maxLength' => 100,
+						),
+					),
+					'required'             => array( 'id', 'srclang', 'label' ),
+					'additionalProperties' => false,
+				),
 			),
 		),
 	);
@@ -67,7 +144,8 @@ final class Block_Edit {
 	 *
 	 * @param string               $content Block markup.
 	 * @param string               $id      leitviaId or path ID such as p:0.2.1.
-	 * @param array<string, mixed> $change  attributes, text, url and image (id, alt, decorative); each optional.
+	 * @param array<string, mixed> $change  attributes, text, url, add_link (text, url), caption and image (id, alt,
+	 *                                      decorative); each optional.
 	 * @param array<string, mixed> $target  Target for rejections, for example array( 'post' => 12 ).
 	 * @return string|\WP_Error
 	 */
@@ -304,6 +382,18 @@ final class Block_Edit {
 				return $block;
 			}
 		}
+		if ( isset( $change['add_link'] ) ) {
+			$block = self::add_link( $block, (array) $change['add_link'], $target, $rebuild );
+			if ( is_wp_error( $block ) ) {
+				return $block;
+			}
+		}
+		if ( isset( $change['caption'] ) ) {
+			$block = self::caption( $block, (string) $change['caption'], $rebuild );
+			if ( is_wp_error( $block ) ) {
+				return $block;
+			}
+		}
 		$html = is_string( $block['innerContent'][0] ?? null ) ? $block['innerContent'][0] : '';
 		if ( isset( $change['url'] ) && ! $link ) {
 			$url  = self::url( (string) $change['url'] );
@@ -346,21 +436,109 @@ final class Block_Edit {
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	private static function text( array $block, array $change, array $target, \WP_Error $rebuild ) {
-		$query = self::TEXT_BLOCKS[ (string) $block['blockName'] ] ?? null;
+		$found = self::element( $block, self::TEXT_BLOCKS[ (string) $block['blockName'] ] ?? null );
+		if ( ! $found ) {
+			return $rebuild;
+		}
+		[ $key, $start, $length ] = $found;
+		$html                     = (string) $block['innerContent'][ $key ];
+		$inner                    = self::inner( substr( $html, $start, $length ), $change, $target, $rebuild );
+		if ( is_wp_error( $inner ) ) {
+			return $inner;
+		}
+		$block['innerContent'][ $key ] = substr_replace( $html, $inner, $start, $length );
+		return $block;
+	}
+
+	/**
+	 * Where the content of the first element of a query lies in the block's own markup.
+	 *
+	 * @param array<string, mixed>      $block Parsed block.
+	 * @param array<string, mixed>|null $query Query of the tag processor.
+	 * @return array{0: int|string, 1: int, 2: int}|null Key in innerContent, byte offset and length of the content.
+	 */
+	private static function element( array $block, ?array $query ): ?array {
 		foreach ( (array) $block['innerContent'] as $key => $html ) {
 			$tags  = is_string( $html ) && null !== $query ? self::processor( $html ) : null;
 			$range = $tags && $tags->next_tag( $query ) ? $tags->inner_range() : null;
-			if ( ! $range ) {
+			if ( $range ) {
+				return array( $key, $range[0], $range[1] );
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Block with a new link around a passage of its text: other links and inline formatting stay. The first place
+	 * outside a link counts, and the passage must lie in one run of text.
+	 *
+	 * @param array<string, mixed> $block   Parsed block.
+	 * @param array<string, mixed> $link    text and url.
+	 * @param array<string, mixed> $target  Target.
+	 * @param \WP_Error            $rebuild Rejection for static markup.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private static function add_link( array $block, array $link, array $target, \WP_Error $rebuild ) {
+		$found = 'core/button' === $block['blockName'] ? null : self::element( $block, self::TEXT_BLOCKS[ (string) $block['blockName'] ] ?? null );
+		if ( ! $found ) {
+			return $rebuild;
+		}
+		$url = self::url( (string) ( $link['url'] ?? '' ) );
+		if ( '' === $url ) {
+			return self::invalid( 'url', __( 'The link is not a valid URL.', 'leitvia-studio' ), $target );
+		}
+		[ $key, $start, $length ] = $found;
+		$html                     = (string) $block['innerContent'][ $key ];
+		$text                     = (string) ( $link['text'] ?? '' );
+		// Saved text keeps quotes as they are, text this class wrote has them as entities.
+		$forms = array_unique( array( htmlspecialchars( $text, ENT_NOQUOTES, 'UTF-8' ), esc_html( $text ) ) );
+		$parts = (array) preg_split( '/(<[^>]*>)/', substr( $html, $start, $length ), -1, PREG_SPLIT_DELIM_CAPTURE );
+		$open  = false;
+		foreach ( $parts as $index => $part ) {
+			$part = (string) $part;
+			if ( 1 === $index % 2 ) {
+				$open = preg_match( '#^<a[\s>]#i', $part ) ? true : ( preg_match( '#^</a\s*>#i', $part ) ? false : $open );
 				continue;
 			}
-			$inner = self::inner( substr( $html, $range[0], $range[1] ), $change, $target, $rebuild );
-			if ( is_wp_error( $inner ) ) {
-				return $inner;
+			foreach ( $open ? array() : $forms as $form ) {
+				$at = strpos( $part, $form );
+				if ( false !== $at ) {
+					$parts[ $index ]               = substr_replace( $part, '<a href="' . esc_url( $url ) . '">' . $form . '</a>', $at, strlen( $form ) );
+					$block['innerContent'][ $key ] = substr_replace( $html, implode( '', $parts ), $start, $length );
+					return $block;
+				}
 			}
-			$block['innerContent'][ $key ] = substr_replace( $html, $inner, $range[0], $range[1] );
-			return $block;
 		}
-		return $rebuild;
+		return self::invalid( 'add_link', __( 'The block has no such passage outside a link. Send the exact words of one run of text, without markup.', 'leitvia-studio' ), $target, 'leitvia/get-block' );
+	}
+
+	/**
+	 * Block with a new caption, as plain text; an empty one removes the figcaption, as the editor saves it.
+	 *
+	 * @param array<string, mixed> $block   Parsed block.
+	 * @param string               $caption Caption.
+	 * @param \WP_Error            $rebuild Rejection for static markup.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private static function caption( array $block, string $caption, \WP_Error $rebuild ) {
+		$classes = self::CAPTION_BLOCKS[ (string) $block['blockName'] ] ?? '';
+		$key     = array_key_last( (array) $block['innerContent'] );
+		$html    = $block['innerContent'][ $key ] ?? null;
+		$end     = is_string( $html ) ? strrpos( $html, '</figure>' ) : false;
+		if ( '' === $classes || false === $end ) {
+			return $rebuild;
+		}
+		$text  = esc_html( trim( $caption ) );
+		$tags  = self::processor( (string) $html );
+		$range = $tags->next_tag( 'figcaption' ) ? $tags->inner_range() : null;
+		if ( $range ) {
+			$block['innerContent'][ $key ] = '' !== $text
+				? substr_replace( (string) $html, $text, $range[0], $range[1] )
+				: substr_replace( (string) $html, '', $range[2], $range[0] + $range[1] + strlen( '</figcaption>' ) - $range[2] );
+		} elseif ( '' !== $text ) {
+			$block['innerContent'][ $key ] = substr_replace( (string) $html, '<figcaption class="' . $classes . '">' . $text . '</figcaption>', $end, 0 );
+		}
+		return $block;
 	}
 
 	/**
@@ -419,8 +597,8 @@ final class Block_Edit {
 
 	/**
 	 * Block with new attributes. Allowed are attributes of the block catalog that live in the block comment, on blocks
-	 * that render on the server or save no markup of their own, the CORE_ATTRIBUTES whose markup is rebuilt here, and
-	 * leitviaAnimation and leitviaMotion on every block that has them, static markup included: the server adds their
+	 * that render on the server or save no markup of their own, the CORE_ATTRIBUTES whose markup is rebuilt here, text
+	 * attributes whose element the block has (sourced()), and leitviaAnimation and leitviaMotion on every block that has them, static markup included: the server adds their
 	 * classes on render, the saved markup stays (animation()). Anything else would leave the saved markup behind.
 	 *
 	 * @param array<string, mixed> $block  Parsed block.
@@ -439,6 +617,7 @@ final class Block_Edit {
 		if ( ! $entry ) {
 			return self::invalid( 'attributes', __( 'This block is not in the block catalog; its attributes cannot be set.', 'leitvia-studio' ), $target, 'leitvia/list-blocks' );
 		}
+		$texts = array();
 		foreach ( $attrs as $key => $value ) {
 			$schema = $entry['attributes']['properties'][ $key ] ?? null;
 			if ( ! is_array( $schema ) ) {
@@ -446,7 +625,11 @@ final class Block_Edit {
 				return self::invalid( 'attributes', sprintf( __( 'The block has no attribute %s in the catalog.', 'leitvia-studio' ), $key ), $target, 'leitvia/list-blocks' );
 			}
 			if ( isset( $schema['source'] ) ) {
-				return $rebuild;
+				if ( ! in_array( $schema['source'], array( 'text', 'rich-text', 'html' ), true ) || ! is_string( $value ) ) {
+					return $rebuild;
+				}
+				$texts[ $key ] = $value;
+				continue;
 			}
 			$valid = rest_validate_value_from_schema( $value, array_diff_key( $schema, array( 'default' => true ) ), (string) $key );
 			if ( is_wp_error( $valid ) ) {
@@ -454,7 +637,19 @@ final class Block_Edit {
 			}
 		}
 		if ( $core ) {
-			return isset( $attrs['level'] ) ? self::level( $block, (int) $attrs['level'], $rebuild ) : $block;
+			return match ( true ) {
+				isset( $attrs['level'] )  => self::level( $block, (int) $attrs['level'], $rebuild ),
+				isset( $attrs['tracks'] ) => self::tracks( $block, array_values( (array) $attrs['tracks'] ), $target, $rebuild ),
+				'core/query' === $name    => self::query( $block, $attrs ),
+				default                   => $block,
+			};
+		}
+		if ( $texts ) {
+			$block = self::sourced( $block, $texts, $rebuild );
+			$attrs = array_diff_key( $attrs, $texts );
+			if ( is_wp_error( $block ) || ! $attrs ) {
+				return $block;
+			}
 		}
 		$position = self::POSITION_ATTRIBUTES[ $name ] ?? array();
 		if ( $position && ! array_diff_key( $attrs, $position ) ) {
@@ -466,6 +661,126 @@ final class Block_Edit {
 			return $rebuild;
 		}
 		$block['attrs'] = $attrs + (array) $block['attrs'];
+		return $block;
+	}
+
+	/**
+	 * Query with new settings: query merges into the settings the block has, from the default of core, which
+	 * inherits, when it has none, because a query attribute replaces that default as a whole.
+	 *
+	 * @param array<string, mixed> $block Parsed block.
+	 * @param array<string, mixed> $attrs query and/or queryId.
+	 * @return array<string, mixed>
+	 */
+	private static function query( array $block, array $attrs ): array {
+		if ( isset( $attrs['query'] ) ) {
+			$default         = \WP_Block_Type_Registry::get_instance()->get_registered( 'core/query' )->attributes['query']['default'] ?? array();
+			$attrs['query'] += (array) ( $block['attrs']['query'] ?? $default );
+		}
+		$block['attrs'] = $attrs + (array) $block['attrs'];
+		return $block;
+	}
+
+	/**
+	 * Video with new text tracks from WebVTT files of the media library: the track elements in the video and the
+	 * attribute tracks, as the editor saves them. An empty list removes all.
+	 *
+	 * @param array<string, mixed>       $block   Parsed block.
+	 * @param list<array<string, mixed>> $tracks  id, kind, srclang, label.
+	 * @param array<string, mixed>       $target  Target.
+	 * @param \WP_Error                  $rebuild Rejection for static markup.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private static function tracks( array $block, array $tracks, array $target, \WP_Error $rebuild ) {
+		$stored = array();
+		$markup = '';
+		foreach ( $tracks as $track ) {
+			$id  = (int) $track['id'];
+			$url = 'text/vtt' === get_post_mime_type( $id ) && Scope::readable( $id ) ? (string) wp_get_attachment_url( $id ) : '';
+			if ( '' === $url ) {
+				return self::invalid( 'tracks', __( 'A track needs a WebVTT file of the media library. Add it with leitvia/add-media first.', 'leitvia-studio' ), $target, 'leitvia/add-media' );
+			}
+			$kind     = (string) ( $track['kind'] ?? 'captions' );
+			$stored[] = array(
+				'src'     => $url,
+				'label'   => (string) $track['label'],
+				'srcLang' => (string) $track['srclang'],
+				'kind'    => $kind,
+			);
+			$markup  .= sprintf( '<track src="%s" label="%s" srclang="%s" kind="%s"/>', esc_url( $url ), esc_attr( (string) $track['label'] ), esc_attr( (string) $track['srclang'] ), esc_attr( $kind ) );
+		}
+		$html  = (string) ( $block['innerContent'][0] ?? '' );
+		$tags  = self::processor( $html );
+		$range = $tags->next_tag( 'video' ) ? $tags->inner_range() : null;
+		if ( ! $range ) {
+			return $rebuild;
+		}
+		$block['innerContent'][0] = substr_replace( $html, $markup, $range[0], $range[1] );
+		unset( $block['attrs']['tracks'] );
+		$block['attrs'] += $stored ? array( 'tracks' => $stored ) : array();
+		return $block;
+	}
+
+	/**
+	 * Block with new text attributes in their elements. The counter rebuilds its number, whose parts come and go; any
+	 * other block needs the element already, because what its save function leaves out cannot be rebuilt here.
+	 *
+	 * @param array<string, mixed>  $block   Parsed block.
+	 * @param array<string, string> $texts   New values by attribute.
+	 * @param \WP_Error             $rebuild Rejection for static markup.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private static function sourced( array $block, array $texts, \WP_Error $rebuild ) {
+		if ( 'leitvia/counter' === $block['blockName'] ) {
+			$number = array_intersect_key( $texts, array_flip( array( 'prefix', 'value', 'suffix' ) ) );
+			$block  = $number ? self::counter( $block, $number, $rebuild ) : $block;
+			$texts  = array_diff_key( $texts, $number );
+			if ( is_wp_error( $block ) ) {
+				return $block;
+			}
+		}
+		$types = \WP_Block_Type_Registry::get_instance()->get_registered( (string) $block['blockName'] )->attributes ?? array();
+		foreach ( $texts as $key => $text ) {
+			$selector = (string) ( $types[ $key ]['selector'] ?? '' );
+			$query    = match ( true ) {
+				(bool) preg_match( '/^\.[\w-]+$/', $selector ) => array( 'class_name' => substr( $selector, 1 ) ),
+				(bool) preg_match( '/^[a-z][a-z0-9]*$/', $selector ) => array( 'tag_name' => $selector ),
+				default => null,
+			};
+			$found = '' !== trim( $text ) ? self::element( $block, $query ) : null;
+			if ( ! $found ) {
+				return $rebuild;
+			}
+			$block['innerContent'][ $found[0] ] = substr_replace( (string) $block['innerContent'][ $found[0] ], esc_html( $text ), $found[1], $found[2] );
+		}
+		return $block;
+	}
+
+	/**
+	 * Counter with a new number, built like its save function: prefix and suffix only with a value, the value with a
+	 * minimum width of its length, so the counting copy of view.js moves nothing.
+	 *
+	 * @param array<string, mixed>  $block   Parsed block.
+	 * @param array<string, string> $values  New prefix, value or suffix.
+	 * @param \WP_Error             $rebuild Rejection for static markup.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private static function counter( array $block, array $values, \WP_Error $rebuild ) {
+		$class = 'wp-block-leitvia-counter__';
+		$html  = (string) ( $block['innerContent'][0] ?? '' );
+		$parts = array();
+		foreach ( array( 'prefix', 'value', 'suffix' ) as $part ) {
+			$found          = self::element( $block, array( 'class_name' => $class . $part ) );
+			$parts[ $part ] = isset( $values[ $part ] ) ? esc_html( $values[ $part ] ) : ( $found ? substr( $html, $found[1], $found[2] ) : '' );
+		}
+		$number = self::element( $block, array( 'class_name' => $class . 'number' ) );
+		if ( ! $number || '' === $parts['value'] ) {
+			return $rebuild;
+		}
+		$span  = static fn( string $part, string $style = '' ): string => '' === $parts[ $part ] ? '' : '<span class="' . $class . $part . '"' . $style . '>' . $parts[ $part ] . '</span>';
+		$width = mb_strlen( html_entity_decode( $parts['value'], ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
+
+		$block['innerContent'][0] = substr_replace( $html, $span( 'prefix' ) . $span( 'value', ' style="min-inline-size:' . $width . 'ch"' ) . $span( 'suffix' ), $number[1], $number[2] );
 		return $block;
 	}
 

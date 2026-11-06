@@ -215,6 +215,9 @@ final class Read_Audit {
 		if ( '' !== trim( $post->post_content ) && ! has_blocks( $post->post_content ) ) {
 			$findings[] = self::finding( 'leitvia/classic-content', __( 'The page holds classic content without blocks.', 'leitvia-studio' ), __( 'Turn it into blocks with leitvia/update-content and content.', 'leitvia-studio' ) );
 		}
+		if ( has_block( 'leitvia/contact-form', $post ) && ! str_contains( $post->post_content, '"privacyNote":false' ) && '' === get_privacy_policy_url() ) {
+			$findings[] = self::finding( 'leitvia/privacy-page', __( 'The contact form promises a note on data use with a link, but the site has no published privacy policy page, so the link is missing.', 'leitvia-studio' ), __( 'Publish the page, then ask for leitvia/set-privacy-page; a person applies it.', 'leitvia-studio' ) );
+		}
 		$legal = self::LEGAL_SLUGS[ $post->post_name ] ?? '';
 		if ( in_array( '' !== $kind ? $kind : $legal, self::LEGAL_SLUGS, true ) ) {
 			foreach ( self::placeholders( $post->post_content ) as $placeholder ) {

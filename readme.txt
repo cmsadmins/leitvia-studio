@@ -4,7 +4,7 @@ Tags: ai, mcp, block theme, accessibility, design tokens
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.28
+Stable tag: 1.3.29
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -212,6 +212,15 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * Privacy policy: https://leitvia.com/privacy-policy/
 
 == Changelog ==
+
+= 1.3.29 =
+* leitvia/add-media takes WebVTT files with captions: right to upload files, .vtt, UTF-8 and the signature WEBVTT. The attribute tracks of leitvia/update-block sets them on a video with kind, srclang and label, and the video prints a track element (WCAG 1.2.2).
+* leitvia/update-block and leitvia/update-content set the caption of images, videos, audio, galleries, tables and embeds, and with add_link a new link on a passage of a text.
+* leitvia/update-content takes status: it publishes a draft, schedules it or takes a post back, by the same package rules as any change.
+* core/query and core/video are in the block catalog. query in leitvia/update-block merges into the settings of a query, so perPage alone keeps the rest.
+* leitvia/update-block changes prefix, value, suffix and label of a counter and the text attributes of other static blocks. Saved counters, wizards and consent settings no longer lose their markup for users without unfiltered_html, and every catalog example passes the gateway.
+* New ability leitvia/reject-package discards an open change package; the package and the audit log stay.
+* New ability leitvia/set-privacy-page proposes the privacy policy page for a person to apply. leitvia/audit-site reports a contact form on a site without a published one (check leitvia/privacy-page).
 
 = 1.3.28 =
 * Without an SEO plugin Leitvia Studio takes its place: leitvia/update-seo and the seo field of leitvia/create-content store title, description and robots and print them in the head, without changing the heading of the page.
