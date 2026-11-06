@@ -23,12 +23,14 @@ final class Wizard {
 	 * @param string $content Rendered block HTML.
 	 */
 	public static function render( string $content ): string {
-		$step  = array(
+		// The default button text is saved in the markup, in English; a text of its own stays.
+		$content = str_replace( '>Show results<', '>' . esc_html__( 'Show results', 'leitvia-studio' ) . '<', $content );
+		$step    = array(
 			'tag_name'   => 'FIELDSET',
 			'class_name' => 'wp-block-leitvia-wizard-step',
 		);
-		$count = new \WP_HTML_Tag_Processor( $content );
-		$total = 0;
+		$count   = new \WP_HTML_Tag_Processor( $content );
+		$total   = 0;
 		while ( $count->next_tag( $step ) ) {
 			++$total;
 		}

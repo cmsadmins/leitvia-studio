@@ -1,4 +1,5 @@
 {
+	"example": "<!-- wp:leitvia/spotlight-hotspot {\"x\":30,\"y\":40} -->\n<details style=\"--x:30%;--y:40%\" data-wp-on--toggle=\"actions.toggle\" class=\"wp-block-leitvia-spotlight-hotspot\"><summary class=\"wp-block-leitvia-spotlight-hotspot__summary\"><span class=\"wp-block-leitvia-spotlight-hotspot__label\">Charging port</span></summary><div class=\"wp-block-leitvia-spotlight-hotspot__content\"></div></details>\n<!-- /wp:leitvia/spotlight-hotspot -->",
 	"usage": {
 		"useWhen": "One point on a spotlight image with a name and a short text. x and y place it in percent of the image from the start edge and the top; leitvia/update-block moves it with attributes x and y, for example after the image changed.",
 		"avoidWhen": "Outside a spotlight; it only works as its child.",

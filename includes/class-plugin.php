@@ -111,6 +111,8 @@ final class Plugin {
 		add_filter( 'wp_insert_post_data', array( Model\Registrar::class, 'force_inherit' ) );
 		add_action( 'enqueue_block_editor_assets', array( Model\Registrar::class, 'enqueue_editor' ) );
 		add_filter( 'render_block_context', array( Model\Registrar::class, 'query_namespace' ), 10, 3 );
+		add_filter( 'query_loop_block_query_vars', array( Model\Registrar::class, 'listed_query_vars' ), 9, 2 );
+		add_filter( 'rest_prepare_post_type', array( Model\Registrar::class, 'listed_in_editor' ), 10, 3 );
 		add_filter( 'query_loop_block_query_vars', array( Model\Registrar::class, 'children_query_vars' ), 10, 2 );
 		add_action( 'init', array( Model\Entry_View::class, 'register' ), 20 );
 		add_filter( 'query_loop_block_query_vars', array( Model\Entry_View::class, 'query_vars' ), 10, 2 );

@@ -285,8 +285,8 @@ final class Registrar {
 			}
 			$stored = $id ? array_map( 'intval', (array) get_post_meta( $id, $key, true ) ) : array();
 			foreach ( array_diff( array_map( 'intval', $meta[ $key ] ), $stored ) as $target ) {
-				// Published posts of a viewable type are public; others need read_post (types without a public flag).
-				$public = 'publish' === get_post_status( $target ) && is_post_type_viewable( $relation['to'] );
+				// Published posts of a viewable or listed type are public; others need read_post (types without a public flag).
+				$public = 'publish' === get_post_status( $target ) && ( is_post_type_viewable( $relation['to'] ) || self::listed_only( $relation['to'] ) );
 				if ( get_post_type( $target ) !== $relation['to'] || ! ( $public || current_user_can( 'read_post', $target ) ) ) {
 					return new \WP_Error(
 						'rest_invalid_param',
@@ -557,6 +557,52 @@ final class Registrar {
 			$context['query']['namespace'] = $namespace;
 		}
 		return $context;
+	}
+
+	/**
+	 * Whether a post type of the model is public without single pages: lists and bindings show its entries, core treats
+	 * it as not viewable.
+	 *
+	 * @param string $key Post type.
+	 */
+	private static function listed_only( string $key ): bool {
+		$type = self::owns_post_type( $key ) ? get_post_type_object( $key ) : null;
+		return $type && $type->public && ! $type->publicly_queryable;
+	}
+
+	/**
+	 * Keeps a query loop on a type without single pages. Core only queries viewable post types and falls back to posts
+	 * without a word. Runs on query_loop_block_query_vars before the other filters, which read the type.
+	 *
+	 * @param array<string, mixed> $query Query vars.
+	 * @param \WP_Block            $block Post template block.
+	 * @return array<string, mixed>
+	 */
+	public static function listed_query_vars( array $query, \WP_Block $block ): array {
+		$post_type = (string) ( $block->context['query']['postType'] ?? '' );
+		if ( self::listed_only( $post_type ) ) {
+			$query['post_type'] = $post_type;
+		}
+		return $query;
+	}
+
+	/**
+	 * Offers a type without single pages in the post type control of the Query Loop, which lists viewable types only. Only
+	 * the list of all types changes: the single type stays not viewable, so its editor shows no View link that leads
+	 * nowhere. Runs on rest_prepare_post_type.
+	 *
+	 * @param \WP_REST_Response $response  Response.
+	 * @param \WP_Post_Type     $post_type Post type.
+	 * @param \WP_REST_Request  $request   Request.
+	 * @return \WP_REST_Response
+	 */
+	public static function listed_in_editor( \WP_REST_Response $response, \WP_Post_Type $post_type, \WP_REST_Request $request ): \WP_REST_Response {
+		if ( 'edit' === $request['context'] && ! isset( $request['type'] ) && self::listed_only( $post_type->name ) ) {
+			$data             = $response->get_data();
+			$data['viewable'] = true;
+			$response->set_data( $data );
+		}
+		return $response;
 	}
 
 	/**

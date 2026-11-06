@@ -1,4 +1,5 @@
 {
+	"example": "<!-- wp:leitvia/wizard-step {\"name\":\"need\",\"options\":[{\"label\":\"Website\",\"value\":\"website\"},{\"label\":\"Shop\",\"value\":\"shop\"}]} -->\n<fieldset class=\"wp-block-leitvia-wizard-step\"><legend>What do you need?</legend><div class=\"wp-block-leitvia-wizard-step__options\"><label><input type=\"radio\" name=\"need\" value=\"website\"/> Website</label><label><input type=\"radio\" name=\"need\" value=\"shop\"/> Shop</label></div></fieldset>\n<!-- /wp:leitvia/wizard-step -->",
 	"usage": {
 		"useWhen": "One step of a wizard with a group of choices.",
 		"avoidWhen": "Outside a wizard; it only works as its child.",

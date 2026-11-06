@@ -900,18 +900,25 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 		$this->assertSame( 'leitvia_rate_limited', $limited->get_error_code() );
 		$this->assertStringStartsWith( 'after:', $limited->get_error_data()['retry'] );
 		$this->assertSame( 2, $work, 'No change computed after the limit.' );
+		// Reads have their own, higher limit: used up writes leave them open, and a site can move both by filter.
 		$read = 0;
-		$this->assertSame(
-			'leitvia_rate_limited',
-			LeitviaStudio\Gateway\Abilities::run(
+		$call = static function () use ( &$read ) {
+			return LeitviaStudio\Gateway\Abilities::run(
 				'leitvia/get-contract',
 				static function () use ( &$read ) {
 					return ++$read;
 				},
 				null
-			)->get_error_code()
-		);
-		$this->assertSame( 0, $read );
+			);
+		};
+		$this->assertSame( 1, $call() );
+		$limit = static fn( int $limit, bool $is_read ): int => $is_read ? 1 : $limit;
+		add_filter( 'leitvia_studio_rate_limit', $limit, 10, 2 );
+		$this->assertSame( 'leitvia_rate_limited', $call()->get_error_code() );
+		remove_filter( 'leitvia_studio_rate_limit', $limit );
+		$this->assertSame( 1, $read );
+		// Reads never use up the writes.
+		$this->assertSame( 2, LeitviaStudio\Gateway\Store::calls_since( get_current_user_id(), '2000-01-01 00:00:00' )[0] );
 		self::settings( 'full' );
 
 		$this->assertSame( 'leitvia_too_large', LeitviaStudio\Gateway\Diff::states( array( 'post_content' => str_repeat( 'a', MB_IN_BYTES ) ), array( 'post_content' => 'b' ) )->get_error_code() );

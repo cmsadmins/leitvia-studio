@@ -1,4 +1,5 @@
 {
+	"example": "<!-- wp:leitvia/form-errors -->\n<div class=\"wp-block-leitvia-form-errors\"><div class=\"wp-block-leitvia-form-errors__summary\" role=\"region\" tabindex=\"-1\" hidden><h2 class=\"wp-block-leitvia-form-errors__title\"></h2><ul class=\"wp-block-leitvia-form-errors__list\"></ul></div><!-- wp:paragraph -->\n<p>Place a form here.</p>\n<!-- /wp:paragraph --></div>\n<!-- /wp:leitvia/form-errors -->",
 	"usage": {
 		"useWhen": "Around a form from a form plugin, so visitors see all errors at the top with links to the fields.",
 		"avoidWhen": "Around content without form fields or forms that already show an error summary.",

@@ -608,10 +608,12 @@ const CHECK_FIELDS = [
 const LIMIT_FIELDS = [
 	{
 		id: 'rate_per_minute',
-		label: __(
-			'Rate limit (calls per minute and agent)',
-			'leitvia-studio'
-		),
+		label: __( 'Changes per minute and agent', 'leitvia-studio' ),
+		type: 'integer',
+	},
+	{
+		id: 'read_rate_per_minute',
+		label: __( 'Reads per minute and agent', 'leitvia-studio' ),
 		type: 'integer',
 	},
 	{

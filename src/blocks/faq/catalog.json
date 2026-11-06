@@ -1,4 +1,5 @@
 {
+	"example": "<!-- wp:leitvia/faq -->\n<div class=\"wp-block-leitvia-faq\"><!-- wp:details {\"showContent\":true} -->\n<details class=\"wp-block-details\" open><summary>How long does a project take?</summary><!-- wp:paragraph -->\n<p>Most projects take four to six weeks.</p>\n<!-- /wp:paragraph --></details>\n<!-- /wp:details -->\n\n<!-- wp:details -->\n<details class=\"wp-block-details\"><summary>Can we keep our content?</summary><!-- wp:paragraph -->\n<p>Yes, posts, pages and media move over.</p>\n<!-- /wp:paragraph --></details>\n<!-- /wp:details --></div>\n<!-- /wp:leitvia/faq -->",
 	"usage": {
 		"useWhen": "Frequently asked questions with short answers, such as on a service, product or contact page. Turn schema off for questions the site does not answer itself.",
 		"avoidWhen": "Content everyone must read, or steps in order; use headings, a list or the wizard block instead.",

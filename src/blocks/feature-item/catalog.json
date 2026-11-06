@@ -1,4 +1,5 @@
 {
+	"example": "<!-- wp:leitvia/feature-item -->\n<li class=\"wp-block-leitvia-feature-item\"><h3 class=\"wp-block-leitvia-feature-item__title\">Unlimited pages</h3><p class=\"wp-block-leitvia-feature-item__text\">Add as many pages as you need.</p></li>\n<!-- /wp:leitvia/feature-item -->",
 	"usage": {
 		"useWhen": "One feature inside a feature group, with the plan that includes it.",
 		"avoidWhen": "Outside a feature group; it only works as its child.",

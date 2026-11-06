@@ -1,4 +1,5 @@
 {
+	"example": "<!-- wp:leitvia/counter -->\n<div class=\"wp-block-leitvia-counter\"><p class=\"wp-block-leitvia-counter__number\"><span class=\"wp-block-leitvia-counter__value\" style=\"min-inline-size:4ch\">1250</span><span class=\"wp-block-leitvia-counter__suffix\">+</span></p><p class=\"wp-block-leitvia-counter__label\">Projects delivered</p></div>\n<!-- /wp:leitvia/counter -->",
 	"usage": {
 		"useWhen": "Three or four key figures with a short label, such as projects delivered or years in business.",
 		"avoidWhen": "Figures that need explanation or exact values in tables; use text or the comparison table.",

@@ -119,6 +119,29 @@ class Test_Contact_Form extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Empty attributes keep the translated defaults, so the block stores no text; own texts replace them.
+	 */
+	public function test_labels_from_attributes(): void {
+		$german = static fn( string $translation, string $text ): string => 'Message' === $text ? 'Nachricht' : $translation;
+		add_filter( 'gettext', $german, 10, 2 );
+		$html   = $this->html( array() );
+		remove_filter( 'gettext', $german, 10 );
+		$this->assertStringContainsString( '>Nachricht<', $html );
+		$html = $this->html(
+			array(
+				'nameLabel'    => 'Ihr Name',
+				'emailLabel'   => 'Ihre E-Mail',
+				'messageLabel' => 'Ihr Anliegen',
+				'requiredNote' => 'Bitte alles ausfüllen.',
+			)
+		);
+		foreach ( array( 'Ihr Name', 'Ihre E-Mail', 'Ihr Anliegen', 'Bitte alles ausfüllen.' ) as $text ) {
+			$this->assertStringContainsString( '>' . $text . '<', $html );
+		}
+		$this->assertStringNotContainsString( '>Email address<', $html );
+	}
+
+	/**
 	 * The Studio pattern holds the block, so it renders the form.
 	 */
 	public function test_pattern_renders_the_form(): void {

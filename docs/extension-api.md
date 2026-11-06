@@ -91,10 +91,11 @@ The owner argument is not authenticated: PHP cannot tell which plugin makes a ca
 
 Every entry of the `blocks` registry appears in the block catalog with its add-on as `owner`, so agents find add-on blocks next to Studio's own. The catalog reads the registered block type from core, never the files: name, title, description, category, `parent`, `ancestor`, the agent-relevant `supports`, the attributes of `block.json` as JSON schema (`type`, `enum`, `default`, `items`, `properties`, `source`) and the allowed children (`allowedBlocks`, otherwise the blocks naming it as `parent`). Core blocks Studio changes (`core/code`, `core/embed`, `core/tabs`) are listed with the owner `core` and an `extension` text.
 
-Usage rules live in `catalog.json` next to `block.json`, because the `block.json` schema allows no own keys:
+Usage rules live in `catalog.json` next to `block.json`, because the `block.json` schema allows no own keys. A block without render callback also names its saved markup as `example`, so an agent writes it with its content in the HTML; the check `leitvia/block-validity` rejects such a block when it is empty or carries an attribute with a `source` in the comment:
 
 ```json
 {
+	"example": "<!-- wp:my-addon/note -->\n<div class=\"wp-block-my-addon-note\"><p>Text</p></div>\n<!-- /wp:my-addon/note -->",
 	"usage": {
 		"useWhen": "When the block is the right choice.",
 		"avoidWhen": "When something else fits better, and what.",
@@ -268,6 +269,7 @@ Add-ons dock onto the gateway through hooks, for example to run one workflow on 
 | `leitvia_studio_package_applied` | action | `int $id` | After a change package was applied, fully or in part. |
 | `leitvia_studio_package_rolled_back` | action | `int $id` | After an applied change package was rolled back. |
 | `leitvia_studio_gateway_areas` | filter | `array $levels` (level by area), `array $settings` | When the autonomy level of an area is read. Add the area of an add-on or cap levels with a policy shared by several sites. `admin` and areas without a valid level (`locked`, `suggest`, `draft`, `autonomous`) stay locked. |
+| `leitvia_studio_rate_limit` | filter | `int $limit`, `bool $read`, `int $user_id` | Calls per minute of one user, reads and changes apart, from the settings `read_rate_per_minute` (300) and `rate_per_minute` (60). |
 | `leitvia_studio_gateway_post_types` | filter | `list<string> $post_types` | Post types open to agents; blocked types are dropped whatever the filter returns. |
 | `leitvia_studio_ai_note` | filter | `string $note`, `int $post_id` | Text of the note shown before content that `leitvia/create-content` marked with `ai_generated` (meta `leitvia_ai_generated`); an empty string hides it. Deleting the meta in the custom fields of a post removes the note for that post. |
 | `leitvia_studio_public_author_name` | filter | `string $name`, `int $user_id` | Name visitors see for an author whose display name is still the login, and for agent users: first and last name, else the name of the site. |

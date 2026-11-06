@@ -119,10 +119,10 @@ class Test_Gateway_Abilities extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Above rate_per_minute the call is rejected before the callback runs, with a retry time.
+	 * Above read_rate_per_minute a read is rejected before the callback runs, with a retry time.
 	 */
 	public function test_rate_limit(): void {
-		update_option( Gateway::OPTION, array( 'rate_per_minute' => 2 ) );
+		update_option( Gateway::OPTION, array( 'read_rate_per_minute' => 2 ) );
 		$user = self::factory()->user->create( array( 'role' => Gateway::ROLE ) );
 		wp_set_current_user( $user );
 		$ability = wp_get_ability( self::NAME );
@@ -134,7 +134,7 @@ class Test_Gateway_Abilities extends WP_UnitTestCase {
 		$this->assertSame( 429, $error->get_error_data()['status'] );
 		$this->assertMatchesRegularExpression( '/^after:([1-9]|[1-5][0-9]|60)$/', $error->get_error_data()['retry'] );
 		$this->assertSame( 2, self::$calls, 'the callback did not run' );
-		$this->assertSame( 2, Store::calls_since( $user, '2000-01-01 00:00:00' )[0], 'rejections do not count' );
+		$this->assertSame( 2, Store::calls_since( $user, '2000-01-01 00:00:00', true )[0], 'rejections do not count' );
 
 		// Another user has their own limit; calls older than a minute do not count.
 		wp_set_current_user( self::factory()->user->create( array( 'role' => Gateway::ROLE ) ) );

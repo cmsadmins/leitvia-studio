@@ -10,6 +10,22 @@
 	"keywords": [ "contact", "form", "email", "message", "enquiry" ],
 	"textdomain": "leitvia-studio",
 	"attributes": {
+		"nameLabel": {
+			"type": "string",
+			"default": ""
+		},
+		"emailLabel": {
+			"type": "string",
+			"default": ""
+		},
+		"messageLabel": {
+			"type": "string",
+			"default": ""
+		},
+		"requiredNote": {
+			"type": "string",
+			"default": ""
+		},
 		"buttonText": {
 			"type": "string",
 			"default": ""

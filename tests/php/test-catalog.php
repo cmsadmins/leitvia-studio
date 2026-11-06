@@ -103,6 +103,23 @@ class Test_Catalog extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Every Studio block that keeps its content in HTML names its saved markup, and that example passes the check and
+	 * renders. The editor loads the same examples without a validation error (tests/e2e/standards.spec.mjs).
+	 */
+	public function test_saved_blocks_have_an_example(): void {
+		$types = WP_Block_Type_Registry::get_instance();
+		foreach ( self::by_name() as $name => $entry ) {
+			if ( 'leitvia-studio' !== $entry['owner'] || $types->get_registered( $name )->is_dynamic() ) {
+				continue;
+			}
+			$this->assertNotEmpty( $entry['example'] ?? '', $name );
+			$findings = \LeitviaStudio\Gateway\Content_Checks::block_validity( $entry['example'], array( 'post_type' => 'page' ) );
+			$this->assertSame( array(), array_column( $findings, 'message' ), $name );
+			$this->assertNotSame( '', trim( do_blocks( $entry['example'] ) ), $name );
+		}
+	}
+
+	/**
 	 * The core blocks Studio extends are listed with the extension.
 	 */
 	public function test_core_extensions(): void {

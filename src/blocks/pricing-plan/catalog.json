@@ -1,4 +1,5 @@
 {
+	"example": "<!-- wp:leitvia/pricing-plan {\"monthly\":9,\"yearly\":90} -->\n<article class=\"wp-block-leitvia-pricing-plan\"><h3 class=\"wp-block-leitvia-pricing-plan__name\">Basic</h3><p class=\"wp-block-leitvia-pricing-plan__price wp-block-leitvia-pricing-plan__price--monthly\"></p><p class=\"wp-block-leitvia-pricing-plan__price wp-block-leitvia-pricing-plan__price--yearly\"></p><div class=\"wp-block-leitvia-pricing-plan__content\"></div></article>\n<!-- /wp:leitvia/pricing-plan -->",
 	"usage": {
 		"useWhen": "One plan inside a pricing block, with its prices and features.",
 		"avoidWhen": "Outside a pricing block; it only works as its child.",

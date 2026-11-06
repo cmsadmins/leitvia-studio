@@ -1,4 +1,5 @@
 {
+	"example": "<!-- wp:leitvia/icon-list -->\n<ul role=\"list\" class=\"wp-block-leitvia-icon-list\"><!-- wp:leitvia/icon-list-item -->\n<li class=\"wp-block-leitvia-icon-list-item\"><span class=\"wp-block-leitvia-icon-list-item__text\">Free delivery from 50 euros</span></li>\n<!-- /wp:leitvia/icon-list-item -->\n\n<!-- wp:leitvia/icon-list-item -->\n<li class=\"wp-block-leitvia-icon-list-item\"><span class=\"wp-block-leitvia-icon-list-item__text\">Returns within 30 days</span></li>\n<!-- /wp:leitvia/icon-list-item -->\n\n<!-- wp:leitvia/icon-list-item {\"icon\":\"phone\"} -->\n<li class=\"wp-block-leitvia-icon-list-item\"><span class=\"wp-block-leitvia-icon-list-item__text\">Advice by phone</span></li>\n<!-- /wp:leitvia/icon-list-item --></ul>\n<!-- /wp:leitvia/icon-list -->",
 	"usage": {
 		"useWhen": "Short lists of benefits, included services or contact details, where an icon such as a check mark replaces the bullet.",
 		"avoidWhen": "Numbered steps or long text per item; use a numbered list, the timeline or feature group.",

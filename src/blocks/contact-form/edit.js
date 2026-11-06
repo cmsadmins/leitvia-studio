@@ -13,6 +13,7 @@ import metadata from './block.json';
 export default function Edit( { attributes, setAttributes } ) {
 	const { buttonText, successMessage, recipient, subject } = attributes;
 	const { privacyNote, privacyText } = attributes;
+	const { nameLabel, emailLabel, messageLabel, requiredNote } = attributes;
 	const set = ( name ) => ( value ) => setAttributes( { [ name ]: value } );
 	const empty = __( 'Empty: the translated default.', 'leitvia-studio' );
 	return (
@@ -39,6 +40,46 @@ export default function Edit( { attributes, setAttributes } ) {
 					/>
 				</PanelBody>
 				<PanelBody title={ __( 'Texts', 'leitvia-studio' ) }>
+					<TextControl
+						__next40pxDefaultSize
+						label={ __(
+							'Label of the name field',
+							'leitvia-studio'
+						) }
+						help={ empty }
+						value={ nameLabel }
+						onChange={ set( 'nameLabel' ) }
+					/>
+					<TextControl
+						__next40pxDefaultSize
+						label={ __(
+							'Label of the email field',
+							'leitvia-studio'
+						) }
+						help={ empty }
+						value={ emailLabel }
+						onChange={ set( 'emailLabel' ) }
+					/>
+					<TextControl
+						__next40pxDefaultSize
+						label={ __(
+							'Label of the message field',
+							'leitvia-studio'
+						) }
+						help={ empty }
+						value={ messageLabel }
+						onChange={ set( 'messageLabel' ) }
+					/>
+					<TextControl
+						__next40pxDefaultSize
+						label={ __(
+							'Note on required fields',
+							'leitvia-studio'
+						) }
+						help={ empty }
+						value={ requiredNote }
+						onChange={ set( 'requiredNote' ) }
+					/>
 					<TextControl
 						__next40pxDefaultSize
 						label={ __( 'Button text', 'leitvia-studio' ) }

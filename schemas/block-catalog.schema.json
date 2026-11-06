@@ -55,6 +55,10 @@
 				"type": [ "array", "null" ],
 				"items": { "type": "string" }
 			},
+			"example": {
+				"description": "Saved markup of a block that keeps its content in HTML: write the block like this, an empty or self-closing block renders nothing. Blocks that render on the server have none; their attributes are enough.",
+				"type": "string"
+			},
 			"usage": {
 				"description": "When to use the block. Required for Studio blocks, optional for add-on blocks.",
 				"type": [ "object", "null" ],

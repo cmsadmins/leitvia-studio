@@ -1,4 +1,5 @@
 {
+	"example": "<!-- wp:leitvia/reveal -->\n<div class=\"wp-block-leitvia-reveal is-effect-rise\"><!-- wp:paragraph -->\n<p>This text appears while it scrolls into view.</p>\n<!-- /wp:paragraph --></div>\n<!-- /wp:leitvia/reveal -->",
 	"usage": {
 		"useWhen": "Subtle emphasis for one or two sections that scroll into view on a landing page.",
 		"avoidWhen": "Every section or content needed right away; motion on every block distracts.",

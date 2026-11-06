@@ -266,6 +266,16 @@ final class Content_Checks {
 				/* translators: %s: block name. */
 				$add( $id, sprintf( __( 'The block %s fails to render with these attributes.', 'leitvia-studio' ), $name ), __( 'Check the attributes against leitvia/list-blocks.', 'leitvia-studio' ) );
 			}
+			$type = $types->get_registered( $name );
+			if ( $entry && $type && 'core' !== $entry['owner'] && ! $type->is_dynamic() ) {
+				// A saved block renders its markup and nothing else: an empty one shows nothing, and core reads attributes with a source from the HTML, never from the comment.
+				$own     = trim( implode( '', array_filter( (array) $block['innerContent'], 'is_string' ) ) );
+				$sourced = array_filter( (array) ( $entry['attributes']['properties'] ?? array() ), static fn( array $property ): bool => isset( $property['source'] ) );
+				if ( '' === $own || array_intersect_key( (array) $block['attrs'], $sourced ) ) {
+					/* translators: %s: block name. */
+					$add( $id, sprintf( __( 'The block %s keeps its content in its saved HTML: attributes alone render nothing.', 'leitvia-studio' ), $name ), __( 'Write the block as in its example in leitvia/list-blocks, or use a pattern that holds it.', 'leitvia-studio' ) );
+				}
+			}
 		}
 		return $findings;
 	}

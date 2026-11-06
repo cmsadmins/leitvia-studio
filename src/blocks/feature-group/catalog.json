@@ -1,4 +1,5 @@
 {
+	"example": "<!-- wp:leitvia/feature-group -->\n<section class=\"wp-block-leitvia-feature-group\"><h2 class=\"wp-block-leitvia-feature-group__heading\"><span class=\"wp-block-leitvia-feature-group__title\">Features</span> <span class=\"wp-block-leitvia-feature-group__count\"></span></h2><ul class=\"wp-block-leitvia-feature-group__list\"><!-- wp:leitvia/feature-item -->\n<li class=\"wp-block-leitvia-feature-item\"><h3 class=\"wp-block-leitvia-feature-item__title\">Unlimited pages</h3><p class=\"wp-block-leitvia-feature-item__text\">Add as many pages as you need.</p></li>\n<!-- /wp:leitvia/feature-item -->\n\n<!-- wp:leitvia/feature-item -->\n<li class=\"wp-block-leitvia-feature-item\"><h3 class=\"wp-block-leitvia-feature-item__title\">Backups</h3><p class=\"wp-block-leitvia-feature-item__text\">Daily backups for thirty days.</p></li>\n<!-- /wp:leitvia/feature-item --></ul></section>\n<!-- /wp:leitvia/feature-group -->",
 	"usage": {
 		"useWhen": "A list of features on a product or pricing page, optionally filtered by plan.",
 		"avoidWhen": "Two or three benefits without plans; use a list with the block style checklist.",

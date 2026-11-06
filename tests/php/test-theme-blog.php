@@ -140,6 +140,49 @@ class Test_Theme_Blog extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A posts page keeps its image and content on the blog overview; content that repeats the excerpt stays out.
+	 */
+	public function test_blog_heading_shows_image_and_content_of_the_posts_page(): void {
+		$image   = self::factory()->attachment->create_upload_object( dirname( __DIR__ ) . '/fixtures/avatar.png', 0 );
+		$journal = self::factory()->post->create(
+			array(
+				'post_type'    => 'page',
+				'post_title'   => 'Journal',
+				'post_excerpt' => 'Notes from the workshop.',
+				'post_content' => '<!-- wp:paragraph --><p>Who writes here and why.</p><!-- /wp:paragraph -->',
+			)
+		);
+		set_post_thumbnail( $journal, $image );
+		update_option( 'page_for_posts', $journal );
+		$render  = static function (): string {
+			unregister_block_pattern( 'leitvia/hidden-page-blog-heading' );
+			_register_theme_block_patterns();
+			return self::content( 'leitvia/hidden-page-blog-heading' );
+		};
+		$content = $render();
+		$this->assertStringContainsString( '<p>Who writes here and why.</p>', $content );
+		$this->assertStringContainsString( 'wp-image-' . $image, $content );
+		$this->assertStringContainsString( 'Notes from the workshop.</p>', $content );
+
+		wp_update_post(
+			array(
+				'ID'           => $journal,
+				'post_excerpt' => '',
+			)
+		);
+		$this->assertStringNotContainsString( 'New essays, projects and notes', $render(), 'the content replaces the default lead' );
+
+		wp_update_post(
+			array(
+				'ID'           => $journal,
+				'post_excerpt' => 'Notes from the workshop.',
+				'post_content' => '<!-- wp:paragraph --><p>Notes from the workshop.</p><!-- /wp:paragraph -->',
+			)
+		);
+		$this->assertSame( 1, substr_count( $render(), 'Notes from the workshop.' ) );
+	}
+
+	/**
 	 * The continue reading link carries the post title for screen readers; the post navigation names direction and
 	 * title in each link inside a named nav landmark.
 	 */

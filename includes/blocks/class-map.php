@@ -52,6 +52,8 @@ final class Map {
 	 * @param array<string, mixed> $block   Parsed block.
 	 */
 	public static function render( string $content, array $block ): string {
+		// The default link text is saved in the markup, in English; a text of its own stays.
+		$content = str_replace( '>View on OpenStreetMap<', '>' . esc_html__( 'View on OpenStreetMap', 'leitvia-studio' ) . '<', $content );
 		$attrs   = (array) ( $block['attrs'] ?? array() );
 		$lat     = (float) ( $attrs['lat'] ?? 52.52 );
 		$lng     = (float) ( $attrs['lng'] ?? 13.405 );

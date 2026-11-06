@@ -1,4 +1,5 @@
 {
+	"example": "<!-- wp:leitvia/announcement-bar -->\n<section class=\"wp-block-leitvia-announcement-bar alignfull\" aria-label=\"Announcement\"><p class=\"wp-block-leitvia-announcement-bar__text\">Open day on 14 November.</p></section>\n<!-- /wp:leitvia/announcement-bar -->",
 	"usage": {
 		"useWhen": "One short, time-bound message with an optional link as a band over the full width at the top of the header, such as an event or a change of opening hours. Use the pattern Header with announcement to place it above the header.",
 		"avoidWhen": "Permanent information, cookie notices or several messages at once; use page content instead. Do not place it inside a section of the page.",

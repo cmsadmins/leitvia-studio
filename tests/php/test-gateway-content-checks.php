@@ -245,6 +245,29 @@ class Test_Gateway_Content_Checks extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A block that keeps its content in saved HTML is rejected when it is empty, self-closing or has an attribute with a
+	 * source in the comment; with its markup it passes, and a block rendered on the server needs none.
+	 */
+	public function test_saved_blocks_need_their_markup(): void {
+		$value = '<span class="wp-block-leitvia-counter__value">10</span>';
+		foreach ( array(
+			'<!-- wp:leitvia/counter /-->',
+			'<!-- wp:leitvia/counter {"value":"10","label":"Years"} /-->',
+			'<!-- wp:leitvia/counter {"value":"10"} --><div class="wp-block-leitvia-counter">' . $value . '</div><!-- /wp:leitvia/counter -->',
+			'<!-- wp:leitvia/bento /-->',
+			'<!-- wp:leitvia/timeline /-->',
+			'<!-- wp:leitvia/marquee /-->',
+			'<!-- wp:leitvia/spotlight /-->',
+			'<!-- wp:leitvia/reveal {"effect":"rise"} /-->',
+			'<!-- wp:leitvia/reveal --><!-- wp:paragraph --><p>Text</p><!-- /wp:paragraph --><!-- /wp:leitvia/reveal -->',
+		) as $markup ) {
+			$this->assertSame( array( 'error p:0' ), self::run_check( 'leitvia/block-validity', $markup ), $markup );
+		}
+		$this->assertSame( array(), self::run_check( 'leitvia/block-validity', '<!-- wp:leitvia/counter --><div class="wp-block-leitvia-counter">' . $value . '</div><!-- /wp:leitvia/counter -->' ) );
+		$this->assertSame( array(), self::run_check( 'leitvia/block-validity', '<!-- wp:leitvia/contact-form {"buttonText":"Send"} /-->' ) );
+	}
+
+	/**
 	 * The pipeline rejects a write with an error finding and names the check.
 	 */
 	public function test_pipeline(): void {

@@ -47,6 +47,24 @@ class Test_Design_Blocks extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The default texts that blocks save in their markup follow the language of the site, own texts stay.
+	 */
+	public function test_saved_default_texts_follow_the_language(): void {
+		$german  = static fn( string $translation, string $text ): string => array(
+			'Show results' => 'Ergebnisse anzeigen',
+			'Revoke'       => 'Widerrufen',
+		)[ $text ] ?? $translation;
+		add_filter( 'gettext', $german, 10, 2 );
+		$wizard  = \LeitviaStudio\Blocks\Wizard::render( '<form><p class="wp-block-leitvia-wizard__submit"><button type="submit">Show results</button></p></form>' );
+		$own     = \LeitviaStudio\Blocks\Wizard::render( '<form><p class="wp-block-leitvia-wizard__submit"><button type="submit">Passende Angebote</button></p></form>' );
+		$consent = \LeitviaStudio\Consent\Consent::filter_settings_block( '<button type="button">Revoke <span></span></button>' );
+		remove_filter( 'gettext', $german, 10 );
+		$this->assertStringContainsString( '>Ergebnisse anzeigen<', $wizard );
+		$this->assertStringContainsString( '>Passende Angebote<', $own );
+		$this->assertStringContainsString( '>Widerrufen <span', $consent );
+	}
+
+	/**
 	 * The saved, empty Pause button of a marquee renders with the label from the state and stays hidden.
 	 */
 	public function test_marquee_button_label_from_the_server(): void {

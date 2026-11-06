@@ -1,4 +1,5 @@
 {
+	"example": "<!-- wp:leitvia/a11y-bar -->\n<nav class=\"wp-block-leitvia-a11y-bar\" aria-label=\"Accessibility\"><a class=\"wp-block-leitvia-a11y-bar__statement\" href=\"#\">Accessibility statement</a><a class=\"wp-block-leitvia-a11y-bar__sign-language\" href=\"#\">Sign language</a></nav>\n<!-- /wp:leitvia/a11y-bar -->",
 	"usage": {
 		"useWhen": "In the header of public sector or accessibility focused sites that offer an easy language version, an accessibility statement or sign language.",
 		"avoidWhen": "Sites without any of these offers; an empty bar only adds noise.",

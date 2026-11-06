@@ -171,6 +171,58 @@ class Test_Registrar extends WP_UnitTestCase {
 		$block->context = array( 'postId' => $post );
 		wp_set_current_user( 0 );
 		$this->assertSame( 'A visitor', \LeitviaStudio\Model\Bindings::meta_value( array( 'key' => 'quote_source' ), $block, 'content' ) );
+
+		// A query loop stays on the type, also with a filter, while core alone would fall back to posts.
+		register_taxonomy(
+			'quote_kind',
+			'quote',
+			array(
+				'public'       => true,
+				'show_in_rest' => true,
+			)
+		);
+		wp_update_post(
+			array(
+				'ID'         => $post,
+				'post_title' => 'Quote one',
+			)
+		);
+		wp_set_object_terms( $post, 'praise', 'quote_kind' );
+		self::factory()->post->create(
+			array(
+				'post_status' => 'publish',
+				'post_title'  => 'A blog post',
+			)
+		);
+		self::factory()->post->create(
+			array(
+				'post_type'   => 'quote',
+				'post_status' => 'publish',
+				'post_title'  => 'Quote two',
+			)
+		);
+		$markup = '<!-- wp:query {"queryId":7,"query":{"postType":"quote","perPage":10,"inherit":false}} --><div class="wp-block-query"><!-- wp:leitvia/query-filter {"facets":[{"key":"quote_kind","control":"checkbox"}]} /--><!-- wp:post-template --><!-- wp:post-title /--><!-- /wp:post-template --></div><!-- /wp:query -->';
+		$html   = do_blocks( $markup );
+		$this->assertStringContainsString( 'Quote one', $html );
+		$this->assertStringContainsString( 'Quote two', $html );
+		$this->assertStringNotContainsString( 'A blog post', $html );
+		$this->assertStringContainsString( '2 results', $html, 'the filter counts the entries' );
+		$_GET['qf-7-quote_kind'] = array( 'praise' );
+		$html                    = do_blocks( $markup );
+		unset( $_GET['qf-7-quote_kind'] );
+		$this->assertStringContainsString( 'Quote one', $html );
+		$this->assertStringNotContainsString( 'Quote two', $html );
+
+		// The list of types offers it to the Query Loop, the type itself stays without a View link.
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+		$request = new WP_REST_Request( 'GET', '/wp/v2/types' );
+		$request->set_param( 'context', 'edit' );
+		$this->assertTrue( rest_do_request( $request )->get_data()['quote']['viewable'] );
+		$request = new WP_REST_Request( 'GET', '/wp/v2/types/quote' );
+		$request->set_param( 'context', 'edit' );
+		$this->assertFalse( rest_do_request( $request )->get_data()['viewable'] );
+
+		unregister_taxonomy( 'quote_kind' );
 		unregister_post_type( 'quote' );
 	}
 

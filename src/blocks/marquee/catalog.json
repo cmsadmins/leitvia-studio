@@ -1,4 +1,5 @@
 {
+	"example": "<!-- wp:leitvia/marquee -->\n<div data-wp-interactive=\"leitvia/marquee\" data-wp-context=\"{&quot;running&quot;:false,&quot;paused&quot;:false}\" data-wp-init=\"callbacks.init\" data-wp-class--is-running=\"context.running\" data-wp-class--is-paused=\"context.paused\" class=\"wp-block-leitvia-marquee\"><button type=\"button\" class=\"wp-block-leitvia-marquee__toggle wp-element-button\" hidden data-wp-bind--hidden=\"!context.running\" data-wp-on--click=\"actions.toggle\" data-wp-text=\"state.label\"></button><div class=\"wp-block-leitvia-marquee__viewport\"><div class=\"wp-block-leitvia-marquee__track\"><!-- wp:list -->\n<ul class=\"wp-block-list\"><!-- wp:list-item -->\n<li>Fast setup</li>\n<!-- /wp:list-item -->\n\n<!-- wp:list-item -->\n<li>Accessible</li>\n<!-- /wp:list-item -->\n\n<!-- wp:list-item -->\n<li>Private</li>\n<!-- /wp:list-item --></ul>\n<!-- /wp:list --></div></div></div>\n<!-- /wp:leitvia/marquee -->",
 	"usage": {
 		"useWhen": "A strip of client logos or short statements as social proof.",
 		"avoidWhen": "Important information visitors must read; moving content is easy to miss.",

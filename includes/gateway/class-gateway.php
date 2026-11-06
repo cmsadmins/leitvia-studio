@@ -64,6 +64,7 @@ final class Gateway {
 		'retention_days'        => 90,
 		'max_table_mb'          => 50,
 		'rate_per_minute'       => 60,
+		'read_rate_per_minute'  => 300,
 		'verify'                => true,
 		'min_composition_score' => 80,
 		'profile'               => 'standard',
@@ -360,6 +361,11 @@ final class Gateway {
 					'type'    => 'integer',
 					'minimum' => 1,
 					'maximum' => 1000,
+				),
+				'read_rate_per_minute'  => array(
+					'type'    => 'integer',
+					'minimum' => 1,
+					'maximum' => 5000,
 				),
 				'verify'                => array( 'type' => 'boolean' ),
 				'min_composition_score' => array(

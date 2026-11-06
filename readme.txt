@@ -4,7 +4,7 @@ Tags: ai, mcp, block theme, accessibility, design tokens
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.26
+Stable tag: 1.3.27
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -213,6 +213,14 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 
 == Changelog ==
 
+= 1.3.27 =
+* German on every site: the plugin header names the languages folder. Since WordPress 6.7 core ignored the former path, so PHP texts of blocks and the plugin stayed English on sites without a language pack, such as Name, Email address and the result count of the filter.
+* New pattern Counted key figures with the block Counter. Blocks that keep their content in HTML name their saved markup as example in the block catalog, and the check block-validity rejects them when they are empty or carry such attributes in the comment.
+* A query loop on a type with singlePages: false lists its entries instead of falling back to posts, with filters and in the post type control of the editor. Relations may point to such entries.
+* Contact form: new attributes nameLabel, emailLabel, messageLabel and requiredNote. Empty texts follow the language of the site.
+* The default texts saved by the blocks Map, Wizard and Consent settings follow the language of the site, own texts stay.
+* Rate limit: reads and changes count apart. New setting read_rate_per_minute (300) next to rate_per_minute (60) and new filter leitvia_studio_rate_limit, so reading during a build no longer blocks changes.
+
 = 1.3.26 =
 * New block Contact form: name, email address and message, sent on the server with wp_mail, without JavaScript and without another plugin. Recipient and subject stay in the block attributes and never reach the page. It stores nothing; spam protection uses a honeypot, a signed time field and a rate limit per salted IP hash. New pattern cta-contact-form.
 * New ability leitvia/set-posts-page makes an existing page the posts page. Like every setting it goes through a change package; the front page and unknown pages are rejected.
@@ -227,7 +235,7 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * A textarea field binds to core/list, one item per line; an empty field shows no list.
 * Query filter works without a page reload and without an Apply button; without JavaScript it stays a form.
 * New check leitvia/query-context: a filter outside a query, in a query that inherits or without queryId is an error, a duplicate queryId a warning. Query filter and Load more report a missing query, the editor warns on an inheriting query. Query filter has the attributes applyLabel and resetLabel.
-* The zip brings its translations: .mo and script JSON in languages/, loaded through lang_dir_for_domain and load_script_translation_file. A language pack in WP_LANG_DIR wins.
+* The zip brings its translations: .mo and script JSON in languages/, loaded through the header Domain Path and load_script_translation_file. A language pack in WP_LANG_DIR wins.
 * leitvia/list-content counts what it shows: the draft of the privacy page is listed for agents, drafts they may not read are missing from items, total and pages alike. Writes return slug_changed when WordPress gives another address, at the latest on publishing.
 * leitvia/check-composition no longer counts the introduction before the first pattern as a section on templates that show the title themselves.
 * The check content-tokens names a px value in rem and points to leitvia/get-tokens.

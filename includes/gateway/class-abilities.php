@@ -212,30 +212,41 @@ final class Abilities {
 	 * @return mixed Output or WP_Error.
 	 */
 	public static function run( string $name, callable $callback, $input ) {
-		$limited = self::rate_limit( get_current_user_id() );
+		$limited = self::rate_limit( get_current_user_id(), true );
 		$result  = $limited ?? $callback( $input );
 		$error   = is_wp_error( $result );
 		Store::audit(
 			array(
-				'ability' => $name,
-				'result'  => $error ? 'rejected' : 'ok',
-				'code'    => $error ? $result->get_error_code() : '',
+				'ability'     => $name,
+				'result'      => $error ? 'rejected' : 'ok',
+				'code'        => $error ? $result->get_error_code() : '',
+				'object_type' => Store::READ,
 			)
 		);
 		return $result;
 	}
 
 	/**
-	 * The rejection leitvia_rate_limited when the user made rate_per_minute calls in the last 60 seconds, else null.
+	 * The rejection leitvia_rate_limited when the user reached the limit in the last 60 seconds, else null. Reads and
+	 * writes count apart: a build reads far more than it writes, and reading must not use up the writes.
 	 * Call before any expensive work.
 	 *
-	 * @param int $user_id User ID.
+	 * @param int  $user_id User ID.
+	 * @param bool $read    Whether the call only reads.
 	 */
-	public static function rate_limit( int $user_id ): ?\WP_Error {
+	public static function rate_limit( int $user_id, bool $read = false ): ?\WP_Error {
 		// ponytail: one indexed COUNT on the audit log per call; move to an object cache counter when load demands it.
 		$now                = time();
-		[ $calls, $oldest ] = Store::calls_since( $user_id, gmdate( 'Y-m-d H:i:s', $now - MINUTE_IN_SECONDS ) );
-		if ( $calls < (int) Gateway::settings()['rate_per_minute'] ) {
+		[ $calls, $oldest ] = Store::calls_since( $user_id, gmdate( 'Y-m-d H:i:s', $now - MINUTE_IN_SECONDS ), $read );
+		$limit              = (int) Gateway::settings()[ $read ? 'read_rate_per_minute' : 'rate_per_minute' ];
+		/**
+		 * Filters the calls per minute of one user, for example to give a build agent more reads.
+		 *
+		 * @param int  $limit   Reads or writes per minute from the settings.
+		 * @param bool $read    Whether the limit is the one for reads.
+		 * @param int  $user_id User ID.
+		 */
+		if ( $calls < (int) apply_filters( 'leitvia_studio_rate_limit', $limit, $read, $user_id ) ) {
 			return null;
 		}
 		$wait = max( 1, MINUTE_IN_SECONDS - ( $now - (int) strtotime( $oldest . ' UTC' ) ) );

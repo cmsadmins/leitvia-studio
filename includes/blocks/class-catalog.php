@@ -14,8 +14,8 @@ defined( 'ABSPATH' ) || exit;
  * appear with their owner and nothing is maintained twice: title, description, category, parent, ancestor, supports,
  * attributes and allowed children come from block.json as core registered it.
  *
- * The usage rules (useWhen, avoidWhen, a11y) live in catalog.json next to block.json and are copied to the build by
- * webpack. They cannot live in block.json: core would ignore an own key such as "leitvia", but the block.json schema
+ * The usage rules (useWhen, avoidWhen, a11y) and the example, the saved markup of a block that keeps its content in
+ * HTML, live in catalog.json next to block.json and are copied to the build by webpack. They cannot live in block.json: core would ignore an own key such as "leitvia", but the block.json schema
  * (schemas.wp.org/trunk/block.json) sets additionalProperties to false, so editors and schema checks reject it.
  */
 final class Catalog {
@@ -110,7 +110,7 @@ final class Catalog {
 			if ( $type ) {
 				$path      = (string) $entry['path'];
 				$file      = ( str_ends_with( $path, '.json' ) ? dirname( $path ) : $path ) . '/catalog.json';
-				$catalog[] = self::entry( $type, (string) $entry['owner'], self::usage( $file ) );
+				$catalog[] = self::entry( $type, (string) $entry['owner'], self::usage( $file ) ) + self::example( $file );
 			}
 		}
 		foreach ( self::CORE_EXTENSIONS as $name => $extension ) {
@@ -197,6 +197,17 @@ final class Catalog {
 			$catalog[ $i ]['innerBlocks'] = $children ? $children : null;
 		}
 		return $catalog;
+	}
+
+	/**
+	 * The example of a catalog.json as array( 'example' => markup ), empty without one.
+	 *
+	 * @param string $file Path to catalog.json.
+	 * @return array{example?: string}
+	 */
+	private static function example( string $file ): array {
+		$data = is_readable( $file ) ? json_decode( (string) file_get_contents( $file ), true ) : null; // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Local file of a block.
+		return is_string( $data['example'] ?? null ) ? array( 'example' => $data['example'] ) : array();
 	}
 
 	/**

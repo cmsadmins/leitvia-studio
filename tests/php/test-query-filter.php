@@ -331,12 +331,10 @@ class Test_Query_Filter extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Studio finds its translations in the plugin as long as no language pack exists; a pack wins.
+	 * Core takes the folder for PHP translations from the header on every request; without it Studio stayed English on
+	 * every site without a language pack. A pack still wins, core looks in WP_LANG_DIR first.
 	 */
 	public function test_translations_in_the_plugin(): void {
-		$own = dirname( LEITVIA_STUDIO_FILE ) . '/languages/';
-		$this->assertSame( $own, apply_filters( 'lang_dir_for_domain', false, 'leitvia-studio', 'de_DE' ) );
-		$this->assertSame( '/pack/', apply_filters( 'lang_dir_for_domain', '/pack/', 'leitvia-studio', 'de_DE' ) );
-		$this->assertFalse( apply_filters( 'lang_dir_for_domain', false, 'other', 'de_DE' ) );
+		$this->assertSame( '/languages', get_file_data( LEITVIA_STUDIO_FILE, array( 'path' => 'Domain Path' ) )['path'] );
 	}
 }

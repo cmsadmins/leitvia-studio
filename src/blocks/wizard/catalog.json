@@ -1,4 +1,5 @@
 {
+	"example": "<!-- wp:leitvia/wizard -->\n<form method=\"get\" class=\"wp-block-leitvia-wizard\"><!-- wp:leitvia/wizard-step {\"name\":\"need\",\"options\":[{\"label\":\"Website\",\"value\":\"website\"},{\"label\":\"Shop\",\"value\":\"shop\"}]} -->\n<fieldset class=\"wp-block-leitvia-wizard-step\"><legend>What do you need?</legend><div class=\"wp-block-leitvia-wizard-step__options\"><label><input type=\"radio\" name=\"need\" value=\"website\"/> Website</label><label><input type=\"radio\" name=\"need\" value=\"shop\"/> Shop</label></div></fieldset>\n<!-- /wp:leitvia/wizard-step --><p class=\"wp-block-leitvia-wizard__submit\"><button type=\"submit\" class=\"wp-element-button\">Show results</button></p></form>\n<!-- /wp:leitvia/wizard -->",
 	"usage": {
 		"useWhen": "A short form in steps that leads visitors to matching results, for example a product finder that sends its answers to a page with a query filter.",
 		"avoidWhen": "Long forms that must store data; use a form plugin.",

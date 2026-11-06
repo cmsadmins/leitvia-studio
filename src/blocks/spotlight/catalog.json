@@ -1,4 +1,5 @@
 {
+	"example": "<!-- wp:leitvia/spotlight -->\n<div data-wp-interactive=\"leitvia/spotlight\" data-wp-on--keydown=\"actions.keydown\" class=\"wp-block-leitvia-spotlight\"><!-- wp:leitvia/spotlight-hotspot {\"x\":30,\"y\":40} -->\n<details style=\"--x:30%;--y:40%\" data-wp-on--toggle=\"actions.toggle\" class=\"wp-block-leitvia-spotlight-hotspot\"><summary class=\"wp-block-leitvia-spotlight-hotspot__summary\"><span class=\"wp-block-leitvia-spotlight-hotspot__label\">Charging port</span></summary><div class=\"wp-block-leitvia-spotlight-hotspot__content\"></div></details>\n<!-- /wp:leitvia/spotlight-hotspot --></div>\n<!-- /wp:leitvia/spotlight -->",
 	"usage": {
 		"useWhen": "An image whose parts need short explanations, such as a product photo or a floor plan.",
 		"avoidWhen": "Images that need no explanation or long texts per point; use an image with a caption or a list.",

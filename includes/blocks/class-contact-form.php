@@ -180,10 +180,9 @@ final class Contact_Form {
 	 * @param array<string, mixed> $attributes Block attributes.
 	 */
 	private static function notice( array $attributes ): string {
-		$text = (string) ( $attributes['successMessage'] ?? '' );
 		return sprintf(
 			'<p class="wp-block-leitvia-contact-form__notice" role="status" tabindex="-1" autofocus>%s</p>',
-			esc_html( '' !== $text ? $text : __( 'Thank you. Your message has been sent.', 'leitvia-studio' ) )
+			esc_html( self::text( $attributes, 'successMessage', __( 'Thank you. Your message has been sent.', 'leitvia-studio' ) ) )
 		);
 	}
 
@@ -201,9 +200,9 @@ final class Contact_Form {
 		$values = $result['values'] ?? array();
 		$errors = $result['errors'] ?? array();
 		$fields = array(
-			'name'    => array( __( 'Name', 'leitvia-studio' ), __( 'Enter your name.', 'leitvia-studio' ) ),
-			'email'   => array( __( 'Email address', 'leitvia-studio' ), __( 'Enter a valid email address.', 'leitvia-studio' ) ),
-			'message' => array( __( 'Message', 'leitvia-studio' ), __( 'Enter your message.', 'leitvia-studio' ) ),
+			'name'    => array( self::text( $attributes, 'nameLabel', __( 'Name', 'leitvia-studio' ) ), __( 'Enter your name.', 'leitvia-studio' ) ),
+			'email'   => array( self::text( $attributes, 'emailLabel', __( 'Email address', 'leitvia-studio' ) ), __( 'Enter a valid email address.', 'leitvia-studio' ) ),
+			'message' => array( self::text( $attributes, 'messageLabel', __( 'Message', 'leitvia-studio' ) ), __( 'Enter your message.', 'leitvia-studio' ) ),
 		);
 		$html   = '';
 		foreach ( $fields as $name => list( $label, $hint ) ) {
@@ -227,12 +226,11 @@ final class Contact_Form {
 		if ( '' !== $alert ) {
 			$alert = sprintf( '<p class="wp-block-leitvia-contact-form__notice is-error" role="alert" tabindex="-1" autofocus>%s</p>', esc_html( $alert ) );
 		}
-		$button = (string) ( $attributes['buttonText'] ?? '' );
 		return sprintf(
 			'%1$s<form method="post">%2$s<p class="wp-block-leitvia-contact-form__hint">%3$s</p>%4$s<div class="wp-block-leitvia-contact-form__trap" aria-hidden="true"><label for="%5$s-homepage">%6$s</label><input type="text" id="%5$s-homepage" name="%7$shomepage" tabindex="-1" autocomplete="off"></div><input type="hidden" name="%7$sform" value="%8$s"><input type="hidden" name="%7$stoken" value="%9$s">%10$s<p><button type="submit" class="wp-element-button">%11$s</button></p></form>',
 			Form_Errors::SUMMARY,
 			$alert,
-			esc_html__( 'All fields are required.', 'leitvia-studio' ),
+			esc_html( self::text( $attributes, 'requiredNote', __( 'All fields are required.', 'leitvia-studio' ) ) ),
 			$html,
 			esc_attr( $id ),
 			esc_html__( 'Leave this field empty', 'leitvia-studio' ),
@@ -240,8 +238,21 @@ final class Contact_Form {
 			esc_attr( $key ),
 			esc_attr( self::token( $key, time() ) ),
 			self::privacy_note( $attributes ),
-			esc_html( '' !== $button ? $button : __( 'Send message', 'leitvia-studio' ) )
+			esc_html( self::text( $attributes, 'buttonText', __( 'Send message', 'leitvia-studio' ) ) )
 		);
+	}
+
+	/**
+	 * A text of the block: its attribute, or the translated default while the attribute is empty. So no block carries a
+	 * default in its content, and blocks without own texts follow the language of the site.
+	 *
+	 * @param array<string, mixed> $attributes Block attributes.
+	 * @param string               $name       Attribute.
+	 * @param string               $fallback   Translated default.
+	 */
+	private static function text( array $attributes, string $name, string $fallback ): string {
+		$text = (string) ( $attributes[ $name ] ?? '' );
+		return '' !== $text ? $text : $fallback;
 	}
 
 	/**
@@ -253,10 +264,9 @@ final class Contact_Form {
 		if ( ! ( $attributes['privacyNote'] ?? true ) ) {
 			return '';
 		}
-		$text = (string) ( $attributes['privacyText'] ?? '' );
 		return sprintf(
 			'<p class="wp-block-leitvia-contact-form__hint">%s %s</p>',
-			esc_html( '' !== $text ? $text : __( 'We use your details only to answer your message and do not store them on this website.', 'leitvia-studio' ) ),
+			esc_html( self::text( $attributes, 'privacyText', __( 'We use your details only to answer your message and do not store them on this website.', 'leitvia-studio' ) ) ),
 			get_the_privacy_policy_link()
 		);
 	}

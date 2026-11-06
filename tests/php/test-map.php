@@ -56,6 +56,19 @@ class Test_Map extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The default link text saved in the markup follows the language of the site, an own text stays.
+	 */
+	public function test_saved_default_link_follows_the_language(): void {
+		$german  = static fn( string $translation, string $text ): string => 'View on OpenStreetMap' === $text ? 'Auf OpenStreetMap ansehen' : $translation;
+		add_filter( 'gettext', $german, 10, 2 );
+		$default = \LeitviaStudio\Blocks\Map::render( '<div class="wp-block-leitvia-map"><a href="#">View on OpenStreetMap</a></div>', array( 'attrs' => array() ) );
+		$own     = \LeitviaStudio\Blocks\Map::render( '<div class="wp-block-leitvia-map"><a href="#">Route planen</a></div>', array( 'attrs' => array() ) );
+		remove_filter( 'gettext', $german, 10 );
+		$this->assertStringContainsString( '>Auf OpenStreetMap ansehen<', $default );
+		$this->assertStringContainsString( '>Route planen<', $own );
+	}
+
+	/**
 	 * Marker data is plain text.
 	 */
 	public function test_marker_data_is_plain_text(): void {

@@ -1,4 +1,5 @@
 {
+	"example": "<!-- wp:leitvia/bento-item {\"size\":\"2x1\"} -->\n<div class=\"wp-block-leitvia-bento-item is-size-2x1\"><!-- wp:heading {\"level\":3} -->\n<h3 class=\"wp-block-heading\">Fast setup</h3>\n<!-- /wp:heading -->\n\n<!-- wp:paragraph -->\n<p>Ready in one afternoon.</p>\n<!-- /wp:paragraph --></div>\n<!-- /wp:leitvia/bento-item -->",
 	"usage": {
 		"useWhen": "One tile inside a bento grid; choose the size by the weight of its content.",
 		"avoidWhen": "Outside a bento grid; it only works as its child.",

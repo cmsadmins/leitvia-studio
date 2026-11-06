@@ -267,7 +267,17 @@ final class Consent {
 	public static function filter_settings_block( string $content ): string {
 		wp_interactivity_state( 'leitvia/consent', array( 'labels' => array_map( static fn( $s ) => (string) ( $s['label'] ?? '' ), self::services() ) ) );
 		self::site_state();
-		return $content;
+		// Save writes these texts into the markup, in the language of whoever saved it; a block saved in English follows the site.
+		return strtr(
+			$content,
+			array(
+				'Without JavaScript, this site stores no consent: content from other providers stays a link.' => esc_html__( 'Without JavaScript, this site stores no consent: content from other providers stays a link.', 'leitvia-studio' ),
+				'You have not allowed any provider on this site in this browser.' => esc_html__( 'You have not allowed any provider on this site in this browser.', 'leitvia-studio' ),
+				/* translators: %s: provider name, for example YouTube. */
+				'%s is no longer allowed.' => esc_attr__( '%s is no longer allowed.', 'leitvia-studio' ),
+				'>Revoke '                 => '>' . esc_html__( 'Revoke', 'leitvia-studio' ) . ' ',
+			)
+		);
 	}
 
 	/**

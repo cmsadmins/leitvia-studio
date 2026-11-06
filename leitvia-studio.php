@@ -3,7 +3,7 @@
  * Plugin Name:       Leitvia Studio
  * Plugin URI:        https://leitvia.com
  * Description:       Pattern lab, design tokens and a content model for block themes, stored in WordPress core structures.
- * Version:           1.3.26
+ * Version:           1.3.27
  * Requires at least: 7.1
  * Requires PHP:      8.2
  * Author:            CMS ADMINS
@@ -11,13 +11,14 @@
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain:       leitvia-studio
+ * Domain Path:       /languages
  *
  * @package LeitviaStudio
  */
 
 defined( 'ABSPATH' ) || exit;
 
-const LEITVIA_STUDIO_VERSION = '1.3.26';
+const LEITVIA_STUDIO_VERSION = '1.3.27';
 const LEITVIA_STUDIO_API     = 1;
 // Oldest Extension API version add-ons may still declare; raised two major Studio versions after a breaking change.
 const LEITVIA_STUDIO_API_MIN = 1;
@@ -43,13 +44,8 @@ spl_autoload_register(
 require __DIR__ . '/includes/functions.php';
 
 // Translations of the release zip in languages/, for sites without a language pack of WordPress.org. A pack in
-// WP_LANG_DIR wins. Plugin Check rejects load_plugin_textdomain() for plugins on WordPress.org.
-add_filter(
-	'lang_dir_for_domain',
-	static fn( $path, $domain ) => 'leitvia-studio' === $domain && ! $path ? __DIR__ . '/languages/' : $path,
-	10,
-	2
-);
+// WP_LANG_DIR wins. PHP strings need only the header Domain Path, which core registers on every request; scripts
+// are looked up in WP_LANG_DIR alone, so they go through this filter.
 add_filter(
 	'load_script_translation_file',
 	static function ( $file, $handle, $domain ) {

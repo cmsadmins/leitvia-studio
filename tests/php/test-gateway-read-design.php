@@ -313,7 +313,7 @@ class Test_Gateway_Read_Design extends WP_UnitTestCase {
 			)
 		);
 		$items    = array();
-		foreach ( array( 1, 2 ) as $page ) {
+		foreach ( array( 1, 2, 3 ) as $page ) {
 			$found = $this->call(
 				'leitvia/list-patterns',
 				array(
