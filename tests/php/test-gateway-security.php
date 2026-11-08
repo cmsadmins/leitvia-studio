@@ -257,8 +257,8 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Unsafe markup is refused on every path that takes markup: a post, a pattern, a variant, a template part, a
-	 * navigation and a package a person applies. Nothing of it is stored outside the package.
+	 * Unsafe markup is refused on every path that takes markup: a post, a pattern, a variant, a template part, a template,
+	 * a navigation and a package a person applies. Nothing of it is stored outside the package.
 	 */
 	public function test_unsafe_markup_is_refused_on_every_path(): void {
 		$page  = $this->page();
@@ -285,6 +285,13 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 					array(
 						'part'    => 'footer',
 						'content' => $markup,
+					)
+				),
+				'template'   => static fn() => self::call(
+					'leitvia/update-template',
+					array(
+						'template' => 'page',
+						'content'  => $markup,
 					)
 				),
 				'navigation' => static fn() => self::call( 'leitvia/update-navigation', array( 'content' => $markup ) ),
@@ -385,6 +392,13 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 				'filename' => 'portrait.png',
 				'alt'      => 'Portrait of the author',
 			),
+			'leitvia/crop-media'           => static fn(): array => array(
+				'id'     => self::factory()->attachment->create_upload_object( dirname( __DIR__ ) . '/fixtures/avatar.png', 0 ),
+				'x'      => 0,
+				'y'      => 0,
+				'width'  => 50,
+				'height' => 50,
+			),
 			'leitvia/create-token-set'     => static fn(): array => array(
 				'title'    => 'Brand',
 				'document' => $document(),
@@ -424,6 +438,10 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 			'leitvia/update-template-part' => static fn(): array => array(
 				'part'    => 'header',
 				'pattern' => 'leitvia/header-search',
+			),
+			'leitvia/update-template'      => static fn(): array => array(
+				'template' => 'page',
+				'content'  => '<!-- wp:post-content /-->',
 			),
 			'leitvia/apply-recipe'         => static fn(): array => array( 'recipe' => 'leitvia/blog' ),
 			'leitvia/add-building-block'   => static function (): array {

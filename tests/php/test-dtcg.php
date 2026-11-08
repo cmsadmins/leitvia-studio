@@ -119,6 +119,136 @@ class Test_Dtcg extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Up to eight extra surfaces become palette presets surface-extra-<slug> after the roles and survive the export;
+	 * a surface ink does not reach 4.5:1 on, a ninth surface and a slug with digits or capitals are rejected.
+	 */
+	public function test_extra_surfaces(): void {
+		$c     = leitvia_studio_contract();
+		$color = static fn( string $hex ): array => array(
+			'$type'  => 'color',
+			'$value' => array(
+				'colorSpace' => 'srgb',
+				'components' => array( 0, 0, 0 ),
+				'hex'        => $hex,
+			),
+		);
+
+		$doc                                       = self::minimal();
+		$doc['color']['surface-extra']['mint']     = $color( '#dff5ea' ) + array( '$extensions' => array( 'com.leitvia' => array( 'name' => 'Mint' ) ) );
+		$doc['color']['surface-extra']['sky-blue'] = $color( '#e3eefc' );
+		$palette                                   = Dtcg::to_settings( $doc, $c )['color']['palette']['theme'];
+		$this->assertSame(
+			array(
+				array(
+					'slug'  => 'surface-extra-mint',
+					'name'  => 'Mint',
+					'color' => '#dff5ea',
+				),
+				array(
+					'slug'  => 'surface-extra-sky-blue',
+					'name'  => 'sky-blue',
+					'color' => '#e3eefc',
+				),
+			),
+			array_slice( $palette, -2 )
+		);
+		$this->assertSame( array_column( $c->data()['roles']['color'], 'slug' ), array_slice( array_column( $palette, 'slug' ), 0, -2 ) );
+		$export = Dtcg::from_settings( array( 'color' => array( 'palette' => array( 'theme' => $palette ) ) ) + wp_get_global_settings(), $c );
+		$this->assertSame( array( 'mint', 'sky-blue' ), array_keys( $export['color']['surface-extra'] ) );
+		$this->assertSame( '#dff5ea', $export['color']['surface-extra']['mint']['$value']['hex'] );
+
+		$dark                                  = $doc;
+		$dark['color']['surface-extra']['ink'] = $color( '#333333' );
+		$error                                 = Dtcg::to_settings( $dark, $c );
+		$this->assertSame( 'leitvia_studio_dtcg_extra_contrast', $error->get_error_code() );
+		$this->assertStringContainsString( 'color.surface-extra.ink', $error->get_error_message() );
+
+		$many = self::minimal();
+		foreach ( array( 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h' ) as $slug ) {
+			$many['color']['surface-extra'][ $slug ] = $color( '#ffffff' );
+		}
+		$this->assertNotWPError( Dtcg::to_settings( $many, $c ) );
+		$many['color']['surface-extra']['i'] = $color( '#ffffff' );
+		$this->assertSame( 'leitvia_studio_dtcg_extra_limit', Dtcg::to_settings( $many, $c )->get_error_code() );
+
+		foreach ( array( 'mint2', 'Mint', 'mint_green', '-mint', '', 'a--b' ) as $slug ) {
+			$bad                                    = self::minimal();
+			$bad['color']['surface-extra'][ $slug ] = $color( '#ffffff' );
+			$this->assertSame( 'leitvia_studio_dtcg_extra_slug', Dtcg::to_settings( $bad, $c )->get_error_code(), $slug );
+		}
+		// The limit is 4.5:1 unrounded: #8e7f75 reaches 4.500001 on the ink of the theme, #d26027 only 4.499999.
+		$edge                                   = self::minimal();
+		$edge['color']['surface-extra']['sand'] = $color( '#8e7f75' );
+		$this->assertNotWPError( Dtcg::to_settings( $edge, $c ) );
+		$edge['color']['surface-extra']['sand'] = $color( '#d26027' );
+		$this->assertSame( 'leitvia_studio_dtcg_extra_contrast', Dtcg::to_settings( $edge, $c )->get_error_code() );
+
+		// A single token or a scalar in place of the group is refused, not read as an empty group.
+		foreach ( array( $color( '#ffffff' ), '#ffffff', null ) as $node ) {
+			$single                           = self::minimal();
+			$single['color']['surface-extra'] = $node;
+			$this->assertSame( 'leitvia_studio_dtcg_extra_group', Dtcg::to_settings( $single, $c )->get_error_code() );
+		}
+
+		// Only color has the group; elsewhere it stays an unknown role.
+		$other                                   = self::minimal();
+		$other['spacing']['surface-extra']['xs'] = $other['spacing']['s'];
+		$this->assertSame( 'leitvia_studio_dtcg_unknown_role', Dtcg::to_settings( $other, $c )->get_error_code() );
+	}
+
+	/**
+	 * The export keeps only extra surfaces the import accepts, so its document compiles again with the same palette:
+	 * names of lowercase letters and hyphens, the first eight.
+	 */
+	public function test_extra_surfaces_round_trip(): void {
+		$c        = leitvia_studio_contract();
+		$settings = wp_get_global_settings();
+		$palette  = $settings['color']['palette']['theme'];
+		$extra    = array();
+		foreach ( array( 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i' ) as $slug ) {
+			$extra[] = array(
+				'slug'  => 'surface-extra-' . $slug,
+				'name'  => strtoupper( $slug ),
+				'color' => '#ffffff',
+			);
+		}
+		$bad                                   = array(
+			'slug'  => 'surface-extra-tile2',
+			'name'  => 'Tile 2',
+			'color' => '#ffffff',
+		);
+		$settings['color']['palette']['theme'] = array_merge( $palette, array( $bad ), $extra );
+
+		$doc  = Dtcg::from_settings( $settings, $c );
+		$back = Dtcg::to_settings( $doc, $c );
+		$this->assertNotWPError( $back );
+		$this->assertSame( array_merge( $palette, array_slice( $extra, 0, 8 ) ), $back['color']['palette']['theme'] );
+		$this->assertSame( $doc['color'], Dtcg::from_settings( $back + $settings, $c )['color'] );
+	}
+
+	/**
+	 * Without a role ink in the contract the surfaces cannot be checked, so they are refused instead of passing.
+	 */
+	public function test_extra_surfaces_without_ink(): void {
+		$data                   = json_decode( (string) file_get_contents( get_template_directory() . '/leitvia-contract.json' ), true );
+		$data['roles']['color'] = array_values( array_filter( $data['roles']['color'], static fn( array $r ): bool => 'ink' !== $r['slug'] ) );
+		$file                   = get_temp_dir() . 'leitvia-contract-no-ink.json';
+		file_put_contents( $file, wp_json_encode( $data ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Test fixture.
+		$c = \LeitviaStudio\Contract\Contract::from_file( $file );
+		$this->assertTrue( $c->is_valid(), $c->error() );
+
+		$doc = self::minimal();
+		unset( $doc['color']['ink'] );
+		$this->assertNotWPError( Dtcg::to_settings( $doc, $c ) );
+		$doc['color']['surface-extra']['mint']['$value'] = array(
+			'colorSpace' => 'srgb',
+			'components' => array( 1, 1, 1 ),
+		);
+		$this->assertSame( 'leitvia_studio_dtcg_extra_contrast', Dtcg::to_settings( $doc, $c )->get_error_code() );
+		wp_delete_file( $file );
+	}
+
+	/**
 	 * A token set saved before contract 1.6.0 has no fontFamily.ui; the role takes the body font instead of failing.
 	 */
 	public function test_missing_role_with_fallback_takes_the_fallback_token(): void {

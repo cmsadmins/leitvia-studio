@@ -9,10 +9,11 @@ use LeitviaStudio\Gateway\Block_Edit;
 use LeitviaStudio\Gateway\Gateway;
 use LeitviaStudio\Gateway\Hashes;
 use LeitviaStudio\Gateway\Outline;
+use LeitviaStudio\Gateway\Packages;
 
 /**
- * Block edits from fixtures, compose-page, update-block, create-pattern, vary-pattern and add-media through the
- * pipeline.
+ * Block edits from fixtures, compose-page, update-block, create-pattern, vary-pattern, add-media and crop-media
+ * through the pipeline.
  *
  * @group multisite
  */
@@ -21,7 +22,7 @@ class Test_Gateway_Build extends WP_UnitTestCase {
 	/**
 	 * Abilities of this task.
 	 */
-	private const ABILITIES = array( 'leitvia/compose-page', 'leitvia/update-block', 'leitvia/create-pattern', 'leitvia/vary-pattern', 'leitvia/add-media' );
+	private const ABILITIES = array( 'leitvia/compose-page', 'leitvia/update-block', 'leitvia/create-pattern', 'leitvia/vary-pattern', 'leitvia/add-media', 'leitvia/crop-media' );
 
 	/**
 	 * Leitvia theme, agent user, autonomous profile and the abilities handed to core.
@@ -673,5 +674,160 @@ class Test_Gateway_Build extends WP_UnitTestCase {
 				)
 			)
 		);
+	}
+
+	/**
+	 * An image of the media library with alt text: avatar.png, 200 by 200 pixels.
+	 */
+	private static function library_image(): int {
+		$id = self::factory()->attachment->create_upload_object( dirname( __DIR__ ) . '/fixtures/avatar.png', 0 );
+		update_post_meta( $id, '_wp_attachment_image_alt', 'Portrait of the author' );
+		wp_update_post(
+			array(
+				'ID'         => $id,
+				'post_title' => 'Portrait',
+			)
+		);
+		return $id;
+	}
+
+	/**
+	 * Crop-media makes a new image from a rectangle in percent with the alt text of the original and the title with
+	 * the addition; the original keeps its file and size. A rollback deletes the new image with its files.
+	 */
+	public function test_crop_media(): void {
+		$id       = self::library_image();
+		$original = (string) get_attached_file( $id );
+		$checksum = md5_file( $original );
+		$result   = self::call(
+			'leitvia/crop-media',
+			array(
+				'id'           => $id,
+				'x'            => 10,
+				'y'            => 0,
+				'width'        => 50,
+				'height'       => 25,
+				'title_suffix' => 'without text band',
+			)
+		);
+		$this->assertIsArray( $result, is_wp_error( $result ) ? wp_json_encode( $result->get_error_data() ) : '' );
+		$crop = (int) $result['target']['post'];
+		$this->assertNotSame( $id, $crop );
+		$this->assertTrue( wp_attachment_is_image( $crop ) );
+		$this->assertSame( 'image/png', get_post_mime_type( $crop ) );
+		$file = (string) get_attached_file( $crop );
+		$this->assertFileExists( $file );
+		$this->assertStringNotContainsString( Packages::PRIVATE_DIR, $file );
+		$size = (array) wp_getimagesize( $file );
+		$this->assertSame( array( 100, 50 ), array( $size[0], $size[1] ) );
+		$this->assertSame( 100, wp_get_attachment_metadata( $crop )['width'] );
+		$this->assertSame( 50, wp_get_attachment_metadata( $crop )['height'] );
+		$this->assertSame( 'Portrait of the author', get_post_meta( $crop, '_wp_attachment_image_alt', true ) );
+		$this->assertSame( 'Portrait (without text band)', get_the_title( $crop ) );
+		$this->assertSame( $checksum, md5_file( $original ), 'the original stays' );
+		$this->assertSame( 200, wp_get_attachment_metadata( $id )['width'] );
+
+		$this->assertGreaterThan( 0, (int) $result['package'], 'a live crop gets a package for the rollback' );
+		$rolled = Packages::rollback( (int) $result['package'] );
+		$this->assertIsArray( $rolled, is_wp_error( $rolled ) ? wp_json_encode( $rolled->get_error_data() ) : '' );
+		$this->assertNull( get_post( $crop ) );
+		$this->assertFileDoesNotExist( $file );
+		$this->assertFileExists( $original );
+		$this->assertSame( 'Portrait', get_the_title( $id ) );
+	}
+
+	/**
+	 * The whole image and a rectangle at the edge pass; an empty rectangle, one beyond the image, an unknown ID, a file
+	 * that is no image and an SVG are refused before anything is written.
+	 */
+	public function test_crop_media_rejections(): void {
+		$id   = self::library_image();
+		$crop = static fn( array $box ): mixed => self::call( 'leitvia/crop-media', array( 'id' => $id ) + $box );
+		$full = $crop(
+			array(
+				'x'      => 0,
+				'y'      => 0,
+				'width'  => 100,
+				'height' => 100,
+			)
+		);
+		$this->assertIsArray( $full, is_wp_error( $full ) ? wp_json_encode( $full->get_error_data() ) : '' );
+		$this->assertSame( 200, wp_get_attachment_metadata( $full['target']['post'] )['width'] );
+		$this->assertSame( 'Portrait (cropped)', get_the_title( $full['target']['post'] ), 'default addition' );
+		$edge = $crop(
+			array(
+				'x'      => 75,
+				'y'      => 90,
+				'width'  => 25,
+				'height' => 10,
+			)
+		);
+		$this->assertIsArray( $edge, is_wp_error( $edge ) ? wp_json_encode( $edge->get_error_data() ) : '' );
+		$this->assertSame( 50, wp_get_attachment_metadata( $edge['target']['post'] )['width'] );
+		$this->assertSame( 20, wp_get_attachment_metadata( $edge['target']['post'] )['height'] );
+
+		// A query, not wp_count_posts(): its cached counts miss attachments the factory adds.
+		$attachments = static fn(): int => count(
+			get_posts(
+				array(
+					'post_type'   => 'attachment',
+					'post_status' => 'any',
+					'fields'      => 'ids',
+					'numberposts' => -1,
+				)
+			)
+		);
+		$count       = $attachments();
+		foreach (
+			array(
+				'no width'        => array( 0, 0, 0, 50 ),
+				'no height'       => array( 0, 0, 50, 0 ),
+				'beyond right'    => array( 60, 0, 50, 50 ),
+				'beyond bottom'   => array( 0, 51, 50, 50 ),
+				'negative'        => array( -1, 0, 50, 50 ),
+				'more than whole' => array( 0, 0, 101, 50 ),
+			) as $case => $box
+		) {
+			$refused = $crop( array_combine( array( 'x', 'y', 'width', 'height' ), $box ) );
+			$this->assertWPError( $refused, $case );
+		}
+		$this->assert_rejected(
+			'leitvia_invalid_input',
+			$crop(
+				array(
+					'x'      => 60,
+					'y'      => 0,
+					'width'  => 50,
+					'height' => 50,
+				)
+			)
+		);
+
+		$box = array(
+			'x'      => 0,
+			'y'      => 0,
+			'width'  => 50,
+			'height' => 50,
+		);
+		$this->assert_rejected( 'leitvia_not_found', self::call( 'leitvia/crop-media', array( 'id' => 999999 ) + $box ) );
+		$this->assert_rejected( 'leitvia_not_found', self::call( 'leitvia/crop-media', array( 'id' => self::factory()->post->create() ) + $box ) );
+		$track = self::factory()->attachment->create(
+			array(
+				'post_mime_type' => 'text/vtt',
+				'file'           => 'captions.vtt',
+			)
+		);
+		$this->assert_rejected( 'leitvia_invalid_input', self::call( 'leitvia/crop-media', array( 'id' => $track ) + $box ) );
+		$svg = self::factory()->attachment->create(
+			array(
+				'post_mime_type' => 'image/svg+xml',
+				'file'           => 'logo.svg',
+			)
+		);
+		$this->assert_rejected( 'leitvia_invalid_input', self::call( 'leitvia/crop-media', array( 'id' => $svg ) + $box ) );
+		$this->assertSame( $count + 2, $attachments(), 'only the two test files were added' );
+
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'subscriber' ) ) );
+		$this->assertWPError( self::call( 'leitvia/crop-media', array( 'id' => $id ) + $box ), 'no crop without the right to upload files' );
 	}
 }

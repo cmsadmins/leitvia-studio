@@ -202,6 +202,167 @@ class Test_Gateway_Maintain extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The template of a page changes to another page template of the contract, live at "autonomous" and back with the
+	 * rollback; slugs outside the contract and templates of another type (single for a page, page for a post) are
+	 * refused.
+	 */
+	public function test_update_content_template(): void {
+		$page = $this->page( '<!-- wp:heading {"level":1} --><h1 class="wp-block-heading">Welcome</h1><!-- /wp:heading -->' . self::paragraph( 'Text' ) );
+		$post = self::factory()->post->create( array( 'post_status' => 'publish' ) );
+		update_option( Gateway::OPTION, array( 'profile' => 'full' ) + Gateway::DEFAULTS );
+		$invalid = array( array( $page, 'page-unknown' ), array( $page, 'single' ), array( $post, 'page-landing' ), array( $post, 'single-product' ), array( $page, 'single-product' ) );
+		if ( ! class_exists( 'WooCommerce' ) ) {
+			$invalid[] = array( $page, 'page-cart' );
+		}
+		foreach ( $invalid as [ $id, $template ] ) {
+			$data = $this->assert_rejected(
+				'leitvia_invalid_input',
+				self::call(
+					'leitvia/update-content',
+					$id,
+					array(
+						'post'     => $id,
+						'template' => $template,
+					)
+				)
+			);
+			$this->assertSame( 'template', $data['reason'], $template );
+		}
+		$this->assertSame( '', get_page_template_slug( $page ) );
+
+		$live = $this->assert_ok(
+			self::call(
+				'leitvia/update-content',
+				$page,
+				array(
+					'post'     => $page,
+					'template' => 'page-landing',
+				)
+			)
+		);
+		$this->assertSame( 'page-landing', get_page_template_slug( $page ) );
+		$this->roll_back( $live );
+		$this->assertSame( '', get_page_template_slug( $page ) );
+
+		// Back to the default template, which shows the title as h1: the h1 of the landing page is refused there, a page
+		// whose text starts at h2 goes back.
+		update_post_meta( $page, '_wp_page_template', 'page-landing' );
+		$data = $this->assert_rejected(
+			'leitvia_check_failed',
+			self::call(
+				'leitvia/update-content',
+				$page,
+				array(
+					'post'     => $page,
+					'template' => 'default',
+				)
+			)
+		);
+		$this->assertContains( 'leitvia/headings', array_column( $data['findings'], 'check' ) );
+		delete_post_meta( $page, '_wp_page_template' );
+		$plain = $this->page( '<!-- wp:heading --><h2 class="wp-block-heading">Welcome</h2><!-- /wp:heading -->' . self::paragraph( 'Text' ) );
+		foreach ( array( 'default', '' ) as $reset ) {
+			update_post_meta( $plain, '_wp_page_template', 'page-landing' );
+			$this->assert_ok(
+				self::call(
+					'leitvia/update-content',
+					$plain,
+					array(
+						'post'     => $plain,
+						'template' => $reset,
+					)
+				)
+			);
+			$this->assertSame( '', get_page_template_slug( $plain ), "reset with '$reset'" );
+		}
+		$this->assert_ok(
+			self::call(
+				'leitvia/update-content',
+				$post,
+				array(
+					'post'     => $post,
+					'template' => 'single',
+				)
+			)
+		);
+		$this->assertSame( 'single', get_page_template_slug( $post ) );
+
+		// At the level draft the switch of a published page waits in a package.
+		update_option( Gateway::OPTION, Gateway::DEFAULTS );
+		$package = $this->assert_ok(
+			self::call(
+				'leitvia/update-content',
+				$page,
+				array(
+					'post'     => $page,
+					'template' => 'page-landing',
+				)
+			)
+		);
+		$this->assertSame( 'package', $package['mode'] );
+		$this->assertSame( '', get_page_template_slug( $page ) );
+		$this->assertSame( 'page-landing', Packages::operations( $package['package'] )[0]['state']['meta_input']['_wp_page_template'] );
+	}
+
+	/**
+	 * Hashes from before the template joined the state of content types still match: a package applied before the
+	 * update rolls back and an old base hash is accepted; a later change still is a conflict.
+	 */
+	public function test_hash_without_template_still_matches(): void {
+		update_option( Gateway::OPTION, array( 'profile' => 'full' ) + Gateway::DEFAULTS );
+		$legacy = static fn( int $post ): string => ( new ReflectionMethod( Hashes::class, 'post' ) )->invoke( null, $post, true );
+		$age    = static function ( array $result ) use ( $legacy ): void {
+			$operations                       = Packages::operations( $result['package'] );
+			$operations[0]['applied']['hash'] = $legacy( (int) $result['target']['post'] );
+			( new ReflectionMethod( Packages::class, 'save' ) )->invoke( null, $result['package'], $operations );
+		};
+		$page   = $this->page( self::paragraph( 'Text' ) );
+		$this->assertNotSame( Hashes::document( $page ), $legacy( $page ) );
+		$live = $this->assert_ok(
+			wp_get_ability( 'leitvia/update-content' )->execute(
+				array(
+					'post'      => $page,
+					'title'     => 'Changed',
+					'base_hash' => $legacy( $page ),
+				)
+			)
+		);
+		$age( $live );
+		$this->roll_back( $live );
+		$this->assertSame( 'Original title', get_the_title( $page ) );
+
+		$live = $this->assert_ok(
+			self::call(
+				'leitvia/update-content',
+				$page,
+				array(
+					'post'  => $page,
+					'title' => 'Changed again',
+				)
+			)
+		);
+		$age( $live );
+		wp_update_post(
+			array(
+				'ID'           => $page,
+				'post_excerpt' => 'Changed by a person',
+			)
+		);
+		$this->assert_rejected( 'leitvia_rollback_conflict', wp_get_ability( 'leitvia/rollback' )->execute( array( 'id' => $live['package'] ) ) );
+		$this->assertSame( 'Changed again', get_the_title( $page ) );
+
+		// An old hash cannot see the template: a write that changes it with one is stale, one that keeps it is not.
+		$switch = array(
+			'post'      => $page,
+			'template'  => 'page-landing',
+			'base_hash' => $legacy( $page ),
+		);
+		$this->assert_rejected( 'leitvia_stale_hash', wp_get_ability( 'leitvia/update-content' )->execute( $switch ) );
+		$this->assertSame( '', get_page_template_slug( $page ) );
+		$this->assert_ok( wp_get_ability( 'leitvia/update-content' )->execute( array( 'template' => '' ) + $switch ) );
+	}
+
+	/**
 	 * A block edit of update-content keeps the one link of a text around link_text, as update-block does; without it a
 	 * text that drops the link is refused.
 	 */

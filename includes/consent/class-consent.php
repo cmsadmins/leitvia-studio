@@ -71,12 +71,15 @@ final class Consent {
 
 		/**
 		 * Filters the services the consent placeholder knows. Add a service, change its label, privacy policy or
-		 * purpose (one sentence shown in the placeholder). An embed from a host no service lists still gets a
+		 * purpose (one sentence shown in the placeholder). The keys statistics and marketing are reserved for the
+		 * categories of scripts (Scripts::categories()) and dropped. An embed from a host no service lists still gets a
 		 * placeholder, named after the host.
 		 *
 		 * @param array<string, array<string, mixed>> $services
 		 */
-		return (array) apply_filters( 'leitvia_studio_consent_services', $services );
+		$services = (array) apply_filters( 'leitvia_studio_consent_services', $services );
+		// The categories of scripts share the list of allowed keys in the browser (Scripts); a service never takes one.
+		return array_diff_key( $services, Scripts::categories() );
 	}
 
 	/**
@@ -265,8 +268,14 @@ final class Consent {
 	 * @param string $content Rendered block.
 	 */
 	public static function filter_settings_block( string $content ): string {
-		wp_interactivity_state( 'leitvia/consent', array( 'labels' => array_map( static fn( $s ) => (string) ( $s['label'] ?? '' ), self::services() ) ) );
+		wp_interactivity_state( 'leitvia/consent', array( 'labels' => array_map( static fn( $s ) => (string) ( $s['label'] ?? '' ), self::services() ) + Scripts::categories() ) );
 		self::site_state();
+		// The categories of scripts that wait for consent (Scripts), above the status line the block shares with them.
+		$scripts = Scripts::settings_markup();
+		$status  = '<p role="status" data-wp-text="state.status"></p>';
+		if ( '' !== $scripts && str_contains( $content, $status ) ) {
+			$content = str_replace( $status, $scripts . $status, $content );
+		}
 		// Save writes these texts into the markup, in the language of whoever saved it; a block saved in English follows the site.
 		return strtr(
 			$content,
@@ -274,7 +283,7 @@ final class Consent {
 				'Without JavaScript, this site stores no consent: content from other providers stays a link.' => esc_html__( 'Without JavaScript, this site stores no consent: content from other providers stays a link.', 'leitvia-studio' ),
 				'You have not allowed any provider on this site in this browser.' => esc_html__( 'You have not allowed any provider on this site in this browser.', 'leitvia-studio' ),
 				/* translators: %s: provider name, for example YouTube. */
-				'%s is no longer allowed.' => esc_attr__( '%s is no longer allowed.', 'leitvia-studio' ),
+				'%s is no longer allowed.' => esc_attr__( '%s is no longer allowed. This applies the next time a page loads.', 'leitvia-studio' ),
 				'>Revoke '                 => '>' . esc_html__( 'Revoke', 'leitvia-studio' ) . ' ',
 			)
 		);
@@ -284,7 +293,7 @@ final class Consent {
 	 * Hands the path of the site to the module, which stores consent under it: sites of a subdirectory network share an
 	 * origin and with it the local storage of the browser, but each has its own controller and privacy policy.
 	 */
-	private static function site_state(): void {
+	public static function site_state(): void {
 		wp_interactivity_state( 'leitvia/consent', array( 'site' => trailingslashit( (string) wp_parse_url( home_url( '/' ), PHP_URL_PATH ) ) ) );
 	}
 }

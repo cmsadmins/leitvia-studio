@@ -564,7 +564,10 @@ final class Packages {
 				continue;
 			}
 			$current = $undo[ $index ] ? Pipeline::hash( $undo[ $index ] ) : '';
-			if ( ! $undo[ $index ] || ! hash_equals( (string) $entry['applied']['hash'], $current ) ) {
+			// The template the rollback writes back; a legacy hash cannot vouch for a template change, see Hashes::matches().
+			$restores = $undo[ $index ] ? ( $undo[ $index ]->change )( array() ) : null;
+			$restores = is_array( $restores ) && isset( $restores['meta_input']['_wp_page_template'] ) ? $restores['meta_input']['_wp_page_template'] : null;
+			if ( ! $undo[ $index ] || ! Pipeline::matches( $undo[ $index ], (string) $entry['applied']['hash'], null === $restores ? null : (string) $restores ) ) {
 				$diff        = $undo[ $index ] ? Diff::states( (array) $entry['state'], Diff::current( $undo[ $index ] ) ) : array();
 				$conflicts[] = array(
 					'op'           => (int) $entry['id'],

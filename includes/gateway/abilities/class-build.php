@@ -19,8 +19,8 @@ use LeitviaStudio\Lab\Status;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Abilities leitvia/compose-page, leitvia/update-block, leitvia/create-pattern, leitvia/vary-pattern and
- * leitvia/add-media. Each one describes an operation for Pipeline::run(); pattern markup comes from the pattern
+ * Abilities leitvia/compose-page, leitvia/update-block, leitvia/create-pattern, leitvia/vary-pattern,
+ * leitvia/add-media and leitvia/crop-media. Each one describes an operation for Pipeline::run(); pattern markup comes from the pattern
  * registry or the Lab, never from files.
  */
 final class Build {
@@ -191,6 +191,40 @@ final class Build {
 				'additionalProperties' => false,
 			),
 			array( self::class, 'describe_add_media' )
+		);
+		$percent = static fn( string $description ): array => array(
+			'type'        => 'number',
+			'minimum'     => 0,
+			'maximum'     => 100,
+			'description' => $description,
+		);
+		Abilities::write(
+			'leitvia/crop-media',
+			__( 'Crop media', 'leitvia-studio' ),
+			__( 'Crops an image of the media library into a new image. The rectangle is in percent of the image size; the original stays. The new image takes the alt text of the original and its title with an addition. Use it for images with text burned in: keep the part without the text band. Only JPEG, PNG, GIF, WebP and AVIF, no SVG; it needs the right to upload files. base_hash is empty. A live crop gets a change package, so leitvia/rollback deletes the new image with its files.', 'leitvia-studio' ),
+			'build',
+			$create,
+			array(
+				'properties'           => array(
+					'id'           => array(
+						'type'        => 'integer',
+						'minimum'     => 1,
+						'description' => __( 'ID of the image in the media library, from leitvia/list-media.', 'leitvia-studio' ),
+					),
+					'x'            => $percent( __( 'Left edge of the rectangle in percent of the image width.', 'leitvia-studio' ) ),
+					'y'            => $percent( __( 'Top edge of the rectangle in percent of the image height.', 'leitvia-studio' ) ),
+					'width'        => $percent( __( 'Width of the rectangle in percent of the image width, above 0; x plus width is at most 100.', 'leitvia-studio' ) ),
+					'height'       => $percent( __( 'Height of the rectangle in percent of the image height, above 0; y plus height is at most 100.', 'leitvia-studio' ) ),
+					'title_suffix' => array(
+						'type'        => 'string',
+						'maxLength'   => 100,
+						'description' => __( 'Addition to the title of the original, in brackets after it; without it the addition is cropped.', 'leitvia-studio' ),
+					),
+				),
+				'required'             => array( 'id', 'x', 'y', 'width', 'height' ),
+				'additionalProperties' => false,
+			),
+			array( self::class, 'describe_crop_media' )
 		);
 	}
 
@@ -584,32 +618,111 @@ final class Build {
 				'post'      => 0,
 				'post_type' => 'attachment',
 			),
-			'change' => static function ( array $state ) use ( $file, $name, $type, $alt, $title ) {
-				$path = Packages::stash_file( $name, $file );
-				if ( '' === $path ) {
-					return Rejection::make( 'leitvia_execution_failed', __( 'The file could not be saved; nothing was changed. Try again later.', 'leitvia-studio' ), 500, 'execution', array(), '', 'never' );
+			'change' => static fn( array $state ) => self::new_media( $state, $name, $file, $type['type'], $alt, $title ),
+		);
+	}
+
+	/**
+	 * Operation of crop-media: a new image from a rectangle of an image of the library, in percent of its size, with
+	 * the alt text of the original and its title with an addition. The original stays; the pipeline writes the new
+	 * image like one from add-media, and a rollback deletes it with its files. The image is cut in the change, after
+	 * the rate limit and the scope checks.
+	 *
+	 * @param array<string, mixed> $input Input.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public static function describe_crop_media( array $input ) {
+		$id = (int) ( $input['id'] ?? 0 );
+		if ( ! $id || 'attachment' !== get_post_type( $id ) || ! Scope::readable( $id ) ) {
+			return Rejection::make( 'leitvia_not_found', __( 'There is no file with this ID in the media library. List the media for the current IDs.', 'leitvia-studio' ), 404, 'id', array( 'post' => $id ), 'leitvia/list-media' );
+		}
+		$source = (string) get_attached_file( $id );
+		// wp_attachment_is_image() knows raster formats only, so an SVG is refused like any other file.
+		if ( ! wp_attachment_is_image( $id ) || ! is_file( $source ) ) {
+			return Block_Edit::invalid( 'type', __( 'Only images of the media library in JPEG, PNG, GIF, WebP or AVIF can be cropped, no SVG or other file.', 'leitvia-studio' ), array( 'post' => $id ) );
+		}
+		$box = array();
+		foreach ( array( 'x', 'y', 'width', 'height' ) as $key ) {
+			$box[ $key ] = (float) ( $input[ $key ] ?? 0 );
+		}
+		// A small tolerance, so 33.3 and 66.7 still end at the edge.
+		if ( $box['width'] <= 0 || $box['height'] <= 0 || min( $box['x'], $box['y'] ) < 0 || $box['x'] + $box['width'] > 100.000001 || $box['y'] + $box['height'] > 100.000001 ) {
+			return Block_Edit::invalid( 'rectangle', __( 'The rectangle must lie within the image: x, y, width and height in percent from 0 to 100, width and height above 0, x plus width and y plus height at most 100.', 'leitvia-studio' ), array( 'post' => $id ) );
+		}
+		$suffix = trim( (string) ( $input['title_suffix'] ?? '' ) );
+		$title  = (string) get_post_field( 'post_title', $id, 'raw' );
+		$title  = ( '' !== $title ? $title : (string) pathinfo( $source, PATHINFO_FILENAME ) ) . ' (' . ( '' !== $suffix ? $suffix : __( 'cropped', 'leitvia-studio' ) ) . ')';
+		$alt    = (string) get_post_meta( $id, '_wp_attachment_image_alt', true );
+		return array(
+			'area'   => 'content',
+			'target' => array(
+				'post'      => 0,
+				'post_type' => 'attachment',
+			),
+			'record' => true,
+			'change' => static function ( array $state ) use ( $source, $box, $alt, $title ) {
+				$failed = Rejection::make( 'leitvia_execution_failed', __( 'The image could not be cropped; nothing was changed. Try again later.', 'leitvia-studio' ), 500, 'execution', array(), '', 'never' );
+				$editor = wp_get_image_editor( $source );
+				if ( is_wp_error( $editor ) ) {
+					return $failed;
 				}
-				$size = 'text/vtt' === $type['type'] ? false : wp_getimagesize( $path );
-				// ponytail: no sub-sizes; a person can generate them with a thumbnail tool when the theme needs them.
-				// The pipeline sets the file path of the metadata when it moves the file into the uploads folder.
-				$meta = 'text/vtt' === $type['type'] ? array() : array(
-					'width'  => (int) ( $size[0] ?? 0 ),
-					'height' => (int) ( $size[1] ?? 0 ),
-				);
-				return array(
-					'post_title'     => '' !== $title ? $title : (string) pathinfo( $name, PATHINFO_FILENAME ),
-					'post_status'    => 'inherit',
-					'post_mime_type' => $type['type'],
-					'file'           => $path,
-					'meta_input'     => array_filter(
-						array(
-							'_wp_attachment_image_alt' => $alt,
-							'_wp_attachment_metadata'  => $meta,
-						)
-					),
-				) + $state;
+				$size   = $editor->get_size();
+				$left   = (int) round( $size['width'] * $box['x'] / 100 );
+				$top    = (int) round( $size['height'] * $box['y'] / 100 );
+				$width  = max( 1, min( $size['width'] - $left, (int) round( $size['width'] * $box['width'] / 100 ) ) );
+				$height = max( 1, min( $size['height'] - $top, (int) round( $size['height'] * $box['height'] / 100 ) ) );
+				$temp   = get_temp_dir();
+				$saved  = $editor->crop( $left, $top, $width, $height );
+				$saved  = is_wp_error( $saved ) ? $saved : $editor->save( $temp . wp_unique_filename( $temp, wp_basename( $editor->generate_filename( 'crop' ) ) ) );
+				if ( is_wp_error( $saved ) || empty( $saved['path'] ) ) {
+					return $failed;
+				}
+				$files = Packages::filesystem();
+				$bytes = $files ? $files->get_contents( (string) $saved['path'] ) : false;
+				wp_delete_file( (string) $saved['path'] );
+				$name = pathinfo( $source, PATHINFO_FILENAME ) . '-crop.' . pathinfo( (string) $saved['path'], PATHINFO_EXTENSION );
+				$type = false === $bytes ? null : Packages::image_type( $bytes, $name );
+				return $type ? self::new_media( $state, $type['name'], (string) $bytes, $type['type'], $alt, $title ) : $failed;
 			},
 		);
+	}
+
+	/**
+	 * State of a new attachment of add-media and crop-media. The file waits in the private area of packages; the
+	 * pipeline moves it into the uploads folder only when it writes the attachment.
+	 *
+	 * @param array<string, mixed> $state State.
+	 * @param string               $name  File name.
+	 * @param string               $bytes File content.
+	 * @param string               $type  MIME type.
+	 * @param string               $alt   Alt text.
+	 * @param string               $title Title, '' for the file name.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private static function new_media( array $state, string $name, string $bytes, string $type, string $alt, string $title ) {
+		$path = Packages::stash_file( $name, $bytes );
+		if ( '' === $path ) {
+			return Rejection::make( 'leitvia_execution_failed', __( 'The file could not be saved; nothing was changed. Try again later.', 'leitvia-studio' ), 500, 'execution', array(), '', 'never' );
+		}
+		$size = 'text/vtt' === $type ? false : wp_getimagesize( $path );
+		// ponytail: no sub-sizes; a person can generate them with a thumbnail tool when the theme needs them.
+		// The pipeline sets the file path of the metadata when it moves the file into the uploads folder.
+		$meta = 'text/vtt' === $type ? array() : array(
+			'width'  => (int) ( $size[0] ?? 0 ),
+			'height' => (int) ( $size[1] ?? 0 ),
+		);
+		return array(
+			'post_title'     => '' !== $title ? $title : (string) pathinfo( $name, PATHINFO_FILENAME ),
+			'post_status'    => 'inherit',
+			'post_mime_type' => $type,
+			'file'           => $path,
+			'meta_input'     => array_filter(
+				array(
+					'_wp_attachment_image_alt' => $alt,
+					'_wp_attachment_metadata'  => $meta,
+				)
+			),
+		) + $state;
 	}
 
 	/**

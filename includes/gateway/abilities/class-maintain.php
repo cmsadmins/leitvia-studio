@@ -43,7 +43,7 @@ final class Maintain {
 		Abilities::write(
 			'leitvia/update-content',
 			__( 'Update content', 'leitvia-studio' ),
-			__( 'Updates title, excerpt, slug, date, status, author, terms, fields, featured image, comment status and the texts and button links of several blocks of one post in one operation, blocks found by their ID from the outline. Per block, url changes the one link of a text too, link_text names the part that stays linked, add_link sets a new link on a passage and caption the caption of a figure, as in leitvia/update-block. status publishes a draft, schedules it (future, with a date) or takes a post back to draft or pending; like every change it follows the autonomy level, so at a lower level it waits in a change package, and publishing needs the right to publish when it is applied. Terms, fields and featured image follow the rules of leitvia/create-content; terms replace those of their taxonomy. Instead of blocks, content replaces the whole content with block markup, for example to turn classic content into blocks; the new content may hold no classic block. Read the post with leitvia/get-page-outline first and send its hash as base_hash. A slug change is a URL change and lands at most as a suggestion; after one, leitvia/repair-links with auto points the links of other posts to the new address. For attributes or images of a block use leitvia/update-block.', 'leitvia-studio' ),
+			__( 'Updates title, excerpt, slug, date, status, author, terms, fields, featured image, comment status and the texts and button links of several blocks of one post in one operation, blocks found by their ID from the outline. Per block, url changes the one link of a text too, link_text names the part that stays linked, add_link sets a new link on a passage and caption the caption of a figure, as in leitvia/update-block. status publishes a draft, schedules it (future, with a date) or takes a post back to draft or pending; like every change it follows the autonomy level, so at a lower level it waits in a change package, and publishing needs the right to publish when it is applied. Terms, fields, featured image and template follow the rules of leitvia/create-content; terms replace those of their taxonomy, and template switches the post to another template of the contract (page-landing for a page). Instead of blocks, content replaces the whole content with block markup, for example to turn classic content into blocks; the new content may hold no classic block. Read the post with leitvia/get-page-outline first and send its hash as base_hash. A slug change is a URL change and lands at most as a suggestion; after one, leitvia/repair-links with auto points the links of other posts to the new address. For attributes or images of a block use leitvia/update-block.', 'leitvia-studio' ),
 			'maintain',
 			$overwrite,
 			array(
@@ -113,6 +113,11 @@ final class Maintain {
 					'fields'         => Content::fields_schema(),
 					'featured_image' => Content::image_schema( false ),
 					'comment_status' => Content::comment_status_schema(),
+					'template'       => array(
+						'type'        => 'string',
+						'pattern'     => '^[a-z0-9-]*$',
+						'description' => __( 'Template of the contract: a page template for pages, a single template for the other types. Empty or default: the standard template.', 'leitvia-studio' ),
+					),
 				),
 				'required'             => array( 'post' ),
 				'additionalProperties' => false,
@@ -218,10 +223,10 @@ final class Maintain {
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	public static function describe_update_content( array $input ) {
-		$post    = (int) ( $input['post'] ?? 0 );
-		$edits   = (array) ( $input['blocks'] ?? array() );
-		$replace = isset( $input['content'] ) ? (string) $input['content'] : null;
-		$fields  = array_filter(
+		$post     = (int) ( $input['post'] ?? 0 );
+		$edits    = (array) ( $input['blocks'] ?? array() );
+		$replace  = isset( $input['content'] ) ? (string) $input['content'] : null;
+		$fields   = array_filter(
 			array(
 				'post_title'     => $input['title'] ?? null,
 				'post_excerpt'   => $input['excerpt'] ?? null,
@@ -230,19 +235,32 @@ final class Maintain {
 			),
 			'is_string'
 		);
-		$extra   = array_intersect_key( $input, array_flip( array( 'date', 'author', 'terms', 'fields', 'featured_image' ) ) );
-		$status  = isset( $input['status'] ) ? (string) $input['status'] : null;
+		$extra    = array_intersect_key( $input, array_flip( array( 'date', 'author', 'terms', 'fields', 'featured_image' ) ) );
+		$status   = isset( $input['status'] ) ? (string) $input['status'] : null;
+		$template = isset( $input['template'] ) ? (string) $input['template'] : null;
 		if ( null !== $replace && $edits ) {
 			return Block_Edit::invalid( 'change', __( 'Send either content or blocks, not both.', 'leitvia-studio' ), array( 'post' => $post ) );
 		}
-		if ( ! $fields && ! $edits && null === $replace && ! $extra && null === $status ) {
-			return Block_Edit::invalid( 'change', __( 'Name what to change: title, excerpt, slug, date, status, author, terms, fields, featured image, comment status, blocks or content.', 'leitvia-studio' ), array( 'post' => $post ) );
+		if ( ! $fields && ! $edits && null === $replace && ! $extra && null === $status && null === $template ) {
+			return Block_Edit::invalid( 'change', __( 'Name what to change: title, excerpt, slug, date, status, author, terms, fields, featured image, comment status, template, blocks or content.', 'leitvia-studio' ), array( 'post' => $post ) );
 		}
 		return array(
 			'area'   => 'content',
 			'target' => array( 'post' => $post ) + ( null === $replace ? array() : array( 'replace' => true ) ),
 			'record' => true,
-			'change' => static function ( array $state ) use ( $post, $edits, $fields, $replace, $extra, $status ) {
+			'change' => static function ( array $state ) use ( $post, $edits, $fields, $replace, $extra, $status, $template ) {
+				if ( null !== $template ) {
+					// The state of an earlier operation of the same package from before Studio 1.3.31 has no template either.
+					if ( ! array_key_exists( '_wp_page_template', (array) ( $state['meta_input'] ?? array() ) ) ) {
+						return Block_Edit::invalid( 'template', __( 'Agents cannot set a template on this post: its post type has none, or an earlier operation of the same change package was made by an older version. Apply or discard that package first.', 'leitvia-studio' ), array( 'post' => $post ) );
+					}
+					$reset   = in_array( $template, array( '', 'default' ), true );
+					$invalid = $reset ? null : Content::invalid_template( (string) $state['post_type'], $template, array( 'post' => $post ) );
+					if ( $invalid ) {
+						return $invalid;
+					}
+					$state['meta_input']['_wp_page_template'] = $reset ? '' : $template;
+				}
 				$content = $replace ?? Build::edit( (string) $state['post_content'], $edits, array( 'post' => $post ) );
 				$state   = is_wp_error( $content ) ? $content : Content::change( array( 'post_content' => $content ) + $fields + $state, $extra, array( 'post' => $post ) );
 				return is_wp_error( $state ) || null === $status ? $state : Content::status( $state, $status, isset( $extra['date'] ), array( 'post' => $post ) );

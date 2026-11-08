@@ -54,9 +54,15 @@ final class Pipeline {
 	/**
 	 * Options an operation may target: the organization data of the site, the reading settings, the pages a recipe
 	 * connects and the options a recipe may turn off (see schemas/recipe.schema.json). Every option counts as
-	 * organization data. The site settings of the content model are open as well, see model_setting().
+	 * organization data. The site settings of the content model are open as well, see model_setting(), and the options
+	 * of add-ons, see addon_options().
 	 */
 	public const OPTIONS = array( 'blogname', 'blogdescription', 'site_logo', 'site_icon', 'show_on_front', 'page_on_front', 'page_for_posts', 'leitvia_studio_settings', 'default_pingback_flag', 'default_ping_status', 'default_comment_status', 'show_avatars', 'wp_page_for_privacy_policy', 'woocommerce_terms_page_id', 'woocommerce_feature_order_attribution_enabled', 'woocommerce_allow_tracking', 'woocommerce_show_marketplace_suggestions', 'woocommerce_feature_remote_logging_enabled' );
+
+	/**
+	 * Core options that stay closed to add-ons, see protected_option().
+	 */
+	private const PROTECTED_OPTIONS = array( 'siteurl', 'home', 'active_plugins', 'active_sitewide_plugins', 'recently_activated', 'uninstall_plugins', 'users_can_register', 'default_role', 'admin_email', 'new_admin_email', 'adminhash', 'template', 'stylesheet', 'current_theme', 'allowedthemes', 'cron', 'secret_key', 'auth_key', 'auth_salt', 'secure_auth_key', 'secure_auth_salt', 'logged_in_key', 'logged_in_salt', 'nonce_key', 'nonce_salt', 'upload_path', 'upload_url_path', 'uploads_use_yearmonth_folders', 'permalink_structure', 'rewrite_rules', 'db_version', 'initial_db_version', 'wp_user_roles', 'mailserver_login', 'mailserver_pass', 'mailserver_url', 'fileupload_url', 'site_admins', 'registration', 'dashboard_widget_options', 'wp_force_deactivated_plugins' );
 
 	/**
 	 * Option of the content model. Model::save() validates and stores it, and like the Model screen it needs
@@ -76,10 +82,11 @@ final class Pipeline {
 	private const PUBLIC_STATUSES = array( 'publish', 'future' );
 
 	/**
-	 * Post types without a useful draft: core renders only published template parts and navigation menus, and no
-	 * ability publishes a draft. Under the level draft a new one waits in a package instead.
+	 * Post types without a useful draft: core renders only published template parts and navigation menus, a draft
+	 * template would replace the one of the theme all the same, and no ability publishes a draft. Under the level draft
+	 * a new one waits in a package instead.
 	 */
-	private const NO_DRAFT = array( 'wp_template_part', 'wp_navigation' );
+	private const NO_DRAFT = array( 'wp_template', 'wp_template_part', 'wp_navigation' );
 
 	/**
 	 * Runs an operation and writes its audit entry. Fires leitvia_studio_gateway_executed after a write or a package.
@@ -146,6 +153,22 @@ final class Pipeline {
 	}
 
 	/**
+	 * Whether a stored hash matches the current state of the target, see hash(); for a post a hash in the format before
+	 * the template joined the state matches as well, unless the operation writes another template (Hashes::matches()).
+	 *
+	 * @param Operation   $op       Operation.
+	 * @param string      $stored   Stored hash.
+	 * @param string|null $template Template the operation writes, null when it writes none.
+	 */
+	public static function matches( Operation $op, string $stored, ?string $template = null ): bool {
+		if ( '' !== $op->option() || isset( $op->target['term'] ) ) {
+			$current = self::hash( $op );
+			return '' !== $current && hash_equals( $current, $stored );
+		}
+		return Hashes::matches( $stored, $op->post_id(), $template );
+	}
+
+	/**
 	 * Steps 1 to 3 of the pipeline, then decide().
 	 *
 	 * @param Operation $op       Operation.
@@ -169,27 +192,31 @@ final class Pipeline {
 			return $before;
 		}
 		// 3. Base hash.
-		if ( ! $op->creates() ) {
-			$current = self::hash( $op );
-			if ( '' === $current || ! hash_equals( $current, $op->base_hash ) ) {
-				return Rejection::make(
-					'leitvia_stale_hash',
-					__( 'The target changed since it was read. Read it again and repeat the change on the current state.', 'leitvia-studio' ),
-					409,
-					'stale_hash',
-					$target,
-					'' !== $op->option() ? '' : 'leitvia/get-page-outline',
-					'once',
-					array( 'current_hash' => $current )
-				);
-			}
+		$current = $op->creates() ? '' : self::hash( $op );
+		$stale   = static fn(): \WP_Error => Rejection::make(
+			'leitvia_stale_hash',
+			__( 'The target changed since it was read. Read it again and repeat the change on the current state.', 'leitvia-studio' ),
+			409,
+			'stale_hash',
+			$target,
+			'' !== $op->option() ? '' : 'leitvia/get-page-outline',
+			'once',
+			array( 'current_hash' => $current )
+		);
+		if ( ! $op->creates() && ! self::matches( $op, $op->base_hash ) ) {
+			return $stale();
 		}
+		// A base hash of the format before Studio 1.3.31 cannot see the template, see Hashes::matches().
+		$legacy = ! $op->creates() && ! hash_equals( $current, $op->base_hash );
 		// An earlier operation of the same package on this target: the change builds on the state it leaves.
 		$follows = $package ? array() : Packages::follows( $op );
 		$before  = $follows ? (array) $follows['state'] : $before;
 		$after   = self::after( $op, $before );
 		if ( is_wp_error( $after ) ) {
 			return $after;
+		}
+		if ( $legacy && isset( $after['meta_input']['_wp_page_template'] ) && ! self::matches( $op, $op->base_hash, (string) $after['meta_input']['_wp_page_template'] ) ) {
+			return $stale();
 		}
 		$result = self::decide( $op, $before, $after, $package, $rollback, (int) ( $follows['id'] ?? 0 ) );
 		// A file the change put in the private area belongs to nobody after a rejection; a stored one stays for a retry.
@@ -233,6 +260,17 @@ final class Pipeline {
 				'leitvia/list-blocks'
 			);
 		}
+		// The check of an add-on option, see addon_options().
+		$check = $rollback || '' === $op->option() ? null : ( self::addon_options()[ $op->option() ] ?? null );
+		try {
+			$valid = $check ? $check( $after['value'] ?? null ) : true;
+		} catch ( \Throwable $e ) {
+			unset( $e );
+			$valid = false;
+		}
+		if ( true !== $valid ) {
+			return Rejection::make( 'leitvia_invalid_input', is_wp_error( $valid ) ? $valid->get_error_message() : __( 'The value is not valid for this option.', 'leitvia-studio' ), 422, 'option', $target, '', 'never' );
+		}
 		// 5. Autonomy.
 		$kinds = Autonomy::kinds( $op, $before, $after );
 		$level = Autonomy::level( $op->area, $kinds, $op->target );
@@ -274,7 +312,10 @@ final class Pipeline {
 			$follows > 0 || $strict => 'package',
 			default                 => self::mode( $op, $level, $before, $after, (bool) $findings ),
 		};
-		$result = array(
+		// The warnings of a token set come after the mode: they are reported but hold nothing back, since the set has to
+		// exist before a person uploads its fonts and activates it again.
+		$findings = $rollback ? $findings : array_merge( $findings, self::token_warnings( $op, $after ) );
+		$result   = array(
 			'mode'     => $mode,
 			'level'    => $level,
 			'kinds'    => $kinds,
@@ -401,7 +442,7 @@ final class Pipeline {
 		$out       = Rejection::make( 'leitvia_out_of_scope', __( 'Agents may not change this object. Only published or draft content of the allowed post types is open to them.', 'leitvia-studio' ), 403, 'scope', $target, '', 'never' );
 		$forbidden = Rejection::make( 'leitvia_forbidden', __( 'Your user may not change this object.', 'leitvia-studio' ), 403, 'capability', $target, '', 'never' );
 		if ( '' !== $op->option() ) {
-			return in_array( $op->option(), self::OPTIONS, true ) || self::MODEL_OPTION === $op->option() || self::model_setting( $op->option() ) ? array( 'value' => get_option( $op->option() ) ) : $out;
+			return in_array( $op->option(), self::OPTIONS, true ) || self::MODEL_OPTION === $op->option() || self::model_setting( $op->option() ) || isset( self::addon_options()[ $op->option() ] ) ? array( 'value' => get_option( $op->option() ) ) : $out;
 		}
 		if ( isset( $op->target['term'] ) ) {
 			if ( ! Scope::term_readable( $op->term() ) ) {
@@ -428,6 +469,43 @@ final class Pipeline {
 			}
 		}
 		return self::state( $op->post_id() );
+	}
+
+	/**
+	 * Options of add-ons that their own abilities write through the pipeline, by name the check of a new value: a
+	 * callable that gets the value and returns true or a WP_Error. The check runs on every write but a rollback, also
+	 * when a package is applied, so a value that waited in a package passes it again. The options of OPTIONS and of the
+	 * content model keep their own rules and are left out. Such a write is a settings change: agents propose it, a
+	 * person applies it (Autonomy::person_decides()). A check that throws counts as a refusal. Core options that
+	 * matter for security never open, see protected_option(). An add-on creates its option before the first write, with autoload
+	 * as it wants it; update_option() keeps that.
+	 *
+	 * @return array<string, callable>
+	 */
+	public static function addon_options(): array {
+		/**
+		 * Filters the options of add-ons the pipeline writes.
+		 *
+		 * @param array<mixed> $options Check of a new value by option name.
+		 */
+		$options = (array) apply_filters( 'leitvia_studio_gateway_options', array() );
+		return array_filter(
+			$options,
+			static fn( $check, $name ): bool => is_string( $name ) && is_callable( $check ) && ! in_array( $name, self::OPTIONS, true ) && self::MODEL_OPTION !== $name && ! self::model_setting( $name ) && ! self::protected_option( $name ),
+			ARRAY_FILTER_USE_BOTH
+		);
+	}
+
+	/**
+	 * Whether an option is one that no filter opens to the pipeline: addresses, plugins, theme, users and roles, keys
+	 * and salts, cron, uploads, the gateway settings and transients, and the auto_update_ options of plugins, themes
+	 * and core (as a prefix). An add-on that names one gets nothing.
+	 *
+	 * @param string $option Option name.
+	 */
+	public static function protected_option( string $option ): bool {
+		global $wpdb;
+		return in_array( strtolower( $option ), array_map( 'strtolower', array_merge( self::PROTECTED_OPTIONS, array( $wpdb->prefix . 'user_roles', $wpdb->get_blog_prefix() . 'user_roles', Gateway::OPTION ) ) ), true ) || (bool) preg_match( '/^_(site_)?transient_|^auto_update_|_(key|salt)$/', strtolower( $option ) );
 	}
 
 	/**
@@ -698,6 +776,24 @@ final class Pipeline {
 			$context['template'] = (string) $after['meta_input']['_wp_page_template'];
 		}
 		return Content_Checks::run( (string) $after['post_content'], $context );
+	}
+
+	/**
+	 * Warnings of the token set checks (Compiler::check(), for example font_not_bundled) for a token set the operation
+	 * creates or activates. check() skips JSON documents and Token_Sets::validate() keeps only errors, so without this
+	 * an agent never heard of a font that falls back to the system font.
+	 *
+	 * @param Operation            $op    Operation.
+	 * @param array<string, mixed> $after State after.
+	 * @return list<array<string, mixed>>
+	 */
+	private static function token_warnings( Operation $op, array $after ): array {
+		$doc = match ( true ) {
+			isset( $op->target['token_set'] )                         => Compiler::document( (int) $op->target['token_set'] ),
+			Token_Sets::POST_TYPE === ( $after['post_type'] ?? null ) => json_decode( (string) ( $after['meta_input'][ Token_Sets::META ] ?? '' ), true ),
+			default                                                   => null,
+		};
+		return is_array( $doc ) ? array_values( wp_list_filter( Compiler::check( $doc ), array( 'severity' => 'warning' ) ) ) : array();
 	}
 
 	/**

@@ -80,6 +80,11 @@ $ratios: (
 		gap: var(--wp--preset--spacing--s, 1rem);
 		padding-block: var(--wp--preset--spacing--xs, 0.5rem);
 		border-block-end: 1px solid var(--wp--preset--color--stroke, currentcolor);
+
+		// A category of scripts the visitor allowed moves to the list of allowed providers (includes/consent/class-scripts.php).
+		&[hidden] {
+			display: none;
+		}
 	}
 }
 

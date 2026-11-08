@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
  * a copy of the current state and returns the new state, so nothing is written before the pipeline agrees.
  *
  * Targets: array( 'post' => <ID> ) for an existing post, array( 'post' => 0, 'post_type' => <type> ) for a new one,
- * array( 'option' => <name> ) for an option of Pipeline::OPTIONS or Pipeline::MODEL_OPTION, array( 'term' => <ID> ) for a
+ * array( 'option' => <name> ) for an option of Pipeline::OPTIONS, Pipeline::MODEL_OPTION or Pipeline::addon_options(), array( 'term' => <ID> ) for a
  * term of a taxonomy in Scope::taxonomies(). 'block' names the affected
  * block for rejections; 'replace' marks content that replaces the whole post content, which may then hold no classic
  * block even where the old content was classic; 'token_set' on the user global styles makes the pipeline write them with Compiler::activate().

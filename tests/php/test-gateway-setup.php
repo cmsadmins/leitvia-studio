@@ -41,6 +41,14 @@ class Test_Gateway_Setup extends WP_UnitTestCase {
 	 */
 	public function tear_down(): void {
 		self::unregister();
+		foreach ( array( 'leitvia-test/single-wide', 'leitvia-test/page-plain', 'leitvia-test/product-wide' ) as $pattern ) {
+			if ( WP_Block_Patterns_Registry::get_instance()->is_registered( $pattern ) ) {
+				unregister_block_pattern( $pattern );
+			}
+		}
+		if ( function_exists( 'unregister_block_template' ) && WP_Block_Templates_Registry::get_instance()->is_registered( 'leitvia-test//leitvia-test-plain' ) ) {
+			unregister_block_template( 'leitvia-test//leitvia-test-plain' );
+		}
 		WP_Theme_JSON_Resolver::clean_cached_data();
 		wp_clean_theme_json_cache();
 		Model::forget();
@@ -292,6 +300,44 @@ class Test_Gateway_Setup extends WP_UnitTestCase {
 		);
 		$this->assertSame( $before, Store::get_snapshot( $result['snapshot'] )['state']['post_content'] );
 		$this->assertSame( '#b00020', self::user_color( 'accent' ) );
+	}
+
+	/**
+	 * A family that is neither bundled nor in the Font Library gives the warning font_not_bundled when the set is
+	 * created and when it is activated, live, in a package and as a suggestion alike; the warning holds nothing back.
+	 * A bundled family gives none.
+	 */
+	public function test_font_not_bundled_is_reported(): void {
+		$warnings = static fn( array $result ): array => array_values( wp_list_filter( $result['findings'], array( 'code' => 'font_not_bundled' ) ) );
+		$create   = static fn( string $title, array $doc ) => self::call(
+			'leitvia/create-token-set',
+			array(
+				'title'    => $title,
+				'document' => $doc,
+			)
+		);
+		$doc      = self::document();
+		$slug     = (string) array_key_first( array_filter( $doc['fontFamily'], 'is_array' ) );
+
+		$this->sign_in( 'full', 'administrator' );
+		$this->assertSame( array(), $warnings( $this->assert_mode( 'live', $create( 'Bundled', $doc ) ) ) );
+
+		$doc['fontFamily'][ $slug ]['$value'] = array( 'Fraunces', 'serif' );
+		$this->sign_in( 'standard' );
+		$proposed = $this->assert_mode( 'package', $create( 'Proposed', $doc ) );
+		$this->assertSame( 'suggest', $proposed['level'] );
+		$this->assertCount( 1, $warnings( $proposed ) );
+
+		$this->sign_in( 'full' );
+		$created = $this->assert_mode( 'live', $create( 'Not bundled', $doc ) );
+		$this->assertSame( array( 'slug' => $slug ), $warnings( $created )[0]['data'] ?? null );
+		$set = (int) $created['target']['post'];
+		$this->assertCount( 1, $warnings( $this->assert_mode( 'package', self::call( 'leitvia/activate-token-set', array( 'set' => $set ) ) ) ) );
+
+		$this->sign_in( 'full', 'administrator' );
+		$activated = $this->assert_mode( 'live', self::call( 'leitvia/activate-token-set', array( 'set' => $set ) ) );
+		$this->assertCount( 1, $warnings( $activated ) );
+		$this->assertSame( $set, (int) get_option( Compiler::ACTIVE_OPTION ) );
 	}
 
 	/**
@@ -766,6 +812,262 @@ class Test_Gateway_Setup extends WP_UnitTestCase {
 		);
 		$this->assertSame( $parts, (int) array_sum( (array) wp_count_posts( 'wp_template_part' ) ), 'no draft part' );
 		$this->assertSame( 'publish', Packages::operations( $result['package'] )[0]['state']['post_status'] );
+	}
+
+	/**
+	 * A template from a template pattern made for its slug gets a post with the theme term; patterns for another
+	 * template, slugs outside the contract and the theme, shop templates without WooCommerce and invalid blocks are
+	 * refused; changed markup needs the hash; rollback restores the content and then the template of the theme.
+	 */
+	public function test_update_template(): void {
+		$marker = '<!-- wp:paragraph --><p>Template from a pattern</p><!-- /wp:paragraph -->';
+		register_block_pattern(
+			'leitvia-test/single-wide',
+			array(
+				'title'         => 'Single wide',
+				'content'       => '<!-- wp:template-part {"slug":"header"} /--><!-- wp:post-title {"level":1} /-->' . $marker . '<!-- wp:post-content {"align":"full","layout":{"type":"constrained"}} /--><!-- wp:template-part {"slug":"footer"} /-->',
+				'templateTypes' => array( 'single' ),
+			)
+		);
+		register_block_pattern(
+			'leitvia-test/page-plain',
+			array(
+				'title'         => 'Page plain',
+				'content'       => '<!-- wp:post-content {"layout":{"type":"constrained"}} /-->',
+				'templateTypes' => array( 'page' ),
+			)
+		);
+		$this->sign_in( 'full' );
+		$this->assertSame( 'theme', get_block_template( get_stylesheet() . '//single' )->source );
+		$first    = $this->assert_mode(
+			'live',
+			self::call(
+				'leitvia/update-template',
+				array(
+					'template' => 'single',
+					'pattern'  => 'leitvia-test/single-wide',
+				)
+			)
+		);
+		$template = get_block_template( get_stylesheet() . '//single' );
+		$this->assertSame( $first['target']['post'], $template->wp_id );
+		$this->assertSame( 'custom', $template->source );
+		$this->assertSame( 'publish', get_post_status( $template->wp_id ) );
+		$this->assertStringContainsString( 'Template from a pattern', $template->content );
+
+		$data = $this->assert_rejected(
+			'leitvia_unknown_pattern',
+			self::call(
+				'leitvia/update-template',
+				array(
+					'template' => 'single',
+					'pattern'  => 'leitvia-test/page-plain',
+				)
+			)
+		);
+		$this->assertContains( 'leitvia-test/single-wide', $data['patterns'], 'the rejection names the patterns that fit' );
+		$this->assertNotContains( 'leitvia-test/page-plain', $data['patterns'] );
+		$this->assert_rejected(
+			'leitvia_invalid_input',
+			self::call(
+				'leitvia/update-template',
+				array(
+					'template' => 'banner',
+					'pattern'  => 'leitvia-test/single-wide',
+				)
+			)
+		);
+		$this->assert_rejected(
+			'leitvia_invalid_input',
+			self::call(
+				'leitvia/update-template',
+				array(
+					'template' => 'single',
+					'pattern'  => 'leitvia-test/single-wide',
+					'content'  => $marker,
+				)
+			)
+		);
+		if ( ! class_exists( 'WooCommerce' ) ) {
+			$shop = array(
+				'template' => 'single-product',
+				'content'  => $marker,
+			);
+			$this->assert_rejected( 'leitvia_invalid_input', self::call( 'leitvia/update-template', $shop ) );
+		}
+		$this->assert_rejected(
+			'leitvia_stale_hash',
+			self::call(
+				'leitvia/update-template',
+				array(
+					'template' => 'single',
+					'content'  => $marker . '<!-- wp:post-content /-->',
+				)
+			)
+		);
+		$this->assert_rejected(
+			'leitvia_check_failed',
+			self::call(
+				'leitvia/update-template',
+				array(
+					'template'  => 'single',
+					'content'   => '<!-- wp:post-content /--><!-- wp:leitvia-test/missing /-->',
+					'base_hash' => Hashes::document( $template->wp_id ),
+				)
+			)
+		);
+		$second = $this->assert_mode(
+			'live',
+			self::call(
+				'leitvia/update-template',
+				array(
+					'template'  => 'single',
+					'content'   => '<!-- wp:post-content /-->',
+					'base_hash' => Hashes::document( $template->wp_id ),
+				)
+			)
+		);
+		$this->assertSame( array( 'core/post-content' ), array_column( parse_blocks( get_post_field( 'post_content', $template->wp_id ) ), 'blockName' ) );
+		$this->assertGreaterThan( 0, $second['snapshot'] );
+
+		$this->assertIsArray( wp_get_ability( 'leitvia/rollback' )->execute( array( 'id' => $second['package'] ) ) );
+		$this->assertStringContainsString( 'Template from a pattern', get_post_field( 'post_content', $template->wp_id ) );
+		$this->assertIsArray( wp_get_ability( 'leitvia/rollback' )->execute( array( 'id' => $first['package'] ) ) );
+		$this->assertNull( get_post( $template->wp_id ), 'the post the package created is gone' );
+		$this->assertSame( 'theme', get_block_template( get_stylesheet() . '//single' )->source );
+
+		$this->sign_in( 'standard' );
+		$templates = (int) array_sum( (array) wp_count_posts( 'wp_template' ) );
+		$result    = $this->assert_mode(
+			'package',
+			self::call(
+				'leitvia/update-template',
+				array(
+					'template' => 'page',
+					'pattern'  => 'leitvia-test/page-plain',
+				)
+			)
+		);
+		$this->assertSame( $templates, (int) array_sum( (array) wp_count_posts( 'wp_template' ) ), 'no draft template' );
+		$this->assertSame( 'publish', Packages::operations( $result['package'] )[0]['state']['post_status'] );
+	}
+
+	/**
+	 * Templates for single posts and pages keep core/post-content, also inside a group; a saved template in the trash
+	 * is named; a template only a plugin registers (get_block_templates()) is open as well.
+	 */
+	public function test_update_template_guards(): void {
+		$this->sign_in( 'full' );
+		$data = $this->assert_rejected(
+			'leitvia_invalid_input',
+			self::call(
+				'leitvia/update-template',
+				array(
+					'template' => 'page-landing',
+					'content'  => '<!-- wp:post-title /-->',
+				)
+			)
+		);
+		$this->assertSame( 'post_content', $data['reason'] );
+		$this->assert_mode(
+			'live',
+			self::call(
+				'leitvia/update-template',
+				array(
+					'template' => 'page-landing',
+					'content'  => '<!-- wp:group --><div class="wp-block-group"><!-- wp:post-content /--></div><!-- /wp:group -->',
+				)
+			)
+		);
+		$this->assert_mode(
+			'live',
+			self::call(
+				'leitvia/update-template',
+				array(
+					'template' => '404',
+					'content'  => '<!-- wp:paragraph --><p>Not found</p><!-- /wp:paragraph -->',
+				)
+			)
+		);
+
+		$saved = (int) get_block_template( get_stylesheet() . '//page-landing' )->wp_id;
+		wp_trash_post( $saved );
+		$data = $this->assert_rejected(
+			'leitvia_invalid_input',
+			self::call(
+				'leitvia/update-template',
+				array(
+					'template' => 'page-landing',
+					'content'  => '<!-- wp:post-content /-->',
+				)
+			)
+		);
+		$this->assertSame( 'trashed', $data['reason'] );
+
+		if ( ! function_exists( 'register_block_template' ) ) {
+			return;
+		}
+		$this->assert_rejected(
+			'leitvia_invalid_input',
+			self::call(
+				'leitvia/update-template',
+				array(
+					'template' => 'leitvia-test-plain',
+					'content'  => '<!-- wp:post-content /-->',
+				)
+			)
+		);
+		register_block_template(
+			'leitvia-test//leitvia-test-plain',
+			array(
+				'title'   => 'Plain',
+				'content' => '<!-- wp:post-content /-->',
+			)
+		);
+		$result = $this->assert_mode(
+			'live',
+			self::call(
+				'leitvia/update-template',
+				array(
+					'template' => 'leitvia-test-plain',
+					'content'  => '<!-- wp:paragraph --><p>Plain</p><!-- /wp:paragraph --><!-- wp:post-content /-->',
+				)
+			)
+		);
+		$this->assertSame( 'leitvia-test-plain', get_post_field( 'post_name', $result['target']['post'] ) );
+	}
+
+	/**
+	 * With WooCommerce the product template takes a template pattern made for it, without core/post-content.
+	 *
+	 * @group woocommerce
+	 */
+	public function test_update_template_for_products(): void {
+		if ( ! class_exists( 'WooCommerce' ) ) {
+			$this->markTestSkipped( 'Needs WooCommerce (npm run test:php:commerce).' );
+		}
+		// The bootstrap loads WooCommerce without the option; the requires of the contract read the active plugins.
+		update_option( 'active_plugins', array( 'woocommerce/woocommerce.php' ) );
+		register_block_pattern(
+			'leitvia-test/product-wide',
+			array(
+				'title'         => 'Product wide',
+				'content'       => '<!-- wp:template-part {"slug":"header"} /--><!-- wp:post-title {"level":1} /--><!-- wp:template-part {"slug":"footer"} /-->',
+				'templateTypes' => array( 'single-product' ),
+			)
+		);
+		$this->sign_in( 'full' );
+		$result = $this->assert_mode(
+			'live',
+			self::call(
+				'leitvia/update-template',
+				array(
+					'template' => 'single-product',
+					'pattern'  => 'leitvia-test/product-wide',
+				)
+			)
+		);
+		$this->assertSame( $result['target']['post'], get_block_template( get_stylesheet() . '//single-product' )->wp_id );
 	}
 
 	/**

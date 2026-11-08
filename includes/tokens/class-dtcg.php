@@ -41,6 +41,13 @@ final class Dtcg {
 	private const ALIAS_FORMAT = '/^\{([^{}]+)\}$/D';
 
 	/**
+	 * Group under color with up to MAX_EXTRA named surfaces without a role, palette slugs EXTRA-<slug>.
+	 */
+	public const EXTRA       = 'surface-extra';
+	public const MAX_EXTRA   = 8;
+	private const EXTRA_NAME = '/^[a-z]+(-[a-z]+)*$/D';
+
+	/**
 	 * Builds a token document from merged theme.json settings. Only contract roles are exported.
 	 *
 	 * @param array<string, mixed> $settings Settings as returned by wp_get_global_settings().
@@ -77,6 +84,19 @@ final class Dtcg {
 					'$value'      => $value['value'],
 					'$extensions' => array( self::EXT => $ext ),
 				);
+			}
+			// The extra surfaces of an activated set go back into the document, so a copy of it keeps them. Only presets
+			// extra_surfaces() accepts (name, at most eight), so the copy can be imported again.
+			foreach ( 'color' === $group ? $presets : array() as $slug => $preset ) {
+				$name = substr( (string) $slug, strlen( self::EXTRA ) + 1 );
+				if ( str_starts_with( (string) $slug, self::EXTRA . '-' ) && preg_match( self::EXTRA_NAME, $name ) && is_string( $preset['color'] ?? null )
+					&& count( $doc['color'][ self::EXTRA ] ?? array() ) < self::MAX_EXTRA ) {
+					$doc['color'][ self::EXTRA ][ $name ] = array(
+						'$type'       => 'color',
+						'$value'      => self::parse_color( $preset['color'] ),
+						'$extensions' => array( self::EXT => array( 'name' => (string) ( $preset['name'] ?? $slug ) ) ),
+					);
+				}
 			}
 		}
 		return $doc;
@@ -120,6 +140,12 @@ final class Dtcg {
 				continue;
 			}
 			$tokens = is_array( $doc[ $group ] ?? null ) ? self::tokens( $doc[ $group ] ) : array();
+			// The raw node, not the one of tokens(): a value that is no group must fail, not count as an empty group.
+			$has_extra = 'color' === $group && array_key_exists( self::EXTRA, $tokens );
+			$extras    = $has_extra ? $doc['color'][ self::EXTRA ] : null;
+			if ( $has_extra ) {
+				unset( $tokens[ self::EXTRA ] );
+			}
 			foreach ( array_diff( array_keys( $tokens ), $slugs ) as $extra ) {
 				return self::error(
 					'unknown_role',
@@ -171,9 +197,76 @@ final class Dtcg {
 				}
 				$presets[] = $preset;
 			}
+			if ( $has_extra ) {
+				$extras = self::extra_surfaces( $extras, $presets );
+				if ( is_wp_error( $extras ) ) {
+					return $extras;
+				}
+				$presets = array_merge( $presets, $extras );
+			}
 			$settings[ $section ][ $list ]['theme'] = $presets;
 		}
 		return $settings;
+	}
+
+	/**
+	 * Palette presets of the group color.surface-extra: up to eight surfaces, slugs of lowercase letters and hyphens,
+	 * each readable with ink at 4.5:1 since text on them stays ink. They get no role, so no contract pair covers them.
+	 *
+	 * @param mixed                      $group Node color.surface-extra, a group of color tokens.
+	 * @param list<array<string, mixed>> $roles Color presets of the roles.
+	 * @return list<array<string, string>>|WP_Error
+	 */
+	private static function extra_surfaces( $group, array $roles ) {
+		$path = 'color.' . self::EXTRA;
+		if ( ! is_array( $group ) || array_key_exists( '$value', $group ) ) {
+			/* translators: %s: token group, color.surface-extra. */
+			return self::error( 'extra_group', __( '%s must be a group of color tokens, not a single token.', 'leitvia-studio' ), $path );
+		}
+		// The role presets hold ink as #rrggbb (hex() above), so ink is only missing when the contract has no such role.
+		// Then the surfaces cannot be checked and are refused.
+		$ink = array_column( $roles, 'color', 'slug' )['ink'] ?? null;
+		if ( ! is_string( $ink ) ) {
+			/* translators: 1: foreground role, 2: background role, 3: missing role. */
+			return self::error( 'extra_contrast', __( '%1$s on %2$s: the color role %3$s is missing', 'leitvia-studio' ), 'ink', $path, 'ink' );
+		}
+		$tokens = self::tokens( $group );
+		if ( count( $tokens ) > self::MAX_EXTRA ) {
+			/* translators: 1: token group, 2: maximum number of colors. */
+			return self::error( 'extra_limit', __( 'The group %1$s holds more than %2$s colors.', 'leitvia-studio' ), $path, (string) self::MAX_EXTRA );
+		}
+		$presets = array();
+		foreach ( $tokens as $slug => $token ) {
+			$slug = (string) $slug;
+			$path = 'color.' . self::EXTRA . '.' . $slug;
+			if ( ! preg_match( self::EXTRA_NAME, $slug ) ) {
+				/* translators: %s: token path, for example color.surface-extra.mint. */
+				return self::error( 'extra_slug', __( 'The token %s needs a name of lowercase letters and hyphens.', 'leitvia-studio' ), $path );
+			}
+			if ( isset( $token['$type'] ) && 'color' !== $token['$type'] ) {
+				/* translators: %s: token path, for example color.focus. */
+				return self::error( 'type', __( 'The token %s has the wrong $type.', 'leitvia-studio' ), $path );
+			}
+			$hex = self::hex( $token['$value'] ?? null );
+			if ( is_wp_error( $hex ) ) {
+				/* translators: 1: token path, 2: error message. */
+				return self::error( (string) $hex->get_error_code(), __( 'The token %1$s is invalid: %2$s', 'leitvia-studio' ), $path, $hex->get_error_message() );
+			}
+			// Text on these surfaces stays ink, so ink has to be readable on each of them.
+			$ratio = Contrast::ratio( $ink, $hex );
+			$ratio = is_wp_error( $ratio ) ? 0.0 : $ratio;
+			if ( $ratio < 4.5 ) {
+				/* translators: 1: token path, 2: contrast ratio. */
+				return self::error( 'extra_contrast', __( 'ink on %1$s: %2$s:1, needs 4.5:1', 'leitvia-studio' ), $path, number_format_i18n( floor( $ratio * 100 ) / 100, 2 ) );
+			}
+			$name      = $token['$extensions'][ self::EXT ]['name'] ?? null;
+			$presets[] = array(
+				'slug'  => self::EXTRA . '-' . $slug,
+				'name'  => is_string( $name ) ? sanitize_text_field( $name ) : $slug,
+				'color' => $hex,
+			);
+		}
+		return $presets;
 	}
 
 	/**

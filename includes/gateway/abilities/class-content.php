@@ -13,6 +13,7 @@ use LeitviaStudio\Gateway\Content_Checks;
 use LeitviaStudio\Gateway\Gateway;
 use LeitviaStudio\Gateway\Hashes;
 use LeitviaStudio\Gateway\Packages;
+use LeitviaStudio\Gateway\Recipes;
 use LeitviaStudio\Gateway\Rejection;
 use LeitviaStudio\Gateway\Scope;
 use LeitviaStudio\Model\Model;
@@ -383,8 +384,8 @@ final class Content {
 
 	/**
 	 * Part of the state of a post of a content type: post_date, post_author, terms by taxonomy (IDs) and, under meta_input, the
-	 * featured image, the fields of the content model and the SEO meta update-seo writes (Seo::keys()). Empty for other
-	 * post types.
+	 * featured image, the template, the fields of the content model and the SEO meta update-seo writes (Seo::keys()).
+	 * Empty for other post types.
 	 *
 	 * @param int    $id   Post ID.
 	 * @param string $type Post type.
@@ -407,6 +408,7 @@ final class Content {
 		if ( post_type_supports( $type, 'thumbnail' ) ) {
 			$state['meta_input']['_thumbnail_id'] = (int) get_post_thumbnail_id( $id );
 		}
+		$state['meta_input']['_wp_page_template'] = (string) get_post_meta( $id, '_wp_page_template', true );
 		foreach ( array_merge( array_keys( self::fields( $type ) ), Seo::keys() ) as $key ) {
 			$state['meta_input'][ $key ] = get_post_meta( $id, $key, true );
 		}
@@ -564,6 +566,25 @@ final class Content {
 	}
 
 	/**
+	 * A rejection when the template is no template of the contract for the post type: page templates for pages,
+	 * single for the other types and single-<type> for its type alone (single-product for products), each only while
+	 * the plugins it requires are active (page-cart needs WooCommerce); null when it fits. Shared by create-content and
+	 * update-content.
+	 *
+	 * @param string               $type     Post type.
+	 * @param string               $template Template slug.
+	 * @param array<string, mixed> $target   Target for the rejection.
+	 */
+	public static function invalid_template( string $type, string $template, array $target ): ?\WP_Error {
+		$known = array_column( (array) ( leitvia_studio_contract()->data()['templates'] ?? array() ), null, 'slug' );
+		$fits  = 'page' === $type ? str_starts_with( $template, 'page' ) : in_array( $template, array( 'single', 'single-' . $type ), true );
+		if ( $fits && isset( $known[ $template ] ) && '' === Recipes::missing( (array) $known[ $template ] ) ) {
+			return null;
+		}
+		return Block_Edit::invalid( 'template', __( 'Use a template of the contract: a page template for pages, a single template for the other types. WooCommerce templates need WooCommerce.', 'leitvia-studio' ), $target, 'leitvia/get-contract' );
+	}
+
+	/**
 	 * Operation of create-content.
 	 *
 	 * @param array<string, mixed> $input Input.
@@ -597,9 +618,9 @@ final class Content {
 			return Block_Edit::invalid( 'kind', __( 'Only pages have a kind.', 'leitvia-studio' ), $target );
 		}
 		$template = (string) ( $input['template'] ?? '' );
-		$known    = array_column( (array) ( leitvia_studio_contract()->data()['templates'] ?? array() ), 'slug' );
-		if ( '' !== $template && ( ! str_starts_with( $template, 'page' === $type ? 'page' : 'single' ) || ! in_array( $template, $known, true ) ) ) {
-			return Block_Edit::invalid( 'template', __( 'Use a template of the contract: a page template for pages, a single template for the other types.', 'leitvia-studio' ), $target, 'leitvia/get-contract' );
+		$invalid  = '' === $template ? null : self::invalid_template( $type, $template, $target );
+		if ( $invalid ) {
+			return $invalid;
 		}
 		$sources = array();
 		foreach ( (array) ( $input['sources'] ?? array() ) as $url ) {

@@ -4,7 +4,7 @@ Tags: ai, mcp, block theme, accessibility, design tokens
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.30
+Stable tag: 1.3.31
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -213,7 +213,17 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 
 == Changelog ==
 
-= 1.3.30 =
+= 1.3.31 =
+* New ability leitvia/update-template: sets a template of the theme from a template pattern whose templateTypes name it, with snapshot, autonomy, package and rollback. Templates of single posts and pages keep the post content.
+* leitvia/update-content takes the field template and gives an existing page or post another template of the contract. The template counts towards the hash; hashes from before still match while the template stays.
+* New ability leitvia/crop-media: crops an image of the media library to a rectangle in percent and adds the result as a new attachment with the alt text of the original, which stays.
+* Token sets may bring up to eight named surfaces under color.surface-extra, for cards and bands; ink needs a contrast of 4.5:1 on each. The export keeps them.
+* create-token-set and activate-token-set report the warning font_not_bundled in their findings.
+* New filter leitvia_studio_icons: icon sets of the site for the icon blocks, next to the fixed Lucide names; filled icons render without a stroke.
+* New filter leitvia_studio_consent_scripts: scripts of other plugins, named by handle or host with the category statistics or marketing, wait for consent like embeds. Until then the browser does not ask the host, and the block Consent settings offers each category to allow and revoke.
+* New filter leitvia_studio_gateway_options: add-ons write options of their own through the pipeline, checked on each write and when a package is applied.
+
+= 1.3.31 =
 * The shortest time between loading a page and sending the contact form (Contact_Form::MIN_SECONDS) is public, so extensions with a form of their own that use the same signed time field check the same time.
 
 = 1.3.29 =

@@ -187,6 +187,71 @@ class Test_Gateway_Pipeline extends WP_UnitTestCase {
 	}
 
 	/**
+	 * 2b. An option of an add-on is open only through the filter leitvia_studio_gateway_options, and its check runs on
+	 * every write, a replay of a package as well: an agent proposes, the check refuses a bad value, a person applies.
+	 */
+	public function test_addon_option(): void {
+		$option = 'my_addon_value';
+		add_option( $option, array(), '', false );
+		$op      = static fn( $value ): Operation => new Operation( 'leitvia/test-write', 'design', array( 'option' => $option ), Hashes::of( (string) wp_json_encode( get_option( $option ) ) ), static fn(): array => array( 'value' => $value ), array(), 'addon-test' );
+		$checked = array();
+		$this->assert_rejected( 'leitvia_out_of_scope', Pipeline::run( $op( array( 'a' => 1 ) ) ) );
+		// Outside the arrow function, which would capture $checked by value.
+		$check = static function ( $value ) use ( &$checked ) {
+			$checked[] = $value;
+			return is_array( $value ) && ! isset( $value['bad'] ) ? true : new WP_Error( 'my_addon_bad', 'Bad value.' );
+		};
+		add_filter(
+			'leitvia_studio_gateway_options',
+			static fn( array $options ): array => $options + array(
+				$option    => $check,
+				'blogname' => static fn(): bool => false,
+			)
+		);
+		$bad = Pipeline::run( $op( array( 'bad' => 1 ) ) );
+		$this->assertSame( 'option', $this->assert_rejected( 'leitvia_invalid_input', $bad )['reason'] );
+		$this->assertSame( 'Bad value.', $bad->get_error_message() );
+		$result = Pipeline::run( $op( array( 'a' => 1 ) ) );
+		$this->assertSame( 'package', $result['mode'], 'agents propose settings' );
+		$this->assertSame( array(), get_option( $option ) );
+		$this->assertNotContains( 'organization', $result['kinds'] );
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+		Packages::apply( (int) $result['package'] );
+		$this->assertSame( array( 'a' => 1 ), get_option( $option ) );
+		$this->assertSame( array( array( 'bad' => 1 ), array( 'a' => 1 ), array( 'a' => 1 ) ), $checked, 'checked when proposed and when applied' );
+		wp_cache_delete( 'alloptions', 'options' );
+		$this->assertArrayNotHasKey( $option, wp_load_alloptions(), 'the write keeps autoload off' );
+		$blog = get_option( 'blogname' );
+		$this->assertIsArray( Pipeline::run( new Operation( 'leitvia/test-write', 'structure', array( 'option' => 'blogname' ), Hashes::of( (string) wp_json_encode( $blog ) ), static fn(): array => array( 'value' => 'Other' ) ) ), 'the filter cannot take over a core option' );
+		remove_all_filters( 'leitvia_studio_gateway_options' );
+	}
+
+	/**
+	 * 2c. Core options that matter for security never open, whatever the filter returns, and a check that throws
+	 * refuses the write instead of breaking it.
+	 *
+	 * @throws RuntimeException Only inside the check of my_addon_throws, which the pipeline catches.
+	 */
+	public function test_addon_option_guards(): void {
+		global $wpdb;
+		$closed = array( 'siteurl', 'home', 'active_plugins', 'auto_update_plugins', 'auto_update_core_major', 'users_can_register', 'default_role', $wpdb->prefix . 'user_roles', 'admin_email', 'template', 'stylesheet', 'auth_key', 'secure_auth_salt', 'cron', Gateway::OPTION, '_transient_doing_cron', 'my_addon_api_key' );
+		add_filter( 'leitvia_studio_gateway_options', static fn( array $options ): array => $options + array_fill_keys( $closed, '__return_true' ) + array( 'my_addon_throws' => static fn() => throw new RuntimeException( 'boom' ) ) );
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+		foreach ( $closed as $option ) {
+			$this->assertTrue( Pipeline::protected_option( $option ), $option );
+			$this->assertArrayNotHasKey( $option, Pipeline::addon_options(), $option );
+			$value = get_option( $option );
+			$this->assert_rejected( 'leitvia_out_of_scope', Pipeline::run( new Operation( 'leitvia/test-write', 'design', array( 'option' => $option ), Hashes::of( (string) wp_json_encode( $value ) ), static fn(): array => array( 'value' => 'x' ) ) ) );
+			$this->assertSame( $value, get_option( $option ), $option );
+		}
+		add_option( 'my_addon_throws', array(), '', false );
+		$thrown = Pipeline::run( new Operation( 'leitvia/test-write', 'design', array( 'option' => 'my_addon_throws' ), Hashes::of( (string) wp_json_encode( array() ) ), static fn(): array => array( 'value' => array( 'a' => 1 ) ) ) );
+		$this->assertSame( 'option', $this->assert_rejected( 'leitvia_invalid_input', $thrown )['reason'] );
+		$this->assertSame( array(), get_option( 'my_addon_throws' ) );
+		remove_all_filters( 'leitvia_studio_gateway_options' );
+	}
+
+	/**
 	 * 3. A wrong base hash is rejected with the current hash, status 409, the outline to read and retry once.
 	 */
 	public function test_stale_hash(): void {

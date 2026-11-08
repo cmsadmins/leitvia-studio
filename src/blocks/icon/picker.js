@@ -1,6 +1,8 @@
 // Icon set and picker of the icon blocks (leitvia/icon, leitvia/icon-list, leitvia/icon-list-item). The set is the
-// same file the server draws from (assets/icons/lucide.json, Icon::svg()); the picker is a radio group, so it takes one
-// Tab stop, the arrow keys move through the icons and each icon has its name as label.
+// same file the server draws from (assets/icons/lucide.json, Icon::svg()) plus the icons of the filter
+// leitvia_studio_icons, which the server hands over as window.leitviaStudioIcons (Icon::editor_data()); a bundled name
+// always wins. The picker is a radio group, so it takes one Tab stop, the arrow keys move through the icons and each
+// icon has its name as label.
 import { __, _n, sprintf } from '@wordpress/i18n';
 import { useState } from '@wordpress/element';
 import { useInstanceId } from '@wordpress/compose';
@@ -122,29 +124,60 @@ const TITLES = {
 	zap: __( 'Lightning', 'leitvia-studio' ),
 };
 
-const title = ( name ) => TITLES[ name ] ?? name;
+// Icons of the site by name: { svg, viewBox, paint }. Read when used, so the order of the scripts does not matter.
+const custom = () =>
+	typeof window !== 'undefined' && window.leitviaStudioIcons
+		? window.leitviaStudioIcons
+		: {};
+
+// Own keys only, so a name such as constructor never reaches the prototype.
+const own = ( set, name ) => Object.hasOwn( set, name );
+
+const icon = ( name ) => {
+	if ( own( ICONS, name ) ) {
+		return { svg: ICONS[ name ], viewBox: '0 0 24 24', paint: 'stroke' };
+	}
+	return own( custom(), name ) ? custom()[ name ] : undefined;
+};
+
+// Titles of the icons of the site are their names, hyphens as spaces.
+const title = ( name ) =>
+	own( TITLES, name ) ? TITLES[ name ] : name.replace( /-/g, ' ' );
+
+// Stroke attributes like Icon::svg(): width 2 on the 24 grid, in proportion on another viewBox.
+const stroke = ( viewBox ) => ( {
+	fill: 'none',
+	stroke: 'currentColor',
+	strokeWidth: String(
+		Math.round(
+			( ( 2 * Number( viewBox.split( ' ' )[ 2 ] ) ) / 24 ) * 1e4
+		) / 1e4
+	),
+	strokeLinecap: 'round',
+	strokeLinejoin: 'round',
+} );
 
 /**
- * An icon of the set as decorative SVG, drawn like Icon::svg() on the server. The markup comes from the bundled file.
+ * An icon of the set as decorative SVG, drawn like Icon::svg() on the server. The markup comes from the bundled file
+ * or from the server, which only hands over icons an add-on cleaned.
  *
  * @param {Object} props
  * @param {string} props.name Icon name.
  */
 export function Svg( { name } ) {
-	return ICONS[ name ] ? (
+	const found = icon( name );
+	return found ? (
 		<svg
 			className={ `leitvia-icon leitvia-icon--${ name }` }
-			viewBox="0 0 24 24"
+			viewBox={ found.viewBox }
 			width="24"
 			height="24"
-			fill="none"
-			stroke="currentColor"
-			strokeWidth="2"
-			strokeLinecap="round"
-			strokeLinejoin="round"
+			{ ...( found.paint === 'fill'
+				? { fill: 'currentColor' }
+				: stroke( found.viewBox ) ) }
 			aria-hidden="true"
 			focusable="false"
-			dangerouslySetInnerHTML={ { __html: ICONS[ name ] } }
+			dangerouslySetInnerHTML={ { __html: found.svg } }
 		/>
 	) : null;
 }
@@ -161,7 +194,11 @@ export function IconPicker( { label, value, onChange } ) {
 	const [ search, setSearch ] = useState( '' );
 	const group = useInstanceId( IconPicker, 'leitvia-icon-picker' );
 	const query = search.trim().toLowerCase();
-	const shown = Object.keys( ICONS ).filter(
+	const names = [
+		...Object.keys( ICONS ),
+		...Object.keys( custom() ).filter( ( name ) => ! own( ICONS, name ) ),
+	];
+	const shown = names.filter(
 		( name ) =>
 			! query ||
 			name.includes( query ) ||

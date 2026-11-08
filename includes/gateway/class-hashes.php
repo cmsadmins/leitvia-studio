@@ -17,12 +17,54 @@ final class Hashes {
 
 	/**
 	 * Hash of a post over title, content, excerpt, status, slug, parent, order, featured image, comment status, the meta
-	 * keys of Pipeline::META (the alt text of an attachment), the props of a product and, for content types, date, terms
-	 * and fields (Abilities\Content::state()); '' when the post does not exist.
+	 * keys of Pipeline::META (the alt text of an attachment), the props of a product and, for content types, date, terms,
+	 * template and fields (Abilities\Content::state()); '' when the post does not exist.
 	 *
 	 * @param int $post_id Post ID.
 	 */
 	public static function document( int $post_id ): string {
+		return self::post( $post_id, false );
+	}
+
+	/**
+	 * Whether a stored hash (a base hash, the hash a package left) is the hash of the post now. Hashes from before
+	 * Studio 1.3.31 left the template (_wp_page_template) out of the state of content types; such a hash matches too
+	 * when the post is otherwise the same, so packages applied before the update still roll back. It cannot tell a
+	 * template change apart, so it never matches for an operation that writes another template than the post has.
+	 *
+	 * Sunset: remove legacy() and the legacy branch once no site can hold a package applied before 1.3.31, at the
+	 * latest with Studio 1.5 (packages and snapshots older than that are no longer kept for rollback).
+	 *
+	 * @param string      $stored   Stored hash.
+	 * @param int         $post_id  Post ID.
+	 * @param string|null $template Template the operation writes, null when it writes none.
+	 */
+	public static function matches( string $stored, int $post_id, ?string $template = null ): bool {
+		$current = self::document( $post_id );
+		if ( '' === $current || hash_equals( $current, $stored ) ) {
+			return '' !== $current;
+		}
+		$same = null === $template || (string) get_post_meta( $post_id, '_wp_page_template', true ) === $template;
+		return $same && self::legacy( $stored, $post_id );
+	}
+
+	/**
+	 * Whether a stored hash is the hash of the post in the format before Studio 1.3.31, see matches().
+	 *
+	 * @param string $stored  Stored hash.
+	 * @param int    $post_id Post ID.
+	 */
+	public static function legacy( string $stored, int $post_id ): bool {
+		return hash_equals( self::post( $post_id, true ), $stored );
+	}
+
+	/**
+	 * Hash of a post, see document(); legacy leaves the template out of the state of content types.
+	 *
+	 * @param int  $post_id Post ID.
+	 * @param bool $legacy  Hash as before Studio 1.3.31.
+	 */
+	private static function post( int $post_id, bool $legacy ): string {
 		$post = get_post( $post_id );
 		if ( ! $post ) {
 			return '';
@@ -45,6 +87,12 @@ final class Hashes {
 			$parts[] = Abilities\Commerce::props( $post->ID );
 		}
 		$content = Abilities\Content::state( $post->ID, $post->post_type );
+		if ( $legacy && isset( $content['meta_input'] ) ) {
+			unset( $content['meta_input']['_wp_page_template'] );
+			if ( ! $content['meta_input'] ) {
+				unset( $content['meta_input'] );
+			}
+		}
 		if ( $content ) {
 			$parts[] = $content;
 		}

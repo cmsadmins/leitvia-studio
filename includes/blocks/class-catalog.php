@@ -105,7 +105,25 @@ final class Catalog {
 		 *
 		 * @param list<array<string, mixed>> $catalog Entries as described in schemas/block-catalog.schema.json.
 		 */
-		return apply_filters( 'leitvia_studio_block_catalog', self::build() );
+		return apply_filters( 'leitvia_studio_block_catalog', self::icon_names( self::build() ) );
+	}
+
+	/**
+	 * The icon blocks name no enum in block.json, so the icons of the filter leitvia_studio_icons pass the validation of
+	 * the editor; the catalog lists the names an agent may write, the bundled ones and those of the site.
+	 *
+	 * @param list<array<string, mixed>> $catalog Catalog entries.
+	 * @return list<array<string, mixed>>
+	 */
+	private static function icon_names( array $catalog ): array {
+		$names = array_keys( Icon::icons() );
+		foreach ( $catalog as &$entry ) {
+			if ( in_array( $entry['name'], array( 'leitvia/icon', 'leitvia/icon-list', 'leitvia/icon-list-item' ), true ) && isset( $entry['attributes']['properties']['icon'] ) ) {
+				$entry['attributes']['properties']['icon']['enum'] = $names;
+			}
+		}
+		unset( $entry );
+		return $catalog;
 	}
 
 	/**

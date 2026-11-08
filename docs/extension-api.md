@@ -270,6 +270,7 @@ Add-ons dock onto the gateway through hooks, for example to run one workflow on 
 | `leitvia_studio_package_rolled_back` | action | `int $id` | After an applied change package was rolled back. |
 | `leitvia_studio_gateway_areas` | filter | `array $levels` (level by area), `array $settings` | When the autonomy level of an area is read. Add the area of an add-on or cap levels with a policy shared by several sites. `admin` and areas without a valid level (`locked`, `suggest`, `draft`, `autonomous`) stay locked. |
 | `leitvia_studio_rate_limit` | filter | `int $limit`, `bool $read`, `int $user_id` | Calls per minute of one user, reads and changes apart, from the settings `read_rate_per_minute` (300) and `rate_per_minute` (60). |
+| `leitvia_studio_gateway_options` | filter | `array $options` (check of a new value by option name) | Options of an add-on that its own abilities write through `Pipeline::run()` with the target `array( 'option' => <name> )`. The check gets the new value and returns `true` or a `WP_Error`, whose message the rejection `leitvia_invalid_input` carries; it runs on every write but a rollback, also when a package is applied, and a check that throws refuses the write. Agents propose such a write, a person applies it. The options of `Pipeline::OPTIONS` and of the content model are left out, and core options that matter for security never open (`Pipeline::protected_option()`: addresses, plugins, theme, users and roles, admin email, keys and salts, cron, uploads, transients, names ending in `_key` or `_salt`). Create the option before the first write (`add_option( 'my_addon_icons', array(), '', false )`) so it keeps its autoload. |
 | `leitvia_studio_gateway_post_types` | filter | `list<string> $post_types` | Post types open to agents; blocked types are dropped whatever the filter returns. |
 | `leitvia_studio_ai_note` | filter | `string $note`, `int $post_id` | Text of the note shown before content that `leitvia/create-content` marked with `ai_generated` (meta `leitvia_ai_generated`); an empty string hides it. Deleting the meta in the custom fields of a post removes the note for that post. |
 | `leitvia_studio_public_author_name` | filter | `string $name`, `int $user_id` | Name visitors see for an author whose display name is still the login, and for agent users: first and last name, else the name of the site. |
@@ -298,6 +299,10 @@ registerLabPanel( 'my-addon/notes', NotesPanel );
 
 - `registerLabPanel( name, Component )` registers a React component. A second registration with the same name throws. The Lab detail view shows the panels as tabs below the preview, sorted by `order`, and passes the props `pattern` (the item of `GET /leitvia-studio/v1/patterns`), `block` (the `wp_block` post in the `edit` context, or `null` for theme patterns) and `onChange` (reloads both). Studio enqueues the `script` handle of every panel the user may see on the Lab screen.
 - `getLabPanels()` returns a `Map` of name to component, passed through the filter `leitvia-studio.labPanels` of `@wordpress/hooks`.
+
+## Icons
+
+The blocks Icon, Icon list and Icon list item draw the bundled Lucide set. The filter `leitvia_studio_icons` adds icons by name: `array( 'my-mark' => array( 'svg' => '<path d="…"/>', 'viewBox' => '0 0 100 100', 'paint' => 'fill' ) )`. `svg` is the inner markup without the `svg` element and is printed as it is, so clean it before (only shapes, no scripts, events, links or styles). `viewBox` defaults to `0 0 24 24`, `paint` to `stroke` (drawn like Lucide, `stroke="currentColor"` with width 2 on the 24 grid and in proportion on another viewBox, 4 on `0 0 48 48`) or `fill` (`fill="currentColor"`, no stroke attributes). Names start with a lowercase letter, followed by lowercase letters, digits and hyphens; a name of the bundled set is ignored, so the set stays stable, and invalid entries are dropped. The icon picker of the editor shows them after the bundled icons, titled by their name with hyphens as spaces (`window.leitviaStudioIcons`). A block whose icon is gone renders nothing. Studio reads the filter once per request after `init`; call `LeitviaStudio\Blocks\Icon::flush()` when the source of your icons changes, for example on `update_option_my_addon_icons`.
 
 ## Consent for third-party content
 
@@ -334,6 +339,30 @@ myCmp.onConsent( ( service ) =>
 	document.dispatchEvent( new CustomEvent( 'leitvia:consent-granted', { detail: { service } } ) )
 );
 ```
+
+### Scripts of plugins
+
+The filter `leitvia_studio_consent_scripts` names scripts that wait for consent: a list of entries with `handle` (a script handle) or `host` (a host name, subdomains included) and `category`, `statistics` or `marketing`. A host may be given as URL (`https://widgets.example.com/`): only the host name counts, lowercase. Invalid entries are dropped. The keys `statistics` and `marketing` are reserved for these categories, so `leitvia_studio_consent_services` drops a service of that name.
+
+```php
+add_filter( 'leitvia_studio_consent_scripts', function ( array $entries ): array {
+	$entries[] = array( 'host' => 'widgets.example.com', 'category' => 'marketing' );
+	$entries[] = array( 'handle' => 'my-addon-stats', 'category' => 'statistics' );
+	return $entries;
+} );
+```
+
+On the front end Studio prints such a script with `type="text/plain"` and `data-leitvia-consent="<category>"` (an original type such as `module` moves to `data-leitvia-type`), through `wp_script_attributes`, `wp_inline_script_attributes` and `script_loader_tag` at priority 999. That covers enqueued scripts with their inline scripts before and after, the scripts that depend on them, and inline scripts printed with `wp_print_inline_script_tag()` that name a listed host. The data of `wp_localize_script()` (`<handle>-js-extra`) and the translations of a held handle wait with it. Resource hints and preloads to a listed host (`wp_resource_hints`, `wp_preload_resources`, every relation) are dropped.
+
+Limits:
+
+- A script echoed without these functions stays as it is, and so does other markup that loads from a host (iframes, images, fonts).
+- An inline loader is recognised only when the host name stands in its text; a URL it puts together at run time (`'https://' + host`) is not. Enter the handle of such a loader.
+- Requests a script makes at run time to another host (`fetch`, an inserted script of a host the filter does not list) leave with the script. Enter the handle of the script that makes them, so it waits itself.
+- Script modules (`wp_register_script_module()`) and their `modulepreload` links are not held.
+- An inline script of type `module` runs on its own time after activation; the scripts after it do not wait for it.
+
+While the filter has entries, every page loads the script module `@leitvia/consent`. The category counts as a key in the same list as the services: once it is allowed, the module replaces every waiting script of the allowed categories with a working copy, one after the other in the order of the page. A revoke applies from the next page load: scripts that already ran stay in the page until then. The block `leitvia/consent-settings` offers each category of the entries with an Allow button and lists an allowed one with Revoke; `leitvia:consent-granted` with the category as `detail.service` activates the scripts of the page without storing anything.
 
 ## Contact form
 

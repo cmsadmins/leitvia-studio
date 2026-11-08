@@ -176,6 +176,12 @@ final class Plugin {
 		add_filter( 'render_block_core/html', array( Consent\Consent::class, 'filter_iframes' ) );
 		add_filter( 'the_content', array( Consent\Consent::class, 'filter_iframes' ), 12 );
 		add_filter( 'render_block_leitvia/consent-settings', array( Consent\Consent::class, 'filter_settings_block' ) );
+		add_filter( 'wp_script_attributes', array( Consent\Scripts::class, 'script_attributes' ) );
+		add_filter( 'wp_inline_script_attributes', array( Consent\Scripts::class, 'inline_attributes' ), 10, 2 );
+		add_filter( 'script_loader_tag', array( Consent\Scripts::class, 'loader_tag' ), 999, 3 );
+		add_action( 'wp_enqueue_scripts', array( Consent\Scripts::class, 'enqueue' ) );
+		add_filter( 'wp_resource_hints', array( Consent\Scripts::class, 'resource_hints' ), 999 );
+		add_filter( 'wp_preload_resources', array( Consent\Scripts::class, 'resource_hints' ), 999 );
 		add_filter( 'render_block_data', array( Blocks\Table_Of_Contents::class, 'enter_content' ) );
 		add_filter( 'render_block_core/post-content', array( Blocks\Table_Of_Contents::class, 'leave_content' ) );
 		add_filter( 'render_block_core/heading', array( Blocks\Table_Of_Contents::class, 'add_id' ), 10, 2 );
@@ -189,6 +195,8 @@ final class Plugin {
 		add_filter( 'default_wp_template_part_areas', array( Blocks\Mega_Menu::class, 'areas' ) );
 		add_filter( 'register_block_type_args', array( Blocks\Mega_Menu::class, 'block_args' ), 10, 2 );
 		add_filter( 'register_block_type_args', array( Blocks\Blocks::class, 'render_callbacks' ), 10, 2 );
+		add_action( 'enqueue_block_editor_assets', array( Blocks\Icon::class, 'editor_data' ) );
+		add_action( 'switch_blog', array( Blocks\Icon::class, 'flush' ) );
 		add_filter( 'render_block_core/navigation', array( Blocks\Mega_Menu::class, 'collapsible_overlay' ), 10, 2 );
 		add_filter( 'query_loop_block_query_vars', array( Blocks\Query_Filter::class, 'query_vars' ), 10, 2 );
 		add_filter( 'leitvia_studio_consent_services', array( Blocks\Map::class, 'service' ) );

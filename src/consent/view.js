@@ -4,9 +4,13 @@
 // consent with its site: sites of a subdirectory network, or installations below one another, share an origin and so
 // their local storage. A list under the old key 'leitvia-consent' moves over on a site at the root path only.
 //
+// Scripts of plugins that wait for consent (includes/consent/class-scripts.php) carry type="text/plain" and
+// data-leitvia-consent="<category>". Their category counts as a key of the same list: once it is allowed, activate()
+// puts a working copy in place of each, in the order of the page, and after a revoke the next page leaves them waiting.
+//
 // Events for consent managers: `leitvia:consent-request` (bubbles from the placeholder before anything loads,
 // cancelable, detail { service }) and `leitvia:consent-granted` (dispatched by the manager on document, detail
-// { service }), which loads every placeholder of that service on the page.
+// { service }), which loads every placeholder of that service on the page, or the scripts when it names a category.
 import { store, getElement, getContext } from '@wordpress/interactivity';
 
 const LEGACY = 'leitvia-consent';
@@ -83,9 +87,66 @@ function load( root, ask ) {
 	return content;
 }
 
-document.addEventListener( 'leitvia:consent-granted', ( event ) =>
-	roots( event.detail?.service ).forEach( ( root ) => load( root, false ) )
-);
+// One chain for the page: scripts allowed later run after those already running, in the order of the page.
+let chain = Promise.resolve();
+
+/**
+ * Puts a working copy in place of a waiting script. Resolves once a script with a URL has loaded or failed, at once
+ * for an inline script: an inline module runs on its own time, so the scripts after it do not wait for it.
+ *
+ * @param {HTMLScriptElement} old The waiting script.
+ * @return {Promise<void>} Settles when the next script may run.
+ */
+function run( old ) {
+	return new Promise( ( resolve ) => {
+		const script = document.createElement( 'script' );
+		for ( const { name, value } of old.attributes ) {
+			if ( ! [ 'type', 'data-leitvia-type' ].includes( name ) ) {
+				script.setAttribute( name, value );
+			}
+		}
+		if ( old.dataset.leitviaType ) {
+			script.type = old.dataset.leitviaType;
+		}
+		script.nonce = old.nonce;
+		const external = old.hasAttribute( 'src' );
+		if ( external ) {
+			script.async = false;
+			script.onload = script.onerror = () => resolve();
+		} else {
+			script.text = old.text;
+		}
+		old.replaceWith( script );
+		if ( ! external ) {
+			resolve();
+		}
+	} );
+}
+
+/**
+ * Activates the waiting scripts of the categories in the order of the page, each after the one before has loaded or
+ * failed. The attribute goes at once, so a second call never starts a script twice.
+ *
+ * @param {string[]} categories Allowed categories.
+ */
+function activate( categories ) {
+	const waiting = [
+		...document.querySelectorAll( 'script[data-leitvia-consent]' ),
+	].filter(
+		( old ) =>
+			old.type === 'text/plain' &&
+			categories.includes( old.dataset.leitviaConsent )
+	);
+	waiting.forEach( ( old ) => {
+		delete old.dataset.leitviaConsent;
+		chain = chain.then( () => run( old ) );
+	} );
+}
+
+document.addEventListener( 'leitvia:consent-granted', ( event ) => {
+	roots( event.detail?.service ).forEach( ( root ) => load( root, false ) );
+	activate( [ event.detail?.service ] );
+} );
 
 const { state } = store( 'leitvia/consent', {
 	state: {
@@ -94,6 +155,11 @@ const { state } = store( 'leitvia/consent', {
 		status: '',
 		get hasList() {
 			return state.list.length > 0;
+		},
+		// A category of scripts in the consent settings block that the visitor already allowed.
+		get isAllowed() {
+			const { category } = getContext();
+			return state.list.some( ( entry ) => entry.key === category );
 		},
 	},
 	actions: {
@@ -112,6 +178,24 @@ const { state } = store( 'leitvia/consent', {
 				] );
 				roots( service ).forEach( ( other ) => load( other, true ) );
 			}
+		},
+		allow() {
+			const { category, label, granted } = getContext();
+			save( [
+				...allowed().filter( ( key ) => key !== category ),
+				category,
+			] );
+			state.list = [
+				...state.list.filter( ( entry ) => entry.key !== category ),
+				{ key: category, label },
+			];
+			state.status = granted.replace( '%s', label );
+			// The button hides with its category; the sentence above the list keeps the focus on the block.
+			getElement()
+				.ref.closest( '.wp-block-leitvia-consent-settings__scripts' )
+				.querySelector( 'p' )
+				.focus();
+			activate( [ category ] );
 		},
 		revoke() {
 			const { item, revoked } = getContext();
@@ -137,3 +221,8 @@ const { state } = store( 'leitvia/consent', {
 		},
 	},
 } );
+
+// The categories allowed before, on every page that has waiting scripts.
+if ( document.querySelector( 'script[data-leitvia-consent]' ) ) {
+	activate( allowed() );
+}

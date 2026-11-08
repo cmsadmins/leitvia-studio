@@ -1,6 +1,6 @@
 <?php
 /**
- * Setup abilities: token sets, style variations, content types, navigation and template parts.
+ * Setup abilities: token sets, style variations, content types, navigation, template parts and templates.
  *
  * @package LeitviaStudio
  */
@@ -13,6 +13,7 @@ use LeitviaStudio\Gateway\Content_Checks;
 use LeitviaStudio\Gateway\Hashes;
 use LeitviaStudio\Admin\Settings;
 use LeitviaStudio\Gateway\Pipeline;
+use LeitviaStudio\Gateway\Recipes;
 use LeitviaStudio\Gateway\Rejection;
 use LeitviaStudio\Gateway\Scope;
 use LeitviaStudio\Model\Model;
@@ -23,9 +24,9 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Abilities leitvia/create-token-set, leitvia/activate-token-set, leitvia/set-variation, leitvia/define-content-type,
- * leitvia/update-navigation and leitvia/update-template-part. Each one describes an operation for Pipeline::run() with
- * the Studio building blocks: token sets with the contrast lock, the compiler, the content model. Token sets and
- * global styles belong to the area design, the rest to structure.
+ * leitvia/update-navigation, leitvia/update-template-part and leitvia/update-template. Each one describes an operation
+ * for Pipeline::run() with the Studio building blocks: token sets with the contrast lock, the compiler, the content
+ * model. Token sets and global styles belong to the area design, the rest to structure.
  */
 final class Setup {
 
@@ -263,6 +264,28 @@ final class Setup {
 				'required'   => array( 'part' ),
 			) + $object,
 			array( self::class, 'describe_update_template_part' )
+		);
+		Abilities::write(
+			'leitvia/update-template',
+			__( 'Update template', 'leitvia-studio' ),
+			__( 'Replaces a template with a template pattern made for it or with changed block markup. Slugs, such as single or single-product, come from the templates of leitvia/get-contract and the templates the theme ships; WooCommerce templates need WooCommerce. A pattern fits when its templateTypes hold the slug; the rejection leitvia_unknown_pattern lists the patterns that fit in patterns. Templates for single posts and pages keep a core/post-content block. The change publishes the template; where the area level is draft a new one waits in a change package. A rollback restores the template as it was, the one of the theme when there was no saved one. The base hash is the hash of the saved template, empty when the theme template has not been saved yet. No ability returns this hash: send base_hash empty and repeat the call once with current_hash from leitvia_stale_hash.', 'leitvia-studio' ),
+			'setup',
+			$replace,
+			array(
+				'properties' => array(
+					'template' => array(
+						'type'    => 'string',
+						'pattern' => '^[a-z0-9-]+$',
+					),
+					'pattern'  => array( 'type' => 'string' ),
+					'content'  => array(
+						'type'      => 'string',
+						'minLength' => 1,
+					),
+				),
+				'required'   => array( 'template' ),
+			) + $object,
+			array( self::class, 'describe_update_template' )
 		);
 	}
 
@@ -647,6 +670,107 @@ final class Setup {
 				'post_status'  => 'publish',
 			) + $new + $state,
 		);
+	}
+
+	/**
+	 * Operation of update-template. Like update-template-part for wp_template: slugs of the contract (shop templates
+	 * only while their plugins are active) and of the templates the theme or a plugin registers, patterns whose
+	 * templateTypes hold the slug.
+	 *
+	 * @param array<string, mixed> $input Input.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public static function describe_update_template( array $input ) {
+		$slug     = (string) ( $input['template'] ?? '' );
+		$contract = array_column( (array) ( leitvia_studio_contract()->data()['templates'] ?? array() ), null, 'slug' );
+		$known    = isset( $contract[ $slug ] ) ? '' === Recipes::missing( (array) $contract[ $slug ] ) : in_array( $slug, wp_list_pluck( get_block_templates(), 'slug' ), true );
+		if ( ! $known ) {
+			return Block_Edit::invalid( 'template', __( 'Use a template of the contract or of the theme. WooCommerce templates need WooCommerce.', 'leitvia-studio' ), array( 'template' => $slug ), 'leitvia/get-contract' );
+		}
+		if ( isset( $input['pattern'] ) === isset( $input['content'] ) ) {
+			return Block_Edit::invalid( 'change', __( 'Send either a pattern or content.', 'leitvia-studio' ), array( 'template' => $slug ) );
+		}
+		$content = (string) ( $input['content'] ?? '' );
+		if ( isset( $input['pattern'] ) ) {
+			$registry = \WP_Block_Patterns_Registry::get_instance();
+			$fits     = static fn( $pattern ): bool => is_array( $pattern ) && in_array( $slug, (array) ( $pattern['templateTypes'] ?? array() ), true );
+			$pattern  = $registry->get_registered( (string) $input['pattern'] );
+			if ( ! is_array( $pattern ) || ! $fits( $pattern ) ) {
+				// leitvia/list-patterns lists the patterns of the contract, template patterns of add-ons are not among them.
+				$names = array_values( wp_list_pluck( array_filter( $registry->get_all_registered(), $fits ), 'name' ) );
+				return Rejection::make( 'leitvia_unknown_pattern', __( 'There is no pattern with this name for this template. Use one of the patterns the rejection lists in patterns.', 'leitvia-studio' ), 404, 'pattern', array( 'pattern' => (string) $input['pattern'] ), '', 'once', array( 'patterns' => $names ) );
+			}
+			$content = (string) $pattern['content'];
+		}
+		// A template for single posts and pages that drops the content block shows every post without its text.
+		$file = get_block_file_template( get_stylesheet() . '//' . $slug );
+		$show = preg_match( '/^(page|single)(-|$)/', $slug ) && ( ! $file || self::shows_content( parse_blocks( (string) $file->content ) ) );
+		if ( $show && ! self::shows_content( parse_blocks( $content ) ) ) {
+			return Block_Edit::invalid( 'post_content', __( 'This template shows a single post or page: keep a core/post-content block in it, also inside a group or pattern.', 'leitvia-studio' ), array( 'template' => $slug ) );
+		}
+		$trashed = get_posts(
+			array(
+				'post_type'      => 'wp_template',
+				'post_status'    => 'trash',
+				// Core adds __trashed to the slug of a post it moves to the trash.
+				'post_name__in'  => array( $slug, $slug . '__trashed' ),
+				'posts_per_page' => 1,
+				'fields'         => 'ids',
+				'no_found_rows'  => true,
+				'tax_query'      => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query -- One template.
+					array(
+						'taxonomy' => 'wp_theme',
+						'field'    => 'name',
+						'terms'    => get_stylesheet(),
+					),
+				),
+			)
+		);
+		if ( $trashed ) {
+			return Block_Edit::invalid( 'trashed', __( 'The saved version of this template is in the trash. A person restores it or empties the trash in the Site Editor first.', 'leitvia-studio' ), array( 'template' => $slug ) );
+		}
+		$template = get_block_template( get_stylesheet() . '//' . $slug );
+		$id       = $template && $template->wp_id ? (int) $template->wp_id : 0;
+		$target   = $id ? array( 'post' => $id ) : array(
+			'post'      => 0,
+			'post_type' => 'wp_template',
+		);
+		// A template the theme ships as a file only gets a post with the term core finds it by.
+		$new = $id ? array() : array(
+			'post_title' => $template ? (string) $template->title : $slug,
+			'post_name'  => $slug,
+			'tax_input'  => array( 'wp_theme' => array( get_stylesheet() ) ),
+		);
+		return array(
+			'area'   => 'structure',
+			'target' => $target,
+			// A live write gets a package too, so leitvia/rollback undoes it and the template of the theme comes back.
+			'record' => true,
+			'change' => static fn( array $state ): array => array(
+				'post_content' => $content,
+				'post_status'  => 'publish',
+			) + $new + $state,
+		);
+	}
+
+	/**
+	 * Whether blocks hold core/post-content, also inside other blocks and registered patterns (core/pattern).
+	 *
+	 * @param array<mixed> $blocks Parsed blocks.
+	 * @param int          $depth  Patterns resolved so far, against patterns that include themselves.
+	 */
+	private static function shows_content( array $blocks, int $depth = 0 ): bool {
+		foreach ( $blocks as $block ) {
+			$name = (string) ( $block['blockName'] ?? '' );
+			if ( 'core/post-content' === $name || self::shows_content( (array) ( $block['innerBlocks'] ?? array() ), $depth ) ) {
+				return true;
+			}
+			$pattern = 'core/pattern' === $name && $depth < 5 ? \WP_Block_Patterns_Registry::get_instance()->get_registered( (string) ( $block['attrs']['slug'] ?? '' ) ) : null;
+			if ( is_array( $pattern ) && self::shows_content( parse_blocks( (string) ( $pattern['content'] ?? '' ) ), $depth + 1 ) ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**

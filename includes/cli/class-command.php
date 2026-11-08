@@ -736,9 +736,10 @@ final class Command {
 		$conflicts = array();
 		foreach ( self::objects( $operations ) as $object ) {
 			$target  = 'option' === $object['type'] ? array( 'option' => (string) $object['id'] ) : array( 'post' => (int) $object['id'] );
-			$current = Pipeline::hash( new Operation( '', '', $target, '', static fn( array $state ): array => $state ) );
+			$op      = new Operation( '', '', $target, '', static fn( array $state ): array => $state );
+			$current = Pipeline::hash( $op );
 			$type    = 'option' === $object['type'] || get_post_type( (int) $object['id'] ) === $object['type'];
-			if ( ! $type || '' === $current || ! hash_equals( $object['base_hash'], $current ) ) {
+			if ( ! $type || ! Pipeline::matches( $op, (string) $object['base_hash'] ) ) {
 				$conflicts[] = $object + array( 'current_hash' => $current );
 			}
 		}
