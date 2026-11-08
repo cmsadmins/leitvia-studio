@@ -26,9 +26,10 @@ final class Contact_Form {
 
 	/**
 	 * Below this time between page and submit a form counts as filled in by a bot. Cached pages carry an older time, so
-	 * on them this check passes; honeypot and rate limit still apply.
+	 * on them this check passes; honeypot and rate limit still apply. Public, so extensions with a form of their own
+	 * that use token() check the same time.
 	 */
-	private const MIN_SECONDS = 3;
+	public const MIN_SECONDS = 3;
 
 	/**
 	 * Messages per IP address and hour. A site behind a proxy that hides REMOTE_ADDR raises it with the filter
