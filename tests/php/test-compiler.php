@@ -445,6 +445,41 @@ class Test_Compiler extends WP_UnitTestCase {
 	}
 
 	/**
+	 * An extra surface on which accent falls below 4.5:1 gets a warning, and once the set is active its blocks get the
+	 * class has-ink-links so the theme draws their links in ink; a surface that carries accent stays as it is.
+	 */
+	public function test_weak_extra_surface_turns_links_ink(): void {
+		$id                                   = self::set_with_accent( '#2f5d50' );
+		$doc                                  = Compiler::document( $id );
+		$color                                = static fn( string $hex ): array => array(
+			'$type'  => 'color',
+			'$value' => array(
+				'colorSpace' => 'srgb',
+				'components' => array( 0, 0, 0 ),
+				'hex'        => $hex,
+			),
+		);
+		$doc['color']['ink']['$value']['hex'] = '#1c1a17';
+		$doc['color']['surface-extra']        = array(
+			'mint' => $color( '#dff5ea' ),
+			'sage' => $color( '#8fb3a8' ),
+		);
+		$warnings                             = wp_list_filter( Compiler::check( $doc ), array( 'code' => 'accent_on_extra' ) );
+		$this->assertSame( array( 'surface-extra-sage' ), array_values( array_map( static fn( array $f ): string => $f['data']['slug'], $warnings ) ) );
+		$this->assertSame( 'warning', array_values( $warnings )[0]['severity'] );
+
+		update_post_meta( $id, Token_Sets::META, wp_slash( wp_json_encode( $doc ) ) );
+		$this->assertTrue( Compiler::activate( $id ) );
+		WP_Theme_JSON_Resolver::clean_cached_data();
+		Compiler::forget_weak();
+		$this->assertSame( array( 'surface-extra-sage' ), Compiler::weak_surfaces() );
+		$group = static fn( string $slug ): string => do_blocks( '<!-- wp:group {"backgroundColor":"' . $slug . '"} --><div class="wp-block-group has-' . $slug . '-background-color has-background"><!-- wp:paragraph --><p><a href="/x/">Link</a></p><!-- /wp:paragraph --></div><!-- /wp:group -->' );
+		$this->assertStringContainsString( Compiler::INK_LINKS, $group( 'surface-extra-sage' ) );
+		$this->assertStringNotContainsString( Compiler::INK_LINKS, $group( 'surface-extra-mint' ) );
+		Compiler::forget_weak();
+	}
+
+	/**
 	 * Creates a set from the theme with a different accent color.
 	 *
 	 * @param string $hex Accent color.

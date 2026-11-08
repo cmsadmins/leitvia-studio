@@ -25,10 +25,12 @@ final class Read_Plan {
 	public const MAX_POINTS = 20;
 
 	/**
-	 * Patterns that show data of their own the plan cannot know: releases, dates, an entry, entries of a type.
+	 * Patterns that show data of their own the plan cannot know: releases, dates, an entry, entries of a type, the
+	 * neighbours of a page in a series (content-pager; it ties with the calls to action on role close and comes first in
+	 * contract order, so it closed every page). An agent adds the pager to pages of a series itself.
 	 * ponytail: a fixed list; a contract field naming what a pattern needs would replace it.
 	 */
-	private const OWN_DATA = array( 'leitvia/content-changelog', 'leitvia-studio/content-timeline', 'leitvia-studio/content-entry-facts', 'leitvia-studio/teaser-type-entries' );
+	private const OWN_DATA = array( 'leitvia/content-changelog', 'leitvia/content-pager', 'leitvia-studio/content-timeline', 'leitvia-studio/content-entry-facts', 'leitvia-studio/teaser-type-entries' );
 
 	/**
 	 * Registers the ability. Runs on leitvia_studio_init.

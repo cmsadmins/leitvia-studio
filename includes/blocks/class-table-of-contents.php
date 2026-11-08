@@ -41,7 +41,7 @@ final class Table_Of_Contents {
 	private static array $cache = array();
 
 	/**
-	 * Renders the block. Fewer than two entries render nothing.
+	 * Renders the block. Fewer than two entries render nothing. Display companion adds the chapter button, see companion().
 	 *
 	 * @param array<string, mixed> $attributes Block attributes.
 	 * @param \WP_Block|null       $block      Block instance.
@@ -73,12 +73,51 @@ final class Table_Of_Contents {
 		}
 		$list .= str_repeat( '</li></ol>', count( $stack ) );
 
+		$companion = 'companion' === ( $attributes['display'] ?? 'inline' );
 		return sprintf(
-			'<nav %1$s><h2 id="%2$s" class="wp-block-leitvia-table-of-contents__title">%3$s</h2>%4$s</nav>',
-			get_block_wrapper_attributes( array( 'aria-labelledby' => $title_id ) ),
+			'<nav %1$s><h2 id="%2$s" class="wp-block-leitvia-table-of-contents__title">%3$s</h2>%4$s%5$s</nav>',
+			get_block_wrapper_attributes(
+				array(
+					'aria-labelledby' => $title_id,
+					'class'           => $companion ? 'is-display-companion' : '',
+				)
+			),
 			esc_attr( $title_id ),
 			esc_html__( 'On this page', 'leitvia-studio' ),
-			$list
+			$list,
+			$companion ? self::companion( $list ) : ''
+		);
+	}
+
+	/**
+	 * The companion of display companion: a button that stays at the bottom edge while the list is out of view, with
+	 * the section being read and the reading progress, and a modal dialog with the same list. Hidden until view.js
+	 * takes it over, so without JavaScript only the list in the flow remains.
+	 *
+	 * @param string $links The list of links.
+	 */
+	private static function companion( string $links ): string {
+		return sprintf(
+			'<div class="wp-block-leitvia-table-of-contents__companion" hidden data-count="%1$s">'
+			. '<button type="button" class="wp-block-leitvia-table-of-contents__open" aria-haspopup="dialog">'
+			. '<span class="wp-block-leitvia-table-of-contents__label">%2$s</span>'
+			. ' <span class="wp-block-leitvia-table-of-contents__current"></span>'
+			. ' <span class="wp-block-leitvia-table-of-contents__count"></span>'
+			. '</button>'
+			. '<span class="wp-block-leitvia-table-of-contents__progress" role="progressbar" aria-label="%3$s" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></span>'
+			. '<dialog class="wp-block-leitvia-table-of-contents__dialog" aria-labelledby="%7$s">'
+			. '<div class="wp-block-leitvia-table-of-contents__sheet">'
+			. '<h2 id="%7$s" class="wp-block-leitvia-table-of-contents__title">%4$s</h2>%5$s'
+			. '<button type="button" class="wp-block-leitvia-table-of-contents__close">%6$s</button>'
+			. '</div></dialog></div>',
+			/* translators: 1: number of the section being read, 2: number of sections. Keep %1$d and %2$d. */
+			esc_attr__( 'Section %1$d of %2$d', 'leitvia-studio' ),
+			esc_html__( 'Chapters', 'leitvia-studio' ),
+			esc_attr__( 'Reading progress', 'leitvia-studio' ),
+			esc_html__( 'On this page', 'leitvia-studio' ),
+			$links,
+			esc_html__( 'Close', 'leitvia-studio' ),
+			esc_attr( wp_unique_id( 'leitvia-toc-dialog-' ) )
 		);
 	}
 

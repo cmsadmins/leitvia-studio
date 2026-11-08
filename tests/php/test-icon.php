@@ -213,6 +213,27 @@ class Test_Icon extends WP_UnitTestCase {
 	}
 
 	/**
+	 * An icon with a wide viewBox is 24 high and wider in its proportion, with the stroke of its height; square icons
+	 * stay 24 by 24.
+	 */
+	public function test_wide_icon_keeps_its_proportion(): void {
+		self::add_icons(
+			array(
+				'brand-pair' => array(
+					'svg'     => '<path d="M1 1h40"/>',
+					'viewBox' => '0 0 48 24',
+				),
+			)
+		);
+		$svg = Icon::svg( 'brand-pair' );
+		$this->assertStringContainsString( 'viewBox="0 0 48 24" width="48" height="24"', $svg );
+		$this->assertStringContainsString( 'stroke-width="2"', $svg );
+		$this->assertStringContainsString( 'width="24" height="24"', Icon::svg( 'phone' ) );
+		$this->assertSame( '24', Icon::width( '0 0 0 0' ) );
+		$this->assertSame( '36', Icon::width( '0 0 150 100' ) );
+	}
+
+	/**
 	 * The icons of the filter are read once per request; flush() reads them again, for an add-on whose source changed.
 	 */
 	public function test_filter_icons_are_kept_until_flushed(): void {

@@ -18,6 +18,13 @@ defined( 'ABSPATH' ) || exit;
 final class Abilities {
 
 	/**
+	 * Whether the operations of a batch run, see execute_batch(): the call counted once, so they skip the rate limit.
+	 *
+	 * @var bool
+	 */
+	private static bool $batching = false;
+
+	/**
 	 * Registers a read ability in the group read. Call on leitvia_studio_init.
 	 *
 	 * @param string               $name          Ability name, leitvia/<name>.
@@ -69,7 +76,9 @@ final class Abilities {
 	 * 'kinds' => list ) or a WP_Error, see Operation. Keep it cheap: it runs before the rate limit, the change runs
 	 * after scope and hash checks. Optional: 'record' => true gives a live write a change package so leitvia/rollback
 	 * can undo it; 'report' => callable adds what it returns after the write as report to the result; 'base_hash' stands
-	 * in for the input where the target is a single value no read ability returns a hash of.
+	 * in for the input where the target is a single value no read ability returns a hash of. Instead of one operation it
+	 * may return array( 'batch' => list ) with one such description (or a WP_Error) per item, each with its base_hash,
+	 * see execute_batch().
 	 *
 	 * @param string               $name         Ability name, leitvia/<name>.
 	 * @param string               $label        Translated label.
@@ -78,10 +87,12 @@ final class Abilities {
 	 * @param array<string, bool>  $annotations  destructive and idempotent; readonly is always false.
 	 * @param array<string, mixed> $input_schema JSON schema of the input, an object.
 	 * @param callable             $describe     Describes the operation.
+	 * @param bool                 $hash_needed  Whether base_hash is required; false for an ability whose list of items
+	 *                                           carries a hash per item.
 	 * @return bool Whether the registry accepted the ability.
 	 * @phpstan-param lowercase-string&non-falsy-string $name
 	 */
-	public static function write( string $name, string $label, string $description, string $group, array $annotations, array $input_schema, callable $describe ): bool {
+	public static function write( string $name, string $label, string $description, string $group, array $annotations, array $input_schema, callable $describe, bool $hash_needed = true ): bool {
 		$schema                            = $input_schema + array(
 			'type'       => 'object',
 			'properties' => array(),
@@ -95,7 +106,7 @@ final class Abilities {
 			'maxLength'   => 64,
 			'description' => __( 'Key of the task: a write with a key always goes into the change package of that key, even where the autonomy would allow it live, and operations with the same key share that package.', 'leitvia-studio' ),
 		);
-		$schema['required']                = array_values( array_unique( array_merge( (array) ( $schema['required'] ?? array() ), array( 'base_hash' ) ) ) );
+		$schema['required']                = array_values( array_unique( array_merge( (array) ( $schema['required'] ?? array() ), $hash_needed ? array( 'base_hash' ) : array() ) ) );
 		return leitvia_studio()->registry( 'abilities' )->register(
 			$name,
 			array(
@@ -130,6 +141,9 @@ final class Abilities {
 		if ( is_wp_error( $parts ) ) {
 			return self::run( $name, static fn() => $parts, $input );
 		}
+		if ( isset( $parts['batch'] ) ) {
+			return self::execute_batch( $name, array_values( (array) $parts['batch'] ), (string) ( $input['package'] ?? '' ) );
+		}
 		$op     = new Operation(
 			$name,
 			(string) ( $parts['area'] ?? '' ),
@@ -153,6 +167,120 @@ final class Abilities {
 			$result['report'] = (array) ( $parts['report'] )();
 		}
 		return $result;
+	}
+
+	/**
+	 * Runs the operations of a batch as one call: one rate limit check and one audit entry for the call (the entries of
+	 * the operations are marked batched and do not count, Store::calls_since()). With a package key from the caller
+	 * every operation waits in that package. Without one the autonomy decides per operation as in a recipe run
+	 * (Recipes::collecting()): what may go live goes live and lands in one applied package that leitvia/rollback undoes
+	 * as a whole, what may not waits in one open package. An operation on a target an earlier one of the batch wrote
+	 * builds on the hash that one left, so items on the same post send the hash read before the call. Items fail one by
+	 * one; when every item fails, the first rejection is the answer.
+	 *
+	 * @param string                               $name  Ability name.
+	 * @param list<array<string, mixed>|\WP_Error> $batch Descriptions per item, see write().
+	 * @param string                               $key   Package key of the caller, '' for none.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private static function execute_batch( string $name, array $batch, string $key ) {
+		$limited = self::rate_limit( get_current_user_id() );
+		if ( $limited ) {
+			return $limited;
+		}
+		$collect        = '' === $key;
+		$key            = $collect ? substr( str_replace( '/', '-', $name ) . '-' . wp_generate_password( 12, false ), 0, 64 ) : $key;
+		$applied        = 0;
+		$failed         = null;
+		$run            = static function () use ( $name, $batch, $key, &$applied, &$failed ): array {
+			$items  = array();
+			$hashes = array();
+			foreach ( $batch as $parts ) {
+				if ( is_wp_error( $parts ) ) {
+					$failed  = $failed ?? $parts;
+					$items[] = self::item_error( $parts );
+					continue;
+				}
+				$base   = (string) ( $parts['base_hash'] ?? '' );
+				$seen   = (int) ( $parts['target']['post'] ?? 0 ) . ':' . $base;
+				$op     = new Operation( $name, (string) ( $parts['area'] ?? '' ), (array) ( $parts['target'] ?? array() ), $hashes[ $seen ] ?? $base, $parts['change'], array_values( (array) ( $parts['kinds'] ?? array() ) ), $key );
+				$result = Pipeline::run( $op );
+				if ( is_wp_error( $result ) ) {
+					$failed  = $failed ?? $result;
+					$items[] = self::item_error( $result );
+					continue;
+				}
+				if ( ! empty( $parts['record'] ) && 'live' === $result['mode'] && ! $result['package'] ) {
+					$applied           = Packages::record( $op, $result, $applied );
+					$result['package'] = $applied;
+				}
+				// Live and draft writes leave a new hash; a queued one leaves the target as it is.
+				if ( '' !== (string) $result['hash'] ) {
+					$hashes[ $seen ] = (string) $result['hash'];
+				}
+				$items[] = $result;
+			}
+			return $items;
+		};
+		self::$batching = true;
+		try {
+			$items = $collect ? Recipes::collecting( $key, $run ) : $run();
+		} finally {
+			self::$batching = false;
+		}
+		$done  = array_values( array_filter( $items, static fn( array $item ): bool => ! isset( $item['code'] ) ) );
+		$modes = array_column( $done, 'mode' );
+		$queue = in_array( 'package', $modes, true ) ? Packages::find( $key ) : 0;
+		Store::audit(
+			array(
+				'ability'    => $name,
+				'result'     => $done ? 'ok' : 'rejected',
+				'code'       => $done ? '' : (string) $items[0]['code'],
+				'package_id' => $queue ? $queue : $applied,
+				'details'    => array(
+					'items' => count( $items ),
+					'done'  => count( $done ),
+				),
+			)
+		);
+		if ( ! $done && $failed instanceof \WP_Error ) {
+			return $failed;
+		}
+		return array(
+			'mode'     => match ( true ) {
+				$queue > 0 => 'package',
+				in_array( 'live', $modes, true ) => 'live',
+				in_array( 'draft', $modes, true ) => 'draft',
+				default => 'unchanged',
+			},
+			'package'  => $queue ? $queue : $applied,
+			'applied'  => $applied,
+			'findings' => array(),
+			'items'    => $items,
+		);
+	}
+
+	/**
+	 * A failed item of a batch: code, message, reason and target of the rejection.
+	 *
+	 * @param \WP_Error $error Rejection.
+	 * @return array<string, mixed>
+	 */
+	private static function item_error( \WP_Error $error ): array {
+		$data = (array) $error->get_error_data();
+		return array(
+			'code'    => (string) $error->get_error_code(),
+			'message' => $error->get_error_message(),
+			'reason'  => (string) ( $data['reason'] ?? '' ),
+			'target'  => (array) ( $data['target'] ?? array() ),
+		) + array_intersect_key( $data, array( 'findings' => true ) );
+	}
+
+	/**
+	 * Whether the operations of a batch run right now, see execute_batch().
+	 */
+	public static function batching(): bool {
+		return self::$batching;
 	}
 
 	/**
@@ -190,6 +318,15 @@ final class Abilities {
 				'slug_changed' => array(
 					'type'        => 'object',
 					'description' => __( 'The slug asked for (requested) is taken or reserved, so the address uses slug instead, on publishing at the latest.', 'leitvia-studio' ),
+				),
+				'applied'      => array(
+					'type'        => 'integer',
+					'description' => __( 'For a list of items: the package that holds what went live, for leitvia/rollback; 0 for none.', 'leitvia-studio' ),
+				),
+				'items'        => array(
+					'type'        => 'array',
+					'items'       => array( 'type' => 'object' ),
+					'description' => __( 'For a list of items: the result per item in their order, or code, message, reason and target of its rejection.', 'leitvia-studio' ),
 				),
 			),
 		);
@@ -235,6 +372,9 @@ final class Abilities {
 	 * @param bool $read    Whether the call only reads.
 	 */
 	public static function rate_limit( int $user_id, bool $read = false ): ?\WP_Error {
+		if ( self::$batching && ! $read ) {
+			return null;
+		}
 		// ponytail: one indexed COUNT on the audit log per call; move to an object cache counter when load demands it.
 		$now                = time();
 		[ $calls, $oldest ] = Store::calls_since( $user_id, gmdate( 'Y-m-d H:i:s', $now - MINUTE_IN_SECONDS ), $read );

@@ -233,7 +233,7 @@ class Test_Gateway_Read_Design extends WP_UnitTestCase {
 	public function test_list_patterns(): void {
 		$all = $this->call( 'leitvia/list-patterns', array( 'per_page' => 50 ) );
 		$this->assertGreaterThan( 50, $all['total'] );
-		$this->assertSame( 2, $all['pages'] );
+		$this->assertSame( (int) ceil( $all['total'] / 50 ), $all['pages'] );
 		$item = wp_list_filter( $all['items'], array( 'slug' => self::PATTERN ) );
 		$item = reset( $item );
 		$this->assertSame( 'theme', $item['source'] );
@@ -368,6 +368,23 @@ class Test_Gateway_Read_Design extends WP_UnitTestCase {
 		$missing = wp_get_ability( 'leitvia/get-pattern' )->execute( array( 'slug' => 'leitvia/none' ) );
 		$this->assertSame( 'leitvia_not_found', $missing->get_error_code() );
 		$this->assertSame( 'leitvia/list-patterns', $missing->get_error_data()['next_ability'] );
+	}
+
+	/**
+	 * The ability get-pattern returns a registered template pattern with its templateTypes, which the pattern list leaves out.
+	 */
+	public function test_get_template_pattern(): void {
+		register_block_pattern(
+			'leitvia-test/single-wide',
+			array(
+				'title'         => 'Single wide',
+				'content'       => '<!-- wp:post-content /-->',
+				'templateTypes' => array( 'single' ),
+			)
+		);
+		$pattern = $this->call( 'leitvia/get-pattern', array( 'slug' => 'leitvia-test/single-wide' ) );
+		unregister_block_pattern( 'leitvia-test/single-wide' );
+		$this->assertSame( array( 'template', array( 'single' ), '<!-- wp:post-content /-->' ), array( $pattern['source'], $pattern['templateTypes'], $pattern['content'] ) );
 	}
 
 	/**

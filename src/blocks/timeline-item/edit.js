@@ -8,7 +8,7 @@ import {
 	useInnerBlocksProps,
 } from '@wordpress/block-editor';
 import { PanelBody, TextControl } from '@wordpress/components';
-import { DATE } from './save';
+import { DATE, dateTag } from './save';
 
 const TEMPLATE = [
 	[
@@ -32,7 +32,7 @@ export default function Edit( {
 				/>
 			</BlockControls>
 			<InspectorControls>
-				<PanelBody title={ __( 'Date', 'leitvia-studio' ) }>
+				<PanelBody title={ __( 'Date or label', 'leitvia-studio' ) }>
 					<TextControl
 						__next40pxDefaultSize
 						label={ __(
@@ -46,7 +46,7 @@ export default function Edit( {
 										'leitvia-studio'
 									)
 								: __(
-										'YYYY, YYYY-MM or YYYY-MM-DD, for search engines and assistive technology.',
+										'YYYY, YYYY-MM or YYYY-MM-DD, for search engines and assistive technology. Leave it empty for a stage without a date: the label then stays plain text.',
 										'leitvia-studio'
 									)
 						}
@@ -59,10 +59,13 @@ export default function Edit( {
 			</InspectorControls>
 			<li { ...useBlockProps() }>
 				<RichText
-					tagName="time"
+					tagName={ dateTag( date ) }
 					className="wp-block-leitvia-timeline-item__date"
-					aria-label={ __( 'Date as shown', 'leitvia-studio' ) }
-					placeholder={ __( 'Date', 'leitvia-studio' ) }
+					aria-label={ __(
+						'Date or label as shown',
+						'leitvia-studio'
+					) }
+					placeholder={ __( 'Date or label', 'leitvia-studio' ) }
 					value={ dateLabel }
 					onChange={ ( value ) =>
 						setAttributes( { dateLabel: value } )

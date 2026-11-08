@@ -25,6 +25,11 @@ defined( 'ABSPATH' ) || exit;
 final class Maintain {
 
 	/**
+	 * Most items of one call of set-alt-text.
+	 */
+	public const MAX_ALT_TEXTS = 100;
+
+	/**
 	 * Registers the abilities. Runs on leitvia_studio_init.
 	 */
 	public static function register(): void {
@@ -124,10 +129,26 @@ final class Maintain {
 			),
 			array( self::class, 'describe_update_content' )
 		);
-		$link = array(
+		$link  = array(
 			'type'      => 'string',
 			'minLength' => 1,
 			'maxLength' => 2000,
+		);
+		$image = array(
+			'type'        => 'integer',
+			'minimum'     => 1,
+			'description' => __( 'Attachment ID of the image.', 'leitvia-studio' ),
+		);
+		$alt   = array(
+			'type'      => 'string',
+			'minLength' => 1,
+			'maxLength' => 500,
+		);
+		$block = array(
+			'type'        => 'string',
+			'minLength'   => 1,
+			'maxLength'   => 200,
+			'description' => __( 'Block ID or path ID of the image or cover block from the outline.', 'leitvia-studio' ),
 		);
 		Abilities::write(
 			'leitvia/repair-links',
@@ -164,33 +185,40 @@ final class Maintain {
 		Abilities::write(
 			'leitvia/set-alt-text',
 			__( 'Set alt text', 'leitvia-studio' ),
-			__( 'Sets the alt text of an image: without post and block on the attachment in the media library (base_hash of the attachment), with post and block on one image or cover block that shows the image (base_hash of the post). leitvia/get-page-outline returns both hashes, for the attachment with its ID as post. leitvia/audit-site reports missing alt text. Call it once per place, with the same package key. The alt text check applies.', 'leitvia-studio' ),
+			__( 'Sets the alt text of an image: without post and block on the attachment in the media library (base_hash of the attachment), with post and block on one image or cover block that shows it (base_hash of the post). leitvia/get-page-outline returns both hashes, for the attachment with its ID as post. Many images: items, one call and package. The alt text check applies.', 'leitvia-studio' ),
 			'maintain',
 			$add,
 			array(
 				'properties'           => array(
-					'image' => array(
-						'type'        => 'integer',
-						'minimum'     => 1,
-						'description' => __( 'Attachment ID of the image.', 'leitvia-studio' ),
-					),
-					'alt'   => array(
-						'type'      => 'string',
-						'minLength' => 1,
-						'maxLength' => 500,
-					),
+					'image' => $image,
+					'alt'   => $alt,
 					'post'  => $post,
-					'block' => array(
-						'type'        => 'string',
-						'minLength'   => 1,
-						'maxLength'   => 200,
-						'description' => __( 'Block ID or path ID of the image or cover block from the outline.', 'leitvia-studio' ),
+					'block' => $block,
+					'items' => array(
+						'type'     => 'array',
+						'minItems' => 1,
+						'maxItems' => self::MAX_ALT_TEXTS,
+						'items'    => array(
+							'type'                 => 'object',
+							'properties'           => array(
+								'image'     => $image,
+								'alt'       => $alt,
+								'post'      => $post,
+								'block'     => $block,
+								'base_hash' => array(
+									'type'        => 'string',
+									'description' => __( 'Hash of the attachment, or of the post with post and block; items on the same post send the hash read before the call.', 'leitvia-studio' ),
+								),
+							),
+							'required'             => array( 'image', 'alt', 'base_hash' ),
+							'additionalProperties' => false,
+						),
 					),
 				),
-				'required'             => array( 'image', 'alt' ),
 				'additionalProperties' => false,
 			),
-			array( self::class, 'describe_set_alt_text' )
+			array( self::class, 'describe_set_alt_text' ),
+			false
 		);
 		Abilities::write(
 			'leitvia/replace-pattern',
@@ -343,13 +371,32 @@ final class Maintain {
 	}
 
 	/**
-	 * Operation of set-alt-text: on the attachment, or on one block of a post that shows the image.
+	 * Operation of set-alt-text: on the attachment, or on one block of a post that shows the image; with items one per
+	 * item as a batch (Abilities::execute_batch()).
 	 *
 	 * @param array<string, mixed> $input Input.
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	public static function describe_set_alt_text( array $input ) {
-		$image = (int) ( $input['image'] ?? 0 );
+		if ( isset( $input['items'] ) ) {
+			if ( isset( $input['image'] ) || isset( $input['alt'] ) || isset( $input['post'] ) || isset( $input['block'] ) ) {
+				return Block_Edit::invalid( 'items', __( 'Send either items or one image with its alt text, not both.', 'leitvia-studio' ) );
+			}
+			return array(
+				'batch' => array_map(
+					static function ( $item ) {
+						$item  = (array) $item;
+						$parts = self::describe_set_alt_text( array_diff_key( $item, array( 'items' => true ) ) );
+						return is_wp_error( $parts ) ? $parts : array( 'base_hash' => (string) ( $item['base_hash'] ?? '' ) ) + $parts;
+					},
+					array_slice( array_values( (array) $input['items'] ), 0, self::MAX_ALT_TEXTS )
+				),
+			);
+		}
+		if ( ! isset( $input['image'] ) ) {
+			return Block_Edit::invalid( 'image', __( 'Send the image and its alt text, or items for many images.', 'leitvia-studio' ) );
+		}
+		$image = (int) $input['image'];
 		$alt   = trim( (string) ( $input['alt'] ?? '' ) );
 		if ( '' === $alt ) {
 			return Block_Edit::invalid( 'alt_text', __( 'Give the image an alt text that describes it.', 'leitvia-studio' ), array( 'post' => $image ) );

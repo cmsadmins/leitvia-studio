@@ -1,7 +1,7 @@
 {
 	"usage": {
-		"useWhen": "Long pages or articles with several h2 and h3 headings.",
+		"useWhen": "Long pages or articles with several h2 and h3 headings. display companion for long texts of about 2,500 words or more: a chapter button stays at the bottom edge once the list is scrolled away.",
 		"avoidWhen": "Short pages with fewer than three headings.",
-		"a11y": "The list is a navigation landmark with links to the headings; the section being read is marked."
+		"a11y": "The list is a navigation landmark with links to the headings; the section being read is marked. The chapter button opens a modal dialog with the same list and returns focus when it closes; without JavaScript only the list remains."
 	}
 }

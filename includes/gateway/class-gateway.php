@@ -157,8 +157,8 @@ final class Gateway {
 	}
 
 	/**
-	 * Filter rest_pre_dispatch: agents read through any route but write only through the abilities of Leitvia
-	 * (/wp-abilities/v1/abilities/leitvia/…/run) and its MCP server. Agents hold core capabilities such as
+	 * Filter rest_pre_dispatch: agents read through any route but write only through the abilities of the Studio
+	 * registry, its own and those of add-ons (/wp-abilities/v1/abilities/<name>/run), and its MCP server. Agents hold core capabilities such as
 	 * edit_pages and edit_theme_options for the pipeline to check; without this, an application password could write
 	 * through /wp/v2 or the Studio routes past autonomy, checks, snapshot and audit log.
 	 *
@@ -174,7 +174,10 @@ final class Gateway {
 			return $result;
 		}
 		$route = untrailingslashit( $request->get_route() );
-		if ( preg_match( '#^/wp-abilities/v1/abilities/leitvia/[a-z0-9-]+/run$#', $route ) || '/' . Mcp::ROUTE_NAMESPACE . '/' . Mcp::ROUTE === $route ) {
+		// Abilities of the Studio registry run through the pipeline, those of add-ons too (my-addon/…); core abilities
+		// and those of other plugins do not.
+		$name = preg_match( '#^/wp-abilities/v1/abilities/([a-z0-9-]+/[a-z0-9-]+)/run$#', $route, $match ) ? $match[1] : '';
+		if ( ( '' !== $name && null !== leitvia_studio()->registry( 'abilities' )->get( $name ) ) || '/' . Mcp::ROUTE_NAMESPACE . '/' . Mcp::ROUTE === $route ) {
 			return $result;
 		}
 		/* translators: %s: short product name */

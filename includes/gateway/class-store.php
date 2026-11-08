@@ -188,7 +188,8 @@ final class Store {
 	}
 
 	/**
-	 * Calls of a user since a time: count and the oldest entry, for the rate limit. Rate limit rejections do not count.
+	 * Calls of a user since a time: count and the oldest entry, for the rate limit. Rate limit rejections do not count,
+	 * nor do the operations of a batch, whose call has an entry of its own (Abilities::execute_batch()).
 	 *
 	 * @param int    $user_id User ID.
 	 * @param string $since   UTC time, Y-m-d H:i:s.
@@ -198,7 +199,7 @@ final class Store {
 	public static function calls_since( int $user_id, string $since, bool $read = false ): array {
 		global $wpdb;
 		$table = self::table( 'audit' );
-		$row   = $wpdb->get_row( $wpdb->prepare( "SELECT COUNT(*) AS calls, MIN(created_at) AS oldest FROM {$table} WHERE user_id = %d AND created_at > %s AND code <> 'leitvia_rate_limited' AND ( object_type = %s ) = %d", $user_id, $since, self::READ, (int) $read ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Own table; an indexed count, never cached.
+		$row   = $wpdb->get_row( $wpdb->prepare( "SELECT COUNT(*) AS calls, MIN(created_at) AS oldest FROM {$table} WHERE user_id = %d AND created_at > %s AND code <> 'leitvia_rate_limited' AND details NOT LIKE %s AND ( object_type = %s ) = %d", $user_id, $since, '%' . $wpdb->esc_like( '"batched":true' ) . '%', self::READ, (int) $read ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Own table; an indexed count, never cached.
 		return array( (int) ( $row->calls ?? 0 ), $row->oldest ?? null );
 	}
 

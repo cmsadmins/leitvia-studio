@@ -17,6 +17,20 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Compiler {
 
+	/**
+	 * Class of blocks on a surface of color.surface-extra where accent falls below 4.5:1; the theme draws their links
+	 * in ink.
+	 */
+	public const INK_LINKS = 'has-ink-links';
+
+	/**
+	 * Weak surfaces of this request, null before the first look.
+	 *
+	 * @var list<string>|null
+	 */
+	private static ?array $weak = null;
+
+
 	public const ACTIVE_OPTION = 'leitvia_studio_active_set';
 	public const HASH_OPTION   = 'leitvia_studio_applied_hash';
 
@@ -48,6 +62,88 @@ final class Compiler {
 	}
 
 	/**
+	 * Warnings for surfaces of color.surface-extra on which accent, the color of links, falls below 4.5:1. Links on
+	 * them turn ink (class INK_LINKS, see ink_links()), so the set stays usable; the warning names the surface.
+	 *
+	 * @param array<string, mixed> $doc Token document.
+	 * @return list<array<string, mixed>>
+	 */
+	private static function check_extra_accent( array $doc ): array {
+		$accent   = (string) ( $doc['color']['accent']['$value']['hex'] ?? '' );
+		$findings = array();
+		foreach ( (array) ( $doc['color'][ Dtcg::EXTRA ] ?? array() ) as $slug => $token ) {
+			$ratio = Contrast::ratio( $accent, (string) ( $token['$value']['hex'] ?? '' ) );
+			if ( is_wp_error( $ratio ) || $ratio >= 4.5 ) {
+				continue;
+			}
+			$findings[] = array(
+				'code'     => 'accent_on_extra',
+				'severity' => 'warning',
+				/* translators: 1: token path, for example color.surface-extra.mint, 2: contrast ratio. */
+				'message'  => sprintf( __( 'accent on %1$s: %2$s:1, below 4.5:1; links on this surface use ink.', 'leitvia-studio' ), 'color.' . Dtcg::EXTRA . '.' . $slug, number_format_i18n( floor( $ratio * 100 ) / 100, 2 ) ),
+				'fix'      => __( 'Choose a lighter or darker surface, or an accent that reads on it, if links there should keep the accent.', 'leitvia-studio' ),
+				'data'     => array( 'slug' => Dtcg::EXTRA . '-' . $slug ),
+			);
+		}
+		return $findings;
+	}
+
+	/**
+	 * Palette slugs of the surfaces of color.surface-extra in the active global styles on which accent falls below
+	 * 4.5:1, once per request.
+	 *
+	 * @return list<string>
+	 */
+	public static function weak_surfaces(): array {
+		if ( null !== self::$weak ) {
+			return self::$weak;
+		}
+		$colors = array();
+		foreach ( (array) wp_get_global_settings( array( 'color', 'palette' ) ) as $origin ) {
+			foreach ( (array) $origin as $preset ) {
+				if ( isset( $preset['slug'], $preset['color'] ) ) {
+					$colors[ (string) $preset['slug'] ] = (string) $preset['color'];
+				}
+			}
+		}
+		self::$weak = array();
+		foreach ( isset( $colors['accent'] ) ? $colors : array() as $slug => $color ) {
+			$ratio = str_starts_with( $slug, Dtcg::EXTRA . '-' ) ? Contrast::ratio( $colors['accent'], $color ) : null;
+			if ( is_float( $ratio ) && $ratio < 4.5 ) {
+				self::$weak[] = $slug;
+			}
+		}
+		return self::$weak;
+	}
+
+	/**
+	 * Filter render_block: a block with the background of a weak surface (weak_surfaces()) gets the class INK_LINKS,
+	 * on which the theme draws links in ink instead of accent.
+	 *
+	 * @param string               $html  Rendered block.
+	 * @param array<string, mixed> $block Parsed block.
+	 */
+	public static function ink_links( string $html, array $block ): string {
+		$background = (string) ( $block['attrs']['backgroundColor'] ?? '' );
+		if ( '' === $background || ! in_array( $background, self::weak_surfaces(), true ) ) {
+			return $html;
+		}
+		$tags = new \WP_HTML_Tag_Processor( $html );
+		if ( ! $tags->next_tag() ) {
+			return $html;
+		}
+		$tags->add_class( self::INK_LINKS );
+		return $tags->get_updated_html();
+	}
+
+	/**
+	 * Forgets the weak surfaces, after global styles change within a request and for tests.
+	 */
+	public static function forget_weak(): void {
+		self::$weak = null;
+	}
+
+	/**
 	 * Decoded DTCG document of a token set.
 	 *
 	 * @param int $set_id Token set ID.
@@ -72,7 +168,7 @@ final class Compiler {
 	 * @return list<array<string, mixed>>
 	 */
 	public static function check( array $doc ): array {
-		$findings = self::check_fonts( $doc );
+		$findings = array_merge( self::check_fonts( $doc ), self::check_extra_accent( $doc ) );
 		foreach ( leitvia_studio()->registry( 'checks' )->all( array( 'scope' => 'token_set' ) ) as $check ) {
 			foreach ( (array) call_user_func( $check['callback'], $doc ) as $finding ) {
 				if ( is_array( $finding ) ) {
@@ -228,6 +324,7 @@ final class Compiler {
 		 * @param int                  $set_id   Token set ID.
 		 * @param array<string, mixed> $settings The compiled theme.json settings.
 		 */
+		self::forget_weak();
 		do_action( 'leitvia_studio_token_set_activated', $set_id, $settings );
 		return true;
 	}

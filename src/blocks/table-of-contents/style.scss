@@ -30,3 +30,127 @@
 .wp-block-heading[id] {
 	scroll-margin-block-start: var(--wp--preset--spacing--xl, 4rem);
 }
+
+// Display companion: the chapter button at the bottom edge, out of sight and out of the accessibility tree
+// (visibility: hidden) until view.js adds is-visible. Fixed, so showing it moves nothing. It keeps clear of other bars
+// fixed to the bottom (--leitvia-bottom-offset, see docs/extension-api.md) and of the safe area; full width on small
+// screens, a compact button at the end of the line from 782 px. Without JavaScript the wrapper stays hidden.
+.wp-block-leitvia-table-of-contents__companion {
+	position: fixed;
+	inset-inline: 0;
+	inset-block-end: max(0px, var(--leitvia-bottom-offset, 0px));
+	z-index: 40;
+	box-sizing: border-box;
+	padding: 0 max(var(--wp--preset--spacing--s, 1rem), env(safe-area-inset-right, 0px)) calc(var(--wp--preset--spacing--s, 1rem) + env(safe-area-inset-bottom, 0px)) max(var(--wp--preset--spacing--s, 1rem), env(safe-area-inset-left, 0px));
+	visibility: hidden;
+	translate: 0 100%;
+	pointer-events: none;
+
+	&.is-visible {
+		visibility: visible;
+		translate: none;
+	}
+
+	@media (min-width: 782px) {
+		inset-inline-start: auto;
+		inline-size: min(24rem, 100%);
+	}
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.wp-block-leitvia-table-of-contents__companion {
+		transition: translate 0.2s ease-out, visibility 0.2s;
+	}
+}
+
+// Label, section and count on their own lines; the section gives way first, its full title is the heading.
+.wp-block-leitvia-table-of-contents__open {
+	display: grid;
+	inline-size: 100%;
+	min-block-size: 2.75rem;
+	box-sizing: border-box;
+	padding: var(--wp--preset--spacing--xs, 0.5rem) var(--wp--preset--spacing--s, 1rem);
+	border: 1px solid var(--wp--preset--color--stroke, currentcolor);
+	border-radius: var(--wp--preset--border-radius--s, 0);
+	background: var(--wp--preset--color--surface, Canvas);
+	color: var(--wp--preset--color--ink, CanvasText);
+	box-shadow: var(--wp--preset--shadow--raised, none);
+	font: inherit;
+	text-align: start;
+	cursor: pointer;
+	pointer-events: auto;
+
+	&:focus-visible {
+		outline: 2px solid var(--wp--preset--color--focus, Highlight);
+		outline-offset: 2px;
+	}
+}
+
+.wp-block-leitvia-table-of-contents__label,
+.wp-block-leitvia-table-of-contents__count {
+	font-size: var(--wp--preset--font-size--meta, 0.875rem);
+	color: var(--wp--preset--color--ink-muted, inherit);
+}
+
+.wp-block-leitvia-table-of-contents__current {
+	overflow: hidden;
+	font-weight: 600;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+// Reading progress as a bar along the top edge of the button, as wide as the part read; the count in the button says
+// the same in words. view.js sets --leitvia-toc-progress from 0 to 1.
+.wp-block-leitvia-table-of-contents__progress {
+	position: absolute;
+	inset-block-start: 0;
+	inset-inline-start: max(var(--wp--preset--spacing--s, 1rem), env(safe-area-inset-left, 0px));
+	inline-size: calc((100% - max(var(--wp--preset--spacing--s, 1rem), env(safe-area-inset-left, 0px)) - max(var(--wp--preset--spacing--s, 1rem), env(safe-area-inset-right, 0px))) * var(--leitvia-toc-progress, 0));
+	block-size: 0.25rem;
+	background: var(--wp--preset--color--accent, currentcolor);
+}
+
+// The dialog, centred by the browser. The sheet fills the dialog, so a click on the dialog itself is a click on the
+// backdrop.
+.wp-block-leitvia-table-of-contents__dialog {
+	inline-size: min(36rem, 100% - 2 * var(--wp--preset--spacing--s, 1rem));
+	max-block-size: min(80vh, 100% - 2 * var(--wp--preset--spacing--s, 1rem));
+	padding: 0;
+	border: 1px solid var(--wp--preset--color--stroke, currentcolor);
+	// The companion around it lets clicks through (pointer-events: none); the dialog and its backdrop take them again.
+	pointer-events: auto;
+	border-radius: var(--wp--preset--border-radius--s, 0);
+	background: var(--wp--preset--color--surface, Canvas);
+	color: var(--wp--preset--color--ink, CanvasText);
+
+	&::backdrop {
+		background: rgb(0 0 0 / 0.5);
+	}
+}
+
+.wp-block-leitvia-table-of-contents__sheet {
+	padding: var(--wp--preset--spacing--m, 1.5rem);
+
+	> ol {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+}
+
+.wp-block-leitvia-table-of-contents__close {
+	min-block-size: 2.75rem;
+	margin-block-start: var(--wp--preset--spacing--s, 1rem);
+	padding-inline: var(--wp--preset--spacing--s, 1rem);
+	border: 1px solid currentcolor;
+	border-radius: var(--wp--preset--border-radius--s, 0);
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	cursor: pointer;
+}
+
+// Focus and jumps stay clear of the button while it shows (WCAG 2.4.11).
+html:has(.wp-block-leitvia-table-of-contents__companion.is-visible) {
+	scroll-padding-block-end: calc(max(0px, var(--leitvia-bottom-offset, 0px)) + 6rem);
+}

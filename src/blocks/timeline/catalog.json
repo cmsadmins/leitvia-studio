@@ -1,8 +1,8 @@
 {
 	"example": "<!-- wp:leitvia/timeline -->\n<ol class=\"wp-block-leitvia-timeline\"><!-- wp:leitvia/timeline-item -->\n<li class=\"wp-block-leitvia-timeline-item\"><time class=\"wp-block-leitvia-timeline-item__date\" datetime=\"2019\">2019</time><h3 class=\"wp-block-leitvia-timeline-item__heading\">Founded</h3><div class=\"wp-block-leitvia-timeline-item__content\"><!-- wp:paragraph -->\n<p>Two designers start the studio.</p>\n<!-- /wp:paragraph --></div></li>\n<!-- /wp:leitvia/timeline-item -->\n\n<!-- wp:leitvia/timeline-item -->\n<li class=\"wp-block-leitvia-timeline-item\"><time class=\"wp-block-leitvia-timeline-item__date\" datetime=\"2024\">2024</time><h3 class=\"wp-block-leitvia-timeline-item__heading\">Twenty people</h3><div class=\"wp-block-leitvia-timeline-item__content\"><!-- wp:paragraph -->\n<p>The team moves into its own office.</p>\n<!-- /wp:paragraph --></div></li>\n<!-- /wp:leitvia/timeline-item --></ol>\n<!-- /wp:leitvia/timeline -->",
 	"usage": {
-		"useWhen": "Dated milestones in order, such as company history or a project schedule.",
-		"avoidWhen": "Undated steps or processes; use an ordered list or the wizard block.",
-		"a11y": "The timeline is an ordered list and each date is a time element with a machine-readable datetime."
+		"useWhen": "Milestones in order, such as company history or a project schedule, also stages without a year (\"First journey\", \"Heading east\") with a free label.",
+		"avoidWhen": "Steps a reader follows to get something done; use an ordered list or the wizard block.",
+		"a11y": "The timeline is an ordered list; each date is a time element with a machine-readable datetime, a label without date is plain text."
 	}
 }

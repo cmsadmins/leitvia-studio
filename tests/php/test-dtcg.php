@@ -262,6 +262,62 @@ class Test_Dtcg extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The role radius.media (contract field choices) takes the value of radius none, s, m or l: an alias takes the
+	 * preset of its target, a copied value passes, any other radius and the pill fail, and a set saved before the role
+	 * existed gets radius.none.
+	 */
+	public function test_media_radius_is_one_of_the_radius_presets(): void {
+		$c     = leitvia_studio_contract();
+		$doc   = self::minimal();
+		$radii = static fn( array $settings ): array => array_column( $settings['border']['radiusSizes']['theme'], 'size', 'slug' );
+		unset( $doc['radius']['media']['$extensions'] );
+
+		foreach ( array( 'none', 's', 'm', 'l' ) as $choice ) {
+			$doc['radius']['media']['$value'] = '{radius.' . $choice . '}';
+			$settings                         = Dtcg::to_settings( $doc, $c );
+			$this->assertNotWPError( $settings, $choice );
+			$this->assertSame( $radii( $settings )[ $choice ], $radii( $settings )['media'], $choice );
+		}
+
+		$doc['radius']['media']['$value'] = $doc['radius']['l']['$value'];
+		$this->assertSame( '1rem', $radii( Dtcg::to_settings( $doc, $c ) )['media'] );
+
+		$doc['radius']['media']['$value'] = array(
+			'value' => 3,
+			'unit'  => 'px',
+		);
+		$this->assertSame( 'leitvia_studio_dtcg_invalid_choice', Dtcg::to_settings( $doc, $c )->get_error_code() );
+		$doc['radius']['media']['$value'] = '{radius.pill}';
+		$this->assertSame( 'leitvia_studio_dtcg_invalid_choice', Dtcg::to_settings( $doc, $c )->get_error_code() );
+
+		unset( $doc['radius']['media'] );
+		$settings = Dtcg::to_settings( $doc, $c );
+		$this->assertNotWPError( $settings );
+		$this->assertSame( $radii( $settings )['none'], $radii( $settings )['media'] );
+	}
+
+	/**
+	 * The media radius is the preset --wp--preset--border-radius--media (settings, so Additional CSS cannot drop it);
+	 * core images and featured images use it through theme.json, covers and media and text through the block styles of
+	 * the theme (assets/css/blocks).
+	 */
+	public function test_theme_outputs_the_media_radius_variable(): void {
+		$css = WP_Theme_JSON_Resolver::get_merged_data()->get_stylesheet( array( 'variables', 'presets', 'styles', 'custom-css' ) );
+		$this->assertStringContainsString( '--wp--preset--border-radius--media: 0;', $css );
+		foreach ( array( '.wp-block-image img', '.wp-block-post-featured-image img' ) as $selector ) {
+			$this->assertMatchesRegularExpression( '/' . preg_quote( $selector, '/' ) . '[^{]*\{[^}]*border-radius: ?var\(--wp--preset--border-radius--media\)/', $css, $selector );
+		}
+		$blocks = array(
+			'core--cover.css'      => '.wp-block-cover:not(.alignfull)',
+			'core--media-text.css' => '.wp-block-media-text__media img',
+		);
+		foreach ( $blocks as $file => $selector ) {
+			$block_css = (string) file_get_contents( get_theme_file_path( 'assets/css/blocks/' . $file ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Theme file.
+			$this->assertMatchesRegularExpression( '/' . preg_quote( $selector, '/' ) . '\s*\{[^}]*border-radius: ?var\(--wp--preset--border-radius--media\)/', $block_css, $file );
+		}
+	}
+
+	/**
 	 * CSS values pass an allowlist: nothing that can load a resource or break out of the declaration.
 	 *
 	 * @dataProvider css_values

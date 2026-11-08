@@ -825,7 +825,7 @@ class Test_Gateway_Setup extends WP_UnitTestCase {
 			'leitvia-test/single-wide',
 			array(
 				'title'         => 'Single wide',
-				'content'       => '<!-- wp:template-part {"slug":"header"} /--><!-- wp:post-title {"level":1} /-->' . $marker . '<!-- wp:post-content {"align":"full","layout":{"type":"constrained"}} /--><!-- wp:template-part {"slug":"footer"} /-->',
+				'content'       => '<!-- wp:template-part {"slug":"header"} /--><!-- wp:group {"tagName":"main"} --><main class="wp-block-group"><!-- wp:post-title {"level":1} /-->' . $marker . '<!-- wp:post-content {"align":"full","layout":{"type":"constrained"}} /--></main><!-- /wp:group --><!-- wp:template-part {"slug":"footer"} /-->',
 				'templateTypes' => array( 'single' ),
 			)
 		);
@@ -833,7 +833,7 @@ class Test_Gateway_Setup extends WP_UnitTestCase {
 			'leitvia-test/page-plain',
 			array(
 				'title'         => 'Page plain',
-				'content'       => '<!-- wp:post-content {"layout":{"type":"constrained"}} /-->',
+				'content'       => '<!-- wp:template-part {"slug":"header"} /--><!-- wp:group {"tagName":"main"} --><main class="wp-block-group"><!-- wp:post-content {"layout":{"type":"constrained"}} /--></main><!-- /wp:group --><!-- wp:template-part {"slug":"footer"} /-->',
 				'templateTypes' => array( 'page' ),
 			)
 		);
@@ -922,12 +922,13 @@ class Test_Gateway_Setup extends WP_UnitTestCase {
 				'leitvia/update-template',
 				array(
 					'template'  => 'single',
-					'content'   => '<!-- wp:post-content /-->',
+					'content'   => '<!-- wp:template-part {"slug":"header"} /--><!-- wp:group {"tagName":"main"} --><main class="wp-block-group"><!-- wp:post-content /--></main><!-- /wp:group --><!-- wp:template-part {"slug":"footer"} /-->',
 					'base_hash' => Hashes::document( $template->wp_id ),
 				)
 			)
 		);
-		$this->assertSame( array( 'core/post-content' ), array_column( parse_blocks( get_post_field( 'post_content', $template->wp_id ) ), 'blockName' ) );
+		$this->assertSame( array( 'core/template-part', 'core/group', 'core/template-part' ), array_column( parse_blocks( get_post_field( 'post_content', $template->wp_id ) ), 'blockName' ) );
+		$this->assertStringNotContainsString( 'Template from a pattern', get_post_field( 'post_content', $template->wp_id ) );
 		$this->assertGreaterThan( 0, $second['snapshot'] );
 
 		$this->assertIsArray( wp_get_ability( 'leitvia/rollback' )->execute( array( 'id' => $second['package'] ) ) );
@@ -975,7 +976,7 @@ class Test_Gateway_Setup extends WP_UnitTestCase {
 				'leitvia/update-template',
 				array(
 					'template' => 'page-landing',
-					'content'  => '<!-- wp:group --><div class="wp-block-group"><!-- wp:post-content /--></div><!-- /wp:group -->',
+					'content'  => '<!-- wp:template-part {"slug":"header"} /--><!-- wp:group {"tagName":"main"} --><main class="wp-block-group"><!-- wp:group --><div class="wp-block-group"><!-- wp:post-content /--></div><!-- /wp:group --></main><!-- /wp:group --><!-- wp:template-part {"slug":"footer"} /-->',
 				)
 			)
 		);
@@ -985,7 +986,7 @@ class Test_Gateway_Setup extends WP_UnitTestCase {
 				'leitvia/update-template',
 				array(
 					'template' => '404',
-					'content'  => '<!-- wp:paragraph --><p>Not found</p><!-- /wp:paragraph -->',
+					'content'  => '<!-- wp:template-part {"slug":"header"} /--><!-- wp:group {"tagName":"main"} --><main class="wp-block-group"><!-- wp:paragraph --><p>Not found</p><!-- /wp:paragraph --></main><!-- /wp:group --><!-- wp:template-part {"slug":"footer"} /-->',
 				)
 			)
 		);
@@ -1030,7 +1031,7 @@ class Test_Gateway_Setup extends WP_UnitTestCase {
 				'leitvia/update-template',
 				array(
 					'template' => 'leitvia-test-plain',
-					'content'  => '<!-- wp:paragraph --><p>Plain</p><!-- /wp:paragraph --><!-- wp:post-content /-->',
+					'content'  => '<!-- wp:template-part {"slug":"header"} /--><!-- wp:group {"tagName":"main"} --><main class="wp-block-group"><!-- wp:paragraph --><p>Plain</p><!-- /wp:paragraph --><!-- wp:post-content /--></main><!-- /wp:group --><!-- wp:template-part {"slug":"footer"} /-->',
 				)
 			)
 		);
@@ -1052,7 +1053,7 @@ class Test_Gateway_Setup extends WP_UnitTestCase {
 			'leitvia-test/product-wide',
 			array(
 				'title'         => 'Product wide',
-				'content'       => '<!-- wp:template-part {"slug":"header"} /--><!-- wp:post-title {"level":1} /--><!-- wp:template-part {"slug":"footer"} /-->',
+				'content'       => '<!-- wp:template-part {"slug":"header"} /--><!-- wp:group {"tagName":"main"} --><main class="wp-block-group"><!-- wp:post-title {"level":1} /--></main><!-- /wp:group --><!-- wp:template-part {"slug":"footer"} /-->',
 				'templateTypes' => array( 'single-product' ),
 			)
 		);
@@ -1068,6 +1069,38 @@ class Test_Gateway_Setup extends WP_UnitTestCase {
 			)
 		);
 		$this->assertSame( $result['target']['post'], get_block_template( get_stylesheet() . '//single-product' )->wp_id );
+	}
+
+	/**
+	 * A product template pattern with blocks that take the product from their context, such as the add to cart form,
+	 * passes the block check without a product to render.
+	 *
+	 * @group woocommerce
+	 */
+	public function test_update_template_with_product_blocks(): void {
+		if ( ! class_exists( 'WooCommerce' ) ) {
+			$this->markTestSkipped( 'Needs WooCommerce (npm run test:php:commerce).' );
+		}
+		update_option( 'active_plugins', array( 'woocommerce/woocommerce.php' ) );
+		register_block_pattern(
+			'leitvia-test/product-form',
+			array(
+				'title'         => 'Product with form',
+				'content'       => '<!-- wp:template-part {"slug":"header"} /--><!-- wp:group {"tagName":"main"} --><main class="wp-block-group"><!-- wp:post-title {"level":1} /--><!-- wp:woocommerce/add-to-cart-form /--></main><!-- /wp:group --><!-- wp:template-part {"slug":"footer"} /-->',
+				'templateTypes' => array( 'single-product' ),
+			)
+		);
+		$this->sign_in( 'full' );
+		$this->assert_mode(
+			'live',
+			self::call(
+				'leitvia/update-template',
+				array(
+					'template' => 'single-product',
+					'pattern'  => 'leitvia-test/product-form',
+				)
+			)
+		);
 	}
 
 	/**

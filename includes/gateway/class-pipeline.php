@@ -121,7 +121,7 @@ final class Pipeline {
 				},
 				'object_id'   => $error ? max( $op->post_id(), $op->term() ) : (int) ( $result['target']['post'] ?? $result['target']['term'] ?? 0 ),
 				'package_id'  => $error ? 0 : (int) $result['package'],
-				'details'     => $error ? array() : array_intersect_key( $result, array_flip( array( 'mode', 'level', 'kinds', 'snapshot' ) ) ) + array_intersect_key( $op->target, array( 'option' => true ) ),
+				'details'     => ( $error ? array() : array_intersect_key( $result, array_flip( array( 'mode', 'level', 'kinds', 'snapshot' ) ) ) + array_intersect_key( $op->target, array( 'option' => true ) ) ) + ( Abilities::batching() ? array( 'batched' => true ) : array() ),
 			)
 		);
 		if ( ! $error ) {

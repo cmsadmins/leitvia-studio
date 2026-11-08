@@ -37,7 +37,8 @@
 	cursor: pointer;
 
 	.leitvia-icon {
-		inline-size: 24px;
+		inline-size: auto;
+		max-inline-size: 100%;
 		block-size: 24px;
 	}
 

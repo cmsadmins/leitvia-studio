@@ -1,10 +1,17 @@
 import { __, sprintf } from '@wordpress/i18n';
 import { InspectorControls, useBlockProps } from '@wordpress/block-editor';
-import { CheckboxControl, PanelBody } from '@wordpress/components';
+import {
+	CheckboxControl,
+	PanelBody,
+	SelectControl,
+} from '@wordpress/components';
 
 const LEVELS = [ 2, 3, 4, 5, 6 ];
 
-export default function Edit( { attributes: { levels }, setAttributes } ) {
+export default function Edit( {
+	attributes: { levels, display },
+	setAttributes,
+} ) {
 	const toggle = ( level, on ) =>
 		setAttributes( {
 			levels: LEVELS.filter( ( l ) =>
@@ -27,6 +34,31 @@ export default function Edit( { attributes: { levels }, setAttributes } ) {
 							onChange={ ( on ) => toggle( level, on ) }
 						/>
 					) ) }
+					<SelectControl
+						__next40pxDefaultSize
+						label={ __( 'Display', 'leitvia-studio' ) }
+						help={ __(
+							'Companion keeps a chapter button at the bottom edge once the list is scrolled away, for long texts.',
+							'leitvia-studio'
+						) }
+						value={ display }
+						options={ [
+							{
+								value: 'inline',
+								label: __( 'In the text', 'leitvia-studio' ),
+							},
+							{
+								value: 'companion',
+								label: __(
+									'In the text and as chapter button',
+									'leitvia-studio'
+								),
+							},
+						] }
+						onChange={ ( value ) =>
+							setAttributes( { display: value } )
+						}
+					/>
 				</PanelBody>
 			</InspectorControls>
 			<nav

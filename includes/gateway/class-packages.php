@@ -113,11 +113,14 @@ final class Packages {
 	/**
 	 * A change package for a live write that had none, with the write as applied operation: the inbox shows it and
 	 * rollback() can undo it. The same write gets the same package (found by its snapshot). 0 when it cannot be stored.
+	 * With into, the write joins that applied package of a batch instead, after an earlier write to the same target as
+	 * the operation that follows it, so rollback() checks that target through the last one.
 	 *
 	 * @param Operation            $op     Operation that was written live.
 	 * @param array<string, mixed> $result Result of Pipeline::run(): level, kinds, target, hash and snapshot.
+	 * @param int                  $into   Applied package of the same batch, 0 for a package of its own.
 	 */
-	public static function record( Operation $op, array $result ): int {
+	public static function record( Operation $op, array $result, int $into = 0 ): int {
 		$snapshot = (int) $result['snapshot'];
 		$found    = get_posts(
 			array(
@@ -136,24 +139,32 @@ final class Packages {
 		}
 		$post   = (int) ( $result['target']['post'] ?? $result['target']['term'] ?? 0 );
 		$target = '' !== $op->option() || isset( $op->target['term'] ) ? $op->target : array( 'post' => $post ) + $op->target;
-		$id     = self::add(
-			'',
-			array(
-				'ability'   => $op->ability,
-				'area'      => $op->area,
-				'target'    => $target,
-				'base_hash' => '',
-				'level'     => (string) $result['level'],
-				'kinds'     => (array) $result['kinds'],
-				'state'     => Diff::current( new Operation( $op->ability, $op->area, $target, '', static fn( array $state ): array => $state ) ),
-				'findings'  => array(),
-				'applied'   => array(
-					'post'     => $post,
-					'hash'     => (string) $result['hash'],
-					'snapshot' => $snapshot,
-				),
-			)
+		$entry  = array(
+			'ability'   => $op->ability,
+			'area'      => $op->area,
+			'target'    => $target,
+			'base_hash' => '',
+			'level'     => (string) $result['level'],
+			'kinds'     => (array) $result['kinds'],
+			'state'     => Diff::current( new Operation( $op->ability, $op->area, $target, '', static fn( array $state ): array => $state ) ),
+			'findings'  => array(),
+			'applied'   => array(
+				'post'     => $post,
+				'hash'     => (string) $result['hash'],
+				'snapshot' => $snapshot,
+			),
 		);
+		if ( $into ) {
+			$operations = self::operations( $into );
+			foreach ( $operations as $earlier ) {
+				if ( self::same_target( (array) $earlier['target'], $target ) ) {
+					$entry['follows'] = (int) $earlier['id'];
+				}
+			}
+			$saved = self::save( $into, array_merge( $operations, array( array( 'id' => count( $operations ) + 1 ) + $entry ) ) );
+			return is_wp_error( $saved ) ? 0 : $into;
+		}
+		$id = self::add( '', $entry );
 		if ( is_wp_error( $id ) ) {
 			return 0;
 		}

@@ -182,7 +182,7 @@ final class Read_Design {
 			'leitvia/get-pattern',
 			__( 'Get pattern', 'leitvia-studio' ),
 			/* translators: %s: product name */
-			sprintf( __( 'Returns one pattern of the theme or of %s with its markup, metadata and the first 20 posts and templates that use it (more is true when there are further ones).', 'leitvia-studio' ), leitvia_studio_brand()['name'] ),
+			sprintf( __( 'Returns one pattern of the theme or of %s with its markup, metadata and the first 20 posts and templates that use it (more is true when there are further ones). Template patterns come with their templateTypes.', 'leitvia-studio' ), leitvia_studio_brand()['name'] ),
 			array(
 				'type'                 => 'object',
 				'properties'           => array(
@@ -484,7 +484,7 @@ final class Read_Design {
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	public static function pattern( string $slug ) {
-		$item = self::patterns()[ $slug ] ?? null;
+		$item = self::patterns()[ $slug ] ?? self::template_pattern( $slug );
 		if ( ! $item ) {
 			return Gateway\Rejection::make( 'leitvia_not_found', __( 'There is no pattern with this slug. List the patterns for the current slugs.', 'leitvia-studio' ), 404, 'pattern', array( 'pattern' => $slug ), 'leitvia/list-patterns' );
 		}
@@ -497,6 +497,27 @@ final class Read_Design {
 				'items' => array_slice( $usage, 0, self::MAX_USAGE ),
 				'more'  => $more || count( $usage ) > self::MAX_USAGE,
 			),
+		);
+	}
+
+	/**
+	 * A registered template pattern (one with templateTypes, the source of leitvia/update-template) that the pattern list
+	 * leaves out, with title, description and templateTypes; null for any other slug.
+	 *
+	 * @param string $slug Pattern slug.
+	 * @return array<string, mixed>|null
+	 */
+	private static function template_pattern( string $slug ): ?array {
+		$pattern = \WP_Block_Patterns_Registry::get_instance()->get_registered( $slug );
+		if ( ! $pattern || empty( $pattern['templateTypes'] ) ) {
+			return null;
+		}
+		return array(
+			'slug'          => $slug,
+			'title'         => (string) ( $pattern['title'] ?? '' ),
+			'description'   => (string) ( $pattern['description'] ?? '' ),
+			'source'        => 'template',
+			'templateTypes' => array_values( array_map( 'strval', (array) $pattern['templateTypes'] ) ),
 		);
 	}
 

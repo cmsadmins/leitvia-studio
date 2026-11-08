@@ -755,6 +755,28 @@ class Test_Gateway_Content extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The ability list-media with include returns the listed IDs in their order and nothing else; search finds a file by its name
+	 * even when the title says something else.
+	 */
+	public function test_list_media_by_ids_and_file_name(): void {
+		$first  = $this->image();
+		$second = $this->image( 'Second sign' );
+		$third  = $this->image( 'Third sign' );
+		wp_update_post(
+			array(
+				'ID'         => $second,
+				'post_title' => 'Portrait',
+			)
+		);
+		$file = pathinfo( (string) get_attached_file( $second ), PATHINFO_FILENAME );
+		$this->assertSame( array( $third, $first ), array_column( self::call( 'leitvia/list-media', array( 'include' => array( $third, $first ) ) )['items'], 'id' ) );
+		$this->assertSame( array( $first ), array_column( self::call( 'leitvia/list-media', array( 'include' => array( $first, 999999 ) ) )['items'], 'id' ) );
+		$this->assertContains( $second, array_column( self::call( 'leitvia/list-media', array( 'search' => $file ) )['items'], 'id' ) );
+		$this->assertSame( array(), self::call( 'leitvia/list-media', array( 'search' => 'no-such-file-name' ) )['items'] );
+		$this->assert_rejected( 'ability_invalid_input', self::call( 'leitvia/list-media', array( 'include' => array_fill( 0, 101, $first ) ) ) );
+	}
+
+	/**
 	 * The ability get-site-health: versions and known updates for the agent, from the stored update check only.
 	 */
 	public function test_site_health(): void {

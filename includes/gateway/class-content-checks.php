@@ -48,10 +48,12 @@ final class Content_Checks {
 		'leitvia/alt-text'         => array( 'content', 'alt_text' ),
 		'leitvia/link-text'        => array( 'content', 'link_text' ),
 		'leitvia/block-validity'   => array( 'content', 'block_validity' ),
+		'leitvia/unregistered'     => array( 'content', 'unregistered' ),
 		'leitvia/content-tokens'   => array( 'content', 'tokens' ),
 		'leitvia/content-contrast' => array( 'content', 'contrast' ),
 		'leitvia/query-context'    => array( 'content', 'query_context' ),
 		'leitvia/page-structure'   => array( 'page', 'page' ),
+		'leitvia/template-parts'   => array( 'content', 'template_parts' ),
 	);
 
 	/**
@@ -65,10 +67,12 @@ final class Content_Checks {
 			'leitvia/alt-text'         => __( 'Alternative text', 'leitvia-studio' ),
 			'leitvia/link-text'        => __( 'Link text', 'leitvia-studio' ),
 			'leitvia/block-validity'   => __( 'Block validity', 'leitvia-studio' ),
+			'leitvia/unregistered'     => __( 'Blocks without a registered type', 'leitvia-studio' ),
 			'leitvia/content-tokens'   => __( 'Design tokens in content', 'leitvia-studio' ),
 			'leitvia/content-contrast' => __( 'Color pairs in content', 'leitvia-studio' ),
 			'leitvia/query-context'    => __( 'Filters inside a query', 'leitvia-studio' ),
 			'leitvia/page-structure'   => __( 'One h1 and landmarks', 'leitvia-studio' ),
+			'leitvia/template-parts'   => __( 'Header, main and footer of a template', 'leitvia-studio' ),
 		);
 		foreach ( self::CHECKS as $name => [ $scope, $method ] ) {
 			$studio->registry( 'checks' )->register(
@@ -219,7 +223,7 @@ final class Content_Checks {
 	/**
 	 * Check leitvia/block-validity: registered blocks only, no classic block outside classic content, no Custom HTML,
 	 * no Base64 data, no deprecated catalog blocks (hidden from the inserter without a parent), and Studio blocks render
-	 * without errors.
+	 * without errors; in a template blocks that take the post from their context are not rendered.
 	 *
 	 * @param string               $content Block markup.
 	 * @param array<string, mixed> $context Context.
@@ -252,9 +256,13 @@ final class Content_Checks {
 				$add( $id, __( 'Custom HTML blocks are not open to agents.', 'leitvia-studio' ), __( 'Use registered blocks from leitvia/list-blocks.', 'leitvia-studio' ) );
 				continue;
 			}
-			if ( ! $types->is_registered( $name ) ) {
+			// In content an unknown type is a warning of leitvia/unregistered, so a migration can go step by step.
+			if ( ! $types->is_registered( $name ) && ! self::content_type( $context ) ) {
 				/* translators: %s: block name. */
 				$add( $id, sprintf( __( 'The block %s is not registered.', 'leitvia-studio' ), $name ), __( 'Use a block from leitvia/list-blocks, or activate the plugin that provides it.', 'leitvia-studio' ) );
+				continue;
+			}
+			if ( ! $types->is_registered( $name ) ) {
 				continue;
 			}
 			$entry = $catalog[ $name ] ?? null;
@@ -262,11 +270,14 @@ final class Content_Checks {
 				/* translators: %s: block name. */
 				$add( $id, sprintf( __( 'The block %s is deprecated.', 'leitvia-studio' ), $name ), __( 'Replace it with a block from leitvia/list-blocks.', 'leitvia-studio' ), 'warning' );
 			}
-			if ( $entry && 'core' !== $entry['owner'] && ! self::renders( $block ) ) {
+			// In a template a block that takes the post from its context (a product gallery, the add to cart form) has no
+			// post to render with; it renders on each request with the post of the page, so the render check skips it.
+			$type       = $types->get_registered( $name );
+			$contextual = ! self::content_type( $context ) && $type && in_array( 'postId', $type->get_uses_context(), true );
+			if ( $entry && 'core' !== $entry['owner'] && ! $contextual && ! self::renders( $block ) ) {
 				/* translators: %s: block name. */
 				$add( $id, sprintf( __( 'The block %s fails to render with these attributes.', 'leitvia-studio' ), $name ), __( 'Check the attributes against leitvia/list-blocks.', 'leitvia-studio' ) );
 			}
-			$type = $types->get_registered( $name );
 			if ( $entry && $type && 'core' !== $entry['owner'] && ! $type->is_dynamic() ) {
 				// A saved block renders its markup and nothing else: an empty one shows nothing, and core reads attributes with a source from the HTML, never from the comment.
 				$own     = trim( implode( '', array_filter( (array) $block['innerContent'], 'is_string' ) ) );
@@ -278,6 +289,84 @@ final class Content_Checks {
 			}
 		}
 		return $findings;
+	}
+
+	/**
+	 * Check leitvia/unregistered: blocks whose type is not registered (blocks of a plugin that is gone, such as acf/*,
+	 * or a placeholder core/missing with the name of the lost type) render nothing, and their content disappears from
+	 * the page without a trace. One warning per content with code leitvia_unregistered_block and the types with their
+	 * count, never a rejection: a migration can write such content and rebuild it step by step. Templates and template
+	 * parts keep the error of leitvia/block-validity. Classic content (core/freeform) is not counted.
+	 *
+	 * @param string               $content Block markup.
+	 * @param array<string, mixed> $context Context.
+	 * @return list<array<string, mixed>>
+	 */
+	public static function unregistered( string $content, array $context ): array {
+		if ( ! self::applies( $context ) || ! self::content_type( $context ) ) {
+			return array();
+		}
+		[ $types, $first ] = self::scan_unregistered( $content );
+		if ( ! $types ) {
+			return array();
+		}
+		$list = implode( ', ', array_map( static fn( string $name, int $count ): string => $name . ' (' . $count . ')', array_keys( $types ), $types ) );
+		return array(
+			array(
+				'code'  => 'leitvia_unregistered_block',
+				'types' => $types,
+			) + self::finding(
+				'leitvia/unregistered',
+				'warning',
+				$first,
+				/* translators: %s: block types with their count, for example acf/hero (2). */
+				sprintf( __( 'Blocks of types that are not registered render nothing: %s.', 'leitvia-studio' ), $list ),
+				__( 'Activate the plugin that provides them, or rebuild their content with blocks from leitvia/list-blocks; the text is in their saved HTML.', 'leitvia-studio' )
+			),
+		);
+	}
+
+	/**
+	 * Block types of the content that are not registered, with their count, in order of appearance; a core/missing
+	 * block counts as the type it stands for.
+	 *
+	 * @param string $content Block markup.
+	 * @return array<string, int>
+	 */
+	public static function unregistered_types( string $content ): array {
+		return self::scan_unregistered( $content )[0];
+	}
+
+	/**
+	 * The types of unregistered_types() and the ID of the first such block, '' for none.
+	 *
+	 * @param string $content Block markup.
+	 * @return array{0: array<string, int>, 1: string}
+	 */
+	private static function scan_unregistered( string $content ): array {
+		$registry = \WP_Block_Type_Registry::get_instance();
+		$types    = array();
+		$first    = '';
+		foreach ( self::walk( $content ) as [ $block, $id ] ) {
+			$name = (string) $block['blockName'];
+			if ( 'core/missing' === $name ) {
+				$name = (string) ( $block['attrs']['originalName'] ?? 'core/missing' );
+			} elseif ( '' === $name || 'core/freeform' === $name || $registry->is_registered( $name ) ) {
+				continue;
+			}
+			$first          = '' === $first ? (string) $id : $first;
+			$types[ $name ] = ( $types[ $name ] ?? 0 ) + 1;
+		}
+		return array( $types, $first );
+	}
+
+	/**
+	 * Whether the context is content (posts, pages, entries, synced patterns), not a template or template part.
+	 *
+	 * @param array<string, mixed> $context Context.
+	 */
+	private static function content_type( array $context ): bool {
+		return ! in_array( (string) ( $context['post_type'] ?? '' ), array( 'wp_template', 'wp_template_part' ), true );
 	}
 
 	/**
@@ -421,6 +510,46 @@ final class Content_Checks {
 			if ( empty( $found[ $landmark ] ) ) {
 				/* translators: 1: landmark element, 2: template slug. */
 				$findings[] = self::finding( 'leitvia/page-structure', 'warning', '', sprintf( __( 'The template %2$s has no %1$s landmark.', 'leitvia-studio' ), strtolower( $landmark ), $template->slug ), __( 'A person should fix the template in the Site Editor.', 'leitvia-studio' ) );
+			}
+		}
+		return $findings;
+	}
+
+	/**
+	 * Check leitvia/template-parts: a template (wp_template) has a header and a footer template part and a main area,
+	 * else pages shown with it lose the navigation, the legal links or the landmark of their content. Warnings, a person
+	 * may want a template without them; template parts and content are not checked here.
+	 *
+	 * @param string               $content Block markup.
+	 * @param array<string, mixed> $context Context.
+	 * @return list<array<string, mixed>>
+	 */
+	public static function template_parts( string $content, array $context ): array {
+		if ( 'wp_template' !== (string) ( $context['post_type'] ?? '' ) ) {
+			return array();
+		}
+		$found = array();
+		foreach ( self::walk( $content ) as [ $block ] ) {
+			$attrs = (array) $block['attrs'];
+			$tag   = (string) ( $attrs['tagName'] ?? '' );
+			if ( 'core/template-part' === $block['blockName'] ) {
+				foreach ( array( 'header', 'footer' ) as $area ) {
+					if ( in_array( $area, array( $tag, (string) ( $attrs['area'] ?? '' ) ), true ) || str_starts_with( (string) ( $attrs['slug'] ?? '' ), $area ) ) {
+						$found[ $area ] = true;
+					}
+				}
+			}
+			if ( 'main' === $tag ) {
+				$found['main'] = true;
+			}
+		}
+		$findings = array();
+		foreach ( array( 'header', 'main', 'footer' ) as $part ) {
+			if ( empty( $found[ $part ] ) ) {
+				$findings[] = 'main' === $part
+					? self::finding( 'leitvia/template-parts', 'warning', '', __( 'The template has no main area.', 'leitvia-studio' ), __( 'Wrap the content of the template in a group with the HTML element main.', 'leitvia-studio' ) )
+					/* translators: %s: header or footer. */
+					: self::finding( 'leitvia/template-parts', 'warning', '', sprintf( __( 'The template has no %s template part.', 'leitvia-studio' ), $part ), __( 'Add the template part of the theme, as the templates of the theme do.', 'leitvia-studio' ) );
 			}
 		}
 		return $findings;

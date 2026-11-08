@@ -119,14 +119,34 @@ final class Icon {
 	}
 
 	/**
-	 * Stroke width of a stroke icon: 2 on the 24 grid of Lucide, in proportion on another viewBox, so every icon draws
-	 * lines of the same weight at the same size.
+	 * Stroke width of a stroke icon: 2 on the 24 grid of Lucide, in proportion to the height of another viewBox (icons
+	 * are drawn 1em high), so every icon draws lines of the same weight at the same size.
 	 *
 	 * @param string $view_box viewBox.
 	 */
 	public static function stroke_width( string $view_box ): string {
-		$width = (float) ( explode( ' ', $view_box )[2] ?? 24 );
-		return rtrim( rtrim( sprintf( '%.4F', 2 * $width / 24 ), '0' ), '.' );
+		$height = (float) ( explode( ' ', $view_box )[3] ?? 24 );
+		return self::number( 2 * ( $height > 0 ? $height : 24 ) / 24 );
+	}
+
+	/**
+	 * Width of an icon that is 24 high, in the proportion of its viewBox: 24 for a square, more for a wide icon, so a
+	 * combined icon is as high as a simple one and the CSS draws it 1em high with the width auto.
+	 *
+	 * @param string $view_box viewBox.
+	 */
+	public static function width( string $view_box ): string {
+		$box = array_map( 'floatval', explode( ' ', $view_box ) );
+		return ( $box[2] ?? 0 ) > 0 && ( $box[3] ?? 0 ) > 0 ? self::number( 24 * $box[2] / $box[3] ) : '24';
+	}
+
+	/**
+	 * A number with at most four decimals, without trailing zeros.
+	 *
+	 * @param float $value Number.
+	 */
+	private static function number( float $value ): string {
+		return rtrim( rtrim( sprintf( '%.4F', $value ), '0' ), '.' );
 	}
 
 	/**
@@ -164,12 +184,13 @@ final class Icon {
 		// The markup comes from the bundled file or from an add-on that cleaned it, not from the post, so it is not
 		// escaped.
 		return sprintf(
-			'<svg class="leitvia-icon leitvia-icon--%3$s" xmlns="http://www.w3.org/2000/svg" viewBox="%4$s" width="24" height="24" %5$s %1$s>%2$s</svg>',
+			'<svg class="leitvia-icon leitvia-icon--%3$s" xmlns="http://www.w3.org/2000/svg" viewBox="%4$s" width="%6$s" height="24" %5$s %1$s>%2$s</svg>',
 			$a11y,
 			$icon['svg'],
 			esc_attr( $name ),
 			esc_attr( $icon['viewBox'] ),
-			$paint
+			$paint,
+			esc_attr( self::width( $icon['viewBox'] ) )
 		);
 	}
 

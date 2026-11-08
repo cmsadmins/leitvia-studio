@@ -100,7 +100,7 @@ class Test_Gateway_Content_Checks extends WP_UnitTestCase {
 			'headings'       => array( 'leitvia/headings', 'headings', array( 'error head0001', 'error p:1', 'error p:2' ) ),
 			'alt-text'       => array( 'leitvia/alt-text', 'alt-text', array( 'error img00001', 'error p:1', 'warning p:2', 'error p:3.0' ) ),
 			'link-text'      => array( 'leitvia/link-text', 'link-text', array( 'error par00001', 'error p:1', 'error p:1', 'error p:2.0' ) ),
-			'block-validity' => array( 'leitvia/block-validity', 'block-validity', array( 'error htm00001', 'error p:1', 'error p:2', 'error p:3' ) ),
+			'block-validity' => array( 'leitvia/block-validity', 'block-validity', array( 'error htm00001', 'error p:2', 'error p:3' ) ),
 			'tokens'         => array( 'leitvia/content-tokens', 'content-tokens', array( 'error grp00001', 'error grp00001', 'error p:0.0', 'error p:0.0' ) ),
 			'contrast'       => array( 'leitvia/content-contrast', 'content-contrast', array( 'error grp00001' ) ),
 			'page-structure' => array( 'leitvia/page-structure', 'page-structure', array( 'error ' ), 'page' ),
@@ -134,7 +134,7 @@ class Test_Gateway_Content_Checks extends WP_UnitTestCase {
 	public function test_registry(): void {
 		$checks = leitvia_studio()->registry( 'checks' );
 		$this->assertSame(
-			array( 'leitvia/headings', 'leitvia/alt-text', 'leitvia/link-text', 'leitvia/block-validity', 'leitvia/content-tokens', 'leitvia/content-contrast', 'leitvia/query-context' ),
+			array( 'leitvia/headings', 'leitvia/alt-text', 'leitvia/link-text', 'leitvia/block-validity', 'leitvia/unregistered', 'leitvia/content-tokens', 'leitvia/content-contrast', 'leitvia/query-context', 'leitvia/template-parts' ),
 			array_keys( $checks->all( array( 'scope' => 'content' ) ) )
 		);
 		$this->assertSame( array( 'leitvia/page-structure', 'leitvia/composition' ), array_keys( $checks->all( array( 'scope' => 'page' ) ) ) );
@@ -245,6 +245,55 @@ class Test_Gateway_Content_Checks extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A template without header or footer part or without main gets a warning each; a complete one and content none.
+	 */
+	public function test_template_parts(): void {
+		$template = array( 'post_type' => 'wp_template' );
+		$this->assertSame( array( 'warning ', 'warning ', 'warning ' ), self::run_check( 'leitvia/template-parts', '<!-- wp:post-content /-->', $template ) );
+		$complete = '<!-- wp:template-part {"slug":"header-shop","tagName":"header"} /--><!-- wp:group {"tagName":"main"} --><main class="wp-block-group"><!-- wp:post-content /--></main><!-- /wp:group --><!-- wp:template-part {"slug":"footer"} /-->';
+		$this->assertSame( array(), self::run_check( 'leitvia/template-parts', $complete, $template ) );
+		$this->assertSame( array( 'warning ' ), self::run_check( 'leitvia/template-parts', str_replace( '"tagName":"main"', '"tagName":"div"', $complete ), $template ) );
+		$this->assertSame( array(), self::run_check( 'leitvia/template-parts', '<!-- wp:post-content /-->' ) );
+	}
+
+	/**
+	 * In a template a block that takes the post from its context is not rendered for the check, in content it is.
+	 */
+	public function test_contextual_blocks_in_templates(): void {
+		register_block_type(
+			'leitvia-test/needs-post',
+			array(
+				'uses_context'    => array( 'postId' ),
+				'render_callback' => static function ( array $attributes, string $content, \WP_Block $block ): string {
+					if ( empty( $block->context['postId'] ) ) {
+						trigger_error( 'no post', E_USER_WARNING ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_trigger_error -- Test.
+					}
+					return '';
+				},
+			)
+		);
+		$catalog  = static fn( array $entries ): array => array_merge(
+			$entries,
+			array(
+				array(
+					'name'     => 'leitvia-test/needs-post',
+					'owner'    => 'leitvia-test',
+					'supports' => array(),
+					'parent'   => null,
+					'ancestor' => null,
+				),
+			)
+		);
+		add_filter( 'leitvia_studio_block_catalog', $catalog );
+		$template = self::run_check( 'leitvia/block-validity', '<!-- wp:leitvia-test/needs-post /-->', array( 'post_type' => 'wp_template' ) );
+		$content  = self::run_check( 'leitvia/block-validity', '<!-- wp:leitvia-test/needs-post /-->' );
+		remove_filter( 'leitvia_studio_block_catalog', $catalog );
+		unregister_block_type( 'leitvia-test/needs-post' );
+		$this->assertSame( array(), $template );
+		$this->assertSame( array( 'error p:0' ), $content );
+	}
+
+	/**
 	 * A block that keeps its content in saved HTML is rejected when it is empty, self-closing or has an attribute with a
 	 * source in the comment; with its markup it passes, and a block rendered on the server needs none.
 	 */
@@ -283,6 +332,67 @@ class Test_Gateway_Content_Checks extends WP_UnitTestCase {
 		$this->assertWPError( $result );
 		$this->assertSame( 'leitvia_check_failed', $result->get_error_code() );
 		$this->assertContains( 'leitvia/link-text', array_column( $result->get_error_data()['findings'], 'check' ) );
+	}
+
+	/**
+	 * Blocks of types that are not registered (a plugin that is gone, a core/missing placeholder) give one warning per
+	 * content with code and count per type; the write goes through, audit-site and check-composition report them, and a
+	 * template keeps the error of block validity.
+	 */
+	public function test_unregistered_blocks(): void {
+		$paragraph = '<!-- wp:paragraph --><p>Kept</p><!-- /wp:paragraph -->';
+		$content   = '<!-- wp:acf/hero {"name":"acf/hero"} /--><!-- wp:group --><div class="wp-block-group"><!-- wp:acf/hero /--><!-- wp:missing {"originalName":"old/box"} --><div>Box</div><!-- /wp:missing --></div><!-- /wp:group -->' . $paragraph;
+		$findings  = Content_Checks::unregistered(
+			$content,
+			array(
+				'post'      => 0,
+				'post_type' => 'post',
+			)
+		);
+		$this->assertCount( 1, $findings );
+		$this->assertSame(
+			array(
+				'code'     => 'leitvia_unregistered_block',
+				'types'    => array(
+					'acf/hero' => 2,
+					'old/box'  => 1,
+				),
+				'check'    => 'leitvia/unregistered',
+				'severity' => 'warning',
+				'block'    => 'p:0',
+			),
+			array_intersect_key( $findings[0], array_flip( array( 'code', 'types', 'check', 'severity', 'block' ) ) )
+		);
+		$this->assertStringContainsString( 'acf/hero (2), old/box (1)', $findings[0]['message'] );
+		$this->assertSame( array(), Content_Checks::unregistered( $paragraph . '<!-- wp:freeform --><p>Classic</p><!-- /wp:freeform -->', array( 'post_type' => 'post' ) ) );
+		$this->assertSame( array(), self::run_check( 'leitvia/block-validity', '<!-- wp:acf/hero /-->' ), 'no error in content' );
+		$this->assertSame( array( 'error p:0' ), self::run_check( 'leitvia/block-validity', '<!-- wp:acf/hero /-->', array( 'post_type' => 'wp_template' ) ) );
+		$this->assertSame( array(), Content_Checks::unregistered( '<!-- wp:acf/hero /-->', array( 'post_type' => 'wp_template' ) ) );
+
+		$page   = self::factory()->post->create(
+			array(
+				'post_type'   => 'page',
+				'post_status' => 'draft',
+			)
+		);
+		$change = static fn( array $state ): array => array( 'post_content' => $content ) + $state;
+		$result = Pipeline::run( new Operation( 'leitvia/test-write', 'content', array( 'post' => $page ), Hashes::document( $page ), $change ) );
+		$this->assertIsArray( $result, is_wp_error( $result ) ? $result->get_error_code() : '' );
+		$this->assertContains( 'leitvia_unregistered_block', array_column( $result['findings'], 'code' ) );
+
+		$post  = self::factory()->post->create( array( 'post_content' => $content ) );
+		$items = wp_get_ability( 'leitvia/audit-site' )->execute( array( 'after' => $post - 1 ) )['items'];
+		$this->assertSame( $post, $items[0]['post'] );
+		$this->assertContains( 'leitvia/unregistered', array_column( $items[0]['findings'], 'check' ) );
+		$checked = wp_get_ability( 'leitvia/check-composition' )->execute( array( 'post' => $post ) );
+		$this->assertWPError( $checked, 'no pattern sections' );
+		$this->assertSame(
+			array(
+				'acf/hero' => 2,
+				'old/box'  => 1,
+			),
+			$checked->get_error_data()['unregistered']
+		);
 	}
 
 	/**

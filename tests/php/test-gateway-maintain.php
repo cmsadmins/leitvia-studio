@@ -102,7 +102,7 @@ class Test_Gateway_Maintain extends WP_UnitTestCase {
 	private function assert_rejected( string $code, $result ): array {
 		$this->assertWPError( $result );
 		$this->assertSame( $code, $result->get_error_code(), $result->get_error_message() );
-		return $result->get_error_data();
+		return (array) $result->get_error_data();
 	}
 
 	/**
@@ -733,6 +733,179 @@ class Test_Gateway_Maintain extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'alt="Portrait of the author"', get_post_field( 'post_content', $page ) );
 		$this->roll_back( $block );
 		$this->assertStringContainsString( 'alt=""', get_post_field( 'post_content', $page ) );
+	}
+
+	/**
+	 * Runs set-alt-text with a list of items.
+	 *
+	 * @param list<array<string, mixed>> $items   Items.
+	 * @param string                     $package Package key, '' for none.
+	 * @return mixed
+	 */
+	private static function alt_texts( array $items, string $package = '' ) {
+		return wp_get_ability( 'leitvia/set-alt-text' )->execute(
+			array_filter(
+				array(
+					'items'   => $items,
+					'package' => $package,
+				)
+			) + array( 'base_hash' => '' )
+		);
+	}
+
+	/**
+	 * Alt texts as a list: attachments and blocks in one call, two blocks of the same page on the hash read before the
+	 * first write, a failing item refused alone; the items that went live share one package that rolls back all of them.
+	 */
+	public function test_set_alt_text_list(): void {
+		$upload = static fn(): int => self::factory()->attachment->create_upload_object( dirname( __DIR__ ) . '/fixtures/avatar.png', 0 );
+		$first  = $upload();
+		$second = $upload();
+		$image  = static fn( int $id ): string => '<!-- wp:image {"id":' . $id . ',"sizeSlug":"full"} --><figure class="wp-block-image size-full"><img src="' . wp_get_attachment_url( $id ) . '" alt="" class="wp-image-' . $id . '"/></figure><!-- /wp:image -->';
+		$page   = $this->page( $image( $first ) . $image( $second ) );
+		$hash   = Hashes::document( $page );
+		$result = $this->assert_ok(
+			self::alt_texts(
+				array(
+					array(
+						'image'     => $first,
+						'alt'       => 'Portrait of the author',
+						'base_hash' => Hashes::document( $first ),
+					),
+					array(
+						'image'     => $second,
+						'alt'       => 'avatar.png',
+						'base_hash' => Hashes::document( $second ),
+					),
+					array(
+						'image'     => $first,
+						'alt'       => 'Portrait of the author',
+						'post'      => $page,
+						'block'     => 'p:0',
+						'base_hash' => $hash,
+					),
+					array(
+						'image'     => $second,
+						'alt'       => 'Red bicycle leaning on a brick wall',
+						'post'      => $page,
+						'block'     => 'p:1',
+						'base_hash' => $hash,
+					),
+				)
+			)
+		);
+		$this->assertSame( 'live', $result['mode'] );
+		$this->assertCount( 4, $result['items'] );
+		$this->assertSame( 'leitvia_check_failed', $result['items'][1]['code'] );
+		$this->assertSame( array( 'live', 'live', 'live' ), array( $result['items'][0]['mode'], $result['items'][2]['mode'], $result['items'][3]['mode'] ) );
+		$this->assertSame( array( $result['package'] ), array_values( array_unique( array( $result['items'][0]['package'], $result['items'][2]['package'], $result['items'][3]['package'] ) ) ), 'one package' );
+		$this->assertCount( 3, Packages::operations( $result['package'] ) );
+		$this->assertSame( 'Portrait of the author', get_post_meta( $first, '_wp_attachment_image_alt', true ) );
+		$this->assertSame( '', get_post_meta( $second, '_wp_attachment_image_alt', true ) );
+		$content = get_post_field( 'post_content', $page );
+		$this->assertStringContainsString( 'alt="Portrait of the author"', $content );
+		$this->assertStringContainsString( 'alt="Red bicycle leaning on a brick wall"', $content );
+
+		$this->assertSame( 'applied', Packages::state( $result['package'] ) );
+		$rolled = $this->assert_ok( wp_get_ability( 'leitvia/rollback' )->execute( array( 'id' => $result['package'] ) ) );
+		$this->assertCount( 3, $rolled['rolled_back'] );
+		$this->assertSame( '', get_post_meta( $first, '_wp_attachment_image_alt', true ) );
+		$this->assertSame( $hash, Hashes::document( $page ) );
+	}
+
+	/**
+	 * At the level draft two items on the same draft both land: the second builds on the hash the first left.
+	 */
+	public function test_set_alt_text_list_on_a_draft(): void {
+		update_option(
+			Gateway::OPTION,
+			array(
+				'overrides' => array(
+					'areas' => array( 'corrections' => 'draft' ),
+					'kinds' => array(),
+				),
+			) + Gateway::DEFAULTS
+		);
+		$upload = static fn(): int => self::factory()->attachment->create_upload_object( dirname( __DIR__ ) . '/fixtures/avatar.png', 0 );
+		$first  = $upload();
+		$second = $upload();
+		$image  = static fn( int $id ): string => '<!-- wp:image {"id":' . $id . ',"sizeSlug":"full"} --><figure class="wp-block-image size-full"><img src="' . wp_get_attachment_url( $id ) . '" alt="" class="wp-image-' . $id . '"/></figure><!-- /wp:image -->';
+		$draft  = self::factory()->post->create(
+			array(
+				'post_type'    => 'page',
+				'post_status'  => 'draft',
+				'post_content' => wp_slash( $image( $first ) . $image( $second ) ),
+			)
+		);
+		$hash   = Hashes::document( $draft );
+		$item   = static fn( int $id, string $alt, string $block ): array => array(
+			'image'     => $id,
+			'alt'       => $alt,
+			'post'      => $draft,
+			'block'     => $block,
+			'base_hash' => $hash,
+		);
+		$result = $this->assert_ok( self::alt_texts( array( $item( $first, 'Portrait of the author', 'p:0' ), $item( $second, 'Red bicycle leaning on a brick wall', 'p:1' ) ) ) );
+		$this->assertSame( array( 'draft', 'draft' ), array_column( $result['items'], 'mode' ) );
+		$content = get_post_field( 'post_content', $draft );
+		$this->assertStringContainsString( 'alt="Portrait of the author"', $content );
+		$this->assertStringContainsString( 'alt="Red bicycle leaning on a brick wall"', $content );
+		update_option( Gateway::OPTION, Gateway::DEFAULTS );
+	}
+
+	/**
+	 * A list with a package key waits in that one package; a list counts once for the rate limit; items and a single
+	 * image exclude each other, and a list holds at most 100 items.
+	 */
+	public function test_set_alt_text_list_package_and_rate_limit(): void {
+		$images = array_map( static fn(): int => self::factory()->attachment->create_upload_object( dirname( __DIR__ ) . '/fixtures/avatar.png', 0 ), range( 1, 3 ) );
+		$items  = array_map(
+			static fn( int $id ): array => array(
+				'image'     => $id,
+				'alt'       => 'Trail sign number ' . $id . ' in the forest',
+				'base_hash' => Hashes::document( $id ),
+			),
+			$images
+		);
+		$queued = $this->assert_ok( self::alt_texts( $items, 'alt-texts' ) );
+		$this->assertSame( 'package', $queued['mode'] );
+		$this->assertCount( 3, Packages::operations( $queued['package'] ) );
+		$this->assertSame( '', get_post_meta( $images[0], '_wp_attachment_image_alt', true ) );
+		Packages::reject( $queued['package'] );
+
+		// The list with the key counted once; the next list and one single call fit into three writes a minute.
+		update_option( Gateway::OPTION, array( 'rate_per_minute' => 3 ) + Gateway::DEFAULTS );
+		$this->assert_ok( self::alt_texts( $items ) );
+		$this->assert_ok(
+			self::call(
+				'leitvia/set-alt-text',
+				$images[0],
+				array(
+					'image' => $images[0],
+					'alt'   => 'Trail sign at the start of the path',
+				)
+			)
+		);
+		$this->assert_rejected( 'leitvia_rate_limited', self::alt_texts( $items ) );
+		update_option( Gateway::OPTION, Gateway::DEFAULTS );
+
+		$this->assertSame(
+			'items',
+			$this->assert_rejected(
+				'leitvia_invalid_input',
+				self::call(
+					'leitvia/set-alt-text',
+					$images[0],
+					array(
+						'items' => $items,
+						'image' => $images[0],
+						'alt'   => 'Sign',
+					)
+				)
+			)['reason']
+		);
+		$this->assert_rejected( 'leitvia_invalid_input', self::call( 'leitvia/set-alt-text', $images[0], array() ) );
+		$this->assert_rejected( 'ability_invalid_input', self::alt_texts( array_fill( 0, 101, $items[0] ) ) );
 	}
 
 	/**

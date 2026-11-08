@@ -1,8 +1,8 @@
 {
 	"example": "<!-- wp:leitvia/timeline-item -->\n<li class=\"wp-block-leitvia-timeline-item\"><time class=\"wp-block-leitvia-timeline-item__date\" datetime=\"2019\">2019</time><h3 class=\"wp-block-leitvia-timeline-item__heading\">Founded</h3><div class=\"wp-block-leitvia-timeline-item__content\"><!-- wp:paragraph -->\n<p>Two designers start the studio.</p>\n<!-- /wp:paragraph --></div></li>\n<!-- /wp:leitvia/timeline-item -->",
 	"usage": {
-		"useWhen": "One dated entry inside a timeline.",
+		"useWhen": "One entry inside a timeline: with a date (datetime YYYY, YYYY-MM or YYYY-MM-DD and the date as shown in a time element), or without date with a free label such as \"First journey\" in a span: leave date empty and write the label as text of the __date element.",
 		"avoidWhen": "Outside a timeline; it only works as its child.",
-		"a11y": "Set the heading level so it fits the heading outline of the page."
+		"a11y": "Set the heading level so it fits the heading outline of the page. A label without date is plain text, never a time element."
 	}
 }

@@ -45,6 +45,7 @@ const TITLES = {
 	eye: __( 'Eye', 'leitvia-studio' ),
 	'file-text': __( 'Document', 'leitvia-studio' ),
 	flag: __( 'Flag', 'leitvia-studio' ),
+	footprints: __( 'Footprints', 'leitvia-studio' ),
 	gavel: __( 'Gavel', 'leitvia-studio' ),
 	gift: __( 'Gift', 'leitvia-studio' ),
 	globe: __( 'Globe', 'leitvia-studio' ),
@@ -94,6 +95,7 @@ const TITLES = {
 	server: __( 'Server', 'leitvia-studio' ),
 	settings: __( 'Settings', 'leitvia-studio' ),
 	'shield-check': __( 'Shield with check mark', 'leitvia-studio' ),
+	ship: __( 'Ship', 'leitvia-studio' ),
 	'shopping-bag': __( 'Shopping bag', 'leitvia-studio' ),
 	'shopping-cart': __( 'Shopping cart', 'leitvia-studio' ),
 	smartphone: __( 'Smartphone', 'leitvia-studio' ),
@@ -144,14 +146,18 @@ const icon = ( name ) => {
 const title = ( name ) =>
 	own( TITLES, name ) ? TITLES[ name ] : name.replace( /-/g, ' ' );
 
-// Stroke attributes like Icon::svg(): width 2 on the 24 grid, in proportion on another viewBox.
+const round = ( value ) => String( Math.round( value * 1e4 ) / 1e4 );
+// Width of an icon 24 high, as Icon::width(): wide icons keep their proportion.
+const width = ( viewBox ) => {
+	const [ , , w, h ] = viewBox.split( ' ' ).map( Number );
+	return w > 0 && h > 0 ? round( ( 24 * w ) / h ) : '24';
+};
+// Stroke attributes like Icon::svg(): width 2 on a grid 24 high, in proportion on another viewBox.
 const stroke = ( viewBox ) => ( {
 	fill: 'none',
 	stroke: 'currentColor',
-	strokeWidth: String(
-		Math.round(
-			( ( 2 * Number( viewBox.split( ' ' )[ 2 ] ) ) / 24 ) * 1e4
-		) / 1e4
+	strokeWidth: round(
+		( 2 * ( Number( viewBox.split( ' ' )[ 3 ] ) || 24 ) ) / 24
 	),
 	strokeLinecap: 'round',
 	strokeLinejoin: 'round',
@@ -170,7 +176,7 @@ export function Svg( { name } ) {
 		<svg
 			className={ `leitvia-icon leitvia-icon--${ name }` }
 			viewBox={ found.viewBox }
-			width="24"
+			width={ width( found.viewBox ) }
 			height="24"
 			{ ...( found.paint === 'fill'
 				? { fill: 'currentColor' }

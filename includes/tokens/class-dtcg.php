@@ -128,6 +128,7 @@ final class Dtcg {
 		if ( ! $c->is_valid() ) {
 			return new WP_Error( 'leitvia_studio_no_contract', __( 'The active theme has no valid contract.', 'leitvia-studio' ), array( 'status' => 422 ) );
 		}
+		$raw = $doc;
 		$doc = self::resolve( $doc );
 		if ( is_wp_error( $doc ) ) {
 			return $doc;
@@ -196,6 +197,10 @@ final class Dtcg {
 					}
 				}
 				$presets[] = $preset;
+			}
+			$presets = self::choices( $c, $group, $presets, $key, is_array( $raw[ $group ] ?? null ) ? $raw[ $group ] : array() );
+			if ( is_wp_error( $presets ) ) {
+				return $presets;
 			}
 			if ( $has_extra ) {
 				$extras = self::extra_surfaces( $extras, $presets );
@@ -427,6 +432,44 @@ final class Dtcg {
 			}
 		}
 		return $fallbacks;
+	}
+
+	/**
+	 * A role with the contract field "choices" takes the value of one of those roles of its group: radius.media is
+	 * radius.none, s, m or l, never a radius of its own. An alias such as "{radius.m}" takes the preset value of its
+	 * target (the target may carry a css extension the alias does not see); a literal value, as in an exported set,
+	 * must equal the value of one of the choices.
+	 *
+	 * @param Contract                   $c       Contract of the active theme.
+	 * @param string                     $group   Role group.
+	 * @param list<array<string, mixed>> $presets Presets of the group, built above.
+	 * @param string                     $key     Preset value key, for example size.
+	 * @param array<mixed>               $raw     The group in the document before aliases were resolved.
+	 * @return list<array<string, mixed>>|WP_Error
+	 */
+	private static function choices( Contract $c, string $group, array $presets, string $key, array $raw ) {
+		$values = array_column( $presets, $key, 'slug' );
+		foreach ( (array) ( $c->data()['roles'][ $group ] ?? array() ) as $role ) {
+			$slug    = is_string( $role['slug'] ?? null ) ? $role['slug'] : '';
+			$choices = is_array( $role['choices'] ?? null ) ? array_map( 'strval', $role['choices'] ) : null;
+			$index   = array_search( $slug, array_column( $presets, 'slug' ), true );
+			if ( null === $choices || false === $index ) {
+				continue;
+			}
+			$alias  = is_string( $raw[ $slug ]['$value'] ?? null ) && preg_match( '/^\{' . preg_quote( $group, '/' ) . '\.([a-z0-9-]+)\}$/D', $raw[ $slug ]['$value'], $m ) ? $m[1] : null;
+			$target = null !== $alias && in_array( $alias, $choices, true ) ? $alias : array_search( $values[ $slug ], array_intersect_key( $values, array_flip( $choices ) ), true );
+			if ( ! is_string( $target ) || ! isset( $values[ $target ] ) ) {
+				return self::error(
+					'invalid_choice',
+					/* translators: 1: token path, for example radius.media, 2: list of token paths. */
+					__( 'The token %1$s must take the value of one of %2$s.', 'leitvia-studio' ),
+					"$group.$slug",
+					implode( ', ', array_map( static fn( string $choice ): string => "$group.$choice", $choices ) )
+				);
+			}
+			$presets[ $index ][ $key ] = $values[ $target ];
+		}
+		return $presets;
 	}
 
 	/**

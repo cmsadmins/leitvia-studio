@@ -207,18 +207,28 @@ final class Content {
 		Abilities::read(
 			'leitvia/list-media',
 			__( 'List media', 'leitvia-studio' ),
-			__( 'Lists the media library, newest first: ID, URL, file name, MIME type, file size in bytes, alt text, width, height and hash (the base_hash for leitvia/set-alt-text). Filter by search text, MIME type (image, image/png or application/pdf) and uploaded after a date.', 'leitvia-studio' ),
+			__( 'Lists the media library, newest first: ID, URL, file name, MIME type, file size in bytes, alt text, width, height and hash (the base_hash for leitvia/set-alt-text). Filter by IDs (include, in their order, for example the images of a gallery), by search text in title, caption and file name, MIME type (image, image/png or application/pdf) and uploaded after a date.', 'leitvia-studio' ),
 			array(
 				'type'                 => 'object',
 				'properties'           => array(
-					'search' => $search,
-					'mime'   => array(
+					'include' => array(
+						'type'        => 'array',
+						'items'       => array(
+							'type'    => 'integer',
+							'minimum' => 1,
+						),
+						'minItems'    => 1,
+						'maxItems'    => self::MAX_LIMIT,
+						'description' => __( 'Only these attachment IDs, in this order. IDs that are no media of the library are left out.', 'leitvia-studio' ),
+					),
+					'search'  => $search + array( 'description' => __( 'Text in the title, caption or file name.', 'leitvia-studio' ) ),
+					'mime'    => array(
 						'type'    => 'string',
 						'pattern' => '^[a-z]+(/[a-z0-9.+-]+)?$',
 					),
-					'after'  => $date,
-					'limit'  => $limit,
-					'page'   => $page,
+					'after'   => $date,
+					'limit'   => $limit,
+					'page'    => $page,
 				),
 				'additionalProperties' => false,
 			),
@@ -935,13 +945,23 @@ final class Content {
 	 * @return array<string, mixed>
 	 */
 	public static function media( array $input ): array {
-		$args  = array(
+		$args = array(
 			'post_type'      => 'attachment',
 			'post_status'    => 'inherit',
 			'post_mime_type' => (string) ( $input['mime'] ?? '' ),
 			'date_query'     => isset( $input['after'] ) ? array( array( 'after' => self::date( (string) $input['after'] ) ) ) : array(),
 		);
-		$query = self::query( $args, $input );
+		if ( ! empty( $input['include'] ) ) {
+			$args['post__in'] = wp_parse_id_list( (array) $input['include'] );
+			$args['orderby']  = 'post__in';
+		}
+		// The search of core finds attachments by file name (_wp_attached_file) only with this filter, as the media library does.
+		add_filter( 'wp_allow_query_attachment_by_filename', '__return_true', 99 );
+		try {
+			$query = self::query( $args, $input );
+		} finally {
+			remove_filter( 'wp_allow_query_attachment_by_filename', '__return_true', 99 );
+		}
 		$items = array();
 		foreach ( $query['posts'] as $post ) {
 			$meta    = wp_get_attachment_metadata( $post->ID );

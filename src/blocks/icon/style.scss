@@ -1,4 +1,5 @@
-// The icon (Icon::svg()) is 1em in the text color, so the font size preset and the text color of the block set size
+// The icon (Icon::svg()) is 1em high in the text color, as wide as its viewBox asks (a wide icon is wider, never
+// lower), so the font size preset and the text color of the block set size
 // and color.
 .wp-block-leitvia-icon {
 	font-size: var(--wp--preset--font-size--heading-m, 2rem);
@@ -6,7 +7,7 @@
 
 	.leitvia-icon {
 		display: inline-block;
-		inline-size: 1em;
+		inline-size: auto;
 		block-size: 1em;
 		vertical-align: middle;
 	}

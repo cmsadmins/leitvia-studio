@@ -119,6 +119,30 @@ class Test_Table_Of_Contents extends WP_UnitTestCase {
 	}
 
 	/**
+	 * (6) Display companion adds a hidden chapter button with a progress bar and a modal dialog with the same list;
+	 * inline, the default and an unknown value render the list alone.
+	 */
+	public function test_companion_adds_button_and_dialog(): void {
+		$headings = self::heading( 2, 'Start' ) . self::heading( 2, 'Use' );
+		$html     = $this->render_post( '<!-- wp:leitvia/table-of-contents {"display":"companion"} /-->' . "\n" . $headings );
+		$list     = '<ol><li><a href="#start">Start</a></li><li><a href="#use">Use</a></li></ol>';
+		$this->assertMatchesRegularExpression( '#<nav [^>]*class="[^"]*\bis-display-companion\b#', $html );
+		$this->assertStringContainsString( '<div class="wp-block-leitvia-table-of-contents__companion" hidden data-count="Section %1$d of %2$d">', $html );
+		$this->assertStringContainsString( '<button type="button" class="wp-block-leitvia-table-of-contents__open" aria-haspopup="dialog"><span class="wp-block-leitvia-table-of-contents__label">Chapters</span>', $html );
+		$this->assertStringContainsString( 'role="progressbar" aria-label="Reading progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"', $html );
+		$this->assertMatchesRegularExpression( '#<dialog class="wp-block-leitvia-table-of-contents__dialog" aria-labelledby="(leitvia-toc-dialog-\d+)"><div class="wp-block-leitvia-table-of-contents__sheet"><h2 id="\1" class="wp-block-leitvia-table-of-contents__title">On this page</h2>#', $html );
+		$this->assertStringContainsString( '</h2>' . $list . '<button type="button" class="wp-block-leitvia-table-of-contents__close">Close</button>', $html );
+		$this->assertSame( 2, substr_count( $html, $list ), 'the list in the flow and in the dialog' );
+
+		foreach ( array( '', ' {"display":"inline"}', ' {"display":"floating"}' ) as $attrs ) {
+			$plain = $this->render_post( '<!-- wp:leitvia/table-of-contents' . $attrs . ' /-->' . "\n" . $headings );
+			$this->assertStringContainsString( $list . '</nav>', $plain, $attrs );
+			$this->assertStringNotContainsString( '<dialog', $plain, $attrs );
+			$this->assertStringNotContainsString( 'is-display-companion', $plain, $attrs );
+		}
+	}
+
+	/**
 	 * (5) Heading text and ids are escaped; markup in a heading becomes plain text.
 	 */
 	public function test_output_is_escaped(): void {

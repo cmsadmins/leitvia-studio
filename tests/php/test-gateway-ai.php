@@ -173,6 +173,31 @@ class Test_Gateway_Ai extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Without AI no frame closes with the pager of a series, which knows no series; the service page closes with the
+	 * call to action banner, as the scenarios leitvia-page/landing-page and unattended-landing expect.
+	 */
+	public function test_plan_leaves_the_series_pager_out(): void {
+		foreach ( array_column( leitvia_studio_contract()->data()['pageFrames'], 'type' ) as $frame ) {
+			$plan = self::plan(
+				array(
+					'goal'   => 'A page for a small agency',
+					'frame'  => $frame,
+					'points' => array( 'Fast setup', 'Fixed prices', 'Local support', 'Certified staff' ),
+				)
+			);
+			$this->assertNotContains( 'leitvia/content-pager', array_column( $plan['sections'], 'pattern' ), $frame );
+		}
+		$service = self::plan(
+			array(
+				'goal'   => 'Service page for a bike repair workshop that gets visitors to book a repair',
+				'frame'  => 'service',
+				'points' => array( 'Repairs within 24 hours', 'Pick-up and delivery in the city', 'Fixed prices, no surprises', 'Certified mechanics' ),
+			)
+		);
+		$this->assertSame( 'leitvia/cta-banner', end( $service['sections'] )['pattern'] );
+	}
+
+	/**
 	 * Without AI the plan leaves out a pattern the inserter hides (as Pro hides the patterns of a kit that is not
 	 * unlocked), and a point labelled with the area, role or slot of a section lands there; the others go round the
 	 * content sections.

@@ -6,8 +6,8 @@
 	"title": "Timeline entry",
 	"category": "leitvia",
 	"icon": "marker",
-	"description": "One dated entry of a timeline with a heading and text.",
-	"keywords": [ "milestone", "date", "event" ],
+	"description": "One entry of a timeline with a date or a label, a heading and text.",
+	"keywords": [ "milestone", "date", "event", "stage" ],
 	"textdomain": "leitvia-studio",
 	"parent": [ "leitvia/timeline" ],
 	"attributes": {
@@ -21,7 +21,7 @@
 		"dateLabel": {
 			"type": "rich-text",
 			"source": "rich-text",
-			"selector": "time"
+			"selector": ".wp-block-leitvia-timeline-item__date"
 		},
 		"heading": {
 			"type": "rich-text",

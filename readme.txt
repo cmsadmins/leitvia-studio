@@ -4,7 +4,7 @@ Tags: ai, mcp, block theme, accessibility, design tokens
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.31
+Stable tag: 1.3.32
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -184,7 +184,7 @@ Token sets can name [Libre Franklin](https://github.com/googlefonts/Libre-Frankl
 
 The Map block bundles [Leaflet](https://leafletjs.com/) 1.9.4 by Volodymyr Agafonkin and contributors into `build/blocks/map/leaflet.js`, loaded only after the visitor agrees to load the map, and ships its stylesheet as `build/blocks/map/leaflet.css`. Leaflet is licensed under the BSD 2-Clause License, which is compatible with the GPL; the license text is in `licenses/LEAFLET.txt`.
 
-Icons: 112 icons of [Lucide](https://lucide.dev/) 1.60.0, ISC License (some from Feather, MIT), in `assets/icons/lucide.json`, license in `licenses/LUCIDE.txt`.
+Icons: 114 icons of [Lucide](https://lucide.dev/) 1.60.0, ISC License (some from Feather, MIT), in `assets/icons/lucide.json`, license in `licenses/LUCIDE.txt`.
 
 The pattern illustration `assets/images/landscape.webp` was drawn for Leitvia by CMS ADMINS and is licensed under the GPL, version 2 or later, like the plugin.
 
@@ -213,6 +213,15 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 
 == Changelog ==
 
+= 1.3.32 =
+* Table of contents with display companion: a chapter button at the bottom edge with the section being read and the reading progress opens a dialog with the list.
+* Timeline entries take a free label instead of a date.
+* leitvia/list-media filters by IDs (include) and finds files by name; leitvia/set-alt-text takes up to 100 items in one call and one package.
+* New checks: blocks without a registered type (warning in content), templates without header, footer or main, accent below 4.5:1 on extra surfaces (links there turn ink). The block check of templates skips blocks that take the post from their context.
+* leitvia/get-pattern returns template patterns; add-on abilities run over REST for agents; the plan of a page no longer ends with the series pager.
+* Icons: ship and footprints (114 Lucide icons); wide icons keep their proportion at 1em height.
+* Token sets may set radius.media, the corner of photos, to radius.none, s, m or l; any other value is rejected with invalid_choice.
+
 = 1.3.31 =
 * New ability leitvia/update-template: sets a template of the theme from a template pattern whose templateTypes name it, with snapshot, autonomy, package and rollback. Templates of single posts and pages keep the post content.
 * leitvia/update-content takes the field template and gives an existing page or post another template of the contract. The template counts towards the hash; hashes from before still match while the template stays.
@@ -223,7 +232,7 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * New filter leitvia_studio_consent_scripts: scripts of other plugins, named by handle or host with the category statistics or marketing, wait for consent like embeds. Until then the browser does not ask the host, and the block Consent settings offers each category to allow and revoke.
 * New filter leitvia_studio_gateway_options: add-ons write options of their own through the pipeline, checked on each write and when a package is applied.
 
-= 1.3.31 =
+= 1.3.30 =
 * The shortest time between loading a page and sending the contact form (Contact_Form::MIN_SECONDS) is public, so extensions with a form of their own that use the same signed time field check the same time.
 
 = 1.3.29 =
