@@ -338,6 +338,59 @@ class Test_Gateway_Pipeline extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A rejection names block, tag, attribute and an excerpt, also in the message; mso-* styles and empty o:p of a word
+	 * processor are dropped instead of rejected, an o:p with text is rejected with its tag.
+	 */
+	public function test_unsafe_place_and_office_rests(): void {
+		$page  = $this->page();
+		$cases = array(
+			'event'     => array( '<!-- wp:paragraph {"metadata":{"leitviaId":"ev000001"}} --><p>Hi <span onclick="steal()">there</span></p><!-- /wp:paragraph -->', 'ev000001', 'span', 'onclick', '<span onclick="steal()">' ),
+			'script'    => array( '<!-- wp:paragraph --><p>Hi<script>alert(1)</script></p><!-- /wp:paragraph -->', 'p:0', 'script', '', '<script>' ),
+			'o:p'       => array( '<!-- wp:paragraph --><p>Text<o:p>Rest</o:p></p><!-- /wp:paragraph -->', 'p:0', 'o:p', '', '<o:p>' ),
+			'attribute' => array( '<!-- wp:paragraph {"metadata":{"name":"<script>x</script>"}} --><p>x</p><!-- /wp:paragraph -->', 'p:0', '', 'metadata.name', '<script>x</script>' ),
+			'nested'    => array( '<!-- wp:group --><div class="wp-block-group"><!-- wp:paragraph --><p>Fine</p><!-- /wp:paragraph --><!-- wp:paragraph --><p><a href="javascript:alert(1)">Go</a></p><!-- /wp:paragraph --></div><!-- /wp:group -->', 'p:0.1', 'a', 'href', '<a href="javascript:alert(1)">' ),
+		);
+		foreach ( $cases as $case => [ $content, $block, $tag, $attribute, $excerpt ] ) {
+			$result = Pipeline::run( self::op( array( 'post' => $page ), self::set( array( 'post_content' => $content ) ), 'corrections' ) );
+			$data   = $this->assert_rejected( 'leitvia_unsafe_content', $result );
+			$this->assertSame( $block, $data['found']['block'], $case );
+			$this->assertSame( $tag, $data['found']['tag'], $case );
+			$this->assertSame( $attribute, $data['found']['attribute'], $case );
+			$this->assertSame( $excerpt, $data['found']['excerpt'], $case );
+			$this->assertStringContainsString( $block, $result->get_error_message(), $case );
+			$this->assertStringContainsString( $excerpt, $result->get_error_message(), $case );
+		}
+		$long = $this->assert_rejected( 'leitvia_unsafe_content', Pipeline::run( self::op( array( 'post' => $page ), self::set( array( 'post_content' => '<!-- wp:html --><p>' . str_repeat( 'a', 200 ) . '</p><!-- /wp:html -->' ) ), 'corrections' ) ) );
+		$this->assertSame( 'html_block', $long['reason'] );
+		$this->assertSame( 81, mb_strlen( $long['found']['excerpt'] ), 'excerpt cut at 80 characters plus ellipsis' );
+
+		$word   = '<!-- wp:paragraph --><p class="has-text-align-left"><b style="mso-bidi-font-weight: normal">Bold</b> <span style="mso-fareast-language: DE; text-decoration: underline">red</span>.<o:p></o:p><o:p>&nbsp;</o:p></p><!-- /wp:paragraph -->';
+		$result = Pipeline::run( self::op( array( 'post' => $page ), self::set( array( 'post_content' => $word ) ), 'corrections' ) );
+		$this->assertIsArray( $result, $result instanceof WP_Error ? $result->get_error_message() : '' );
+		$stored = (string) get_post_field( 'post_content', $page, 'raw' );
+		$this->assertStringContainsString( '<p class="has-text-align-left"><b>Bold</b> <span style="text-decoration: underline">red</span>.</p>', $stored );
+		$this->assertStringNotContainsString( 'mso-', $stored );
+		$this->assertSame( '<p>Plain</p>', Pipeline::office( '<p>Plain</p>' ), 'content without rests stays byte for byte' );
+	}
+
+	/**
+	 * Office rests: office() cleans only a text the write changes: a change of the title alone leaves Word rests a person stored as
+	 * they are and is rejected with their place, instead of rewriting the content on the side.
+	 */
+	public function test_office_rests_stay_on_a_write_without_content(): void {
+		$page = $this->page();
+		$word = '<!-- wp:paragraph --><p><b style="mso-bidi-font-weight: normal">Bold</b></p><!-- /wp:paragraph -->';
+		global $wpdb;
+		$wpdb->update( $wpdb->posts, array( 'post_content' => $word ), array( 'ID' => $page ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Content written as by a person.
+		clean_post_cache( $page );
+
+		$data = $this->assert_rejected( 'leitvia_unsafe_content', Pipeline::run( self::op( array( 'post' => $page ), self::set( array( 'post_title' => 'New title' ) ), 'corrections' ) ) );
+		$this->assertSame( array( 'b', 'style' ), array( $data['found']['tag'], $data['found']['attribute'] ) );
+		$this->assertSame( $word, get_post_field( 'post_content', $page, 'raw' ) );
+		$this->assertNotSame( 'New title', get_post_field( 'post_title', $page, 'raw' ) );
+	}
+
+	/**
 	 * New content of an agent goes through the KSES of core and the hash is the one of what was stored; a rollback puts
 	 * a snapshot back past KSES, so markup a person with unfiltered_html wrote survives it.
 	 */

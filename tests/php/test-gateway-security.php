@@ -579,12 +579,14 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 	private static function checksum(): string {
 		global $wpdb;
 		// phpcs:disable WordPress.DB.DirectDatabaseQuery -- Test.
+		// <taxonomy>_children is the term hierarchy cache core writes on the first read of a hierarchical taxonomy
+		// (_get_term_hierarchy()), not a change; a run of this test alone starts without it.
 		return md5(
 			(string) wp_json_encode(
 				array(
 					$wpdb->get_results( "SELECT * FROM {$wpdb->posts} ORDER BY ID" ),
 					$wpdb->get_results( "SELECT * FROM {$wpdb->postmeta} ORDER BY meta_id" ),
-					array_values( array_filter( $wpdb->get_results( "SELECT option_name, option_value FROM {$wpdb->options} WHERE option_name NOT LIKE '%\\_transient\\_%' ORDER BY option_name" ), static fn( $row ): bool => Model::CHECKED_OPTION !== $row->option_name ) ),
+					array_values( array_filter( $wpdb->get_results( "SELECT option_name, option_value FROM {$wpdb->options} WHERE option_name NOT LIKE '%\\_transient\\_%' ORDER BY option_name" ), static fn( $row ): bool => Model::CHECKED_OPTION !== $row->option_name && ! str_ends_with( $row->option_name, '_children' ) ) ),
 				)
 			)
 		);

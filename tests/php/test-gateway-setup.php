@@ -1072,6 +1072,35 @@ class Test_Gateway_Setup extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Template slugs with an underscore pass the schema: without WooCommerce taxonomy-product_cat is refused as an
+	 * unknown template, with WooCommerce it is written as a template of its own and a rollback removes it again.
+	 *
+	 * @group woocommerce
+	 */
+	public function test_update_template_for_product_categories(): void {
+		$this->sign_in( 'full' );
+		$content = '<!-- wp:template-part {"slug":"header"} /--><!-- wp:group {"tagName":"main"} --><main class="wp-block-group"><!-- wp:query-title {"type":"archive","level":1} /--></main><!-- /wp:group --><!-- wp:template-part {"slug":"footer"} /-->';
+		$input   = array(
+			'template' => 'taxonomy-product_cat',
+			'content'  => $content,
+		);
+		if ( ! class_exists( 'WooCommerce' ) ) {
+			$this->assertSame( 'template', $this->assert_rejected( 'leitvia_invalid_input', self::call( 'leitvia/update-template', $input ) )['reason'] );
+			return;
+		}
+		update_option( 'active_plugins', array( 'woocommerce/woocommerce.php' ) );
+		$result   = $this->assert_mode( 'live', self::call( 'leitvia/update-template', $input ) );
+		$template = get_block_template( get_stylesheet() . '//taxonomy-product_cat' );
+		$this->assertSame( $result['target']['post'], $template->wp_id );
+		$this->assertSame( 'taxonomy-product_cat', get_post_field( 'post_name', $template->wp_id ) );
+		$this->assertStringContainsString( 'wp:query-title', $template->content );
+		$this->assertNotSame( $template->wp_id, get_block_template( get_stylesheet() . '//archive-product' )->wp_id ?? 0, 'the shop page keeps its own template' );
+
+		$this->assertIsArray( wp_get_ability( 'leitvia/rollback' )->execute( array( 'id' => $result['package'] ) ) );
+		$this->assertNull( get_post( $result['target']['post'] ), 'the template the package created is gone' );
+	}
+
+	/**
 	 * A product template pattern with blocks that take the product from their context, such as the add to cart form,
 	 * passes the block check without a product to render.
 	 *

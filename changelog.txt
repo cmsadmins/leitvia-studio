@@ -1,6 +1,132 @@
-== Changelog of Leitvia Studio, versions 1.0.0 to 1.2.2 ==
+== Changelog of Leitvia Studio, versions 1.0.0 to 1.3.19 ==
 
 Newer versions are listed in readme.txt.
+
+= 1.3.19 =
+* New pattern FAQ with structured data: heading and intro above five questions in the FAQ block, one open at a time.
+* New pattern Benefits with icons: heading and intro beside five promises in the icon list, such as delivery, returns and support.
+* New pattern Share at the end of a post: one inviting line above the Share block, nothing loads from the networks before a click.
+
+= 1.3.18 =
+* New block FAQ: questions as core Details blocks, one FAQPage in the structured data per page, optionally only one answer open at a time.
+* New blocks Icon and Icon list with a local icon set (76 Lucide icons, ISC), decorative or with an accessible name, no external requests.
+* New block Share: plain share links for LinkedIn, Bluesky, Facebook, WhatsApp, Threads, Xing and email, Copy link and the system share dialog, no scripts or requests before a click.
+* New block Rating: stars in half steps with the value as text, optionally a Review in the structured data with author and reviewed item.
+* Every block can fade or rise into view (Animation panel in the block settings), off for visitors who prefer reduced motion and without scroll-driven animation support.
+* Lightbox: Tab stays inside the dialog of a single image (WordPress 7.1 lets the focus leave it).
+* Structured data from blocks prints as one graph in the head, off while an SEO plugin is active.
+
+= 1.3.17 =
+* The BreadcrumbList names a posts page and a category of the same name (News and News) only once.
+
+= 1.3.16 =
+* News for Google News: every post is a NewsArticle, or only the posts of the categories chosen under Design and search; the others stay BlogPosting.
+* The article data names the page, description, language, section and free access, and the publisher names the editorial page as its publishing principles.
+* Posts index and archives get a CollectionPage with the list of their posts, posts and archives a BreadcrumbList.
+* A news sitemap at /news.xml lists the news of the last 48 hours for Google News and is named in robots.txt while the site is open to search engines. The address avoids the word sitemap, which the Yoast rules of many nginx hosts catch.
+* create-content takes seo with title and description and writes them through the active SEO plugin.
+* get-seo reports indexable, the news sitemap and the schema type of each post; audit-site reports a site hidden from search engines, missing imprint, contact or editorial page, news without a 1200 px image and authors without a biography.
+
+= 1.3.15 =
+* A dark token set keeps inverse bands dark: activating a set now writes the inverse mapping of group and cover for the scheme of the set.
+* update-content takes link_text in blocks, as update-block does.
+* A recipe run with a selection of pages links only pages that exist or that the run creates, and a second run writes the same footer again.
+* plan-page no longer plans patterns of kits that are not unlocked, and puts a named point on its section.
+* update-block moves the points of a spotlight; the spotlight patterns say that their points belong to the sample image.
+* A suggestion with a package key no longer fails on the privacy policy page; whoever applies the package needs the capability.
+
+= 1.3.14 =
+* With the AI plugin 1.5, the rejection of a connector request names Tools, Connector Approvals, where an administrator approves it.
+* The Agents screen says when another plugin also shares Leitvia tools on the default MCP server.
+* The agent handbook lists wpai_connector_not_approved of the AI plugin and asks agents to use the leitvia server.
+
+= 1.3.13 =
+* Agents only propose administrative changes. Settings, the content model, the global styles and activating a token set always wait for a person in the Inbox, in every autonomy profile.
+* The Agents screen and the access routes refuse application passwords and MCP.
+* The head scripts of the announcement and accessibility bars are fixed strings; the block value is passed as JSON.
+* The preview canvas path uses the core constant.
+* Provider information names Patrick Schlesinger (CMS ADMINS).
+
+= 1.3.12 =
+* Building blocks: a registry of the building blocks of a site (a content type with its patterns), the abilities leitvia/list-building-blocks and leitvia/add-building-block and a list in the REST API.
+* Patterns can name the building block they need. The editor then shows a button Set up with the name of the block, and the front end hides a section whose registered block is not set up yet. Sections of blocks that are not registered keep showing.
+* The list screen of a building block's content type shows Show with the name of the block on a page, with a button New page with this section.
+* Each building block gets its own category in the block inserter.
+* Recipes apply in parts (parts, pages, building blocks), with a dry run first.
+* A person in the admin applies a recipe at once; the change settles and can be rolled back in the Inbox. Agents and application passwords still wait for review.
+* New entries of the content model register in the same request, so a recipe needs one run.
+* leitvia/define-content-type keeps fields a person added.
+* Readable names for the steps of a recipe.
+* New filters leitvia_studio_recipe_document and leitvia_studio_recipe_model.
+* German: the admin strings of screens that load later are translated now (613 strings were shown in English).
+
+= 1.3.11 =
+* Pattern Lab: the newest and recently changed patterns come first. Sort by the date of the last change or by title; the list has an Updated column and marks new patterns with New.
+* Pattern Lab: the details of a pattern explain it in plain words and fold the rest away, each pattern shows one status, and test content sits under Variants.
+* Agents: one screen with the tabs Overview, Inbox and Autonomy and checks. Overview shows the state of the connection, the application passwords, the checks and the MCP Adapter. The Inbox is no longer a menu item of its own; old links lead to its tab.
+* Settings in the tabs General, Privacy and Design and search. The declared settings of the Content Model are called Site details.
+* The first menu item is called Pattern Lab instead of Lab.
+* New filters for add-ons: leitvia_studio_pattern_dates adds the dates of their patterns to the Pattern Lab, leitvia_studio_framed_pages gives their screens the frame of Studio screens.
+
+= 1.3.10 =
+* Query filter: parameters of other blocks on the page are carried over only with a clean key and as plain text.
+* The notices of bundled third-party libraries end in .txt, as WordPress.org requires.
+* Source code: the plugin ships its package-lock.json, and `npm ci` and `npm run build` in the plugin folder alone recreate `build/` exactly.
+* Images waiting in a change package live in `wp-content/uploads/leitvia-studio/private/`; the update moves them from `uploads/leitvia-private/`. Adjust an nginx rule (see the FAQ).
+* Agent users cannot sign in with a password, open the admin or call admin-ajax.php; they connect with their application password only. A user who gets the agent role is signed out everywhere.
+* The ability "Get site health" needs a user who may view the Site Health checks, or the agent role; editors no longer get versions and updates.
+* The patterns "Annotated image" and "Scene with points" bring their illustration along and show it with any block theme.
+* Uninstalling no longer empties the whole object cache, only the cached data of the patterns it changes.
+* The small scripts of the announcement bar and the accessibility bar that apply a stored choice before the first paint, and the scripts of the Lab preview, are queued through WordPress instead of being printed into the block markup.
+* The blocks Query filter, Load more, Table of contents and Language switch render through a callback that returns their markup.
+* Structured data of posts keeps the JSON escaping of WordPress.
+* The Lab preview renders through the block template canvas of WordPress; a refused preview shows the reason on the error page of WordPress.
+* Content that agents write goes through the HTML filter of WordPress (KSES) like any write of a user without unfiltered_html; only a rollback puts a snapshot back as it was stored.
+* Map block: the stylesheet of Leaflet is a style of the block that WordPress loads with it.
+* Spotlight: the text of a point stays inside the image, also near the edges and in right-to-left languages, and the open point lies above the others. Whether the points sit on the image or follow it as a list depends on the width of the spotlight in em (a container query, from 30em) instead of the screen width, so it answers to text zoom and narrow columns (WCAG 1.4.4, 1.4.10).
+
+= 1.3.9 =
+* Pattern Lab: patterns in draft or review no longer appear in the block inserter and the pattern list of the site editor; the Lab still shows them.
+
+= 1.3.8 =
+* Inbox: a change of the global styles lists the colors and fonts that change, with their values before and after, and names the token set, instead of showing only JSON.
+
+= 1.3.7 =
+* Extension API: add-ons can turn other file formats into Lab patterns on import (filter leitvia_studio_import_pattern_file).
+* Extension API: exports that add-ons register as sync targets appear as actions in the token list (REST: export with target).
+* Extension API: the action for notes above Studio screens is now leitvia_studio_screen_notes. The note on Leitvia Pro shows on the Settings screen only.
+
+= 1.3.6 =
+* Highlight: the circle style is drawn on every line of a wrapped mark instead of one ellipse around all lines.
+* Studio screens show a focus outline in forced colors (Windows contrast themes) on buttons, card headers and search fields.
+
+= 1.3.5 =
+* Media of a change package are stored only after core confirmed an image type the site allows, also for packages imported on the command line.
+* WP-CLI: wp leitvia package export prints the package as JSON on standard output instead of writing a file (wp leitvia package export 12 > package.json).
+* Tabs and wizard without JavaScript: the styles for that case load with the block stylesheets (media feature scripting: none) instead of a style element in the markup. JSON-LD is printed with wp_print_inline_script_tag().
+
+= 1.3.4 =
+* Recipes: a header or footer in templateParts can carry edits at block IDs, like a page section, so the button and the service bar of a header pattern get their own texts and targets instead of sample links.
+
+= 1.3.3 =
+* A featured image uploaded before Studio was active, without the three 1200 px crops, now stands in with its original in the article JSON-LD when it is at least 1200 px wide, so older posts keep their image for rich results.
+* The admin screens and the token preview use logical properties for list indents and text alignment, so they read correctly in right-to-left languages.
+* Spotlight: in right-to-left languages the points stay on their position on the image, and below 782 px the numbered list no longer slides out of the page.
+
+= 1.3.2 =
+* The front page carries JSON-LD of type WebSite with name, tagline and the site as publisher with its logo, so search engines can show the site name. Same switch as the article data: off with the setting or an active SEO plugin.
+
+= 1.3.1 =
+* MCP server lists the abilities of compatible add-ons: every ability in the registry of Studio is a tool of the MCP server leitvia, not only the abilities of Studio itself.
+
+= 1.3.0 =
+* New screen Recipes: every registered recipe with source, status and the plan read from its file. Apply runs the ability apply-recipe, so autonomy, change package, rate limit and audit work as for an agent. New REST route GET /leitvia-studio/v1/recipes.
+* New abilities get-seo and update-seo: read title, description, canonical, robots, Open Graph fields, focus keyword and schema type from Yoast SEO, Rank Math, SEOPress or The SEO Framework, and write title, description, noindex and nofollow through the pipeline with length checks, change package and rollback. Without one of these plugins both answer leitvia_no_seo_plugin.
+* New ability export: pages, menus, token sets, template parts and the content model as a portable JSON package, page by page with every call under 1 MB.
+* The SEO fields of an entry belong to its state, so the hashes of entries change once while an SEO plugin is active.
+* The DTCG document of a token set belongs to its state: hashes, snapshots, change packages and rollback cover it, so a change package can update an existing set.
+
+Older versions: see changelog.txt in the plugin folder.
 
 = 1.2.2 =
 * Accessibility bar: a pressed High contrast button keeps a readable label, so high contrast can be switched off again. Before, label and background took the same color.

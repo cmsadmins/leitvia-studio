@@ -77,6 +77,11 @@ final class Pipeline {
 	public const JSON_TYPES = array( 'wp_global_styles' );
 
 	/**
+	 * Characters of markup in the place of a rejection, see unsafe().
+	 */
+	private const EXCERPT_LENGTH = 80;
+
+	/**
 	 * Statuses visitors see.
 	 */
 	private const PUBLIC_STATUSES = array( 'publish', 'future' );
@@ -240,7 +245,19 @@ final class Pipeline {
 	 */
 	private static function decide( Operation $op, array $before, array $after, int $package, bool $rollback, int $follows = 0 ) {
 		$target = self::target( $op );
-		// 4. Content safety. Unsafe content is rejected; safe content is written through the KSES of core, see execute().
+		// 4. Content safety. Harmless rests of word processors are dropped first, see office(), but only from a text
+		// this write changes: a change of meta, title or status leaves the stored content as it is. Unsafe content is
+		// rejected with the first finding; safe content is written through the KSES of core, see execute().
+		if ( ! $rollback && ! self::json( $after ) ) {
+			foreach ( array( 'post_content', 'post_excerpt' ) as $field ) {
+				if ( isset( $after[ $field ] ) && is_string( $after[ $field ] ) && ( $before[ $field ] ?? null ) !== $after[ $field ] ) {
+					$after[ $field ] = self::office( $after[ $field ] );
+				}
+			}
+			if ( isset( $after['term']['description'] ) && is_string( $after['term']['description'] ) && ( $before['term']['description'] ?? null ) !== $after['term']['description'] ) {
+				$after['term']['description'] = self::office( $after['term']['description'] );
+			}
+		}
 		$unsafe = match ( true ) {
 			$rollback                  => null,
 			self::json( $after )       => self::unsafe_json( (string) $after['post_content'] ),
@@ -253,11 +270,13 @@ final class Pipeline {
 		if ( $unsafe ) {
 			return Rejection::make(
 				'leitvia_unsafe_content',
-				__( 'The content holds markup agents may not write: scripts, event attributes, Custom HTML blocks, classic blocks or Base64 data. Use registered blocks and media from the library.', 'leitvia-studio' ),
+				__( 'The content holds markup agents may not write: scripts, event attributes, Custom HTML blocks, classic blocks or Base64 data. Use registered blocks and media from the library.', 'leitvia-studio' ) . self::where( $unsafe ),
 				422,
 				$unsafe['reason'],
 				$target + array( 'block' => $unsafe['block'] ),
-				'leitvia/list-blocks'
+				'leitvia/list-blocks',
+				'once',
+				array( 'found' => $unsafe )
 			);
 		}
 		// The check of an add-on option, see addon_options().
@@ -631,13 +650,14 @@ final class Pipeline {
 	}
 
 	/**
-	 * The first block agents may not write, with its ID (metadata.leitviaId or path p:0.2.1) and the reason; null when
-	 * the content is safe. Unsafe: core/html, a classic block outside classic content, Base64 data, and any markup or
-	 * attribute text that wp_kses_post() would change beyond entity and self-closing-tag spelling.
+	 * The first block agents may not write, with its ID (metadata.leitviaId or path p:0.2.1), the reason and the place:
+	 * tag and attribute ('' when the finding has none; a block attribute as dotted key such as metadata.name) and a
+	 * short excerpt; null when the content is safe. Unsafe: core/html, a classic block outside classic content, Base64
+	 * data, and any markup or attribute text that wp_kses_post() would change beyond entity and self-closing-tag spelling.
 	 *
 	 * @param string $content Block markup.
 	 * @param bool   $classic Whether the current content is classic.
-	 * @return array{block: string, reason: string}|null
+	 * @return array{block: string, reason: string, tag: string, attribute: string, excerpt: string}|null
 	 */
 	public static function unsafe( string $content, bool $classic = false ): ?array {
 		return self::unsafe_blocks( parse_blocks( $content ), 'p:', $classic );
@@ -649,7 +669,7 @@ final class Pipeline {
 	 * @param array<int|string, array<string, mixed>> $blocks  Parsed blocks.
 	 * @param string                                  $path    Path prefix.
 	 * @param bool                                    $classic Whether classic blocks are allowed.
-	 * @return array{block: string, reason: string}|null
+	 * @return array{block: string, reason: string, tag: string, attribute: string, excerpt: string}|null
 	 */
 	private static function unsafe_blocks( array $blocks, string $path, bool $classic ): ?array {
 		foreach ( Block_Ids::blocks( $blocks ) as $index => $block ) {
@@ -664,9 +684,13 @@ final class Pipeline {
 				default => '',
 			};
 			if ( '' !== $reason ) {
+				$place = in_array( $reason, array( 'markup', 'base64' ), true ) ? self::locate( $html, (array) $block['attrs'] ) : array();
 				return array(
-					'block'  => $id,
-					'reason' => $reason,
+					'block'     => $id,
+					'reason'    => $reason,
+					'tag'       => $place['tag'] ?? '',
+					'attribute' => $place['attribute'] ?? '',
+					'excerpt'   => $place['excerpt'] ?? self::excerpt( trim( $html ) ),
 				);
 			}
 			$inner = self::unsafe_blocks( (array) $block['innerBlocks'], $path . $index . '.', false );
@@ -675,6 +699,142 @@ final class Pipeline {
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * Tag, attribute and excerpt of the first unsafe place in a block: a tag wp_kses_post() does not allow, an attribute
+	 * it would change or drop, a script URL or Base64 data, in the markup first, then in the block attributes. Without
+	 * such a place (text that KSES changes) only the excerpt of the markup.
+	 *
+	 * @param string       $html  Own markup of the block.
+	 * @param array<mixed> $attrs Block attributes.
+	 * @return array{tag?: string, attribute?: string, excerpt: string}
+	 */
+	private static function locate( string $html, array $attrs ): array {
+		$allowed = wp_kses_allowed_html( 'post' );
+		$tags    = new \WP_HTML_Tag_Processor( $html );
+		while ( $tags->next_tag() ) {
+			$tag   = strtolower( (string) $tags->get_tag() );
+			$names = (array) $tags->get_attribute_names_with_prefix( '' );
+			$parts = array();
+			foreach ( $names as $name ) {
+				$value   = $tags->get_attribute( $name );
+				$parts[] = is_string( $value ) ? $name . '="' . $value . '"' : $name;
+			}
+			$opening = self::excerpt( '<' . $tag . ( $parts ? ' ' . implode( ' ', $parts ) : '' ) . '>' );
+			if ( ! isset( $allowed[ $tag ] ) ) {
+				return array(
+					'tag'       => $tag,
+					'attribute' => '',
+					'excerpt'   => $opening,
+				);
+			}
+			foreach ( $names as $name ) {
+				$value = $tags->get_attribute( $name );
+				$text  = is_string( $value ) ? $value : '';
+				if ( self::bad_value( $text ) || ! self::kses_safe( '<' . $tag . ' ' . $name . ( is_string( $value ) ? '="' . esc_attr( $value ) . '"' : '' ) . '>' ) ) {
+					return array(
+						'tag'       => $tag,
+						'attribute' => $name,
+						'excerpt'   => $opening,
+					);
+				}
+			}
+		}
+		return self::locate_attrs( $attrs, '' ) ?? array( 'excerpt' => self::excerpt( trim( $html ) ) );
+	}
+
+	/**
+	 * The first string of block attributes, by dotted key, that holds a script URL or Base64 data or that
+	 * wp_kses_post() would change; null for none.
+	 *
+	 * @param array<mixed> $values Attributes.
+	 * @param string       $prefix Key prefix.
+	 * @return array{tag: string, attribute: string, excerpt: string}|null
+	 */
+	private static function locate_attrs( array $values, string $prefix ): ?array {
+		foreach ( $values as $key => $value ) {
+			if ( is_array( $value ) ) {
+				$found = self::locate_attrs( $value, $prefix . $key . '.' );
+				if ( $found ) {
+					return $found;
+				}
+			} elseif ( is_string( $value ) && ( self::bad_value( $value ) || ! self::kses_safe( $value ) ) ) {
+				return array(
+					'tag'       => '',
+					'attribute' => $prefix . $key,
+					'excerpt'   => self::excerpt( $value ),
+				);
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Whether a value holds Base64 data or is a script URL.
+	 *
+	 * @param string $value Value.
+	 */
+	private static function bad_value( string $value ): bool {
+		return (bool) preg_match( '/data:[^,"\'\s]*;base64/i', $value ) || self::script_url( $value );
+	}
+
+	/**
+	 * The first EXCERPT_LENGTH characters of a text, with an ellipsis when cut.
+	 *
+	 * @param string $text Text.
+	 */
+	private static function excerpt( string $text ): string {
+		return mb_strlen( $text ) > self::EXCERPT_LENGTH ? mb_substr( $text, 0, self::EXCERPT_LENGTH ) . '…' : $text;
+	}
+
+	/**
+	 * The place of a finding of unsafe(), as a sentence for the rejection with a space before it; '' for a finding of
+	 * unsafe_json(), which has no place.
+	 *
+	 * @param array{block: string, reason: string, tag?: string, attribute?: string, excerpt?: string} $found Finding.
+	 */
+	private static function where( array $found ): string {
+		if ( ! isset( $found['excerpt'] ) ) {
+			return '';
+		}
+		$place = trim( ( '' !== ( $found['tag'] ?? '' ) ? '<' . $found['tag'] . '>' : '' ) . ' ' . ( $found['attribute'] ?? '' ) );
+		return ' ' . ( '' !== $place
+			/* translators: 1: block ID, 2: tag and attribute such as <b> style, 3: excerpt of the markup */
+			? sprintf( __( 'First finding in block %1$s, %2$s: %3$s', 'leitvia-studio' ), $found['block'], $place, $found['excerpt'] )
+			/* translators: 1: block ID, 2: excerpt of the markup */
+			: sprintf( __( 'First finding in block %1$s: %2$s', 'leitvia-studio' ), $found['block'], $found['excerpt'] ) );
+	}
+
+	/**
+	 * Content without the harmless rests a word processor leaves when text is pasted: mso-* declarations in style
+	 * attributes (the attribute goes when nothing else is left) and empty <o:p> elements. Both would otherwise reject
+	 * the whole write; an o:p with text stays and is rejected with its place.
+	 * ponytail: splits declarations at every semicolon; a mso- style next to a url() with a semicolon in it breaks.
+	 *
+	 * @param string $content Block markup or classic HTML.
+	 */
+	public static function office( string $content ): string {
+		if ( ! str_contains( $content, 'mso-' ) && ! str_contains( $content, '<o:p' ) ) {
+			return $content;
+		}
+		$content = (string) preg_replace( '#<o:p>(?:\s|&nbsp;|&\#160;|\xC2\xA0)*</o:p>#i', '', $content );
+		$tags    = new \WP_HTML_Tag_Processor( $content );
+		while ( $tags->next_tag() ) {
+			$style = $tags->get_attribute( 'style' );
+			if ( ! is_string( $style ) || ! str_contains( strtolower( $style ), 'mso-' ) ) {
+				continue;
+			}
+			$kept = array_filter( array_map( 'trim', explode( ';', $style ) ), static fn( string $rule ): bool => '' !== $rule && ! str_starts_with( strtolower( $rule ), 'mso-' ) );
+			if ( $kept ) {
+				// Joined as safecss_filter_attr() joins, so KSES keeps the attribute as it is.
+				$tags->set_attribute( 'style', implode( ';', $kept ) );
+			} else {
+				$tags->remove_attribute( 'style' );
+			}
+		}
+		// remove_attribute() leaves the space before it (<b >), which KSES would close up.
+		return (string) preg_replace( '#<([a-z][^\s/>]*)\s+>#i', '<$1>', $tags->get_updated_html() );
 	}
 
 	/**

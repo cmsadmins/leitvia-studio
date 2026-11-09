@@ -25,6 +25,11 @@ $heights: (
 	}
 }
 
+.wp-block-leitvia-map__attribution {
+	margin-block: var(--wp--preset--spacing--xxs, 0.25rem) 0;
+	font-size: var(--wp--preset--font-size--meta, 0.875rem);
+}
+
 .wp-block-leitvia-map__marker {
 	box-sizing: border-box;
 	border: 0.1875rem solid var(--wp--preset--color--surface, Canvas);

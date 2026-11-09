@@ -78,6 +78,38 @@ class Test_Map extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A caller on the server may give markers a link for the popup and fit the map to the markers; a link needs an
+	 * http or https address and a text, and fit needs markers.
+	 */
+	public function test_marker_links_and_fit_from_the_server(): void {
+		$marker = array(
+			'title'     => 'North',
+			'lat'       => 53.55,
+			'lng'       => 9.99,
+			'url'       => 'https://example.org/north/',
+			'linkText'  => 'View post',
+			'linkLabel' => 'View post: North',
+		);
+		$bad    = array(
+			'url'      => 'javascript:alert(1)',
+			'linkText' => 'x',
+		) + $marker;
+		$html   = \LeitviaStudio\Blocks\Map::render(
+			'<div class="wp-block-leitvia-map"></div>',
+			array(
+				'attrs' => array(
+					'fit'     => 25,
+					'markers' => array( $marker, $bad ),
+				),
+			)
+		);
+		$this->assertStringContainsString( '&quot;url&quot;:&quot;https:\/\/example.org\/north\/&quot;,&quot;linkText&quot;:&quot;View post&quot;,&quot;linkLabel&quot;:&quot;View post: North&quot;}', $html );
+		$this->assertSame( 1, substr_count( $html, 'linkText' ) );
+		$this->assertStringContainsString( 'data-fit="19"', $html );
+		$this->assertStringNotContainsString( 'data-fit', do_blocks( self::BLOCK ) );
+	}
+
+	/**
 	 * Tile url setting is validated.
 	 */
 	public function test_tile_url_setting_is_validated(): void {

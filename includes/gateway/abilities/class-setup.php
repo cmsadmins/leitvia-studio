@@ -31,6 +31,11 @@ defined( 'ABSPATH' ) || exit;
 final class Setup {
 
 	/**
+	 * Templates of WooCommerce for product categories and tags, open to update-template while WooCommerce is active.
+	 */
+	private const SHOP_TERM_TEMPLATES = array( 'taxonomy-product_cat', 'taxonomy-product_tag' );
+
+	/**
 	 * Blocks a navigation may hold at its own level and inside submenus.
 	 */
 	public const NAVIGATION_BLOCKS = array( 'core/navigation-link', 'core/navigation-submenu', 'core/page-list', 'leitvia/mega-menu' );
@@ -268,14 +273,15 @@ final class Setup {
 		Abilities::write(
 			'leitvia/update-template',
 			__( 'Update template', 'leitvia-studio' ),
-			__( 'Replaces a template with a template pattern made for it or with changed block markup. Slugs, such as single or single-product, come from the templates of leitvia/get-contract and the templates the theme ships; WooCommerce templates need WooCommerce. A pattern fits when its templateTypes hold the slug; the rejection leitvia_unknown_pattern lists the patterns that fit in patterns. Templates for single posts and pages keep a core/post-content block. The change publishes the template; where the area level is draft a new one waits in a change package. A rollback restores the template as it was, the one of the theme when there was no saved one. The base hash is the hash of the saved template, empty when the theme template has not been saved yet. No ability returns this hash: send base_hash empty and repeat the call once with current_hash from leitvia_stale_hash.', 'leitvia-studio' ),
+			__( 'Replaces a template with a template pattern made for it or with changed block markup. Slugs, such as single, single-product or taxonomy-product_cat, come from the templates of leitvia/get-contract and the templates the theme ships; WooCommerce templates need WooCommerce. A pattern fits when its templateTypes hold the slug; the rejection leitvia_unknown_pattern lists the patterns that fit in patterns. Templates for single posts and pages keep a core/post-content block. The change publishes the template; where the area level is draft a new one waits in a change package. A rollback restores the template as it was, the one of the theme when there was no saved one. The base hash is the hash of the saved template, empty when the theme template has not been saved yet. No ability returns this hash: send base_hash empty and repeat the call once with current_hash from leitvia_stale_hash.', 'leitvia-studio' ),
 			'setup',
 			$replace,
 			array(
 				'properties' => array(
+					// Template slugs of core and WooCommerce may hold an underscore: taxonomy-product_cat, taxonomy-product_tag.
 					'template' => array(
 						'type'    => 'string',
-						'pattern' => '^[a-z0-9-]+$',
+						'pattern' => '^[a-z0-9_-]+$',
 					),
 					'pattern'  => array( 'type' => 'string' ),
 					'content'  => array(
@@ -684,6 +690,9 @@ final class Setup {
 		$slug     = (string) ( $input['template'] ?? '' );
 		$contract = array_column( (array) ( leitvia_studio_contract()->data()['templates'] ?? array() ), null, 'slug' );
 		$known    = isset( $contract[ $slug ] ) ? '' === Recipes::missing( (array) $contract[ $slug ] ) : in_array( $slug, wp_list_pluck( get_block_templates(), 'slug' ), true );
+		// The templates of product categories and tags are in the hierarchy of WooCommerce, which falls back to
+		// archive-product; WooCommerce may not list them before one is saved.
+		$known = $known || ( in_array( $slug, self::SHOP_TERM_TEMPLATES, true ) && '' === Recipes::missing( array( 'requires' => array( 'woocommerce' ) ) ) );
 		if ( ! $known ) {
 			return Block_Edit::invalid( 'template', __( 'Use a template of the contract or of the theme. WooCommerce templates need WooCommerce.', 'leitvia-studio' ), array( 'template' => $slug ), 'leitvia/get-contract' );
 		}

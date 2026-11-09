@@ -71,7 +71,22 @@ final class Outline {
 			);
 		}
 		[ $block, $path ] = $found;
-		$children         = array();
+		// Custom HTML and classic content are nothing but their markup: empty, the read would hide what the block held
+		// (a shortcode, an embed) from a comparison. Other blocks may be empty (dynamic blocks render on the server).
+		if ( in_array( self::name( $block ), array( 'core/html', 'core/freeform' ), true ) && '' === trim( (string) $block['innerHTML'] ) && ! $block['innerBlocks'] ) {
+			return Rejection::make(
+				'leitvia_empty_block',
+				__( 'The block holds no markup. Read the page outline again; if the block is still empty there, it has no content to keep.', 'leitvia-studio' ),
+				409,
+				'empty_block',
+				array(
+					'post'  => $post->ID,
+					'block' => $id,
+				),
+				'leitvia/get-page-outline'
+			);
+		}
+		$children = array();
 		foreach ( Block_Ids::blocks( (array) $block['innerBlocks'] ) as $index => $child ) {
 			$children[] = self::key( $child, $path . '.' . $index );
 		}

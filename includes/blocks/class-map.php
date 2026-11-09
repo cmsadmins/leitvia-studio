@@ -15,6 +15,10 @@ defined( 'ABSPATH' ) || exit;
  * The saved HTML of leitvia/map is a list of places with links to OpenStreetMap and requests nothing. On render this
  * class puts the map canvas above the list, wrapped in the consent placeholder unless the tile server is the site
  * itself. view.js starts Leaflet once the canvas is in the page, so tiles load only after consent.
+ *
+ * Blocks that render this one on the server (Data map of Leitvia Pro) may pass two things the editor does not set: a
+ * marker with url and linkText (and linkLabel, its accessible name) gets that link in its popup, and fit (1 to 19)
+ * fits the map to the markers, zooming in at most that far, instead of keeping lat, lng and zoom.
  */
 final class Map {
 
@@ -67,20 +71,32 @@ final class Map {
 					'lat'     => (float) $marker['lat'],
 					'lng'     => (float) $marker['lng'],
 				);
+				$url       = esc_url_raw( (string) ( $marker['url'] ?? '' ), array( 'http', 'https' ) );
+				$text      = wp_strip_all_tags( (string) ( $marker['linkText'] ?? '' ) );
+				if ( '' !== $url && '' !== $text ) {
+					$markers[ array_key_last( $markers ) ] += array(
+						'url'       => $url,
+						'linkText'  => $text,
+						'linkLabel' => wp_strip_all_tags( (string) ( $marker['linkLabel'] ?? $text ) ),
+					);
+				}
 			}
 		}
+		$fit = $markers ? max( 0, min( 19, (int) ( $attrs['fit'] ?? 0 ) ) ) : 0;
 		// The tile URL is a template with the placeholders {z}, {x}, {y} and {s}. esc_url() strips curly braces, so the
 		// view script could no longer fill them in; it is escaped as an attribute value instead. Settings::tile_url()
 		// validated it before: https only, {z}, {x} and {y} present, no whitespace, quotes or angle brackets
 		// (TILE_URL_PATTERN) and a valid URL once the placeholders are filled; anything else gives the default server.
-		$tiles   = \LeitviaStudio\Admin\Settings::tile_url( leitvia_studio_setting( 'map_tile_url' ) );
-		$canvas  = sprintf(
-			'<div class="wp-block-leitvia-map__canvas" role="region" aria-label="%1$s" data-tiles="%2$s" data-attribution="%3$s" data-view="%4$s" data-markers="%5$s"></div>',
+		$tiles  = \LeitviaStudio\Admin\Settings::tile_url( leitvia_studio_setting( 'map_tile_url' ) );
+		$canvas = sprintf(
+			'<div class="wp-block-leitvia-map__canvas" role="region" aria-label="%1$s" data-tiles="%2$s" data-attribution="%3$s" data-view="%4$s" data-markers="%5$s"%6$s></div>',
 			esc_attr__( 'Interactive map', 'leitvia-studio' ),
 			esc_attr( $tiles ),
-			esc_attr( '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' ),
+			// Shown below the map by view.js, see there.
+			esc_attr( '<a href="https://leafletjs.com">Leaflet</a>, &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' ),
 			esc_attr( (string) wp_json_encode( array( $lat, $lng, $zoom ) ) ),
-			esc_attr( (string) wp_json_encode( $markers ) )
+			esc_attr( (string) wp_json_encode( $markers ) ),
+			$fit ? ' data-fit="' . $fit . '"' : ''
 		);
 		$service = Consent::service_for( $tiles );
 		$map     = '' === $service ? $canvas : Consent::placeholder( $service, $canvas, self::link( $lat, $lng, $zoom ) );

@@ -222,6 +222,42 @@ class Test_Gateway_Outline extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A Custom HTML block as a person with unfiltered_html stores it (HTML comment, script, shortcode, iframe) comes back
+	 * whole in get-block, by leitviaId and by path; an empty one is a rejection, not an empty result.
+	 */
+	public function test_get_block_custom_html(): void {
+		$html    = "\n<!-- Map of the region -->\n<div class=\"map\">[karte id=\"5\" zoom=\"7\"]</div>\n<script>window.mapConfig = { zoom: 7, a: \"<b>\" };</script>\n<iframe src=\"https://maps.example/embed?q=1&amp;z=7\" title=\"Map\"></iframe>\n";
+		$content = '<!-- wp:paragraph {"metadata":{"leitviaId":"par00002"}} --><p>Intro</p><!-- /wp:paragraph -->' . "\n\n" . '<!-- wp:html {"metadata":{"leitviaId":"htm00001"}} -->' . $html . '<!-- /wp:html -->' . "\n\n" . '<!-- wp:html -->' . "\n" . '<!-- /wp:html -->';
+		$page    = $this->page( 'Placeholder' );
+		global $wpdb;
+		$wpdb->update( $wpdb->posts, array( 'post_content' => $content ), array( 'ID' => $page ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Content written as by a user with unfiltered_html.
+		clean_post_cache( $page );
+		foreach ( array( 'htm00001', 'p:1' ) as $id ) {
+			$block = self::ability(
+				'leitvia/get-block',
+				array(
+					'post'  => $page,
+					'block' => $id,
+				)
+			);
+			$this->assertIsArray( $block, $id );
+			$this->assertSame( 'core/html', $block['name'], $id );
+			$this->assertSame( $html, $block['inner_html'], $id );
+			$this->assertSame( '<!-- wp:html {"metadata":{"leitviaId":"htm00001"}} -->' . $html . '<!-- /wp:html -->', $block['markup'], $id );
+		}
+		$empty = self::ability(
+			'leitvia/get-block',
+			array(
+				'post'  => $page,
+				'block' => 'p:2',
+			)
+		);
+		$this->assertWPError( $empty );
+		$this->assertSame( 'leitvia_empty_block', $empty->get_error_code() );
+		$this->assertSame( 'leitvia/get-page-outline', $empty->get_error_data()['next_ability'] );
+	}
+
+	/**
 	 * Classic content is one block core/freeform in get-block as in the outline; get-block names the attachments of its
 	 * images by URL or by the class wp-image-<id>, and leaves out foreign images and classes of non-attachments.
 	 */
