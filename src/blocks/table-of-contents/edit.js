@@ -9,7 +9,7 @@ import {
 const LEVELS = [ 2, 3, 4, 5, 6 ];
 
 export default function Edit( {
-	attributes: { levels, display },
+	attributes: { levels, display, scope },
 	setAttributes,
 } ) {
 	const toggle = ( level, on ) =>
@@ -57,6 +57,28 @@ export default function Edit( {
 						] }
 						onChange={ ( value ) =>
 							setAttributes( { display: value } )
+						}
+					/>
+					<SelectControl
+						__next40pxDefaultSize
+						label={ __( 'Posts with parts', 'leitvia-studio' ) }
+						help={ __(
+							'For posts split with page breaks. All parts groups the headings by part and links each to its part.',
+							'leitvia-studio'
+						) }
+						value={ scope }
+						options={ [
+							{
+								value: 'all',
+								label: __( 'All parts', 'leitvia-studio' ),
+							},
+							{
+								value: 'part',
+								label: __( 'This part only', 'leitvia-studio' ),
+							},
+						] }
+						onChange={ ( value ) =>
+							setAttributes( { scope: value } )
 						}
 					/>
 				</PanelBody>

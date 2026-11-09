@@ -14,6 +14,10 @@ defined( 'ABSPATH' ) || exit;
  * Headings without an id get one while the post content renders (render_block_core/heading), only on posts with a
  * table of contents; ids an author set stay. The id comes from the heading text and gets a number when it repeats,
  * so the same content gives the same ids on every request.
+ *
+ * In a post split into parts (core/nextpage) every entry knows its part: entries of another part link to the address
+ * of that part plus the anchor (anchor_url(), also for add-ons), scope all groups them by part, scope part lists the
+ * current part alone. A table of contents in one part shows at the top of the parts without one.
  */
 final class Table_Of_Contents {
 
@@ -36,7 +40,7 @@ final class Table_Of_Contents {
 	/**
 	 * Entries per post and levels.
 	 *
-	 * @var array<string, array<int, array{level: int, text: string, id: string, own: bool}>>
+	 * @var array<string, array<int, array{level: int, text: string, id: string, own: bool, part: int}>>
 	 */
 	private static array $cache = array();
 
@@ -47,32 +51,35 @@ final class Table_Of_Contents {
 	 * @param \WP_Block|null       $block      Block instance.
 	 */
 	public static function render( array $attributes, ?\WP_Block $block = null ): string {
-		$post_id = (int) ( $block->context['postId'] ?? get_the_ID() );
-		$levels  = self::levels( $attributes['levels'] ?? array( 2, 3 ) );
-		$entries = self::entries( $post_id, $levels );
+		$post = get_post( (int) ( $block->context['postId'] ?? get_the_ID() ) );
+		if ( ! $post ) {
+			return '';
+		}
+		$entries = self::entries( $post->ID, self::levels( $attributes['levels'] ?? array( 2, 3 ) ) );
+		$parts   = count( self::pages( $post ) );
+		$current = self::current_part( $post );
+		$grouped = $parts > 1 && 'part' !== ( $attributes['scope'] ?? 'all' );
+		if ( $parts > 1 && ! $grouped ) {
+			$entries = wp_list_filter( $entries, array( 'part' => max( 1, $current ) ) );
+		}
 		if ( count( $entries ) < 2 ) {
 			return '';
 		}
 
-		$title_id = 'leitvia-toc-title'; // The block allows one instance per post (supports.multiple false).
-		$list     = '';
-		$stack    = array();
-		foreach ( $entries as $entry ) {
-			$level = $entry['level'];
-			while ( isset( $stack[1] ) && $level < end( $stack ) ) {
-				$list .= '</li></ol>';
-				array_pop( $stack );
-			}
-			if ( ! $stack || $level > end( $stack ) ) {
-				$list   .= '<ol>';
-				$stack[] = $level;
-			} else {
-				$list .= '</li>';
-			}
-			$list .= sprintf( '<li><a href="%1$s">%2$s</a>', esc_attr( '#' . $entry['id'] ), esc_html( $entry['text'] ) );
+		$list = $grouped ? '<ol>' : self::nested( $post, $entries );
+		for ( $part = 1; $grouped && $part <= $parts; $part++ ) {
+			$list .= sprintf(
+				'<li><a href="%1$s"%2$s>%3$s</a>%4$s</li>',
+				esc_url( self::part_url( $post, $part ) ),
+				$part === $current ? ' aria-current="page"' : '',
+				/* translators: %d: number of the part of a post split into pages. */
+				esc_html( sprintf( __( 'Part %d', 'leitvia-studio' ), $part ) ),
+				self::nested( $post, wp_list_filter( $entries, array( 'part' => $part ) ) )
+			);
 		}
-		$list .= str_repeat( '</li></ol>', count( $stack ) );
+		$list .= $grouped ? '</ol>' : '';
 
+		$title_id  = 'leitvia-toc-title'; // One instance per page: supports.multiple false, and one part renders at a time.
 		$companion = 'companion' === ( $attributes['display'] ?? 'inline' );
 		return sprintf(
 			'<nav %1$s><h2 id="%2$s" class="wp-block-leitvia-table-of-contents__title">%3$s</h2>%4$s%5$s</nav>',
@@ -87,6 +94,112 @@ final class Table_Of_Contents {
 			$list,
 			$companion ? self::companion( $list ) : ''
 		);
+	}
+
+	/**
+	 * Entries as nested lists by level, empty without entries.
+	 *
+	 * @param \WP_Post                                                                      $post    Post.
+	 * @param array<int, array{level: int, text: string, id: string, own: bool, part: int}> $entries Entries.
+	 */
+	private static function nested( \WP_Post $post, array $entries ): string {
+		$list  = '';
+		$stack = array();
+		foreach ( $entries as $entry ) {
+			$level = $entry['level'];
+			while ( isset( $stack[1] ) && $level < end( $stack ) ) {
+				$list .= '</li></ol>';
+				array_pop( $stack );
+			}
+			if ( ! $stack || $level > end( $stack ) ) {
+				$list   .= '<ol>';
+				$stack[] = $level;
+			} else {
+				$list .= '</li>';
+			}
+			$url   = self::link( $post, $entry['part'], $entry['id'] );
+			$list .= sprintf( '<li><a href="%1$s">%2$s</a>', '#' === $url[0] ? esc_attr( $url ) : esc_url( $url ), esc_html( $entry['text'] ) );
+		}
+		return $list . str_repeat( '</li></ol>', count( $stack ) );
+	}
+
+	/**
+	 * Address of an anchor in a post: #anchor when it lies in the part being viewed or the post has no parts,
+	 * otherwise the address of its part (as wp_link_pages() links it) plus #anchor. Knows the ids the table of contents
+	 * gives headings and the ids saved in the content; an unknown anchor stays #anchor. For add-ons that link into
+	 * posts with parts, for example the stops of a route. The result is not escaped.
+	 *
+	 * @param \WP_Post|int $post   Post or post ID.
+	 * @param string       $anchor Id of the target, with or without #.
+	 */
+	public static function anchor_url( $post, string $anchor ): string {
+		$post   = get_post( $post );
+		$anchor = ltrim( $anchor, '#' );
+		if ( ! $post || '' === $anchor ) {
+			return '#' . $anchor;
+		}
+		$part = 0;
+		foreach ( self::entries( $post->ID, self::post_levels( $post ) ) as $entry ) {
+			if ( $entry['id'] === $anchor ) {
+				$part = $entry['part'];
+				break;
+			}
+		}
+		foreach ( 0 === $part ? self::pages( $post ) : array() as $i => $page ) {
+			if ( str_contains( $page, 'id="' . esc_attr( $anchor ) . '"' ) ) {
+				$part = $i + 1;
+				break;
+			}
+		}
+		return 0 === $part ? '#' . $anchor : self::link( $post, $part, $anchor );
+	}
+
+	/**
+	 * Address of an anchor in a known part.
+	 *
+	 * @param \WP_Post $post   Post.
+	 * @param int      $part   Part, from 1.
+	 * @param string   $anchor Id of the target.
+	 */
+	private static function link( \WP_Post $post, int $part, string $anchor ): string {
+		return ( self::current_part( $post ) === $part || count( self::pages( $post ) ) < 2 ) ? '#' . $anchor : self::part_url( $post, $part ) . '#' . $anchor;
+	}
+
+	/**
+	 * Address of a part as wp_link_pages() links it: plain and pretty permalinks, front page, previews.
+	 *
+	 * @param \WP_Post $post Post.
+	 * @param int      $part Part, from 1.
+	 */
+	private static function part_url( \WP_Post $post, int $part ): string {
+		$saved           = $GLOBALS['post'] ?? null;
+		$GLOBALS['post'] = $post; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- _wp_link_page() reads the global post; restored below.
+		$tags            = new \WP_HTML_Tag_Processor( _wp_link_page( $part ) );
+		$url             = $tags->next_tag() ? (string) $tags->get_attribute( 'href' ) : (string) get_permalink( $post );
+		$GLOBALS['post'] = $saved; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Restores the global post.
+		return $url;
+	}
+
+	/**
+	 * Part of the post being viewed, 0 while another post is viewed.
+	 *
+	 * @param \WP_Post $post Post.
+	 */
+	private static function current_part( \WP_Post $post ): int {
+		return get_queried_object_id() === $post->ID ? min( max( 1, (int) get_query_var( 'page' ) ), count( self::pages( $post ) ) ) : 0;
+	}
+
+	/**
+	 * Content of the parts of a post, split as generate_postdata() splits it.
+	 *
+	 * @param \WP_Post $post Post.
+	 * @return list<string>
+	 */
+	private static function pages( \WP_Post $post ): array {
+		$content = str_replace( array( "\n<!--nextpage-->\n", "\n<!--nextpage-->", "<!--nextpage-->\n" ), '<!--nextpage-->', $post->post_content );
+		$content = str_replace( array( '<!-- wp:nextpage -->', '<!-- /wp:nextpage -->' ), '', $content );
+		$content = str_starts_with( $content, '<!--nextpage-->' ) ? substr( $content, 15 ) : $content;
+		return explode( '<!--nextpage-->', $content );
 	}
 
 	/**
@@ -136,13 +249,30 @@ final class Table_Of_Contents {
 	}
 
 	/**
-	 * Marks the end of a post content render. Runs on render_block_core/post-content.
+	 * Marks the end of a post content render. Runs on render_block_core/post-content. In a post with parts, a part
+	 * without a table of contents gets the one of another part at its top, so every part has the list.
 	 *
 	 * @param string $content Rendered block HTML.
 	 */
 	public static function leave_content( string $content ): string {
+		$post            = 0 === self::$rendering ? null : get_post( self::$rendering );
 		self::$rendering = 0;
-		return $content;
+		if ( ! $post ) {
+			return $content;
+		}
+		$pages = self::pages( $post );
+		$block = isset( $pages[1] ) && ! str_contains( $pages[ self::rendered_part( $pages ) - 1 ], '<!-- wp:' . self::BLOCK ) ? self::find( parse_blocks( $post->post_content ) ) : null;
+		$at    = strpos( $content, '>' );
+		return null === $block || false === $at ? $content : substr_replace( $content, render_block( $block ), $at + 1, 0 );
+	}
+
+	/**
+	 * Part that renders now, as get_the_content() picks it from the global page.
+	 *
+	 * @param array<int, string> $pages Parts of the post.
+	 */
+	private static function rendered_part( array $pages ): int {
+		return min( max( 1, (int) ( $GLOBALS['page'] ?? 1 ) ), max( 1, count( $pages ) ) );
 	}
 
 	/**
@@ -162,8 +292,9 @@ final class Table_Of_Contents {
 		}
 		$text = self::text( (string) ( $block['innerHTML'] ?? '' ) );
 		$seen = self::$handed[ $text ] ?? 0;
+		$part = self::rendered_part( self::pages( $post ) );
 		foreach ( self::entries( $post->ID, self::post_levels( $post ) ) as $entry ) {
-			if ( ! $entry['own'] && $entry['text'] === $text && 0 === $seen-- ) {
+			if ( $entry['part'] === $part && ! $entry['own'] && $entry['text'] === $text && 0 === $seen-- ) {
 				self::$handed[ $text ] = ( self::$handed[ $text ] ?? 0 ) + 1;
 				$tags->set_attribute( 'id', $entry['id'] );
 				return $tags->get_updated_html();
@@ -173,12 +304,13 @@ final class Table_Of_Contents {
 	}
 
 	/**
-	 * Headings of a post at the given levels, in document order, each with an id: its own or a generated one.
-	 * Own ids of headings at every level are reserved, so a generated id never repeats one.
+	 * Headings of a post at the given levels, in document order, each with an id (its own or a generated one) and its
+	 * part (1 without core/nextpage). Own ids of headings at every level are reserved, so a generated id never repeats
+	 * one; generated ids are unique across all parts.
 	 *
 	 * @param int        $post_id Post ID.
 	 * @param array<int> $levels  Heading levels.
-	 * @return array<int, array{level: int, text: string, id: string, own: bool}>
+	 * @return array<int, array{level: int, text: string, id: string, own: bool, part: int}>
 	 */
 	public static function entries( int $post_id, array $levels ): array {
 		$key = $post_id . ':' . implode( ',', $levels );
@@ -187,8 +319,8 @@ final class Table_Of_Contents {
 		}
 		$post     = get_post( $post_id );
 		$headings = array();
-		if ( $post ) {
-			self::collect( parse_blocks( $post->post_content ), $headings, array() );
+		foreach ( $post ? self::pages( $post ) : array() as $i => $page ) {
+			self::collect( parse_blocks( $page ), $headings, array(), $i + 1 );
 		}
 		$used    = array_fill_keys( array_filter( array_column( $headings, 'id' ) ), true );
 		$entries = array();
@@ -212,6 +344,7 @@ final class Table_Of_Contents {
 				'text'  => $heading['text'],
 				'id'    => $id,
 				'own'   => $own,
+				'part'  => $heading['part'],
 			);
 		}
 		self::$cache[ $key ] = $entries;
@@ -228,11 +361,12 @@ final class Table_Of_Contents {
 	/**
 	 * Collects core/heading blocks, walking inner blocks, theme patterns (core/pattern) and synced patterns (core/block).
 	 *
-	 * @param array<int|string, array<string, mixed>>                 $blocks   Parsed blocks.
-	 * @param array<int, array{level: int, text: string, id: string}> $headings Collected headings.
-	 * @param array<string, bool>                                     $seen     Patterns on the current path, against loops.
+	 * @param array<int|string, array<string, mixed>>                            $blocks   Parsed blocks.
+	 * @param array<int, array{level: int, text: string, id: string, part: int}> $headings Collected headings.
+	 * @param array<string, bool>                                                $seen     Patterns on the current path, against loops.
+	 * @param int                                                                $part     Part of the post the blocks are in.
 	 */
-	private static function collect( array $blocks, array &$headings, array $seen ): void {
+	private static function collect( array $blocks, array &$headings, array $seen, int $part ): void {
 		foreach ( $blocks as $block ) {
 			$name  = (string) ( $block['blockName'] ?? '' );
 			$attrs = (array) ( $block['attrs'] ?? array() );
@@ -244,6 +378,7 @@ final class Table_Of_Contents {
 					'level' => (int) ( $attrs['level'] ?? 2 ),
 					'text'  => self::text( $html ),
 					'id'    => $id,
+					'part'  => $part,
 				);
 			}
 			$inner = (array) ( $block['innerBlocks'] ?? array() );
@@ -256,7 +391,7 @@ final class Table_Of_Contents {
 				$inner                                 = ( $synced && 'wp_block' === $synced->post_type && 'publish' === $synced->post_status ) ? parse_blocks( $synced->post_content ) : array();
 				$seen[ 'b:' . ( $attrs['ref'] ?? 0 ) ] = true;
 			}
-			self::collect( $inner, $headings, $seen );
+			self::collect( $inner, $headings, $seen, $part );
 		}
 	}
 
@@ -287,18 +422,22 @@ final class Table_Of_Contents {
 	 * @return array<int>
 	 */
 	private static function post_levels( \WP_Post $post ): array {
-		$find = static function ( array $blocks ) use ( &$find ) {
-			foreach ( $blocks as $block ) {
-				if ( self::BLOCK === ( $block['blockName'] ?? '' ) ) {
-					return (array) ( $block['attrs']['levels'] ?? array( 2, 3 ) );
-				}
-				$found = $find( (array) ( $block['innerBlocks'] ?? array() ) );
-				if ( null !== $found ) {
-					return $found;
-				}
+		return self::levels( self::find( parse_blocks( $post->post_content ) )['attrs']['levels'] ?? null );
+	}
+
+	/**
+	 * The first table of contents among parsed blocks, inner blocks included.
+	 *
+	 * @param array<int|string, array<string, mixed>> $blocks Parsed blocks.
+	 * @return array<string, mixed>|null
+	 */
+	private static function find( array $blocks ): ?array {
+		foreach ( $blocks as $block ) {
+			$found = self::BLOCK === ( $block['blockName'] ?? '' ) ? $block : self::find( (array) ( $block['innerBlocks'] ?? array() ) );
+			if ( null !== $found ) {
+				return $found;
 			}
-			return null;
-		};
-		return self::levels( $find( parse_blocks( $post->post_content ) ) );
+		}
+		return null;
 	}
 }

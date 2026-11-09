@@ -13,6 +13,13 @@ use LeitviaStudio\Blocks\Table_Of_Contents;
 class Test_Table_Of_Contents extends WP_UnitTestCase {
 
 	/**
+	 * Post of the last render_post().
+	 *
+	 * @var int
+	 */
+	private int $post_id = 0;
+
+	/**
 	 * Saved heading markup.
 	 *
 	 * @param int    $level  Heading level.
@@ -37,8 +44,18 @@ class Test_Table_Of_Contents extends WP_UnitTestCase {
 	 */
 	private function render_post( string $content ): string {
 		Table_Of_Contents::forget();
-		$id = self::factory()->post->create( array( 'post_content' => $content ) );
-		$this->go_to( get_permalink( $id ) );
+		$this->post_id = self::factory()->post->create( array( 'post_content' => $content ) );
+		return $this->render_part( 1 );
+	}
+
+	/**
+	 * Renders a part of the post of the last render_post() through core/post-content, as the address of that part does.
+	 *
+	 * @param int $part Part, from 1.
+	 */
+	private function render_part( int $part ): string {
+		$id = $this->post_id;
+		$this->go_to( 1 === $part ? get_permalink( $id ) : add_query_arg( 'page', $part, get_permalink( $id ) ) );
 		setup_postdata( get_post( $id ) );
 		$GLOBALS['post'] = get_post( $id ); // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- The loop of a template.
 		return do_blocks( '<!-- wp:post-content /-->' );
@@ -149,5 +166,92 @@ class Test_Table_Of_Contents extends WP_UnitTestCase {
 		$html = $this->render_post( "<!-- wp:leitvia/table-of-contents /-->\n" . self::heading( 2, 'A &lt;b&gt; &amp; <em>c</em>' ) . self::heading( 2, 'Quote', 'x&quot;onmouseover=&quot;y' ) );
 		$this->assertStringContainsString( '>A &lt;b&gt; &amp; c</a>', $html );
 		$this->assertStringNotContainsString( '"onmouseover', $html );
+	}
+
+	/**
+	 * Three parts: the table of contents in part 1, Arrival in parts 1 and 2, an own id in part 3 and an h4 with an
+	 * own id there that the list leaves out.
+	 *
+	 * @param string $attrs Attributes of the table of contents, JSON with a leading space or empty.
+	 */
+	private static function three_parts( string $attrs = '' ): string {
+		$next = "<!-- wp:nextpage -->\n<!--nextpage-->\n<!-- /wp:nextpage -->\n";
+		return '<!-- wp:leitvia/table-of-contents' . $attrs . " /-->\n"
+			. self::heading( 2, 'Arrival' ) . self::heading( 3, 'Ferry' ) . $next
+			. self::heading( 2, 'Highlands' ) . self::heading( 2, 'Arrival' ) . $next
+			. self::heading( 2, 'Islands', 'isles' ) . self::heading( 4, 'Deep', 'deep' ) . self::heading( 2, 'Departure' );
+	}
+
+	/**
+	 * (7) In part 2 of three, scope all groups the entries by part: the part links lead to their parts, the current
+	 * one with aria-current page; entries of parts 1 and 3 link to the address of their part plus the anchor, those of
+	 * part 2 to the anchor alone. The list stands at the top of part 2, which has none of its own, and the second
+	 * Arrival gets its id, not the one of part 1.
+	 */
+	public function test_parts_link_to_their_part(): void {
+		$this->render_post( self::three_parts() );
+		$html = $this->render_part( 2 );
+		$one  = home_url( '/?p=' ) . $this->post_id;
+		$this->assertStringContainsString(
+			'<ol><li><a href="' . $one . '">Part 1</a><ol><li><a href="' . $one . '#arrival">Arrival</a><ol><li><a href="' . $one . '#ferry">Ferry</a></li></ol></li></ol></li>'
+			. '<li><a href="' . $one . '&#038;page=2" aria-current="page">Part 2</a><ol><li><a href="#highlands">Highlands</a></li><li><a href="#arrival-2">Arrival</a></li></ol></li>'
+			. '<li><a href="' . $one . '&#038;page=3">Part 3</a><ol><li><a href="' . $one . '&#038;page=3#isles">Islands</a></li><li><a href="' . $one . '&#038;page=3#departure">Departure</a></li></ol></li></ol></nav>',
+			$html
+		);
+		$this->assertMatchesRegularExpression( '#^<div [^>]*class="[^"]*\bwp-block-post-content\b[^"]*"[^>]*><nav #', $html, 'the list at the top of the part' );
+		$this->assertSame( 1, substr_count( $html, '<nav ' ) );
+		$this->assertStringContainsString( '<h2 id="highlands" class="wp-block-heading">Highlands</h2>', $html );
+		$this->assertStringContainsString( '<h2 id="arrival-2" class="wp-block-heading">Arrival</h2>', $html );
+		$this->assertStringNotContainsString( 'Ferry</h3>', $html, 'part 1 does not render in part 2' );
+	}
+
+	/**
+	 * (7) With pretty permalinks the parts are /<slug>/<n>/; in part 1 its own entries link to the anchor alone and
+	 * the list in the flow is not repeated.
+	 */
+	public function test_parts_with_pretty_permalinks(): void {
+		$this->set_permalink_structure( '/%postname%/' );
+		$html = $this->render_post( self::three_parts() );
+		$url  = get_permalink( $this->post_id );
+		$this->assertStringContainsString( '<a href="' . $url . '" aria-current="page">Part 1</a><ol><li><a href="#arrival">Arrival</a>', $html );
+		$this->assertStringContainsString( '<li><a href="' . $url . '2/#arrival-2">Arrival</a></li>', $html );
+		$this->assertStringContainsString( '<li><a href="' . $url . '3/#departure">Departure</a></li>', $html );
+		$this->assertStringContainsString( '<h2 id="arrival" class="wp-block-heading">Arrival</h2>', $html );
+		$this->assertSame( 1, substr_count( $html, '<nav ' ) );
+	}
+
+	/**
+	 * (7) Scope part lists the current part alone, without part links; a post without parts ignores the scope.
+	 */
+	public function test_scope_part_lists_the_current_part(): void {
+		$this->render_post( self::three_parts( ' {"scope":"part"}' ) );
+		$html = $this->render_part( 3 );
+		$this->assertStringContainsString( '<ol><li><a href="#isles">Islands</a></li><li><a href="#departure">Departure</a></li></ol></nav>', $html );
+		$this->assertStringNotContainsString( 'Part 1', $html );
+		$this->assertStringNotContainsString( 'arrival', $html );
+
+		$plain = $this->render_post( '<!-- wp:leitvia/table-of-contents {"scope":"part"} /-->' . "\n" . self::heading( 2, 'Start' ) . self::heading( 2, 'Use' ) );
+		$this->assertStringContainsString( '<ol><li><a href="#start">Start</a></li><li><a href="#use">Use</a></li></ol></nav>', $plain );
+	}
+
+	/**
+	 * (8) anchor_url() for add-ons: in part 2, an anchor of part 1 or 3 gets the address of its part, generated ids,
+	 * own ids and own ids of headings outside the list alike; an anchor of part 2 and an unknown one stay #anchor, so
+	 * does every anchor of a post without parts. A leading # is allowed.
+	 */
+	public function test_anchor_url_for_add_ons(): void {
+		$this->render_post( self::three_parts() );
+		$id  = $this->post_id;
+		$one = home_url( '/?p=' ) . $id;
+		$this->render_part( 2 );
+		$this->assertSame( $one . '#ferry', Table_Of_Contents::anchor_url( $id, 'ferry' ) );
+		$this->assertSame( $one . '&page=3#isles', Table_Of_Contents::anchor_url( get_post( $id ), '#isles' ) );
+		$this->assertSame( $one . '&page=3#deep', Table_Of_Contents::anchor_url( $id, 'deep' ) );
+		$this->assertSame( '#arrival-2', Table_Of_Contents::anchor_url( $id, 'arrival-2' ) );
+		$this->assertSame( '#nowhere', Table_Of_Contents::anchor_url( $id, 'nowhere' ) );
+
+		$this->render_post( "<!-- wp:leitvia/table-of-contents /-->\n" . self::heading( 2, 'Start' ) );
+		$this->assertSame( '#start', Table_Of_Contents::anchor_url( $this->post_id, 'start' ) );
+		$this->assertSame( '#x', Table_Of_Contents::anchor_url( 0, 'x' ) );
 	}
 }

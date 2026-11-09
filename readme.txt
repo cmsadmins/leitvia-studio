@@ -4,7 +4,7 @@ Tags: ai, mcp, block theme, accessibility, design tokens
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.34
+Stable tag: 1.3.35
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -212,6 +212,11 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * Privacy policy: https://leitvia.com/privacy-policy/
 
 == Changelog ==
+
+= 1.3.35 =
+* Table of contents in a post split into parts (core/nextpage): every heading knows its part. With scope all (default) the list groups the headings under Part 1, Part 2 and so on, marks the part being read with aria-current and links headings of other parts to the address of their part plus the anchor; scope part lists the part being read alone. One table of contents in part 1 shows at the top of every part. Generated heading ids stay unique across all parts.
+* Table_Of_Contents::anchor_url( $post, $anchor ) gives add-ons the address of an anchor in a post with parts.
+* Token sets with a group this version does not read (a role of a later version, a typo) come back from creating and activating with the warning leitvia_studio_dtcg_unknown_group, naming the group and the version of Studio, instead of dropping the group without a word.
 
 = 1.3.34 =
 * Token sets may set the text width and the wide width with the optional roles size.content (30 to 80 rem) and size.wide (60 to 100 rem, not narrower than size.content); without them the widths of the theme stay.

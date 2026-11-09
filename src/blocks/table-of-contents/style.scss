@@ -15,7 +15,8 @@
 		margin-block: var(--wp--preset--spacing--xs, 0.5rem);
 	}
 
-	a[aria-current="location"] {
+	// The section being read (location) and, in a post split into parts, the part being read (page).
+	a[aria-current] {
 		text-decoration-line: underline;
 		text-decoration-thickness: 0.2em;
 	}

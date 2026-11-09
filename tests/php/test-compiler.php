@@ -295,6 +295,37 @@ class Test_Compiler extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A top-level group this version does not read warns with the group and the version of Studio and holds nothing
+	 * back; the known groups, size and keys from $ give no such warning.
+	 */
+	public function test_unknown_group_warns_with_version(): void {
+		$id  = self::set_with_accent( '#123456' );
+		$doc = json_decode( get_post_meta( $id, Token_Sets::META, true ), true );
+		$this->assertSame( array(), wp_list_filter( Compiler::check( $doc + array( '$description' => 'Set' ) ), array( 'code' => 'leitvia_studio_dtcg_unknown_group' ) ) );
+
+		$doc['lineHeight'] = array(
+			'body' => array(
+				'$type'  => 'dimension',
+				'$value' => '1.5rem',
+			),
+		);
+		update_post_meta( $id, Token_Sets::META, wp_slash( wp_json_encode( $doc ) ) );
+		$found = array_values( wp_list_filter( Compiler::check( $doc ), array( 'code' => 'leitvia_studio_dtcg_unknown_group' ) ) );
+		$this->assertCount( 1, $found );
+		$this->assertSame( 'warning', $found[0]['severity'] );
+		$this->assertSame(
+			array(
+				'group'   => 'lineHeight',
+				'version' => LEITVIA_STUDIO_VERSION,
+			),
+			$found[0]['data']
+		);
+		$this->assertStringContainsString( 'lineHeight', $found[0]['message'] );
+		$this->assertStringContainsString( LEITVIA_STUDIO_VERSION, $found[0]['message'] );
+		$this->assertTrue( Compiler::activate( $id ) );
+	}
+
+	/**
 	 * A check with an error blocks activation; warnings do not.
 	 */
 	public function test_checks_block_activation(): void {

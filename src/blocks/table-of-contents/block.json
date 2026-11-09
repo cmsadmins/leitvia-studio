@@ -6,7 +6,7 @@
 	"title": "Table of Contents",
 	"category": "leitvia",
 	"icon": "list-view",
-	"description": "Lists the headings of this page as links, built when the page renders. Marks the section being read; as a companion it stays at hand as a chapter button.",
+	"description": "Lists the headings of this page as links, built when the page renders. Marks the section being read; as a companion it stays at hand as a chapter button. In a post split into parts it groups the headings by part and links each to its part.",
 	"keywords": [ "toc", "headings", "outline", "jump links" ],
 	"textdomain": "leitvia-studio",
 	"attributes": {
@@ -19,6 +19,11 @@
 			"type": "string",
 			"enum": [ "inline", "companion" ],
 			"default": "inline"
+		},
+		"scope": {
+			"type": "string",
+			"enum": [ "all", "part" ],
+			"default": "all"
 		}
 	},
 	"usesContext": [ "postId" ],

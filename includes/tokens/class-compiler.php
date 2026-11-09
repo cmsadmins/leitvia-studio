@@ -35,6 +35,35 @@ final class Compiler {
 	public const HASH_OPTION   = 'leitvia_studio_applied_hash';
 
 	/**
+	 * Warns about top-level groups this version does not read (a role group of a later version, a typo), which would
+	 * otherwise be dropped without a word. Keys from $ ($schema, $description, $extensions) are no groups.
+	 *
+	 * @param array<string, mixed> $doc Token document.
+	 * @return list<array<string, mixed>>
+	 */
+	private static function check_unknown_groups( array $doc ): array {
+		$findings = array();
+		foreach ( array_keys( $doc ) as $group ) {
+			$group = (string) $group;
+			if ( str_starts_with( $group, '$' ) || isset( Dtcg::GROUPS[ $group ] ) || 'size' === $group ) {
+				continue;
+			}
+			$findings[] = array(
+				'code'     => 'leitvia_studio_dtcg_unknown_group',
+				'severity' => 'warning',
+				/* translators: 1: token group, for example size, 2: version of Leitvia Studio. */
+				'message'  => sprintf( __( 'Token group %1$s is unknown to Leitvia Studio %2$s and is ignored.', 'leitvia-studio' ), $group, LEITVIA_STUDIO_VERSION ),
+				'fix'      => __( 'Update Leitvia Studio to the version the token role needs, or remove the group or correct its name.', 'leitvia-studio' ),
+				'data'     => array(
+					'group'   => $group,
+					'version' => LEITVIA_STUDIO_VERSION,
+				),
+			);
+		}
+		return $findings;
+	}
+
+	/**
 	 * Warns about font families without font faces on this site: not bundled, not in the Font Library.
 	 *
 	 * @param array<string, mixed> $doc Token document.
@@ -168,7 +197,7 @@ final class Compiler {
 	 * @return list<array<string, mixed>>
 	 */
 	public static function check( array $doc ): array {
-		$findings = array_merge( self::check_fonts( $doc ), self::check_extra_accent( $doc ) );
+		$findings = array_merge( self::check_unknown_groups( $doc ), self::check_fonts( $doc ), self::check_extra_accent( $doc ) );
 		foreach ( leitvia_studio()->registry( 'checks' )->all( array( 'scope' => 'token_set' ) ) as $check ) {
 			foreach ( (array) call_user_func( $check['callback'], $doc ) as $finding ) {
 				if ( is_array( $finding ) ) {

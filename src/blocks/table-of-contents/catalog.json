@@ -1,6 +1,6 @@
 {
 	"usage": {
-		"useWhen": "Long pages or articles with several h2 and h3 headings. display companion for long texts of about 2,500 words or more: a chapter button stays at the bottom edge once the list is scrolled away.",
+		"useWhen": "Long pages or articles with several h2 and h3 headings. display companion for long texts of about 2,500 words or more: a chapter button stays at the bottom edge once the list is scrolled away. In a post split with core/nextpage, one at the top of part 1: it shows at the top of every part, grouped by part with links to the other parts (scope all), or for the part being read alone (scope part).",
 		"avoidWhen": "Short pages with fewer than three headings.",
 		"a11y": "The list is a navigation landmark with links to the headings; the section being read is marked. The chapter button opens a modal dialog with the same list and returns focus when it closes; without JavaScript only the list remains."
 	}

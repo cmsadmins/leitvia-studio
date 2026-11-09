@@ -341,6 +341,44 @@ class Test_Gateway_Setup extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A group this version does not read gives the warning leitvia_studio_dtcg_unknown_group with the group and the
+	 * Studio version when the set is created and when it is activated; the warning holds nothing back.
+	 */
+	public function test_unknown_group_is_reported(): void {
+		$warnings         = static fn( array $result ): array => array_values( wp_list_filter( $result['findings'], array( 'code' => 'leitvia_studio_dtcg_unknown_group' ) ) );
+		$doc              = self::document();
+		$doc['maxWidths'] = array(
+			'page' => array(
+				'$type'  => 'dimension',
+				'$value' => '80rem',
+			),
+		);
+
+		$this->sign_in( 'full', 'administrator' );
+		$created = $this->assert_mode(
+			'live',
+			self::call(
+				'leitvia/create-token-set',
+				array(
+					'title'    => 'Later role',
+					'document' => $doc,
+				)
+			)
+		);
+		$this->assertSame(
+			array(
+				'group'   => 'maxWidths',
+				'version' => LEITVIA_STUDIO_VERSION,
+			),
+			$warnings( $created )[0]['data'] ?? null
+		);
+		$set       = (int) $created['target']['post'];
+		$activated = $this->assert_mode( 'live', self::call( 'leitvia/activate-token-set', array( 'set' => $set ) ) );
+		$this->assertCount( 1, $warnings( $activated ) );
+		$this->assertSame( $set, (int) get_option( Compiler::ACTIVE_OPTION ) );
+	}
+
+	/**
 	 * A full variation replaces the global styles, a colors variation only its colors; the snapshot keeps the state
 	 * before; unknown variations are refused. An agent proposes a variation in the profile full as well.
 	 */

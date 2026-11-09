@@ -1,9 +1,10 @@
 // Marks the link of the section being read with aria-current="location". It moves no focus and announces nothing;
-// the links work without this module. With display companion (Table_Of_Contents::companion()) it also shows the
-// chapter button while the list is out of view and the end of the content is not, with the section being read and
-// the reading progress. The button opens a modal dialog with the same list: focus on the current entry, Escape, the
-// close button and a click outside close it and focus returns to the button; an entry closes it and moves focus to
-// its heading.
+// the links work without this module. In a post split into parts only the links of the part being read point into
+// this page (#anchor); the others lead to their part. With display companion (Table_Of_Contents::companion()) it
+// also shows the chapter button while the list is out of view and the end of the content is not, with the section
+// being read and the reading progress. The button opens a modal dialog with the same list: focus on the current
+// entry, Escape, the close button and a click outside close it and focus returns to the button; an entry closes it
+// and moves focus to its heading.
 const reduced = window.matchMedia( '(prefers-reduced-motion: reduce)' );
 const PREFIX = '.wp-block-leitvia-table-of-contents__';
 
@@ -13,6 +14,10 @@ for ( const nav of document.querySelectorAll(
 	const list = nav.querySelector( ':scope > ol' );
 	const links = [ ...nav.querySelectorAll( 'a[href^="#"]' ) ];
 	const flow = [ ...list.querySelectorAll( 'a[href^="#"]' ) ];
+	// A part of a post without headings of its own links only to other parts: nothing to mark or follow here.
+	if ( ! flow.length ) {
+		continue;
+	}
 	const targets = flow.map( ( link ) =>
 		document.getElementById(
 			decodeURIComponent( link.getAttribute( 'href' ).slice( 1 ) )
