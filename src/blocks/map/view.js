@@ -36,20 +36,37 @@ async function draw( canvas ) {
 			title: place.title,
 			keyboard: true,
 		} )
-			.bindPopup( () => {
-				const popup = document.createElement( 'div' );
-				popup.append( document.createElement( 'p' ) );
-				popup.firstChild.textContent = text.join( ', ' );
-				// A link the server passed (Map::render()), named with the place.
-				if ( place.url ) {
-					const link = document.createElement( 'a' );
-					link.href = place.url;
-					link.textContent = place.linkText;
-					link.setAttribute( 'aria-label', place.linkLabel );
-					popup.append( link );
-				}
-				return popup;
-			} )
+			.bindPopup(
+				() => {
+					// Title in bold, the address below it, the link on a line of its own.
+					const popup = document.createElement( 'div' );
+					const lines = document.createElement( 'p' );
+					text.forEach( ( part, i ) => {
+						const line = document.createElement(
+							0 === i && place.title ? 'strong' : 'span'
+						);
+						line.textContent = part;
+						if ( i ) {
+							lines.append( document.createElement( 'br' ) );
+						}
+						lines.append( line );
+					} );
+					popup.append( lines );
+					// A link the server passed (Map::render()), named with the place.
+					if ( place.url ) {
+						const link = document.createElement( 'a' );
+						link.href = place.url;
+						link.textContent = place.linkText;
+						link.setAttribute( 'aria-label', place.linkLabel );
+						const row = document.createElement( 'p' );
+						row.append( link );
+						popup.append( row );
+					}
+					return popup;
+				},
+				// 24rem at most; the stylesheet keeps it at least 18rem or 80 % of the screen.
+				{ maxWidth: 384 }
+			)
 			.addTo( map );
 		marker.getElement()?.setAttribute( 'aria-label', text.join( ', ' ) );
 		markers.push( marker );

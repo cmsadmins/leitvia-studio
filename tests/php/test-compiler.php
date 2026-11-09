@@ -104,6 +104,41 @@ class Test_Compiler extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The roles size.content and size.wide set the layout widths; a set without them gives the widths of theme.json back, and
+	 * the export of the active styles carries them.
+	 */
+	public function test_size_tokens_set_the_layout(): void {
+		$theme       = wp_get_global_settings( array( 'layout' ) );
+		$plain       = self::set_with_accent( '#654321' );
+		$wide        = self::set_with_accent( '#123456' );
+		$doc         = json_decode( get_post_meta( $wide, Token_Sets::META, true ), true );
+		$size        = static fn( float $rem ): array => array(
+			'$type'  => 'dimension',
+			'$value' => array(
+				'value' => $rem,
+				'unit'  => 'rem',
+			),
+		);
+		$doc['size'] = array(
+			'content' => $size( 64 ),
+			'wide'    => $size( (float) $theme['wideSize'] ),
+		);
+		update_post_meta( $wide, Token_Sets::META, wp_slash( wp_json_encode( $doc ) ) );
+
+		$this->assertTrue( Compiler::activate( $wide ) );
+		WP_Theme_JSON_Resolver::clean_cached_data();
+		$this->assertSame( '64rem', wp_get_global_settings( array( 'layout', 'contentSize' ) ) );
+		$this->assertSame( $theme['wideSize'], wp_get_global_settings( array( 'layout', 'wideSize' ) ) );
+		$this->assertSame( 64, Dtcg::from_settings( wp_get_global_settings(), leitvia_studio_contract() )['size']['content']['$value']['value'] );
+		$this->assertArrayNotHasKey( 'wide', Dtcg::from_settings( wp_get_global_settings(), leitvia_studio_contract() )['size'], 'the width of the theme is not exported' );
+
+		$this->assertTrue( Compiler::activate( $plain ) );
+		WP_Theme_JSON_Resolver::clean_cached_data();
+		$this->assertSame( $theme['contentSize'], wp_get_global_settings( array( 'layout', 'contentSize' ) ) );
+		$this->assertSame( $theme['wideSize'], wp_get_global_settings( array( 'layout', 'wideSize' ) ) );
+	}
+
+	/**
 	 * Drift is detected after the active set is saved again and after the palette changes outside Studio.
 	 */
 	public function test_drift(): void {

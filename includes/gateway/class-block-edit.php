@@ -129,6 +129,12 @@ final class Block_Edit {
 	);
 
 	/**
+	 * Core media blocks whose layout attributes may change, see media(): align and a block style (className) on all of
+	 * them, size, crop, link and lightbox on an image as well.
+	 */
+	public const MEDIA_BLOCKS = array( 'core/image', 'core/gallery', 'core/cover', 'core/media-text' );
+
+	/**
 	 * Attributes of Studio blocks that save as a custom property in percent in the style of their element, rebuilt from
 	 * the new value: the position of a spotlight point on its image.
 	 */
@@ -612,6 +618,9 @@ final class Block_Edit {
 		if ( $attrs && ! array_diff_key( $attrs, array_flip( array( 'leitviaAnimation', 'leitviaMotion' ) ) ) ) {
 			return self::animation( $block, $attrs, $target );
 		}
+		if ( in_array( $name, self::MEDIA_BLOCKS, true ) ) {
+			return self::media( $block, $attrs, $target, $rebuild );
+		}
 		$core  = self::CORE_ATTRIBUTES[ $name ] ?? null;
 		$entry = $core ? array( 'attributes' => array( 'properties' => $core ) ) : array_column( \LeitviaStudio\Blocks\Catalog::get(), null, 'name' )[ $name ] ?? null;
 		if ( ! $entry ) {
@@ -661,6 +670,185 @@ final class Block_Edit {
 			return $rebuild;
 		}
 		$block['attrs'] = $attrs + (array) $block['attrs'];
+		return $block;
+	}
+
+	/**
+	 * Schema of the attributes media() changes on a block of MEDIA_BLOCKS. null removes an attribute.
+	 *
+	 * @param string $name Block name.
+	 * @return array<string, array<string, mixed>>
+	 */
+	public static function media_schema( string $name ): array {
+		$size   = array(
+			'type'    => array( 'string', 'null' ),
+			'pattern' => '^(auto|\d+(\.\d+)?(px|%|em|rem|vw|vh))$',
+		);
+		$schema = array(
+			'align'     => array(
+				'type' => array( 'string', 'null' ),
+				'enum' => array( 'left', 'center', 'right', 'wide', 'full', null ),
+			),
+			'className' => array(
+				'type'    => array( 'string', 'null' ),
+				'pattern' => '^(is-style-[a-z0-9-]+)?$',
+			),
+		);
+		if ( 'core/image' !== $name ) {
+			return $schema;
+		}
+		return $schema + array(
+			'width'           => $size,
+			'height'          => $size,
+			'aspectRatio'     => array(
+				'type'    => array( 'string', 'null' ),
+				'pattern' => '^(auto|\d+(\.\d+)?(/\d+(\.\d+)?)?)$',
+			),
+			'scale'           => array(
+				'type' => array( 'string', 'null' ),
+				'enum' => array( 'cover', 'contain', 'fill', null ),
+			),
+			'sizeSlug'        => array(
+				'type' => 'string',
+				'enum' => array_values( array_merge( get_intermediate_image_sizes(), array( 'full' ) ) ),
+			),
+			'linkDestination' => array(
+				'type' => 'string',
+				'enum' => array( 'none', 'media', 'attachment', 'custom' ),
+			),
+			'href'            => array( 'type' => array( 'string', 'null' ) ),
+			'lightbox'        => array(
+				'type'                 => array( 'object', 'null' ),
+				'properties'           => array( 'enabled' => array( 'type' => 'boolean' ) ),
+				'additionalProperties' => false,
+			),
+		);
+	}
+
+	/**
+	 * Media block with new layout attributes (MEDIA_BLOCKS, media_schema()), its markup rebuilt as the editor saves it:
+	 * the classes align<value>, is-style-<name>, size-<slug> and is-resized on the element of the block, aspect-ratio,
+	 * object-fit, width and height in the style of the image, the src of the size and the link around the image.
+	 * null removes an attribute, so a fixed height without aspect ratio goes with height null.
+	 *
+	 * @param array<string, mixed> $block   Parsed block.
+	 * @param array<string, mixed> $attrs   New attribute values.
+	 * @param array<string, mixed> $target  Target.
+	 * @param \WP_Error            $rebuild Rejection for static markup.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private static function media( array $block, array $attrs, array $target, \WP_Error $rebuild ) {
+		$name   = (string) $block['blockName'];
+		$schema = self::media_schema( $name );
+		foreach ( $attrs as $key => $value ) {
+			if ( ! isset( $schema[ $key ] ) ) {
+				/* translators: %s: attribute name. */
+				return self::invalid( 'attributes', sprintf( __( 'The block has no attribute %s in the catalog.', 'leitvia-studio' ), $key ), $target, 'leitvia/list-blocks' );
+			}
+			$valid = rest_validate_value_from_schema( $value, $schema[ $key ], (string) $key );
+			if ( is_wp_error( $valid ) ) {
+				return self::invalid( 'attributes', $valid->get_error_message(), $target );
+			}
+		}
+		$style = (string) ( $attrs['className'] ?? '' );
+		if ( '' !== $style && ! \WP_Block_Styles_Registry::get_instance()->is_registered( $name, substr( $style, 9 ) ) ) {
+			/* translators: %s: class of a block style. */
+			return self::invalid( 'attributes', sprintf( __( 'The block has no block style %s.', 'leitvia-studio' ), $style ), $target, 'leitvia/list-blocks' );
+		}
+		$tags = new \WP_HTML_Tag_Processor( (string) ( $block['innerContent'][0] ?? '' ) );
+		if ( ! $tags->next_tag() ) {
+			return $rebuild;
+		}
+		$new = array_merge( (array) $block['attrs'], $attrs );
+		if ( array_key_exists( 'align', $attrs ) ) {
+			foreach ( array( 'left', 'center', 'right', 'wide', 'full' ) as $align ) {
+				$tags->remove_class( 'align' . $align );
+			}
+			if ( null !== $attrs['align'] ) {
+				$tags->add_class( 'align' . $attrs['align'] );
+			}
+		}
+		if ( array_key_exists( 'className', $attrs ) ) {
+			$classes = (array) preg_split( '/\s+/', trim( (string) ( $block['attrs']['className'] ?? '' ) ), -1, PREG_SPLIT_NO_EMPTY );
+			foreach ( array_merge( $classes, iterator_to_array( $tags->class_list(), false ) ) as $class ) {
+				if ( str_starts_with( (string) $class, 'is-style-' ) ) {
+					$tags->remove_class( (string) $class );
+				}
+			}
+			$kept = array_values( array_filter( $classes, static fn( $name ): bool => ! str_starts_with( (string) $name, 'is-style-' ) ) );
+			if ( '' !== $style ) {
+				$tags->add_class( $style );
+				$kept[] = $style;
+			}
+			$new['className'] = implode( ' ', $kept );
+		}
+		if ( isset( $attrs['sizeSlug'] ) ) {
+			foreach ( iterator_to_array( $tags->class_list(), false ) as $class ) {
+				if ( str_starts_with( (string) $class, 'size-' ) ) {
+					$tags->remove_class( (string) $class );
+				}
+			}
+			$tags->add_class( 'size-' . $attrs['sizeSlug'] );
+		}
+		$resize = array_intersect_key( $attrs, array_flip( array( 'width', 'height', 'aspectRatio', 'scale' ) ) );
+		if ( $resize && ( empty( $new['width'] ) && empty( $new['height'] ) ) ) {
+			$tags->remove_class( 'is-resized' );
+		} elseif ( $resize ) {
+			$tags->add_class( 'is-resized' );
+		}
+		if ( 'core/image' === $name && ( $resize || isset( $attrs['sizeSlug'] ) ) ) {
+			if ( ! $tags->next_tag( array( 'tag_name' => 'img' ) ) ) {
+				return $rebuild;
+			}
+			if ( isset( $attrs['sizeSlug'] ) ) {
+				$url = wp_get_attachment_image_url( (int) ( $block['attrs']['id'] ?? 0 ), (string) $attrs['sizeSlug'] );
+				if ( ! $url ) {
+					return $rebuild;
+				}
+				$tags->set_attribute( 'src', $url );
+			}
+			if ( $resize ) {
+				// The editor saves the four as style of the image, in this order, after the border styles.
+				$rules = array_filter(
+					array_map( 'trim', explode( ';', (string) $tags->get_attribute( 'style' ) ) ),
+					static fn( string $rule ): bool => '' !== $rule && ! preg_match( '/^(aspect-ratio|object-fit|width|height)\s*:/i', $rule )
+				);
+				$css   = array(
+					'aspect-ratio' => $new['aspectRatio'] ?? null,
+					'object-fit'   => $new['scale'] ?? null,
+					'width'        => $new['width'] ?? null,
+					'height'       => $new['height'] ?? null,
+				);
+				foreach ( array_filter( $css, static fn( $value ): bool => is_string( $value ) && '' !== $value ) as $property => $value ) {
+					$rules[] = $property . ':' . $value;
+				}
+				$tags->remove_attribute( 'width' );
+				$tags->remove_attribute( 'height' );
+				if ( $rules ) {
+					$tags->set_attribute( 'style', implode( ';', $rules ) );
+				} else {
+					$tags->remove_attribute( 'style' );
+				}
+			}
+		}
+		// remove_attribute() leaves the space before it (<img >), which KSES would close up.
+		$html = (string) preg_replace( '#<([a-z][^\s/>]*)\s+(/?)>#i', '<$1$2>', $tags->get_updated_html() );
+		if ( array_key_exists( 'href', $attrs ) ) {
+			$url = null === $attrs['href'] ? '' : self::url( (string) $attrs['href'] );
+			if ( null !== $attrs['href'] && '' === $url ) {
+				return self::invalid( 'url', __( 'The link is not a valid URL.', 'leitvia-studio' ), $target );
+			}
+			$linked = preg_match( '#<a\b[^>]*>\s*(<img\b[^>]*>)\s*</a>#i', $html, $match );
+			$image  = $linked ? $match[1] : ( preg_match( '#<img\b[^>]*>#i', $html, $found ) ? $found[0] : '' );
+			if ( 'core/image' !== $name || '' === $image ) {
+				return $rebuild;
+			}
+			$html                   = str_replace( $linked ? $match[0] : $image, '' === $url ? $image : '<a href="' . esc_url( $url ) . '">' . $image . '</a>', $html );
+			$new['href']            = '' === $url ? null : $url;
+			$new['linkDestination'] = $attrs['linkDestination'] ?? ( '' === $url ? 'none' : 'custom' );
+		}
+		$block['innerContent'][0] = $html;
+		$block['attrs']           = array_filter( $new, static fn( $value ): bool => null !== $value && '' !== $value );
 		return $block;
 	}
 

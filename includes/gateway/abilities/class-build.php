@@ -326,7 +326,7 @@ final class Build {
 		if ( $attributes ) {
 			$schema['properties']['attributes'] = array(
 				'type'        => 'object',
-				'description' => __( 'Attributes from leitvia/list-blocks; for a core/heading its level, 1 to 6; for a core/query query with perPage, pages, offset, postType, order, orderBy, sticky and inherit (perPage counts with inherit false); for a core/video tracks, each with id, kind, srclang and label; leitviaAnimation and leitviaMotion on every block that lists them (null removes leitviaMotion).', 'leitvia-studio' ),
+				'description' => __( 'Attributes from leitvia/list-blocks; for a core/heading its level, 1 to 6; for a core/query query with perPage, pages, offset, postType, order, orderBy, sticky and inherit (perPage counts with inherit false); for a core/video tracks, each with id, kind, srclang and label; leitviaAnimation and leitviaMotion on every block that lists them (null removes leitviaMotion); on core media blocks align and className (is-style-<name>), on core/image also width, height, aspectRatio, scale, sizeSlug, linkDestination, href, lightbox (null removes one).', 'leitvia-studio' ),
 			);
 		}
 		return $schema;

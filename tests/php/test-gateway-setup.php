@@ -1253,4 +1253,40 @@ class Test_Gateway_Setup extends WP_UnitTestCase {
 		$this->assertSame( $first['package'], $second['package'] );
 		$this->assertCount( 1, Packages::operations( $first['package'] ) );
 	}
+
+	/**
+	 * A header written as content keeps the settings of the navigation of the theme header (submenus on click, the
+	 * overlay, the name) where the new navigation lacks them; a value it sets stays. Without a navigation in the part
+	 * nothing is added.
+	 */
+	public function test_update_template_part_keeps_navigation_settings(): void {
+		$this->sign_in( 'full' );
+		$this->assert_mode(
+			'live',
+			self::call(
+				'leitvia/update-template-part',
+				array(
+					'part'    => 'header',
+					'content' => '<!-- wp:group {"tagName":"header"} --><header class="wp-block-group"><!-- wp:site-title /--><!-- wp:navigation {"ref":4711} /--></header><!-- /wp:group -->',
+				)
+			)
+		);
+		$template = get_block_template( get_stylesheet() . '//header', 'wp_template_part' );
+		$attrs    = parse_blocks( $template->content )[0]['innerBlocks'][1]['attrs'];
+		$this->assertSame( 4711, $attrs['ref'] );
+		$this->assertSame( 'click', $attrs['submenuVisibility'] );
+		$this->assertSame( 'navigation-overlay', $attrs['overlay'] );
+		$this->assertNotEmpty( $attrs['ariaLabel'] );
+		$this->assertArrayNotHasKey( 'layout', $attrs, 'only the settings, not the layout' );
+
+		$this->assertSame(
+			'<!-- wp:navigation {"submenuVisibility":"hover","ariaLabel":"Main"} /-->',
+			LeitviaStudio\Gateway\Abilities\Setup::keep_navigation(
+				'<!-- wp:navigation {"submenuVisibility":"hover","ariaLabel":"Main"} /-->',
+				'<!-- wp:navigation {"submenuVisibility":"click","ariaLabel":"Old"} /-->'
+			),
+			'values the content sets stay, byte for byte'
+		);
+		$this->assertSame( '<!-- wp:site-title /-->', LeitviaStudio\Gateway\Abilities\Setup::keep_navigation( '<!-- wp:site-title /-->', '<!-- wp:navigation {"submenuVisibility":"click"} /-->' ) );
+	}
 }

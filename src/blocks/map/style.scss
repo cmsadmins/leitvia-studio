@@ -54,3 +54,21 @@ $heights: (
 		gap: var(--wp--preset--spacing--xxs, 0.25rem);
 	}
 }
+
+// Leaflet sizes the popup to its content: without a minimum a title and address wrap word by word and the theme
+// hyphenates them in the middle of a word. Long codes without spaces (a plus code) still break instead of overflowing.
+.wp-block-leitvia-map .leaflet-popup-content {
+	min-inline-size: min(18rem, 80vw);
+	max-inline-size: min(24rem, 80vw);
+	hyphens: manual;
+	overflow-wrap: break-word;
+
+	p {
+		margin-block: 0 var(--wp--preset--spacing--xxs, 0.25rem);
+		hyphens: manual;
+
+		&:last-child {
+			margin-block-end: 0;
+		}
+	}
+}

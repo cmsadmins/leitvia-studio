@@ -180,7 +180,8 @@ final class Compiler {
 	}
 
 	/**
-	 * Lays the preset lists of compiled settings over user global styles data as origin theme. A style variation stores
+	 * Lays the preset lists of compiled settings over user global styles data as origin theme, and the layout widths
+	 * of the group size. A style variation stores
 	 * plain lists, which core reads as origin custom, and custom presets outrank theme ones in the stylesheet; so the
 	 * roles of the settings leave custom and only other presets stay there. Activation, overlays and the Lab preview
 	 * share this, so a set takes effect on a site with a style variation as well.
@@ -201,6 +202,16 @@ final class Compiler {
 			$custom  = array_values( array_filter( (array) ( $current['custom'] ?? array() ), static fn( $p ): bool => ! in_array( $p['slug'] ?? null, $slugs, true ) ) );
 			unset( $current['custom'] );
 			$data['settings'][ $section ][ $list ] = array( 'theme' => $presets ) + ( $custom ? array( 'custom' => $custom ) : array() ) + $current;
+		}
+		// The widths of size.content and size.wide; a set without them gives the widths of theme.json back.
+		foreach ( Dtcg::SIZES as list( $setting ) ) {
+			unset( $data['settings']['layout'][ $setting ] );
+			if ( isset( $settings['layout'][ $setting ] ) ) {
+				$data['settings']['layout'][ $setting ] = $settings['layout'][ $setting ];
+			}
+		}
+		if ( isset( $data['settings']['layout'] ) && ! $data['settings']['layout'] ) {
+			unset( $data['settings']['layout'] );
 		}
 		return $data;
 	}

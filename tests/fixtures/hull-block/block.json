@@ -1,0 +1,9 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "hull-addon/aside",
+	"title": "Hull demo",
+	"category": "design",
+	"description": "A block of a test add-on whose inner blocks sit in a box element.",
+	"supports": { "align": [ "wide" ] }
+}

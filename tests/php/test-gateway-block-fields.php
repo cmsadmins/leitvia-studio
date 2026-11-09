@@ -396,6 +396,145 @@ class Test_Gateway_Block_Fields extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Layout attributes of core media blocks change one by one: a fixed height goes with null, an aspect ratio and a
+	 * crop come in, a size swaps class and src, a link wraps the image and goes again, align and a block style change
+	 * the classes. Other attributes and unknown block styles are refused.
+	 */
+	public function test_update_block_media_attributes(): void {
+		$image = self::factory()->attachment->create_upload_object( DIR_TESTDATA . '/images/canola.jpg' );
+		$src   = (string) wp_get_attachment_image_url( $image, 'large' );
+		$page  = self::page( '<!-- wp:image {"id":' . $image . ',"width":"1198px","height":"512px","sizeSlug":"large","linkDestination":"none"} --><figure class="wp-block-image size-large is-resized"><img src="' . $src . '" alt="Lake at dusk" class="wp-image-' . $image . '" style="width:1198px;height:512px"/></figure><!-- /wp:image -->' );
+
+		$content = self::edit( $page, array( 'attributes' => array( 'height' => null ) ) );
+		$this->assertIsString( $content, is_wp_error( $content ) ? $content->get_error_message() : '' );
+		$block = parse_blocks( $content )[0];
+		$this->assertArrayNotHasKey( 'height', $block['attrs'] );
+		$this->assertSame( '1198px', $block['attrs']['width'] );
+		$this->assertStringContainsString( 'style="width:1198px"', $block['innerHTML'] );
+		$this->assertStringContainsString( 'is-resized', $block['innerHTML'] );
+
+		$content = self::edit(
+			$page,
+			array(
+				'attributes' => array(
+					'width'       => null,
+					'aspectRatio' => '16/9',
+					'scale'       => 'cover',
+				),
+			)
+		);
+		$block   = parse_blocks( $content )[0];
+		$this->assertSame( '16/9', $block['attrs']['aspectRatio'] );
+		$this->assertSame( 'cover', $block['attrs']['scale'] );
+		$this->assertStringContainsString( 'style="aspect-ratio:16/9;object-fit:cover"', $block['innerHTML'] );
+		$this->assertStringNotContainsString( 'is-resized', $block['innerHTML'] );
+
+		$content = self::edit(
+			$page,
+			array(
+				'attributes' => array(
+					'sizeSlug' => 'medium',
+					'href'     => '/journeys/',
+					'align'    => 'wide',
+				),
+			)
+		);
+		$block   = parse_blocks( $content )[0];
+		$this->assertStringContainsString( 'size-medium', $block['innerHTML'] );
+		$this->assertStringNotContainsString( 'size-large', $block['innerHTML'] );
+		$this->assertStringContainsString( 'alignwide', $block['innerHTML'] );
+		$this->assertStringContainsString( 'src="' . wp_get_attachment_image_url( $image, 'medium' ) . '"', $block['innerHTML'] );
+		$this->assertMatchesRegularExpression( '#<a href="[^"]*/journeys/"><img [^>]+></a>#', $block['innerHTML'] );
+		$this->assertSame( 'custom', $block['attrs']['linkDestination'] );
+
+		$content = self::edit( $page, array( 'attributes' => array( 'href' => null ) ) );
+		$block   = parse_blocks( $content )[0];
+		$this->assertStringNotContainsString( '<a ', $block['innerHTML'] );
+		$this->assertArrayNotHasKey( 'href', $block['attrs'] );
+		$this->assertSame( 'none', $block['attrs']['linkDestination'] );
+
+		$this->assert_rejected( 'leitvia_invalid_input', self::edit( $page, array( 'attributes' => array( 'url' => 'https://example.com/x.jpg' ) ) ) );
+		$this->assert_rejected( 'leitvia_invalid_input', self::edit( $page, array( 'attributes' => array( 'height' => '12 parsecs' ) ) ) );
+		$this->assert_rejected( 'leitvia_invalid_input', self::edit( $page, array( 'attributes' => array( 'className' => 'is-style-unknown' ) ) ) );
+
+		register_block_style(
+			'core/gallery',
+			array(
+				'name'  => 'test-frame',
+				'label' => 'Frame',
+			)
+		);
+		$gallery = self::page( '<!-- wp:gallery {"linkTo":"none"} --><figure class="wp-block-gallery has-nested-images columns-default is-cropped"><!-- wp:image {"id":' . $image . '} --><figure class="wp-block-image"><img src="' . $src . '" alt="Lake at dusk" class="wp-image-' . $image . '"/></figure><!-- /wp:image --></figure><!-- /wp:gallery -->' );
+		$content = self::edit( $gallery, array( 'attributes' => array( 'className' => 'is-style-test-frame' ) ) );
+		unregister_block_style( 'core/gallery', 'test-frame' );
+		$this->assertIsString( $content, is_wp_error( $content ) ? $content->get_error_message() : '' );
+		$block = parse_blocks( $content )[0];
+		$this->assertSame( 'is-style-test-frame', $block['attrs']['className'] );
+		$this->assertStringContainsString( 'wp-block-gallery has-nested-images columns-default is-cropped is-style-test-frame', $block['innerHTML'] );
+		$this->assert_rejected( 'leitvia_invalid_input', self::edit( $gallery, array( 'attributes' => array( 'width' => '10px' ) ) ) );
+	}
+
+	/**
+	 * A stored block of a plugin that is gone, with markup KSES would cut (an iframe), holds back no write elsewhere in
+	 * the post: only changed blocks are checked, the stored block stays byte for byte, and a rejection names the block
+	 * that is unsafe, not the block the write targets.
+	 */
+	public function test_stored_unsafe_block_stays(): void {
+		$text    = '<!-- wp:paragraph --><p>Old</p><!-- /wp:paragraph -->';
+		$foreign = '<!-- wp:acf/decor {"name":"acf/decor"} --><div class="decor"><iframe src="https://maps.example.com/embed"></iframe></div><!-- /wp:acf/decor -->';
+		$page    = self::page( $text );
+		global $wpdb;
+		$wpdb->update( $wpdb->posts, array( 'post_content' => $text . $foreign ), array( 'ID' => $page ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Content as a person with unfiltered_html stored it.
+		clean_post_cache( $page );
+
+		$content = self::edit( $page, array( 'text' => 'New' ) );
+		$this->assertIsString( $content, is_wp_error( $content ) ? $content->get_error_code() . ' ' . $content->get_error_message() : '' );
+		$this->assertStringContainsString( '<p>New</p>', $content );
+		// The markup stays byte for byte; only the block ID of the gateway lands in its delimiter.
+		$this->assertStringContainsString( '<div class="decor"><iframe src="https://maps.example.com/embed"></iframe></div><!-- /wp:acf/decor -->', $content, 'the stored block stays byte for byte' );
+
+		$changed = Pipeline::unsafe( $text . str_replace( 'maps.example.com', 'other.example.com', $foreign ), false, $text . $foreign );
+		$this->assertSame( 'p:1', $changed['block'], 'a changed foreign block is checked' );
+		$this->assertNull( Pipeline::unsafe( '<!-- wp:paragraph --><p>Other</p><!-- /wp:paragraph -->' . $foreign, false, $text . $foreign ) );
+
+		$page   = self::page( $text . '<!-- wp:paragraph --><p>Second</p><!-- /wp:paragraph -->' );
+		$result = self::call(
+			'leitvia/update-content',
+			array(
+				'post'      => $page,
+				'content'   => '<!-- wp:paragraph --><p>Hi<script>x()</script></p><!-- /wp:paragraph --><!-- wp:paragraph --><p>Second</p><!-- /wp:paragraph -->',
+				'base_hash' => Hashes::document( $page ),
+			)
+		);
+		$this->assert_rejected( 'leitvia_unsafe_content', $result );
+		$this->assertSame( 'p:0', $result->get_error_data()['found']['block'] );
+		$this->assertSame( 'p:0', $result->get_error_data()['target']['block'] );
+	}
+
+	/**
+	 * Only markup the content before holds as it is passes unchecked. A new block that splits stored markup around an
+	 * inner block (at a | of the stored text) is checked, and so is a new block inside a stored foreign block. A copy
+	 * of a stored block in the same post passes: it brings no markup that was not there.
+	 */
+	public function test_stored_keys_do_not_cover_new_markup(): void {
+		$stored = '<!-- wp:acf/decor --><div class="decor"><a href="java|script:x()">Link</a></div><!-- /wp:acf/decor -->';
+		$split  = '<!-- wp:acf/decor --><div class="decor"><a href="java<!-- wp:paragraph /-->script:x()">Link</a></div><!-- /wp:acf/decor -->';
+		$this->assertNull( Pipeline::unsafe( $stored, false, $stored ), 'the stored block itself passes' );
+		$found = Pipeline::unsafe( $split, false, $stored );
+		$this->assertNotNull( $found, 'markup split around an inner block is new' );
+		$this->assertSame( 'p:0', $found['block'] );
+
+		$box   = '<!-- wp:acf/box --><div class="box"><!-- wp:paragraph --><p>A</p><!-- /wp:paragraph --></div><!-- /wp:acf/box -->';
+		$found = Pipeline::unsafe( '<!-- wp:acf/box --><div class="box"><!-- wp:paragraph --><p>A</p><!-- /wp:paragraph --><!-- wp:html --><script>x()</script><!-- /wp:html --></div><!-- /wp:acf/box -->', false, $box );
+		$this->assertSame( 'html_block', $found['reason'] ?? '', 'a new block inside a stored foreign block is checked' );
+		$this->assertSame( 'p:0.1', $found['block'] );
+		$foreign = '<!-- wp:acf/decor {"name":"acf/decor"} --><div class="decor"><iframe src="https://maps.example.com/embed"></iframe><!-- wp:paragraph --><p>A</p><!-- /wp:paragraph --></div><!-- /wp:acf/decor -->';
+		$this->assertNotNull( Pipeline::unsafe( str_replace( '<p>A</p>', '<p>A<script>x()</script></p>', $foreign ), false, $foreign ) );
+
+		$this->assertNull( Pipeline::unsafe( $foreign . $foreign, false, $foreign ), 'a copy of a stored block brings nothing new' );
+	}
+
+	/**
 	 * Query is in the catalog; perPage alone keeps the other settings, or the default of core on a query without any.
 	 */
 	public function test_update_block_query(): void {

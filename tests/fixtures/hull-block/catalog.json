@@ -1,0 +1,8 @@
+{
+	"usage": {
+		"useWhen": "Tests of the static hull.",
+		"avoidWhen": "Anything else.",
+		"a11y": "None."
+	},
+	"example": "<!-- wp:hull-addon/aside {\"align\":\"wide\"} -->\n<div class=\"wp-block-hull-addon-aside alignwide\"><div class=\"wp-block-hull-addon-aside__box\"><!-- wp:paragraph -->\n<p>Box</p>\n<!-- /wp:paragraph --></div></div>\n<!-- /wp:hull-addon/aside -->"
+}

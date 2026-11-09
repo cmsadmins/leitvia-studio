@@ -134,7 +134,7 @@ class Test_Gateway_Content_Checks extends WP_UnitTestCase {
 	public function test_registry(): void {
 		$checks = leitvia_studio()->registry( 'checks' );
 		$this->assertSame(
-			array( 'leitvia/headings', 'leitvia/alt-text', 'leitvia/link-text', 'leitvia/block-validity', 'leitvia/unregistered', 'leitvia/content-tokens', 'leitvia/content-contrast', 'leitvia/query-context', 'leitvia/template-parts' ),
+			array( 'leitvia/headings', 'leitvia/alt-text', 'leitvia/link-text', 'leitvia/block-validity', 'leitvia/unregistered', 'leitvia/shortcodes', 'leitvia/image-height', 'leitvia/content-tokens', 'leitvia/content-contrast', 'leitvia/query-context', 'leitvia/template-parts' ),
 			array_keys( $checks->all( array( 'scope' => 'content' ) ) )
 		);
 		$this->assertSame( array( 'leitvia/page-structure', 'leitvia/composition' ), array_keys( $checks->all( array( 'scope' => 'page' ) ) ) );
@@ -393,6 +393,76 @@ class Test_Gateway_Content_Checks extends WP_UnitTestCase {
 			),
 			$checked->get_error_data()['unregistered']
 		);
+	}
+
+	/**
+	 * Shortcodes of page builders that no plugin handles give one warning with name and block; registered ones,
+	 * placeholders such as [date], escaped shortcodes and code blocks do not count. The write goes through, the page
+	 * outline lists them, templates are not checked.
+	 */
+	public function test_unknown_shortcodes(): void {
+		$content = '<!-- wp:paragraph --><p>[vc_row][vc_column width="1/2"]Text[/vc_column][/vc_row]</p><!-- /wp:paragraph -->'
+			. '<!-- wp:shortcode -->[us_btn link="/x/" /]<!-- /wp:shortcode -->'
+			. '<!-- wp:paragraph --><p>Since [date] at [Organization name], [[vc_row]] and [gallery ids="1"]</p><!-- /wp:paragraph -->'
+			. '<!-- wp:code --><pre class="wp-block-code"><code>[et_pb_section]</code></pre><!-- /wp:code -->';
+		$this->assertSame(
+			array(
+				array(
+					'name'  => 'vc_row',
+					'block' => 'p:0',
+				),
+				array(
+					'name'  => 'vc_column',
+					'block' => 'p:0',
+				),
+				array(
+					'name'  => 'us_btn',
+					'block' => 'p:1',
+				),
+			),
+			Content_Checks::unknown_shortcodes( $content )
+		);
+		$findings = Content_Checks::shortcodes( $content, array( 'post_type' => 'post' ) );
+		$this->assertCount( 1, $findings );
+		$this->assertSame( 'leitvia_unknown_shortcode', $findings[0]['code'] );
+		$this->assertSame( 'warning', $findings[0]['severity'] );
+		$this->assertSame( 'p:0', $findings[0]['block'] );
+		$this->assertStringContainsString( '[vc_row] (p:0), [vc_column] (p:0), [us_btn] (p:1)', $findings[0]['message'] );
+		$this->assertSame( array(), Content_Checks::shortcodes( $content, array( 'post_type' => 'wp_template' ) ) );
+		$this->assertSame( array(), Content_Checks::shortcodes( '<!-- wp:paragraph --><p>[gallery]</p><!-- /wp:paragraph -->', array( 'post_type' => 'post' ) ) );
+
+		$page   = self::factory()->post->create(
+			array(
+				'post_type'   => 'page',
+				'post_status' => 'draft',
+			)
+		);
+		$change = static fn( array $state ): array => array( 'post_content' => $content ) + $state;
+		$result = Pipeline::run( new Operation( 'leitvia/test-write', 'content', array( 'post' => $page ), Hashes::document( $page ), $change ) );
+		$this->assertIsArray( $result, is_wp_error( $result ) ? $result->get_error_code() : '' );
+		$this->assertContains( 'leitvia_unknown_shortcode', array_column( $result['findings'], 'code' ) );
+
+		$post    = self::factory()->post->create( array( 'post_content' => $content ) );
+		$outline = wp_get_ability( 'leitvia/get-page-outline' )->execute( array( 'post' => $post ) );
+		$this->assertSame( array( 'vc_row', 'vc_column', 'us_btn' ), array_column( $outline['shortcodes'], 'name' ) );
+		$plain = self::factory()->post->create( array( 'post_content' => '<!-- wp:paragraph --><p>[date]</p><!-- /wp:paragraph -->' ) );
+		$this->assertArrayNotHasKey( 'shortcodes', wp_get_ability( 'leitvia/get-page-outline' )->execute( array( 'post' => $plain ) ) );
+		$items = wp_get_ability( 'leitvia/audit-site' )->execute( array( 'after' => $post - 1 ) )['items'];
+		$this->assertContains( 'leitvia/shortcodes', array_column( $items[0]['findings'], 'check' ) );
+	}
+
+	/**
+	 * An image block with a height and no aspect ratio gives the warning leitvia_image_fixed_height per block; with an
+	 * aspect ratio, without a height and in templates it does not.
+	 */
+	public function test_image_fixed_height(): void {
+		$image    = static fn( string $attrs ): string => '<!-- wp:image ' . $attrs . ' --><figure class="wp-block-image"><img src="https://example.org/a.jpg" alt="Lake"/></figure><!-- /wp:image -->';
+		$findings = Content_Checks::image_height( $image( '{"width":"1198px","height":"512px"}' ) . $image( '{"width":"800px","height":"600px","aspectRatio":"4/3","scale":"cover"}' ) . $image( '{"width":"800px"}' ) . '<!-- wp:group --><div class="wp-block-group">' . $image( '{"height":"300px"}' ) . '</div><!-- /wp:group -->', array( 'post_type' => 'page' ) );
+		$this->assertSame( array( 'p:0', 'p:3.0' ), array_column( $findings, 'block' ) );
+		$this->assertSame( array( 'leitvia_image_fixed_height' ), array_values( array_unique( array_column( $findings, 'code' ) ) ) );
+		$this->assertSame( 'warning', $findings[0]['severity'] );
+		$this->assertSame( 'leitvia/image-height', $findings[0]['check'] );
+		$this->assertSame( array(), Content_Checks::image_height( $image( '{"height":"20px"}' ), array( 'post_type' => 'wp_template_part' ) ) );
 	}
 
 	/**

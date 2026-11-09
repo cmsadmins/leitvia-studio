@@ -29,6 +29,15 @@ final class Dtcg {
 		'shadow'     => array( 'shadow', 'presets', 'shadow', 'shadow' ),
 	);
 
+	/**
+	 * Optional roles of the group size: token => layout setting, smallest and largest value in rem. Without them the
+	 * widths of theme.json stay; size.content may not be wider than size.wide.
+	 */
+	public const SIZES = array(
+		'content' => array( 'contentSize', 30, 80 ),
+		'wide'    => array( 'wideSize', 60, 100 ),
+	);
+
 	public const MAX_BYTES     = 512 * 1024;
 	public const MAX_DEPTH     = 32;
 	private const ALIAS_DEPTH  = 10;
@@ -98,6 +107,21 @@ final class Dtcg {
 					);
 				}
 			}
+		}
+		// The widths only when they differ from theme.json, so an export of the theme keeps following the theme.
+		$theme = (array) ( \WP_Theme_JSON_Resolver::get_theme_data()->get_settings()['layout'] ?? array() );
+		foreach ( self::SIZES as $slug => list( $setting, $min, $max ) ) {
+			$css = (string) ( $settings['layout'][ $setting ] ?? '' );
+			if ( '' === $css || ( $theme[ $setting ] ?? null ) === $css || ! preg_match( '/^(\d*\.?\d+)rem$/D', $css, $match ) || $match[1] < $min || $match[1] > $max ) {
+				continue;
+			}
+			$doc['size'][ $slug ] = array(
+				'$type'  => 'dimension',
+				'$value' => array(
+					'value' => self::number( $match[1] ),
+					'unit'  => 'rem',
+				),
+			);
 		}
 		return $doc;
 	}
@@ -211,7 +235,49 @@ final class Dtcg {
 			}
 			$settings[ $section ][ $list ]['theme'] = $presets;
 		}
-		return $settings;
+		$layout = self::sizes( $doc['size'] ?? null, array_key_exists( 'size', $doc ) );
+		if ( is_wp_error( $layout ) ) {
+			return $layout;
+		}
+		return $settings + ( $layout ? array( 'layout' => $layout ) : array() );
+	}
+
+	/**
+	 * Layout settings contentSize and wideSize from the group size (SIZES), empty without it.
+	 *
+	 * @param mixed $group Resolved node size.
+	 * @param bool  $given Whether the document has the node.
+	 * @return array<string, string>|WP_Error
+	 */
+	private static function sizes( $group, bool $given ) {
+		if ( ! $given ) {
+			return array();
+		}
+		if ( ! is_array( $group ) || array_key_exists( '$value', $group ) ) {
+			/* translators: %s: token group, size. */
+			return self::error( 'size_group', __( '%s must be a group of dimension tokens, not a single token.', 'leitvia-studio' ), 'size' );
+		}
+		$layout = array();
+		$rem    = array();
+		foreach ( self::tokens( $group ) as $slug => $token ) {
+			if ( ! isset( self::SIZES[ $slug ] ) ) {
+				/* translators: %s: token path, for example color.brand. */
+				return self::error( 'unknown_role', __( 'The token %s is not a role of the theme contract.', 'leitvia-studio' ), "size.$slug" );
+			}
+			[ $setting, $min, $max ] = self::SIZES[ $slug ];
+			$value                   = $token['$value'] ?? null;
+			if ( ( isset( $token['$type'] ) && 'dimension' !== $token['$type'] ) || ! is_array( $value ) || 'rem' !== ( $value['unit'] ?? null ) || ! is_numeric( $value['value'] ?? null )
+				|| $value['value'] < $min || $value['value'] > $max ) {
+				/* translators: 1: token path, for example size.content, 2: smallest value, 3: largest value. */
+				return self::error( 'size_range', __( 'The token %1$s must be a dimension in rem from %2$s to %3$s.', 'leitvia-studio' ), "size.$slug", (string) $min, (string) $max );
+			}
+			$rem[ $slug ]       = (float) $value['value'];
+			$layout[ $setting ] = (string) self::dimension( $value );
+		}
+		if ( isset( $rem['content'], $rem['wide'] ) && $rem['content'] > $rem['wide'] ) {
+			return self::error( 'size_order', __( 'The token size.content may not be wider than size.wide.', 'leitvia-studio' ) );
+		}
+		return $layout;
 	}
 
 	/**

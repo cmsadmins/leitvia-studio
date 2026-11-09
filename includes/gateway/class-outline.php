@@ -21,7 +21,8 @@ final class Outline {
 	public const TEXT_LENGTH = 80;
 
 	/**
-	 * Outline of a post: id, hash, title, status, template, kind and the block tree.
+	 * Outline of a post: id, hash, title, status, template, kind and the block tree; shortcodes no plugin handles, with
+	 * their block, when there are any (see Content_Checks::unknown_shortcodes()).
 	 *
 	 * @param int $post_id Post ID.
 	 * @return array<string, mixed>|\WP_Error
@@ -31,6 +32,7 @@ final class Outline {
 		if ( is_wp_error( $post ) ) {
 			return $post;
 		}
+		$shortcodes = Content_Checks::unknown_shortcodes( $post->post_content );
 		return array(
 			'id'       => $post->ID,
 			'type'     => $post->post_type,
@@ -40,7 +42,7 @@ final class Outline {
 			'template' => (string) get_page_template_slug( $post ),
 			'kind'     => (string) get_post_meta( $post->ID, '_leitvia_page_kind', true ),
 			'blocks'   => self::tree( Block_Ids::blocks( parse_blocks( $post->post_content ) ), 'p:' ),
-		);
+		) + ( $shortcodes ? array( 'shortcodes' => $shortcodes ) : array() );
 	}
 
 	/**

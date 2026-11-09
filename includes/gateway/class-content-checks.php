@@ -49,6 +49,8 @@ final class Content_Checks {
 		'leitvia/link-text'        => array( 'content', 'link_text' ),
 		'leitvia/block-validity'   => array( 'content', 'block_validity' ),
 		'leitvia/unregistered'     => array( 'content', 'unregistered' ),
+		'leitvia/shortcodes'       => array( 'content', 'shortcodes' ),
+		'leitvia/image-height'     => array( 'content', 'image_height' ),
 		'leitvia/content-tokens'   => array( 'content', 'tokens' ),
 		'leitvia/content-contrast' => array( 'content', 'contrast' ),
 		'leitvia/query-context'    => array( 'content', 'query_context' ),
@@ -68,6 +70,8 @@ final class Content_Checks {
 			'leitvia/link-text'        => __( 'Link text', 'leitvia-studio' ),
 			'leitvia/block-validity'   => __( 'Block validity', 'leitvia-studio' ),
 			'leitvia/unregistered'     => __( 'Blocks without a registered type', 'leitvia-studio' ),
+			'leitvia/shortcodes'       => __( 'Shortcodes without a registered handler', 'leitvia-studio' ),
+			'leitvia/image-height'     => __( 'Images with a fixed height', 'leitvia-studio' ),
 			'leitvia/content-tokens'   => __( 'Design tokens in content', 'leitvia-studio' ),
 			'leitvia/content-contrast' => __( 'Color pairs in content', 'leitvia-studio' ),
 			'leitvia/query-context'    => __( 'Filters inside a query', 'leitvia-studio' ),
@@ -358,6 +362,99 @@ final class Content_Checks {
 			$types[ $name ] = ( $types[ $name ] ?? 0 ) + 1;
 		}
 		return array( $types, $first );
+	}
+
+	/**
+	 * Check leitvia/shortcodes: shortcodes no plugin handles (rests of page builders such as [vc_row], [us_btn],
+	 * [et_pb_section] or [fusion_text]) show as text on the page. One warning per content with code
+	 * leitvia_unknown_shortcode and the shortcodes with the block they stand in, never a rejection: a migration can
+	 * write such content and rebuild it step by step. Templates and template parts are not checked.
+	 *
+	 * @param string               $content Block markup.
+	 * @param array<string, mixed> $context Context.
+	 * @return list<array<string, mixed>>
+	 */
+	public static function shortcodes( string $content, array $context ): array {
+		if ( ! self::applies( $context ) || ! self::content_type( $context ) ) {
+			return array();
+		}
+		$found = self::unknown_shortcodes( $content );
+		if ( ! $found ) {
+			return array();
+		}
+		$list = implode( ', ', array_map( static fn( array $shortcode ): string => '[' . $shortcode['name'] . '] (' . $shortcode['block'] . ')', $found ) );
+		return array(
+			array(
+				'code'       => 'leitvia_unknown_shortcode',
+				'shortcodes' => $found,
+			) + self::finding(
+				'leitvia/shortcodes',
+				'warning',
+				$found[0]['block'],
+				/* translators: %s: shortcodes with the ID of their block, for example [vc_row] (p:0). */
+				sprintf( __( 'Shortcodes that no plugin handles show as text: %s.', 'leitvia-studio' ), $list ),
+				__( 'Rebuild their content with blocks from leitvia/list-blocks and remove the shortcodes, or activate the plugin that provides them.', 'leitvia-studio' )
+			),
+		);
+	}
+
+	/**
+	 * Shortcodes of the content that are not registered, once per name and block, in order of appearance. Counted are
+	 * shortcodes as page builders write them: with attributes, closing ([/vc_row]), self-closing or with an underscore
+	 * in the name; a placeholder such as [date] or [Organization name] and escaped [[name]] are not. Code and
+	 * preformatted blocks show code and are skipped.
+	 *
+	 * @param string $content Block markup.
+	 * @return list<array{name: string, block: string}>
+	 */
+	public static function unknown_shortcodes( string $content ): array {
+		$found = array();
+		foreach ( self::walk( $content ) as [ $block, $id ] ) {
+			if ( in_array( $block['blockName'], array( 'core/code', 'core/preformatted' ), true ) ) {
+				continue;
+			}
+			preg_match_all( '#(?<!\[)\[(/?)([a-z][a-z0-9_-]*)(\s+[a-z_-]+\s*=|\s*/\]|\])#', self::html( $block ), $matches, PREG_SET_ORDER );
+			foreach ( $matches as [ , $closing, $name, $rest ] ) {
+				$builder = '' !== $closing || ']' !== $rest || str_contains( $name, '_' );
+				$key     = $name . '|' . $id;
+				if ( $builder && ! isset( $found[ $key ] ) && ! shortcode_exists( $name ) ) {
+					$found[ $key ] = array(
+						'name'  => $name,
+						'block' => (string) $id,
+					);
+				}
+			}
+		}
+		return array_values( $found );
+	}
+
+	/**
+	 * Check leitvia/image-height: an image block with a height but no aspectRatio stretches the image to that box;
+	 * migrations often bring both sizes of the old page. A warning with code leitvia_image_fixed_height per block.
+	 * Templates and template parts are not checked.
+	 *
+	 * @param string               $content Block markup.
+	 * @param array<string, mixed> $context Context.
+	 * @return list<array<string, mixed>>
+	 */
+	public static function image_height( string $content, array $context ): array {
+		if ( ! self::applies( $context ) || ! self::content_type( $context ) ) {
+			return array();
+		}
+		$findings = array();
+		foreach ( self::walk( $content ) as [ $block, $id ] ) {
+			$attrs = (array) $block['attrs'];
+			if ( 'core/image' === $block['blockName'] && isset( $attrs['height'] ) && '' !== (string) $attrs['height'] && empty( $attrs['aspectRatio'] ) ) {
+				$findings[] = array( 'code' => 'leitvia_image_fixed_height' ) + self::finding(
+					'leitvia/image-height',
+					'warning',
+					(string) $id,
+					__( 'The image has a height but no aspect ratio and may be stretched.', 'leitvia-studio' ),
+					__( 'Remove height (and width) so the image keeps its own proportions, or set aspectRatio with scale cover for a crop.', 'leitvia-studio' )
+				);
+			}
+		}
+		return $findings;
 	}
 
 	/**

@@ -8,6 +8,7 @@
 use LeitviaStudio\Gateway\Abilities;
 use LeitviaStudio\Gateway\Gateway;
 use LeitviaStudio\Gateway\Hashes;
+use LeitviaStudio\Gateway\Normalize;
 use LeitviaStudio\Gateway\Operation;
 use LeitviaStudio\Gateway\Packages;
 use LeitviaStudio\Gateway\Pipeline;
@@ -374,8 +375,65 @@ class Test_Gateway_Pipeline extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Markup repairs before the checks: the vertical alignment of columns reaches columns without their own, and the
+	 * inner blocks of an add-on block get the box of its catalog example; the stored content is the repaired one.
+	 * Content without anything to repair stays byte for byte, a column keeps its own alignment, and a hull with text
+	 * in the example is left alone.
+	 */
+	public function test_normalize_columns_and_static_hull(): void {
+		$columns = '<!-- wp:columns {"verticalAlignment":"center"} --><div class="wp-block-columns are-vertically-aligned-center"><!-- wp:column --><div class="wp-block-column"><!-- wp:paragraph --><p>A</p><!-- /wp:paragraph --></div><!-- /wp:column --><!-- wp:column {"verticalAlignment":"top"} --><div class="wp-block-column is-vertically-aligned-top"><!-- wp:paragraph --><p>B</p><!-- /wp:paragraph --></div><!-- /wp:column --></div><!-- /wp:columns -->';
+		$fixed   = Normalize::markup( $columns );
+		$inner   = parse_blocks( $fixed )[0]['innerBlocks'];
+		$this->assertSame( 'center', $inner[0]['attrs']['verticalAlignment'] );
+		$this->assertStringContainsString( '<div class="wp-block-column is-vertically-aligned-center">', $fixed );
+		$this->assertSame( 'top', $inner[1]['attrs']['verticalAlignment'], 'its own value stays' );
+		$plain = '<!-- wp:columns --><div class="wp-block-columns"><!-- wp:column --><div class="wp-block-column"></div><!-- /wp:column --></div><!-- /wp:columns -->';
+		$this->assertSame( $plain, Normalize::markup( $plain ) );
+
+		add_action(
+			'leitvia_studio_init',
+			static function ( $studio ): void {
+				$studio->extensions()->register(
+					'hull-addon',
+					array(
+						'label'           => 'Hull Add-on',
+						'version'         => '1.0.0',
+						'requires_studio' => '0.1.0',
+						'requires_api'    => 1,
+					)
+				);
+				$studio->registry( 'blocks' )->register( 'hull-addon/aside', array( 'path' => dirname( __DIR__ ) . '/fixtures/hull-block' ), 'hull-addon' );
+			}
+		);
+		register_block_type( dirname( __DIR__ ) . '/fixtures/hull-block' );
+		leitvia_studio()->reset_for_tests();
+		$loose = '<!-- wp:hull-addon/aside {"align":"wide"} --><div class="wp-block-hull-addon-aside alignwide"><!-- wp:heading --><h2 class="wp-block-heading">Facts</h2><!-- /wp:heading --><!-- wp:paragraph --><p>Text</p><!-- /wp:paragraph --></div><!-- /wp:hull-addon/aside -->';
+		$boxed = '<!-- wp:hull-addon/aside {"align":"wide"} --><div class="wp-block-hull-addon-aside alignwide"><div class="wp-block-hull-addon-aside__box"><!-- wp:heading --><h2 class="wp-block-heading">Facts</h2><!-- /wp:heading --><!-- wp:paragraph --><p>Text</p><!-- /wp:paragraph --></div></div><!-- /wp:hull-addon/aside -->';
+		$this->assertSame( $boxed, Normalize::markup( $loose ) );
+		$this->assertSame( $boxed, Normalize::markup( $boxed ), 'a block with its box stays' );
+
+		// Only blocks the write changes: a stored block keeps its spelling (escaped slashes that serialize_block() would
+		// drop) and stored columns keep their alignment as they are, while a new block next to them is repaired.
+		$kept   = '<!-- wp:acf/decor {"url":"https:\/\/example.com\/"} --><div class="decor"></div><!-- /wp:acf/decor -->' . "\n\n" . $columns;
+		$result = Normalize::markup( $kept . "\n\n" . $loose, $kept );
+		$this->assertStringStartsWith( $kept . "\n\n", $result, 'stored blocks stay byte for byte' );
+		$this->assertStringEndsWith( $boxed, $result );
+		$this->assertSame( $kept . $columns, Normalize::markup( $kept . $columns, $kept ), 'a copy of stored columns stays' );
+
+		$page   = $this->page();
+		$result = Pipeline::run( self::op( array( 'post' => $page ), self::set( array( 'post_content' => $loose . $columns ) ), 'corrections' ) );
+		$this->assertIsArray( $result, $result instanceof WP_Error ? $result->get_error_message() : '' );
+		$stored = (string) get_post_field( 'post_content', $page, 'raw' );
+		$this->assertStringContainsString( '<div class="wp-block-hull-addon-aside__box">', $stored );
+		$this->assertStringContainsString( 'is-vertically-aligned-center"><!-- wp:paragraph', $stored, 'the first column took the alignment (the paragraph carries its block ID)' );
+		unregister_block_type( 'hull-addon/aside' );
+	}
+
+
+	/**
 	 * Office rests: office() cleans only a text the write changes: a change of the title alone leaves Word rests a person stored as
-	 * they are and is rejected with their place, instead of rewriting the content on the side.
+	 * they are instead of rewriting the content on the side. The stored block is not checked again (see Pipeline::unsafe()), so
+	 * the title changes and the rests stay; only the block ID lands in the delimiter.
 	 */
 	public function test_office_rests_stay_on_a_write_without_content(): void {
 		$page = $this->page();
@@ -384,10 +442,11 @@ class Test_Gateway_Pipeline extends WP_UnitTestCase {
 		$wpdb->update( $wpdb->posts, array( 'post_content' => $word ), array( 'ID' => $page ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Content written as by a person.
 		clean_post_cache( $page );
 
-		$data = $this->assert_rejected( 'leitvia_unsafe_content', Pipeline::run( self::op( array( 'post' => $page ), self::set( array( 'post_title' => 'New title' ) ), 'corrections' ) ) );
-		$this->assertSame( array( 'b', 'style' ), array( $data['found']['tag'], $data['found']['attribute'] ) );
-		$this->assertSame( $word, get_post_field( 'post_content', $page, 'raw' ) );
-		$this->assertNotSame( 'New title', get_post_field( 'post_title', $page, 'raw' ) );
+		$result = Pipeline::run( self::op( array( 'post' => $page ), self::set( array( 'post_title' => 'New title' ) ), 'corrections' ) );
+		$this->assertIsArray( $result, $result instanceof WP_Error ? $result->get_error_message() : '' );
+		$this->assertStringContainsString( '<p><b style="mso-bidi-font-weight: normal">Bold</b></p>', get_post_field( 'post_content', $page, 'raw' ) );
+		$this->assertSame( 'New title', get_post_field( 'post_title', $page, 'raw' ) );
+		$this->assertNotNull( Pipeline::unsafe( $word ), 'the same rests in new content are still found' );
 	}
 
 	/**

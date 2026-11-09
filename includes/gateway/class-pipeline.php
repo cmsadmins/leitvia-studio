@@ -254,6 +254,10 @@ final class Pipeline {
 					$after[ $field ] = self::office( $after[ $field ] );
 				}
 			}
+			// Block markup agents often get wrong is repaired the same way, see Normalize; a package shows the repair.
+			if ( isset( $after['post_content'] ) && is_string( $after['post_content'] ) && ( $before['post_content'] ?? null ) !== $after['post_content'] && ! isset( $after['product'] ) ) {
+				$after['post_content'] = Normalize::markup( $after['post_content'], is_string( $before['post_content'] ?? null ) ? $before['post_content'] : '' );
+			}
 			if ( isset( $after['term']['description'] ) && is_string( $after['term']['description'] ) && ( $before['term']['description'] ?? null ) !== $after['term']['description'] ) {
 				$after['term']['description'] = self::office( $after['term']['description'] );
 			}
@@ -265,7 +269,9 @@ final class Pipeline {
 			isset( $after['term'] )    => self::unsafe( (string) ( $after['term']['description'] ?? '' ), true ),
 			isset( $after['product'] ) => self::unsafe( (string) $after['post_content'], true ) ?? self::unsafe( (string) $after['post_excerpt'], true ),
 			// Content that replaces classic content whole keeps no classic block (target replace, see update-content).
-			default                    => self::unsafe( (string) ( $after['post_content'] ?? '' ), self::classic( $before ) && empty( $op->target['replace'] ) ),
+			// Only blocks the write changes count: a block stored as it is (a block of a plugin that is gone, with markup
+			// KSES would cut) stays byte for byte, see stored_unsafe().
+			default                    => self::unsafe( (string) ( $after['post_content'] ?? '' ), self::classic( $before ) && empty( $op->target['replace'] ), (string) ( $before['post_content'] ?? '' ) ),
 		};
 		if ( $unsafe ) {
 			return Rejection::make(
@@ -273,7 +279,7 @@ final class Pipeline {
 				__( 'The content holds markup agents may not write: scripts, event attributes, Custom HTML blocks, classic blocks or Base64 data. Use registered blocks and media from the library.', 'leitvia-studio' ) . self::where( $unsafe ),
 				422,
 				$unsafe['reason'],
-				$target + array( 'block' => $unsafe['block'] ),
+				array( 'block' => $unsafe['block'] ) + $target,
 				'leitvia/list-blocks',
 				'once',
 				array( 'found' => $unsafe )
@@ -377,7 +383,7 @@ final class Pipeline {
 			return $denied;
 		}
 		// 8. Snapshot, write; on any failure the previous state comes back.
-		return self::execute( $op, $before, $after, $result, $rollback && ! empty( $op->target['delete'] ), $rollback );
+		return self::execute( $op, $before, $after, $result, $rollback && ! empty( $op->target['delete'] ), $rollback || self::stored_unsafe( $op, $after ) );
 	}
 
 	/**
@@ -655,12 +661,63 @@ final class Pipeline {
 	 * short excerpt; null when the content is safe. Unsafe: core/html, a classic block outside classic content, Base64
 	 * data, and any markup or attribute text that wp_kses_post() would change beyond entity and self-closing-tag spelling.
 	 *
+	 * A block whose own markup and attributes the content before holds as they are is not checked again (its inner
+	 * blocks are): what is stored was written by a person or passed before, and a write elsewhere must not fail on it.
+	 * A copy of such a block in the same post passes as well, on purpose: it brings no markup the post did not hold.
+	 *
 	 * @param string $content Block markup.
 	 * @param bool   $classic Whether the current content is classic.
+	 * @param string $before  Content before the write, '' for none.
 	 * @return array{block: string, reason: string, tag: string, attribute: string, excerpt: string}|null
 	 */
-	public static function unsafe( string $content, bool $classic = false ): ?array {
-		return self::unsafe_blocks( parse_blocks( $content ), 'p:', $classic );
+	public static function unsafe( string $content, bool $classic = false, string $before = '' ): ?array {
+		$known = array();
+		foreach ( '' !== $before && has_blocks( $before ) ? self::own_parts( parse_blocks( $before ) ) : array() as $part ) {
+			$known[ $part ] = true;
+		}
+		return self::unsafe_blocks( parse_blocks( $content ), 'p:', $classic, $known );
+	}
+
+	/**
+	 * Keys of the own markup and attributes of every block, inner blocks included.
+	 *
+	 * @param array<int|string, array<string, mixed>> $blocks Parsed blocks.
+	 * @return list<string>
+	 */
+	public static function own_parts( array $blocks ): array {
+		$parts = array();
+		foreach ( $blocks as $block ) {
+			$parts[] = self::own_part( $block );
+			array_push( $parts, ...self::own_parts( (array) $block['innerBlocks'] ) );
+		}
+		return $parts;
+	}
+
+	/**
+	 * Key of the own markup and attributes of a block. innerContent goes in whole, the places of the inner blocks (null)
+	 * included: a stored block whose markup holds a separator must not match a new block that splits that markup around
+	 * an inner block (<a href="java|script:..."> against <a href="java<!-- wp:x /-->script:...">).
+	 *
+	 * @param array<string, mixed> $block Parsed block.
+	 */
+	public static function own_part( array $block ): string {
+		return md5( (string) wp_json_encode( array( (string) $block['blockName'], array_values( (array) $block['innerContent'] ), $block['attrs'] ) ) );
+	}
+
+	/**
+	 * Whether the content after the write keeps stored blocks that KSES would change (see unsafe()): then the write
+	 * passes by the KSES filter of post content, so they stay byte for byte. unsafe() found every block the write
+	 * changes safe, that is kept by KSES.
+	 *
+	 * @param Operation            $op    Operation.
+	 * @param array<string, mixed> $after State after.
+	 */
+	private static function stored_unsafe( Operation $op, array $after ): bool {
+		if ( '' !== $op->option() || isset( $op->target['term'] ) || isset( $after['product'] ) || self::json( $after ) || ! is_string( $after['post_content'] ?? null ) ) {
+			return false;
+		}
+		$content = $after['post_content'];
+		return has_blocks( $content ) && null !== self::unsafe_blocks( parse_blocks( $content ), 'p:', false );
 	}
 
 	/**
@@ -669,14 +726,17 @@ final class Pipeline {
 	 * @param array<int|string, array<string, mixed>> $blocks  Parsed blocks.
 	 * @param string                                  $path    Path prefix.
 	 * @param bool                                    $classic Whether classic blocks are allowed.
+	 * @param array<string, true>                     $known   Keys of own_part() of stored blocks, not checked.
 	 * @return array{block: string, reason: string, tag: string, attribute: string, excerpt: string}|null
 	 */
-	private static function unsafe_blocks( array $blocks, string $path, bool $classic ): ?array {
+	private static function unsafe_blocks( array $blocks, string $path, bool $classic, array $known = array() ): ?array {
 		foreach ( Block_Ids::blocks( $blocks ) as $index => $block ) {
 			$name   = (string) ( $block['blockName'] ?? '' );
 			$html   = implode( '', array_filter( (array) $block['innerContent'], 'is_string' ) );
-			$id     = (string) ( $block['attrs']['metadata']['leitviaId'] ?? $path . $index );
+			$id     = Block_Ids::id( $block );
+			$id     = '' !== $id ? $id : $path . $index;
 			$reason = match ( true ) {
+				isset( $known[ self::own_part( $block ) ] ) => '',
 				'core/html' === $name => 'html_block',
 				( '' === $name || 'core/freeform' === $name ) && ! $classic && '' !== trim( $html ) => 'classic_block',
 				(bool) preg_match( '/data:[^,"\'\s]*;base64/i', $html . wp_json_encode( $block['attrs'] ) ) => 'base64',
@@ -693,7 +753,7 @@ final class Pipeline {
 					'excerpt'   => $place['excerpt'] ?? self::excerpt( trim( $html ) ),
 				);
 			}
-			$inner = self::unsafe_blocks( (array) $block['innerBlocks'], $path . $index . '.', false );
+			$inner = self::unsafe_blocks( (array) $block['innerBlocks'], $path . $index . '.', false, $known );
 			if ( $inner ) {
 				return $inner;
 			}

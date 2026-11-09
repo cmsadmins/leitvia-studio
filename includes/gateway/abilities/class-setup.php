@@ -36,6 +36,11 @@ final class Setup {
 	private const SHOP_TERM_TEMPLATES = array( 'taxonomy-product_cat', 'taxonomy-product_tag' );
 
 	/**
+	 * Settings of a core/navigation in a template part that update-template-part keeps, see keep_navigation().
+	 */
+	public const NAVIGATION_KEEP = array( 'submenuVisibility', 'overlay', 'overlayMenu', 'overlayBackgroundColor', 'overlayTextColor', 'ariaLabel' );
+
+	/**
 	 * Blocks a navigation may hold at its own level and inside submenus.
 	 */
 	public const NAVIGATION_BLOCKS = array( 'core/navigation-link', 'core/navigation-submenu', 'core/page-list', 'leitvia/mega-menu' );
@@ -59,7 +64,7 @@ final class Setup {
 		Abilities::write(
 			'leitvia/create-token-set',
 			__( 'Create token set', 'leitvia-studio' ),
-			__( 'Creates a token set from a DTCG document. Start from the document leitvia/get-tokens returns; base_hash is empty for the new set. It must compile against the contract and pass every token set check; contrast findings name the failing pair and the ratio it needs. Activate it with leitvia/activate-token-set.', 'leitvia-studio' ),
+			__( 'Creates a token set from a DTCG document. Start from the document leitvia/get-tokens returns; base_hash is empty for the new set. It must compile against the contract and pass every token set check; contrast findings name the failing pair and the ratio it needs. Optional group size: page widths. Activate it with leitvia/activate-token-set.', 'leitvia-studio' ),
 			'setup',
 			$add,
 			array(
@@ -653,8 +658,11 @@ final class Setup {
 			$content = (string) $pattern['content'];
 		}
 		$template = get_block_template( get_stylesheet() . '//' . $name, 'wp_template_part' );
-		$id       = $template && $template->wp_id ? (int) $template->wp_id : 0;
-		$target   = $id ? array( 'post' => $id ) : array(
+		if ( isset( $input['content'] ) && $template ) {
+			$content = self::keep_navigation( $content, (string) $template->content );
+		}
+		$id     = $template && $template->wp_id ? (int) $template->wp_id : 0;
+		$target = $id ? array( 'post' => $id ) : array(
 			'post'      => 0,
 			'post_type' => 'wp_template_part',
 		);
@@ -676,6 +684,60 @@ final class Setup {
 				'post_status'  => 'publish',
 			) + $new + $state,
 		);
+	}
+
+	/**
+	 * Content of a template part with the settings of its navigation kept: a core/navigation in the new content gets
+	 * each of NAVIGATION_KEEP that the first navigation of the part had and it lacks (agents often send only the ref or
+	 * the links, and the menu would lose its overlay, its submenus on click and its name). A value it sets stays.
+	 * Patterns in the part are read through, since the theme ships its header as a pattern.
+	 *
+	 * @param string $content New content.
+	 * @param string $old     Current content of the part.
+	 */
+	public static function keep_navigation( string $content, string $old ): string {
+		$keep = array_intersect_key( self::first_navigation( parse_blocks( $old ) ), array_flip( self::NAVIGATION_KEEP ) );
+		if ( ! $keep || ! str_contains( $content, 'wp:navigation' ) ) {
+			return $content;
+		}
+		$changed = false;
+		$walk    = static function ( array $blocks ) use ( &$walk, $keep, &$changed ): array {
+			foreach ( $blocks as &$block ) {
+				if ( 'core/navigation' === $block['blockName'] && array_diff_key( $keep, (array) $block['attrs'] ) ) {
+					$block['attrs'] = (array) $block['attrs'] + $keep;
+					$changed        = true;
+				}
+				$block['innerBlocks'] = $walk( (array) $block['innerBlocks'] );
+			}
+			return $blocks;
+		};
+		$blocks  = $walk( parse_blocks( $content ) );
+		return $changed ? serialize_blocks( $blocks ) : $content;
+	}
+
+	/**
+	 * Attributes of the first core/navigation of blocks, core/pattern blocks read through; empty without one.
+	 *
+	 * @param array<int|string, array<string, mixed>> $blocks Parsed blocks.
+	 * @param int                                     $depth  Patterns read through so far.
+	 * @return array<string, mixed>
+	 */
+	private static function first_navigation( array $blocks, int $depth = 0 ): array {
+		foreach ( $blocks as $block ) {
+			if ( 'core/navigation' === $block['blockName'] ) {
+				return (array) $block['attrs'];
+			}
+			$inner = (array) $block['innerBlocks'];
+			if ( 'core/pattern' === $block['blockName'] && $depth < 3 ) {
+				$pattern = \WP_Block_Patterns_Registry::get_instance()->get_registered( (string) ( $block['attrs']['slug'] ?? '' ) );
+				$inner   = $pattern ? parse_blocks( (string) $pattern['content'] ) : array();
+			}
+			$found = self::first_navigation( $inner, $depth + ( 'core/pattern' === $block['blockName'] ? 1 : 0 ) );
+			if ( $found ) {
+				return $found;
+			}
+		}
+		return array();
 	}
 
 	/**

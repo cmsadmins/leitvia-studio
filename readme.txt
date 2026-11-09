@@ -4,7 +4,7 @@ Tags: ai, mcp, block theme, accessibility, design tokens
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.33
+Stable tag: 1.3.34
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -212,6 +212,15 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * Privacy policy: https://leitvia.com/privacy-policy/
 
 == Changelog ==
+
+= 1.3.34 =
+* Token sets may set the text width and the wide width with the optional roles size.content (30 to 80 rem) and size.wide (60 to 100 rem, not narrower than size.content); without them the widths of the theme stay.
+* New warnings when writing content: leitvia_image_fixed_height for an image with a height but no aspect ratio, which stretches it, and leitvia_unknown_shortcode for shortcodes no plugin handles, such as rests of page builders. leitvia/get-page-outline lists such shortcodes with their block, leitvia/audit-site reports both.
+* leitvia/update-block changes align and the block style of image, gallery, cover and media and text blocks, and width, height, aspectRatio, scale, size, link and lightbox of an image; null removes one, so a fixed height goes without rewriting the page.
+* Only blocks a write changes are checked for unsafe markup: a stored block of a plugin that is gone no longer holds back every write of its post and stays byte for byte, and the rejection names the block that is unsafe. A new block inside a stored one is checked; a copy of a stored block in the same post passes on purpose, since it brings no markup the post did not hold.
+* Writes repair markup agents often get wrong, visible in the package: a vertical alignment of columns reaches the columns without one of their own, and an add-on block whose catalog example wraps its inner blocks in a box (the scroll gallery) gets that box. Only blocks the write changes are repaired, stored blocks keep their markup byte for byte.
+* leitvia/update-template-part keeps the settings of the navigation (submenus on click, overlay, name) when new content leaves them out.
+* Map: the popup is at least 18rem wide (80 % of a small screen) and at most 24rem, without hyphens in the middle of a word; title in bold, address below it, the link on a line of its own.
 
 = 1.3.33 =
 * A rejection of unsafe content names the place: block ID, tag, attribute and a short excerpt, in the message and in the data. Harmless rests of word processors (mso-* styles, empty o:p) are removed from a text the write changes instead of rejecting it; a write of title, meta or status alone leaves the stored content as it is.

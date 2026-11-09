@@ -422,6 +422,71 @@ class Test_Dtcg extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The roles size.content (30 to 80 rem) and size.wide (60 to 100 rem) become layout.contentSize and layout.wideSize; either
+	 * may be left out, a document without the group sets no layout. Other units, values out of range, content wider
+	 * than wide, unknown roles and a single token as group are rejected; aliases resolve.
+	 */
+	public function test_size_tokens(): void {
+		$c    = leitvia_studio_contract();
+		$size = static fn( $value, string $unit = 'rem' ): array => array(
+			'$type'  => 'dimension',
+			'$value' => array(
+				'value' => $value,
+				'unit'  => $unit,
+			),
+		);
+		$doc  = self::minimal();
+		$this->assertArrayNotHasKey( 'size', $doc, 'the theme export follows the theme' );
+		$this->assertArrayNotHasKey( 'layout', Dtcg::to_settings( $doc, $c ) );
+
+		$doc['size'] = array(
+			'content' => $size( 64 ),
+			'wide'    => $size( 90.5 ),
+		);
+		$this->assertSame(
+			array(
+				'contentSize' => '64rem',
+				'wideSize'    => '90.5rem',
+			),
+			Dtcg::to_settings( $doc, $c )['layout']
+		);
+		$doc['size'] = array( 'content' => $size( 80 ) );
+		$this->assertSame( array( 'contentSize' => '80rem' ), Dtcg::to_settings( $doc, $c )['layout'] );
+		$doc['primitive']['width'] = $size( 70 );
+		$doc['size']               = array( 'content' => array( '$value' => '{primitive.width}' ) );
+		$this->assertSame( array( 'contentSize' => '70rem' ), Dtcg::to_settings( $doc, $c )['layout'] );
+
+		$cases = array(
+			'size_range'   => array(
+				array( 'content' => $size( 29 ) ),
+				array( 'content' => $size( 81 ) ),
+				array( 'wide' => $size( 59.5 ) ),
+				array( 'wide' => $size( 101 ) ),
+				array( 'content' => $size( 600, 'px' ) ),
+			),
+			'size_order'   => array(
+				array(
+					'content' => $size( 70 ),
+					'wide'    => $size( 65 ),
+				),
+			),
+			'unknown_role' => array( array( 'full' => $size( 90 ) ) ),
+			'size_group'   => array( $size( 60 ) ),
+		);
+		foreach ( $cases as $code => $groups ) {
+			foreach ( $groups as $group ) {
+				$doc['size'] = $group;
+				$result      = Dtcg::to_settings( $doc, $c );
+				$this->assertWPError( $result, $code );
+				$this->assertSame( 'leitvia_studio_dtcg_' . $code, $result->get_error_code(), wp_json_encode( $group ) );
+			}
+		}
+
+		$export = Dtcg::from_settings( array( 'layout' => array( 'contentSize' => '64rem' ) ) + wp_get_global_settings(), $c );
+		$this->assertSame( $size( 64 ), $export['size']['content'] );
+	}
+
+	/**
 	 * Size and depth limits.
 	 */
 	public function test_validate_size_and_sanitize(): void {
