@@ -4,7 +4,7 @@ Tags: ai, mcp, block theme, accessibility, design tokens
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.35
+Stable tag: 1.3.36
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -212,6 +212,11 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * Privacy policy: https://leitvia.com/privacy-policy/
 
 == Changelog ==
+
+= 1.3.36 =
+* In a post split into parts (core/nextpage) a write gives a link to #anchor whose anchor lies in another part the path of that part plus the anchor (Table_Of_Contents::anchor_url(), without the host), once the post is published with pretty permalinks; drafts and plain permalinks keep the link. Only blocks the write changes are touched.
+* New content check leitvia/anchors: warning leitvia_anchor_other_part for a link to an anchor of another part (the fix names the path) and leitvia_anchor_missing for an anchor in no part. leitvia/audit-site reports both.
+* Table_Of_Contents::anchor_part() and entries() also take a post with content not yet saved.
 
 = 1.3.35 =
 * Table of contents in a post split into parts (core/nextpage): every heading knows its part. With scope all (default) the list groups the headings under Part 1, Part 2 and so on, marks the part being read with aria-current and links headings of other parts to the address of their part plus the anchor; scope part lists the part being read alone. One table of contents in part 1 shows at the top of every part. Generated heading ids stay unique across all parts.

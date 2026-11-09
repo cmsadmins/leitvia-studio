@@ -429,6 +429,62 @@ class Test_Gateway_Pipeline extends WP_UnitTestCase {
 		unregister_block_type( 'hull-addon/aside' );
 	}
 
+	/**
+	 * In a post with parts, a link to #anchor that a write brings and whose anchor lies in another part gets the path
+	 * of that part without the host (Table_Of_Contents::anchor_url()); a link to an anchor of its own part and an
+	 * unknown anchor stay. Stored blocks stay byte for byte, and the pipeline stores the rewritten link. A new post, a
+	 * draft and a site with plain permalinks (?p=1&page=2 would end up in the content) keep every link.
+	 */
+	public function test_normalize_anchors_across_parts(): void {
+		$this->set_permalink_structure( '/%postname%/' );
+		$next   = "<!-- wp:nextpage -->\n<!--nextpage-->\n<!-- /wp:nextpage -->\n";
+		$link   = static fn( string $anchor, string $text ): string => '<!-- wp:paragraph --><p>See <a href="#' . $anchor . '">' . $text . '</a>.</p><!-- /wp:paragraph -->' . "\n";
+		$before = $link( 'isles', 'the islands' )
+			. '<!-- wp:heading --><h2 class="wp-block-heading" id="start">Start</h2><!-- /wp:heading -->' . "\n" . $next
+			. '<!-- wp:paragraph --><p>Middle</p><!-- /wp:paragraph -->' . "\n" . $next
+			. '<!-- wp:heading --><h2 class="wp-block-heading" id="isles">Islands</h2><!-- /wp:heading -->' . "\n"
+			. $link( 'start', 'the start' );
+		$page   = $this->page( $before );
+		$hrefs  = static function ( string $html ): array {
+			$tags = new WP_HTML_Tag_Processor( $html );
+			$list = array();
+			while ( $tags->next_tag( 'a' ) ) {
+				$list[] = (string) $tags->get_attribute( 'href' );
+			}
+			return $list;
+		};
+		$isles  = wp_make_link_relative( \LeitviaStudio\Blocks\Table_Of_Contents::anchor_url( $page, 'isles' ) );
+		$start  = wp_make_link_relative( \LeitviaStudio\Blocks\Table_Of_Contents::anchor_url( $page, 'start' ) );
+		$this->assertStringEndsWith( '/3/#isles', $isles );
+		$this->assertStringStartsWith( '/', $isles, 'a path, without the host' );
+
+		$after  = $link( 'isles', 'Islands' ) . $link( 'start', 'Start' ) . $link( 'nowhere', 'Nowhere' ) . $before . $link( 'start', 'Back' );
+		$result = Normalize::markup( $after, $before, $page );
+		$this->assertSame( array( $isles, '#start', '#nowhere', '#isles', '#start', $start ), $hrefs( $result ) );
+		$this->assertStringContainsString( $before, $result, 'stored blocks stay byte for byte' );
+		$this->assertSame( $before, Normalize::markup( $before, $before, $page ) );
+		$this->assertSame( $after, Normalize::markup( $after, $before ), 'a new post has no address for its parts' );
+		$draft = self::factory()->post->create(
+			array(
+				'post_status'  => 'draft',
+				'post_content' => $before,
+			)
+		);
+		$this->assertSame( $after, Normalize::markup( $after, $before, $draft ), 'a draft has no lasting address' );
+		$this->set_permalink_structure( '' );
+		$this->assertSame( $after, Normalize::markup( $after, $before, $page ), 'plain permalinks give no lasting address' );
+		$this->set_permalink_structure( '/%postname%/' );
+
+		// The pipeline compares with the stored content, which carries the block IDs of the save.
+		$saved  = (string) get_post_field( 'post_content', $page, 'raw' );
+		$result = Pipeline::run( self::op( array( 'post' => $page ), self::set( array( 'post_content' => $link( 'isles', 'Islands' ) . $saved ) ), 'corrections' ) );
+		$this->assertIsArray( $result, $result instanceof WP_Error ? $result->get_error_message() : '' );
+		$stored = (string) get_post_field( 'post_content', $page, 'raw' );
+		$this->assertSame( $isles, $hrefs( $stored )[0] );
+		$this->assertSame( '#isles', $hrefs( $stored )[1], 'the stored link stays' );
+		$this->assertStringEndsWith( $saved, $stored );
+	}
+
 
 	/**
 	 * Office rests: office() cleans only a text the write changes: a change of the title alone leaves Word rests a person stored as

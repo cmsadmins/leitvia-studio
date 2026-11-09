@@ -134,7 +134,7 @@ class Test_Gateway_Content_Checks extends WP_UnitTestCase {
 	public function test_registry(): void {
 		$checks = leitvia_studio()->registry( 'checks' );
 		$this->assertSame(
-			array( 'leitvia/headings', 'leitvia/alt-text', 'leitvia/link-text', 'leitvia/block-validity', 'leitvia/unregistered', 'leitvia/shortcodes', 'leitvia/image-height', 'leitvia/content-tokens', 'leitvia/content-contrast', 'leitvia/query-context', 'leitvia/template-parts' ),
+			array( 'leitvia/headings', 'leitvia/alt-text', 'leitvia/link-text', 'leitvia/block-validity', 'leitvia/unregistered', 'leitvia/shortcodes', 'leitvia/image-height', 'leitvia/anchors', 'leitvia/content-tokens', 'leitvia/content-contrast', 'leitvia/query-context', 'leitvia/template-parts' ),
 			array_keys( $checks->all( array( 'scope' => 'content' ) ) )
 		);
 		$this->assertSame( array( 'leitvia/page-structure', 'leitvia/composition' ), array_keys( $checks->all( array( 'scope' => 'page' ) ) ) );
@@ -463,6 +463,39 @@ class Test_Gateway_Content_Checks extends WP_UnitTestCase {
 		$this->assertSame( 'warning', $findings[0]['severity'] );
 		$this->assertSame( 'leitvia/image-height', $findings[0]['check'] );
 		$this->assertSame( array(), Content_Checks::image_height( $image( '{"height":"20px"}' ), array( 'post_type' => 'wp_template_part' ) ) );
+	}
+
+	/**
+	 * Links to #anchor have to find their anchor in their own part: an anchor of another part gives the warning
+	 * leitvia_anchor_other_part, an anchor in no part leitvia_anchor_missing; an anchor of the same part and ids of the
+	 * template (#top) do not. A post without parts and templates give nothing. audit-site reports dead anchors of
+	 * published posts and names the address of the part as the fix.
+	 */
+	public function test_anchors_across_parts(): void {
+		$next     = "<!-- wp:nextpage -->\n<!--nextpage-->\n<!-- /wp:nextpage -->\n";
+		$content  = '<!-- wp:paragraph --><p><a href="#isles">Islands</a> <a href="#start">Start</a> <a href="#top">Top</a> <a href="#nowhere">Nowhere</a></p><!-- /wp:paragraph -->'
+			. '<!-- wp:heading --><h2 class="wp-block-heading" id="start">Start</h2><!-- /wp:heading -->' . "\n" . $next
+			. '<!-- wp:heading --><h2 class="wp-block-heading" id="isles">Islands</h2><!-- /wp:heading -->'
+			. '<!-- wp:paragraph --><p><a href="#isles">Here in part 2</a></p><!-- /wp:paragraph -->';
+		$findings = Content_Checks::anchors( $content, array( 'post_type' => 'post' ) );
+		$this->assertSame( array( 'leitvia_anchor_other_part', 'leitvia_anchor_missing' ), array_column( $findings, 'code' ) );
+		$this->assertSame( array( 'isles', 'nowhere' ), array_column( $findings, 'anchor' ) );
+		$this->assertSame( array( 'p:0', 'p:0' ), array_column( $findings, 'block' ) );
+		$this->assertSame( array( 'warning' ), array_values( array_unique( array_column( $findings, 'severity' ) ) ) );
+		$this->assertSame( 'leitvia/anchors', $findings[0]['check'] );
+		$this->assertStringContainsString( 'part 2', $findings[0]['message'] );
+		$this->assertSame( array(), Content_Checks::anchors( '<!-- wp:paragraph --><p><a href="#start">Start</a></p><!-- /wp:paragraph --><!-- wp:heading --><h2 class="wp-block-heading" id="start">Start</h2><!-- /wp:heading -->', array( 'post_type' => 'post' ) ) );
+		$this->assertSame( array(), Content_Checks::anchors( $content, array( 'post_type' => 'wp_template' ) ) );
+
+		$this->assertStringContainsString( 'Publish', $findings[0]['fix'], 'without a published post the part has no lasting address' );
+
+		$this->set_permalink_structure( '/%postname%/' );
+		$post  = self::factory()->post->create( array( 'post_content' => $content ) );
+		$items = wp_get_ability( 'leitvia/audit-site' )->execute( array( 'after' => $post - 1 ) )['items'];
+		$found = array_values( wp_list_filter( $items[0]['findings'], array( 'check' => 'leitvia/anchors' ) ) );
+		$this->assertSame( array( 'leitvia_anchor_other_part', 'leitvia_anchor_missing' ), array_column( $found, 'code' ) );
+		$this->assertStringContainsString( wp_make_link_relative( \LeitviaStudio\Blocks\Table_Of_Contents::anchor_url( $post, 'isles' ) ), $found[0]['fix'] );
+		$this->assertStringNotContainsString( '://', $found[0]['fix'] );
 	}
 
 	/**

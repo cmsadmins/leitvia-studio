@@ -7,6 +7,7 @@
 
 namespace LeitviaStudio\Gateway;
 
+use LeitviaStudio\Blocks\Table_Of_Contents;
 use LeitviaStudio\Lab\Token_Lint;
 use LeitviaStudio\Tokens\Contrast;
 
@@ -51,6 +52,7 @@ final class Content_Checks {
 		'leitvia/unregistered'     => array( 'content', 'unregistered' ),
 		'leitvia/shortcodes'       => array( 'content', 'shortcodes' ),
 		'leitvia/image-height'     => array( 'content', 'image_height' ),
+		'leitvia/anchors'          => array( 'content', 'anchors' ),
 		'leitvia/content-tokens'   => array( 'content', 'tokens' ),
 		'leitvia/content-contrast' => array( 'content', 'contrast' ),
 		'leitvia/query-context'    => array( 'content', 'query_context' ),
@@ -72,6 +74,7 @@ final class Content_Checks {
 			'leitvia/unregistered'     => __( 'Blocks without a registered type', 'leitvia-studio' ),
 			'leitvia/shortcodes'       => __( 'Shortcodes without a registered handler', 'leitvia-studio' ),
 			'leitvia/image-height'     => __( 'Images with a fixed height', 'leitvia-studio' ),
+			'leitvia/anchors'          => __( 'Links to anchors on the page', 'leitvia-studio' ),
 			'leitvia/content-tokens'   => __( 'Design tokens in content', 'leitvia-studio' ),
 			'leitvia/content-contrast' => __( 'Color pairs in content', 'leitvia-studio' ),
 			'leitvia/query-context'    => __( 'Filters inside a query', 'leitvia-studio' ),
@@ -451,6 +454,74 @@ final class Content_Checks {
 					(string) $id,
 					__( 'The image has a height but no aspect ratio and may be stretched.', 'leitvia-studio' ),
 					__( 'Remove height (and width) so the image keeps its own proportions, or set aspectRatio with scale cover for a crop.', 'leitvia-studio' )
+				);
+			}
+		}
+		return $findings;
+	}
+
+	/**
+	 * Ids a link may point to that the template gives the page, not the content.
+	 */
+	private const PAGE_IDS = array( 'top', 'main', 'content', 'wp--skip-link--target', 'comments', 'respond' );
+
+	/**
+	 * Check leitvia/anchors: a link to #anchor has to find its anchor in the part of the post it stands in. In a post
+	 * split into parts (core/nextpage) an anchor of another part gives leitvia_anchor_other_part; a write gives such
+	 * links the path of the part (see Normalize), so the warning names links of stored blocks, drafts and posts on a site
+	 * with plain permalinks; the fix names the path. An anchor in no part gives leitvia_anchor_missing. Anchors are the
+	 * ids saved in the content and the ids the table of contents gives headings. Templates and template parts are not
+	 * checked.
+	 *
+	 * @param string               $content Block markup.
+	 * @param array<string, mixed> $context Context.
+	 * @return list<array<string, mixed>>
+	 */
+	public static function anchors( string $content, array $context ): array {
+		if ( ! self::applies( $context ) || ! self::content_type( $context ) || ! str_contains( $content, 'href="#' ) ) {
+			return array();
+		}
+		$post     = Normalize::parts_post( $content, (int) ( $context['post'] ?? 0 ) ) ?? new \WP_Post(
+			(object) array(
+				'ID'           => 0,
+				'post_content' => $content,
+				'filter'       => 'raw',
+			)
+		);
+		$findings = array();
+		$part     = 1;
+		foreach ( self::walk( $content ) as [ $block, $id ] ) {
+			$html  = self::html( $block );
+			$part += substr_count( $html, '<!--nextpage-->' );
+			$tags  = new \WP_HTML_Tag_Processor( $html );
+			while ( str_contains( $html, 'href="#' ) && $tags->next_tag( array( 'tag_name' => 'a' ) ) ) {
+				$anchor = ltrim( (string) $tags->get_attribute( 'href' ), '#' );
+				if ( ! str_starts_with( (string) $tags->get_attribute( 'href' ), '#' ) || '' === $anchor || in_array( $anchor, self::PAGE_IDS, true ) ) {
+					continue;
+				}
+				$found = Table_Of_Contents::anchor_part( $post, $anchor );
+				if ( $found === $part ) {
+					continue;
+				}
+				$address    = 0 === $found ? '' : Normalize::part_address( $post, $anchor );
+				$findings[] = array(
+					'code'   => 0 === $found ? 'leitvia_anchor_missing' : 'leitvia_anchor_other_part',
+					'anchor' => $anchor,
+				) + self::finding(
+					'leitvia/anchors',
+					'warning',
+					(string) $id,
+					0 === $found
+						/* translators: %s: anchor, for example #arrival. */
+						? sprintf( __( 'The link to #%s finds no such anchor in the post.', 'leitvia-studio' ), $anchor )
+						/* translators: 1: anchor, for example #arrival, 2: number of the part it lies in. */
+						: sprintf( __( 'The link to #%1$s leads nowhere: the anchor lies in part %2$d of the post.', 'leitvia-studio' ), $anchor, $found ),
+					match ( true ) {
+						0 === $found    => __( 'Link to an id of a heading in the same part (leitvia/get-page-outline), or remove the link.', 'leitvia-studio' ),
+						'' === $address => __( 'Publish the post with pretty permalinks first, then change the block: a write gives the link the path of the part.', 'leitvia-studio' ),
+						/* translators: %s: path of the part with the anchor. */
+						default         => sprintf( __( 'Link to %s instead.', 'leitvia-studio' ), $address ),
+					}
 				);
 			}
 		}

@@ -127,7 +127,8 @@ final class Table_Of_Contents {
 	 * Address of an anchor in a post: #anchor when it lies in the part being viewed or the post has no parts,
 	 * otherwise the address of its part (as wp_link_pages() links it) plus #anchor. Knows the ids the table of contents
 	 * gives headings and the ids saved in the content; an unknown anchor stays #anchor. For add-ons that link into
-	 * posts with parts, for example the stops of a route. The result is not escaped.
+	 * posts with parts, for example the stops of a route. The post may carry content not yet saved (a write that is
+	 * checked). The result is not escaped.
 	 *
 	 * @param \WP_Post|int $post   Post or post ID.
 	 * @param string       $anchor Id of the target, with or without #.
@@ -135,23 +136,33 @@ final class Table_Of_Contents {
 	public static function anchor_url( $post, string $anchor ): string {
 		$post   = get_post( $post );
 		$anchor = ltrim( $anchor, '#' );
-		if ( ! $post || '' === $anchor ) {
-			return '#' . $anchor;
-		}
-		$part = 0;
-		foreach ( self::entries( $post->ID, self::post_levels( $post ) ) as $entry ) {
-			if ( $entry['id'] === $anchor ) {
-				$part = $entry['part'];
-				break;
-			}
-		}
-		foreach ( 0 === $part ? self::pages( $post ) : array() as $i => $page ) {
-			if ( str_contains( $page, 'id="' . esc_attr( $anchor ) . '"' ) ) {
-				$part = $i + 1;
-				break;
-			}
-		}
+		$part   = $post ? self::anchor_part( $post, $anchor ) : 0;
 		return 0 === $part ? '#' . $anchor : self::link( $post, $part, $anchor );
+	}
+
+	/**
+	 * Part of a post an anchor lies in, from 1; 0 when no heading id of the table of contents and no id saved in the
+	 * content matches.
+	 *
+	 * @param \WP_Post $post   Post.
+	 * @param string   $anchor Id of the target, with or without #.
+	 */
+	public static function anchor_part( \WP_Post $post, string $anchor ): int {
+		$anchor = ltrim( $anchor, '#' );
+		if ( '' === $anchor ) {
+			return 0;
+		}
+		foreach ( self::entries( $post, self::post_levels( $post ) ) as $entry ) {
+			if ( $entry['id'] === $anchor ) {
+				return $entry['part'];
+			}
+		}
+		foreach ( self::pages( $post ) as $i => $page ) {
+			if ( str_contains( $page, 'id="' . esc_attr( $anchor ) . '"' ) ) {
+				return $i + 1;
+			}
+		}
+		return 0;
 	}
 
 	/**
@@ -308,16 +319,16 @@ final class Table_Of_Contents {
 	 * part (1 without core/nextpage). Own ids of headings at every level are reserved, so a generated id never repeats
 	 * one; generated ids are unique across all parts.
 	 *
-	 * @param int        $post_id Post ID.
-	 * @param array<int> $levels  Heading levels.
+	 * @param \WP_Post|int $post   Post or post ID; a post object may carry content not yet saved.
+	 * @param array<int>   $levels Heading levels.
 	 * @return array<int, array{level: int, text: string, id: string, own: bool, part: int}>
 	 */
-	public static function entries( int $post_id, array $levels ): array {
-		$key = $post_id . ':' . implode( ',', $levels );
+	public static function entries( $post, array $levels ): array {
+		$post = get_post( $post );
+		$key  = ( $post ? $post->ID . ':' . md5( $post->post_content ) : '0' ) . ':' . implode( ',', $levels );
 		if ( isset( self::$cache[ $key ] ) ) {
 			return self::$cache[ $key ];
 		}
-		$post     = get_post( $post_id );
 		$headings = array();
 		foreach ( $post ? self::pages( $post ) : array() as $i => $page ) {
 			self::collect( parse_blocks( $page ), $headings, array(), $i + 1 );

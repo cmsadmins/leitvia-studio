@@ -256,7 +256,7 @@ final class Pipeline {
 			}
 			// Block markup agents often get wrong is repaired the same way, see Normalize; a package shows the repair.
 			if ( isset( $after['post_content'] ) && is_string( $after['post_content'] ) && ( $before['post_content'] ?? null ) !== $after['post_content'] && ! isset( $after['product'] ) ) {
-				$after['post_content'] = Normalize::markup( $after['post_content'], is_string( $before['post_content'] ?? null ) ? $before['post_content'] : '' );
+				$after['post_content'] = Normalize::markup( $after['post_content'], is_string( $before['post_content'] ?? null ) ? $before['post_content'] : '', $op->post_id() );
 			}
 			if ( isset( $after['term']['description'] ) && is_string( $after['term']['description'] ) && ( $before['term']['description'] ?? null ) !== $after['term']['description'] ) {
 				$after['term']['description'] = self::office( $after['term']['description'] );

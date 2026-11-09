@@ -8,6 +8,7 @@
 namespace LeitviaStudio\Gateway;
 
 use LeitviaStudio\Blocks\Catalog;
+use LeitviaStudio\Blocks\Table_Of_Contents;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -19,6 +20,10 @@ defined( 'ABSPATH' ) || exit;
  * - A block of an add-on whose inner blocks the saved HTML of its catalog example wraps in more elements than the
  *   written block (the box of a scroll gallery) gets the missing wrappers from the example. The catalog example of a
  *   block is its save output for this purpose; a block without one stays as written.
+ * - In a post split into parts (core/nextpage) a link to #anchor whose anchor lies in another part leads nowhere; it
+ *   gets the path of that part plus the anchor, see part_address(). Only a published post with pretty permalinks has
+ *   a lasting address for its parts; a draft or plain permalinks (?p=1&page=2) keep the link, and the check
+ *   leitvia/anchors warns.
  */
 final class Normalize {
 
@@ -30,8 +35,9 @@ final class Normalize {
 	 *
 	 * @param string $content Block markup.
 	 * @param string $before  Content before the write, '' for none.
+	 * @param int    $post    Post the content belongs to, 0 for a new one (its parts have no address yet).
 	 */
-	public static function markup( string $content, string $before = '' ): string {
+	public static function markup( string $content, string $before = '', int $post = 0 ): string {
 		if ( ! has_blocks( $content ) ) {
 			return $content;
 		}
@@ -39,13 +45,17 @@ final class Normalize {
 		$hulls   = self::hulls();
 		$changed = false;
 		$out     = '';
+		$part    = 1;
+		$target  = self::parts_post( $content, $post );
 		foreach ( self::top_level( $content ) as [ $piece, $is_block ] ) {
-			$block = $is_block ? parse_blocks( $piece )[0] ?? null : null;
-			if ( is_array( $block ) && self::block( $block, $hulls, $known ) ) {
+			$block   = $is_block ? parse_blocks( $piece )[0] ?? null : null;
+			$anchors = $target ? self::anchors( $target, $part ) : null;
+			if ( is_array( $block ) && self::block( $block, $hulls, $known, $anchors ) ) {
 				$piece   = serialize_block( $block );
 				$changed = true;
 			}
-			$out .= $piece;
+			$part += substr_count( $piece, '<!--nextpage-->' );
+			$out  .= $piece;
 		}
 		return $changed ? $out : $content;
 	}
@@ -94,25 +104,93 @@ final class Normalize {
 	/**
 	 * Repairs one parsed block and its children in place.
 	 *
-	 * @param array{blockName: string|null, attrs: array<string, mixed>, innerBlocks: array<int, mixed>, innerHTML: string, innerContent: array<int, string|null>} $block Parsed block.
-	 * @param array<string, list<array{name: string, tag: string}>>                                                                                                $hulls Wrappers by block name, see hulls().
-	 * @param array<string, true>                                                                                                                                  $known Keys of stored blocks, which stay as they are.
+	 * @param array{blockName: string|null, attrs: array<string, mixed>, innerBlocks: array<int, mixed>, innerHTML: string, innerContent: array<int, string|null>} $block   Parsed block.
+	 * @param array<string, list<array{name: string, tag: string}>>                                                                                                $hulls   Wrappers by block name, see hulls().
+	 * @param array<string, true>                                                                                                                                  $known   Keys of stored blocks, which stay as they are.
+	 * @param (callable(string): string)|null                                                                                                                      $anchors Rewrites the anchor links of a piece of HTML, see anchors().
 	 * @return bool Whether anything changed.
 	 */
-	private static function block( array &$block, array $hulls, array $known = array() ): bool {
+	private static function block( array &$block, array $hulls, array $known = array(), ?callable $anchors = null ): bool {
 		$changed = false;
 		$stored  = isset( $known[ Pipeline::own_part( $block ) ] );
-		$align   = 'core/columns' === $block['blockName'] && ! $stored ? (string) ( $block['attrs']['verticalAlignment'] ?? '' ) : '';
+		foreach ( $block['innerContent'] as $i => $chunk ) {
+			$fixed = is_string( $chunk ) && ! $stored && null !== $anchors ? $anchors( $chunk ) : $chunk;
+			if ( is_string( $fixed ) && $fixed !== $chunk ) {
+				$block['innerContent'][ $i ] = $fixed;
+				$changed                     = true;
+			}
+		}
+		$align = 'core/columns' === $block['blockName'] && ! $stored ? (string) ( $block['attrs']['verticalAlignment'] ?? '' ) : '';
 		foreach ( $block['innerBlocks'] as &$inner ) {
 			if ( '' !== $align && 'core/column' === $inner['blockName'] && ! isset( $inner['attrs']['verticalAlignment'] ) ) {
 				$inner['attrs']['verticalAlignment'] = $align;
 				$inner['innerContent'][0]            = self::add_class( (string) ( $inner['innerContent'][0] ?? '' ), 'is-vertically-aligned-' . $align );
 				$changed                             = true;
 			}
-			$changed = self::block( $inner, $hulls, $known ) || $changed;
+			$changed = self::block( $inner, $hulls, $known, $anchors ) || $changed;
 		}
 		unset( $inner );
 		return ( ! $stored && self::hull( $block, $hulls ) ) || $changed;
+	}
+
+	/**
+	 * The post with the content of the write, when the content has parts and anchor links and the post an address;
+	 * null otherwise.
+	 *
+	 * @param string $content Block markup.
+	 * @param int    $post    Post ID, 0 for none.
+	 */
+	public static function parts_post( string $content, int $post ): ?\WP_Post {
+		$saved = $post > 0 && str_contains( $content, '<!--nextpage-->' ) && str_contains( $content, 'href="#' ) ? get_post( $post ) : null;
+		if ( ! $saved ) {
+			return null;
+		}
+		$target               = clone $saved;
+		$target->post_content = $content;
+		return $target;
+	}
+
+	/**
+	 * Lasting address of an anchor in another part of a post: the path of the part plus #anchor, without the host, so
+	 * it survives a move of the site; '' while the post is not published or the site has plain permalinks, where the
+	 * address of a part is a query (?p=1&page=2) that changes with the next permalink setting.
+	 *
+	 * @param \WP_Post $post   Post with the content of the write.
+	 * @param string   $anchor Id of the target, with or without #.
+	 */
+	public static function part_address( \WP_Post $post, string $anchor ): string {
+		if ( 'publish' !== $post->post_status || '' === (string) get_option( 'permalink_structure' ) ) {
+			return '';
+		}
+		$url = Table_Of_Contents::anchor_url( $post, $anchor );
+		return str_starts_with( $url, '#' ) ? '' : wp_make_link_relative( $url );
+	}
+
+	/**
+	 * Rewrites the links to #anchor of a piece of HTML in a part whose anchor lies in another part.
+	 *
+	 * @param \WP_Post $post Post with the content of the write.
+	 * @param int      $part Part the HTML is in, from 1.
+	 * @return callable(string): string
+	 */
+	private static function anchors( \WP_Post $post, int $part ): callable {
+		return static function ( string $html ) use ( $post, $part ): string {
+			if ( ! str_contains( $html, 'href="#' ) ) {
+				return $html;
+			}
+			$tags    = new \WP_HTML_Tag_Processor( $html );
+			$changed = false;
+			while ( $tags->next_tag( array( 'tag_name' => 'a' ) ) ) {
+				$href  = (string) $tags->get_attribute( 'href' );
+				$found = str_starts_with( $href, '#' ) ? Table_Of_Contents::anchor_part( $post, $href ) : 0;
+				$url   = $found > 0 && $found !== $part ? self::part_address( $post, $href ) : '';
+				if ( '' !== $url ) {
+					$tags->set_attribute( 'href', $url );
+					$changed = true;
+				}
+			}
+			return $changed ? $tags->get_updated_html() : $html;
+		};
 	}
 
 	/**
