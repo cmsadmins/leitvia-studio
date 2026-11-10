@@ -4,7 +4,7 @@ Tags: ai, mcp, block theme, accessibility, design tokens
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.38
+Stable tag: 1.3.39
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -212,6 +212,9 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * Privacy policy: https://leitvia.com/privacy-policy/
 
 == Changelog ==
+
+= 1.3.39 =
+* create-product and update-product: the long description has no fixed length any more, as the content of update-content. The limit of 20,000 characters counted the block markup, so a structured description with cards, icon lists and columns reached it at about 950 words. The short description keeps its 5,000 characters.
 
 = 1.3.38 =
 * New abilities leitvia/list-product-reviews and leitvia/update-product-review: read the reviews of a product with rating, verified owner, status and hash (never email address, IP address or user account), and set the rating, the verified flag or the status with hash, snapshot, package and rollback; WooCommerce counts the average rating and the review count again. Rights as on the reviews screen of WooCommerce: editing needs edit_products and edit_comment. Without moderate_comments, which agents do not have, a write only adds a missing rating to an approved review; another rating, the verified flag, a new status and held, spam or trashed reviews are moderation. Trash and spam go through the functions of core, so the admin restores such a review as it was.

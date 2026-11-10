@@ -810,6 +810,44 @@ class Test_Gateway_Commerce extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A long description in block markup has no fixed length, as the content of update-content: markup of lists and
+	 * columns counts, so 20,000 characters were reached at about 950 words. create-product and update-product store
+	 * more than that as sent.
+	 *
+	 * @group woocommerce
+	 */
+	public function test_long_description_has_no_fixed_length(): void {
+		self::settings( array( 'profile' => 'full' ) );
+		$section = "<!-- wp:list -->\n<ul class=\"wp-block-list\"><!-- wp:list-item -->\n<li>Vegetable-tanned leather, waxed thread and hand-burnished edges.</li>\n<!-- /wp:list-item --></ul>\n<!-- /wp:list -->";
+		$long    = implode( "\n\n", array_fill( 0, 120, $section ) );
+		$this->assertGreaterThan( 20000, strlen( $long ) );
+		$result = $this->assert_ok(
+			wp_get_ability( 'leitvia/create-product' )->execute(
+				array(
+					'title'       => 'Card case',
+					'description' => $long,
+					'base_hash'   => '',
+				)
+			)
+		);
+		$id     = (int) $result['target']['post'];
+		$this->assertSame( $long, self::without_ids( wc_get_product( $id )->get_description() ) );
+
+		$longer = $long . "\n\n" . $section;
+		$this->assert_ok(
+			self::call(
+				'leitvia/update-product',
+				$id,
+				array(
+					'product'     => $id,
+					'description' => $longer,
+				)
+			)
+		);
+		$this->assertSame( $longer, self::without_ids( wc_get_product( $id )->get_description() ) );
+	}
+
+	/**
 	 * Global attributes: list-product-attributes reads name, slug, sort order, the values in their order with slugs and
 	 * the hash; update-product-attribute renames the attribute and a value and sets the order in one operation, slugs
 	 * stay. Live in the profile full with snapshot and rollback, a package in the profile standard (attributes have no

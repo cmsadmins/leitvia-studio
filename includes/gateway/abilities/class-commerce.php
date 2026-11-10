@@ -194,8 +194,7 @@ final class Commerce {
 					),
 					'description'       => array(
 						'type'        => 'string',
-						'maxLength'   => 20000,
-						'description' => __( 'Long description, block markup or plain text. Plain text without HTML becomes paragraph blocks: a blank line starts a new paragraph, the text is escaped.', 'leitvia-studio' ),
+						'description' => __( 'Long description, block markup or plain text. Plain text without HTML becomes paragraph blocks: a blank line starts a new paragraph, the text is escaped. No fixed length, as with the content of leitvia/update-content; a change package shows the comparison up to 1 MB for before and after together.', 'leitvia-studio' ),
 					),
 					'short_description' => array(
 						'type'        => 'string',
@@ -255,8 +254,7 @@ final class Commerce {
 					),
 					'description'       => array(
 						'type'        => 'string',
-						'maxLength'   => 20000,
-						'description' => __( 'Long description, block markup or plain text. Plain text without HTML becomes paragraph blocks: a blank line starts a new paragraph, the text is escaped.', 'leitvia-studio' ),
+						'description' => __( 'Long description, block markup or plain text. Plain text without HTML becomes paragraph blocks: a blank line starts a new paragraph, the text is escaped. No fixed length, as with the content of leitvia/update-content; a change package shows the comparison up to 1 MB for before and after together.', 'leitvia-studio' ),
 					),
 					'short_description' => array(
 						'type'      => 'string',
