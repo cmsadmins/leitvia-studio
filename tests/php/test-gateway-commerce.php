@@ -5,6 +5,7 @@
  * @package LeitviaStudio
  */
 
+use LeitviaStudio\Gateway\Abilities\Commerce;
 use LeitviaStudio\Gateway\Abilities\Read_Audit;
 use LeitviaStudio\Gateway\Gateway;
 use LeitviaStudio\Gateway\Hashes;
@@ -14,8 +15,8 @@ use LeitviaStudio\Gateway\Scope;
 use LeitviaStudio\Gateway\Store;
 
 /**
- * Abilities list-products, get-product, create-product, update-product, update-product-category and set-merchandising: reads without
- * sales or customer figures, writes through the pipeline in the area products, prices, taxes and shipping at most
+ * Abilities list-products, get-product, create-product, update-product, update-product-category, set-merchandising,
+ * list-product-attributes and update-product-attribute: reads without sales or customer figures, writes through the pipeline in the area products, prices, taxes and shipping at most
  * "suggest", orders, refunds, coupons and customers out of scope, rollback for products. The group woocommerce runs
  * with WooCommerce loaded (npm run test:php:commerce).
  */
@@ -32,9 +33,9 @@ class Test_Gateway_Commerce extends WP_UnitTestCase {
 
 
 	/**
-	 * Names of the six abilities.
+	 * Names of the eight abilities.
 	 */
-	private const ABILITIES = array( 'leitvia/list-products', 'leitvia/get-product', 'leitvia/create-product', 'leitvia/update-product', 'leitvia/update-product-category', 'leitvia/set-merchandising' );
+	private const ABILITIES = array( 'leitvia/list-products', 'leitvia/get-product', 'leitvia/create-product', 'leitvia/update-product', 'leitvia/update-product-category', 'leitvia/set-merchandising', 'leitvia/list-product-attributes', 'leitvia/update-product-attribute' );
 
 	/**
 	 * Agent user.
@@ -157,7 +158,57 @@ class Test_Gateway_Commerce extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Without WooCommerce the six abilities, the products area and product types do not exist.
+	 * A global attribute Colour (pa_colour, sorted by the custom order) with the values Red, Blue and Green in that
+	 * order. WooCommerce registers the taxonomy of an attribute on init, so the test registers it as WooCommerce does.
+	 *
+	 * @return array{0: int, 1: array<string, int>} Attribute ID and term IDs by name.
+	 */
+	private static function attribute(): array {
+		$id = wc_create_attribute(
+			array(
+				'name'     => 'Colour',
+				'slug'     => 'colour',
+				'order_by' => 'menu_order',
+			)
+		);
+		register_taxonomy(
+			'pa_colour',
+			array( 'product' ),
+			array(
+				'capabilities' => array(
+					'manage_terms' => 'manage_product_terms',
+					'edit_terms'   => 'edit_product_terms',
+					'delete_terms' => 'delete_product_terms',
+					'assign_terms' => 'assign_product_terms',
+				),
+			)
+		);
+		$terms = array();
+		foreach ( array( 'Red', 'Blue', 'Green' ) as $order => $name ) {
+			$terms[ $name ] = self::factory()->term->create(
+				array(
+					'taxonomy' => 'pa_colour',
+					'name'     => $name,
+				)
+			);
+			update_term_meta( $terms[ $name ], 'order', $order );
+		}
+		return array( (int) $id, $terms );
+	}
+
+	/**
+	 * The attribute of the ID as list-product-attributes lists it.
+	 *
+	 * @param int $id Attribute ID.
+	 * @return array<string, mixed>
+	 */
+	private static function listed( int $id ): array {
+		$list = wp_get_ability( 'leitvia/list-product-attributes' )->execute();
+		return (array) current( wp_list_filter( (array) $list['attributes'], array( 'id' => $id ) ) );
+	}
+
+	/**
+	 * Without WooCommerce the eight abilities, the products area and product types do not exist.
 	 */
 	public function test_without_woocommerce_not_registered(): void {
 		$this->assertFalse( class_exists( 'WooCommerce' ) );
@@ -756,5 +807,328 @@ class Test_Gateway_Commerce extends WP_UnitTestCase {
 		$update['description'] = "<!-- wp:paragraph -->\n<p>Kept as <strong>sent</strong>.</p>\n<!-- /wp:paragraph -->";
 		$this->assert_ok( self::call( 'leitvia/update-product', $id, $update ) );
 		$this->assertSame( $update['description'], self::without_ids( wc_get_product( $id )->get_description() ) );
+	}
+
+	/**
+	 * Global attributes: list-product-attributes reads name, slug, sort order, the values in their order with slugs and
+	 * the hash; update-product-attribute renames the attribute and a value and sets the order in one operation, slugs
+	 * stay. Live in the profile full with snapshot and rollback, a package in the profile standard (attributes have no
+	 * draft) that a person applies.
+	 *
+	 * @group woocommerce
+	 */
+	public function test_product_attributes(): void {
+		[ $id, $terms ] = self::attribute();
+		$listed         = self::listed( $id );
+		$this->assertSame( 'Colour', $listed['name'] );
+		$this->assertSame( 'pa_colour', $listed['slug'] );
+		$this->assertSame( 'menu_order', $listed['order_by'] );
+		$this->assertSame( array( 'Red', 'Blue', 'Green' ), array_column( $listed['values'], 'name' ) );
+		$this->assertSame( array( 'red', 'blue', 'green' ), array_column( $listed['values'], 'slug' ) );
+		$this->assertSame( array_values( $terms ), array_column( $listed['values'], 'id' ) );
+		$this->assertSame( Commerce::attribute_hash( $id ), $listed['hash'] );
+
+		self::settings( array( 'profile' => 'full' ) );
+		$input = array(
+			'attribute' => $id,
+			'name'      => 'Farbe',
+			'values'    => array(
+				array(
+					'value' => $terms['Red'],
+					'name'  => 'Rot',
+				),
+			),
+			'order'     => array( $terms['Green'], $terms['Red'], $terms['Blue'] ),
+		);
+		// Values and their order need edit_product_terms, the name of the attribute itself manage_product_terms.
+		$this->assert_rejected( 'leitvia_forbidden', wp_get_ability( 'leitvia/update-product-attribute' )->execute( $input + array( 'base_hash' => $listed['hash'] ) ) );
+		$this->assertSame( 'Colour', wc_get_attribute( $id )->name );
+		$values = $this->assert_ok( wp_get_ability( 'leitvia/update-product-attribute' )->execute( array_diff_key( $input, array( 'name' => true ) ) + array( 'base_hash' => $listed['hash'] ) ) );
+		$this->assertSame( 'live', $values['mode'] );
+		$this->assertSame( 'Rot', get_term( $terms['Red'] )->name );
+		$this->assert_ok( wp_get_ability( 'leitvia/rollback' )->execute( array( 'id' => $values['package'] ) ) );
+		wp_get_current_user()->add_cap( 'manage_product_terms' );
+		$result = $this->assert_ok( wp_get_ability( 'leitvia/update-product-attribute' )->execute( $input + array( 'base_hash' => Commerce::attribute_hash( $id ) ) ) );
+		$this->assertSame( 'live', $result['mode'] );
+		$this->assertSame( array( 'attribute' => $id ), $result['target'] );
+		$this->assertSame( 'Farbe', wc_get_attribute( $id )->name );
+		$this->assertSame( 'pa_colour', wc_get_attribute( $id )->slug );
+		$this->assertSame( 'Rot', get_term( $terms['Red'] )->name );
+		$this->assertSame( 'red', get_term( $terms['Red'] )->slug );
+		$changed = self::listed( $id );
+		$this->assertSame( array( 'Green', 'Rot', 'Blue' ), array_column( $changed['values'], 'name' ) );
+		$this->assertSame( $result['hash'], $changed['hash'] );
+		$snapshot = Store::get_snapshot( $result['snapshot'] );
+		$this->assertSame( 'attribute', $snapshot['object_type'] );
+		$this->assertSame( 'Colour', $snapshot['state']['attribute']['name'] );
+
+		$this->assert_ok( wp_get_ability( 'leitvia/rollback' )->execute( array( 'id' => $result['package'] ) ) );
+		$this->assertSame( 'rolled_back', Packages::state( $result['package'] ) );
+		$this->assertSame( 'Colour', wc_get_attribute( $id )->name );
+		$this->assertSame( array( 'Red', 'Blue', 'Green' ), array_column( self::listed( $id )['values'], 'name' ) );
+
+		self::settings( array() );
+		$result = $this->assert_ok( wp_get_ability( 'leitvia/update-product-attribute' )->execute( $input + array( 'base_hash' => Commerce::attribute_hash( $id ) ) ) );
+		$this->assertSame( 'package', $result['mode'] );
+		$this->assertSame( 'Colour', wc_get_attribute( $id )->name );
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+		$this->assertSame( 'applied', $this->assert_ok( Packages::apply( $result['package'] ) )['state'] );
+		$this->assertSame( 'Farbe', wc_get_attribute( $id )->name );
+		$this->assertSame( 'Rot', get_term( $terms['Red'] )->name );
+		unregister_taxonomy( 'pa_colour' );
+	}
+
+	/**
+	 * Update-product-attribute refuses an empty change, a value of another taxonomy, an order that leaves out or repeats
+	 * a value, an order with another order_by, names without text, a stale hash and an attribute that does not exist;
+	 * HTML is removed from names.
+	 *
+	 * @group woocommerce
+	 */
+	public function test_product_attribute_rejections(): void {
+		[ $id, $terms ] = self::attribute();
+		$tag            = self::factory()->term->create( array( 'taxonomy' => 'product_tag' ) );
+		$call           = static fn( array $input ) => wp_get_ability( 'leitvia/update-product-attribute' )->execute(
+			$input + array(
+				'attribute' => $id,
+				'base_hash' => Commerce::attribute_hash( $id ),
+			)
+		);
+		$all            = array_values( $terms );
+		foreach ( array(
+			'change'   => array(),
+			'values'   => array(
+				'values' => array(
+					array(
+						'value' => $tag,
+						'name'  => 'Sale',
+					),
+				),
+			),
+			'order'    => array( 'order' => array( $terms['Red'], $terms['Blue'] ) ),
+			'order_by' => array(
+				'order'    => $all,
+				'order_by' => 'name',
+			),
+			'name'     => array( 'name' => '<b></b>' ),
+		) as $reason => $input ) {
+			$this->assertSame( $reason, $this->assert_rejected( 'leitvia_invalid_input', $call( $input ) )['reason'], $reason );
+		}
+		$this->assertSame( 'order', $this->assert_rejected( 'leitvia_invalid_input', $call( array( 'order' => array( $terms['Red'], $terms['Blue'], $terms['Blue'] ) ) ) )['reason'] );
+		$this->assert_rejected(
+			'leitvia_stale_hash',
+			$call(
+				array(
+					'name'      => 'Farbe',
+					'base_hash' => 'stale',
+				)
+			)
+		);
+		$this->assert_rejected(
+			'leitvia_out_of_scope',
+			$call(
+				array(
+					'attribute' => $id + 1000,
+					'name'      => 'Farbe',
+				)
+			)
+		);
+
+		self::settings( array( 'profile' => 'full' ) );
+		wp_get_current_user()->add_cap( 'manage_product_terms' );
+		$this->assert_ok( $call( array( 'name' => '<em>Farbe</em>' ) ) );
+		$this->assertSame( 'Farbe', wc_get_attribute( $id )->name );
+		$this->assertSame( 'menu_order', wc_get_attribute( $id )->order_by );
+		$this->assert_ok( $call( array( 'order_by' => 'name' ) ) );
+		$this->assertSame( 'name', wc_get_attribute( $id )->order_by );
+		unregister_taxonomy( 'pa_colour' );
+	}
+
+	/**
+	 * A product description keeps a synced pattern with its overrides (ref and content) as sent, quotes, line breaks
+	 * and backslashes in the overrides included, as update-content keeps it in a page; so does a title with a
+	 * backslash. A save that drops attributes fails with leitvia_attributes_lost and leaves the product as it was.
+	 *
+	 * @group woocommerce
+	 */
+	public function test_synced_pattern_in_description(): void {
+		self::settings( array( 'profile' => 'full' ) );
+		$pattern = self::factory()->post->create(
+			array(
+				'post_type'    => 'wp_block',
+				'post_content' => '<!-- wp:paragraph {"metadata":{"bindings":{"__default":{"source":"core/pattern-overrides"}},"name":"Feature"}} --><p>Feature</p><!-- /wp:paragraph -->',
+			)
+		);
+		$id      = self::product();
+		$attrs   = array(
+			'ref'     => $pattern,
+			'content' => array( 'Feature' => array( 'content' => "Oiled \"oak\"\nwith a 2\\3 joint" ) ),
+		);
+		// As agents write it: JSON with backslash escapes, not the " spelling of serialize_block().
+		$markup = '<!-- wp:block ' . wp_json_encode( $attrs, JSON_UNESCAPED_SLASHES ) . ' /-->';
+		$this->assert_ok(
+			self::call(
+				'leitvia/update-product',
+				$id,
+				array(
+					'product'     => $id,
+					'title'       => 'Oak tray 2\\3',
+					'description' => $markup,
+				)
+			)
+		);
+		$product = wc_get_product( $id );
+		$this->assertSame( 'Oak tray 2\\3', $product->get_name() );
+		$blocks = parse_blocks( $product->get_description() );
+		$this->assertSame( 'core/block', $blocks[0]['blockName'] );
+		unset( $blocks[0]['attrs']['metadata'] );
+		$this->assertSame( $attrs, $blocks[0]['attrs'] );
+
+		$stored = $product->get_description();
+		// Only the new text loses its attributes; restoring the stored one works.
+		$drop = static function ( $content ) {
+			if ( ! str_contains( (string) $content, 'Oiled oak' ) ) {
+				return $content;
+			}
+			$blocks = parse_blocks( wp_unslash( (string) $content ) );
+			unset( $blocks[0]['attrs']['content'] );
+			return wp_slash( serialize_blocks( $blocks ) );
+		};
+		add_filter( 'content_save_pre', $drop, 99 );
+		$attrs['content']['Feature']['content'] = 'Oiled oak';
+		$data                                   = $this->assert_rejected(
+			'leitvia_attributes_lost',
+			self::call(
+				'leitvia/update-product',
+				$id,
+				array(
+					'product'     => $id,
+					'description' => '<!-- wp:block ' . wp_json_encode( $attrs ) . ' /-->',
+				)
+			)
+		);
+		remove_filter( 'content_save_pre', $drop, 99 );
+		$this->assertSame(
+			array(
+				array(
+					'block'      => 'core/block',
+					'index'      => 0,
+					'attributes' => array( 'content' ),
+				),
+			),
+			$data['lost']
+		);
+		$this->assertSame( $stored, wc_get_product( $id )->get_description() );
+	}
+
+	/**
+	 * The texts reach WooCommerce unslashed: a rename with an apostrophe gives the variations of a variable product the
+	 * name without a backslash, and a write of the price alone leaves the post row (description with quotes) untouched.
+	 *
+	 * @group woocommerce
+	 */
+	public function test_texts_unslashed_in_woocommerce(): void {
+		self::settings(
+			array(
+				'profile'   => 'full',
+				'overrides' => array(
+					'areas' => array(),
+					'kinds' => array( 'prices' ),
+				),
+			)
+		);
+		$variable = new WC_Product_Variable();
+		$variable->set_props(
+			array(
+				'name'   => 'Oak tray',
+				'status' => 'publish',
+			)
+		);
+		$id        = $variable->save();
+		$variation = new WC_Product_Variation();
+		$variation->set_props(
+			array(
+				'parent_id'     => $id,
+				'status'        => 'publish',
+				'regular_price' => '48.00',
+			)
+		);
+		$child = $variation->save();
+		$this->assertStringContainsString( 'Oak tray', get_post_field( 'post_title', $child, 'raw' ) );
+		$this->assert_ok(
+			self::call(
+				'leitvia/update-product',
+				$id,
+				array(
+					'product' => $id,
+					'title'   => "Tom's tray",
+				)
+			)
+		);
+		$this->assertSame( "Tom's tray", get_post_field( 'post_title', $id, 'raw' ) );
+		$this->assertStringContainsString( "Tom's tray", get_post_field( 'post_title', $child, 'raw' ) );
+		$this->assertStringNotContainsString( '\\', get_post_field( 'post_title', $child, 'raw' ) );
+
+		$simple  = self::product( array( 'description' => '<p>A "tray" of oiled oak.</p>' ) );
+		$written = 0;
+		$count   = static function () use ( &$written ): void {
+			++$written;
+		};
+		add_action( 'pre_post_update', $count );
+		$result = $this->assert_ok(
+			self::call(
+				'leitvia/update-product',
+				$simple,
+				array(
+					'product'       => $simple,
+					'regular_price' => '59.00',
+				)
+			)
+		);
+		remove_action( 'pre_post_update', $count );
+		$this->assertSame( 'live', $result['mode'] );
+		$this->assertSame( '59.00', wc_get_product( $simple )->get_regular_price() );
+		$this->assertSame( 0, $written, 'no wp_update_post() for a price' );
+		$this->assertSame( '<p>A "tray" of oiled oak.</p>', get_post_field( 'post_content', $simple, 'raw' ) );
+	}
+
+	/**
+	 * A product description keeps a stored block KSES would cut (Custom HTML a person wrote) byte for byte when an
+	 * agent changes another part, as update-content does, and rejects a new one as html_block.
+	 *
+	 * @group woocommerce
+	 */
+	public function test_stored_html_block_in_description(): void {
+		self::settings( array( 'profile' => 'full' ) );
+		$html = '<!-- wp:html --><iframe src="https://example.org/map"></iframe><!-- /wp:html -->';
+		// As a person with unfiltered_html stores it.
+		kses_remove_filters();
+		$id = self::product( array( 'description' => $html ) );
+		kses_init_filters();
+		$stored = wc_get_product( $id )->get_description();
+		$this->assertStringContainsString( '<iframe', $stored );
+		$this->assert_ok(
+			self::call(
+				'leitvia/update-product',
+				$id,
+				array(
+					'product'     => $id,
+					'description' => $stored . '<!-- wp:paragraph --><p>Oiled oak.</p><!-- /wp:paragraph -->',
+				)
+			)
+		);
+		$this->assertStringContainsString( '<iframe src="https://example.org/map"></iframe>', wc_get_product( $id )->get_description() );
+		$data = $this->assert_rejected(
+			'leitvia_unsafe_content',
+			self::call(
+				'leitvia/update-product',
+				$id,
+				array(
+					'product'     => $id,
+					'description' => $stored . '<!-- wp:html --><iframe src="https://example.org/x"></iframe><!-- /wp:html -->',
+				)
+			)
+		);
+		$this->assertSame( 'html_block', $data['reason'] );
 	}
 }

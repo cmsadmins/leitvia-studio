@@ -120,3 +120,21 @@ function wc_review_ratings_enabled(): bool {}
 function wc_get_product_stock_status_options(): array {}
 
 function wc_attribute_label( string $name, mixed $product = '' ): string {}
+
+/**
+ * @return array<string, object{attribute_id: string, attribute_name: string, attribute_label: string, attribute_type: string, attribute_orderby: string, attribute_public: string}>
+ */
+function wc_get_attribute_taxonomies(): array {}
+
+/**
+ * @return object{id: int, name: string, slug: string, type: string, order_by: string, has_archives: bool}|null
+ */
+function wc_get_attribute( int $id ): ?object {}
+
+/**
+ * @param array<string, mixed> $args Arguments.
+ * @return int|WP_Error
+ */
+function wc_update_attribute( int $id, array $args ) {}
+
+function wc_attribute_taxonomy_name( string $attribute_name ): string {}

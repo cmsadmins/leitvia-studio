@@ -192,7 +192,8 @@ final class Content_Checks {
 	}
 
 	/**
-	 * Check leitvia/link-text: no empty links, no vague link texts without an accessible name, no href="#".
+	 * Check leitvia/link-text: no empty links, no vague link texts without an accessible name, no href="#" or empty
+	 * href.
 	 *
 	 * @param string               $content Block markup.
 	 * @param array<string, mixed> $context Context.
@@ -210,8 +211,11 @@ final class Content_Checks {
 				$tag->next_tag();
 				$label = trim( (string) $tag->get_attribute( 'aria-label' ) ) . trim( (string) $tag->get_attribute( 'aria-labelledby' ) );
 				$text  = strtolower( trim( (string) preg_replace( array( '/\s+/u', '/[\s.:…»›>]+$/u' ), array( ' ', '' ), html_entity_decode( wp_strip_all_tags( $inner ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) ) ) );
-				if ( '#' === trim( (string) $tag->get_attribute( 'href' ) ) ) {
+				$href  = $tag->get_attribute( 'href' );
+				if ( '#' === trim( (string) $href ) ) {
 					$findings[] = self::finding( 'leitvia/link-text', 'error', $id, __( 'The link points to "#" and goes nowhere.', 'leitvia-studio' ), __( 'Link to the real target, or use a button block for an action.', 'leitvia-studio' ) );
+				} elseif ( true === $href || ( is_string( $href ) && '' === trim( $href ) ) ) {
+					$findings[] = self::finding( 'leitvia/link-text', 'error', $id, __( 'The link has an empty address and goes nowhere.', 'leitvia-studio' ), __( 'Link to the real target, or use a button block for an action.', 'leitvia-studio' ) );
 				}
 				if ( '' !== $label ) {
 					continue;
@@ -798,6 +802,163 @@ final class Content_Checks {
 		add_filter( 'pre_render_block', $skip, 10, 2 );
 		$html    = do_blocks( serialize_blocks( $replace( parse_blocks( (string) $template->content ) ) ) );
 		remove_filter( 'pre_render_block', $skip, 10 );
+		return $html;
+	}
+
+	/**
+	 * Links of a piece of HTML that lead nowhere: an empty href, "#" alone, or "#id" with no element of that id or
+	 * name in the HTML (ids the template gives every page, PAGE_IDS, count as there). Per link its href, its text (at
+	 * most 100 characters) and the source: the class of the link or of the nearest element around it that has one,
+	 * '' when none has.
+	 *
+	 * @param string $html HTML, a whole page or block markup.
+	 * @return list<array{href: string, text: string, source: string}>
+	 */
+	public static function empty_links( string $html ): array {
+		$targets = array_fill_keys( self::PAGE_IDS, true );
+		$scan    = new \WP_HTML_Tag_Processor( $html );
+		while ( $scan->next_tag() ) {
+			foreach ( array( 'id', 'name' ) as $attribute ) {
+				$value = $scan->get_attribute( $attribute );
+				if ( is_string( $value ) && '' !== $value ) {
+					$targets[ $value ] = true;
+				}
+			}
+		}
+		$tags  = new \WP_HTML_Tag_Processor( $html );
+		$stack = array();
+		$links = array();
+		$open  = null;
+		while ( $tags->next_token() ) {
+			$type = $tags->get_token_type();
+			if ( '#text' === $type && null !== $open ) {
+				$links[ $open ]['text'] .= $tags->get_modifiable_text();
+			}
+			if ( '#tag' !== $type ) {
+				continue;
+			}
+			$name = (string) $tags->get_tag();
+			if ( $tags->is_tag_closer() ) {
+				$open = 'A' === $name ? null : $open;
+				// The innermost open element of that name and everything inside it close.
+				for ( $at = count( $stack ) - 1; $at >= 0; $at-- ) {
+					if ( $stack[ $at ][0] === $name ) {
+						$stack = array_slice( $stack, 0, $at );
+						break;
+					}
+				}
+				continue;
+			}
+			$class = $tags->get_attribute( 'class' );
+			$class = is_string( $class ) ? trim( (string) preg_replace( '/\s+/', ' ', $class ) ) : '';
+			$href  = 'A' === $name ? $tags->get_attribute( 'href' ) : null;
+			if ( null !== $href ) {
+				$href   = is_string( $href ) ? trim( $href ) : '';
+				$anchor = str_starts_with( $href, '#' ) ? rawurldecode( substr( $href, 1 ) ) : null;
+				if ( '' === $href || '' === $anchor || ( null !== $anchor && ! isset( $targets[ $anchor ] ) ) ) {
+					$source = $class;
+					foreach ( array_reverse( $stack ) as [ , $around ] ) {
+						$source = '' !== $source ? $source : $around;
+					}
+					$links[] = array(
+						'href'   => $href,
+						'text'   => '',
+						'source' => $source,
+					);
+					$open    = array_key_last( $links );
+				}
+			}
+			if ( ! \WP_HTML_Processor::is_void( $name ) ) {
+				$stack[] = array( $name, $class );
+			}
+		}
+		return array_map(
+			static fn( array $link ): array => array(
+				'href'   => $link['href'],
+				'text'   => mb_substr( trim( (string) preg_replace( '/\s+/u', ' ', $link['text'] ) ), 0, 100 ),
+				'source' => $link['source'],
+			),
+			$links
+		);
+	}
+
+	/**
+	 * The page of a published post as a visitor sees it, rendered in this request: its block template with the post as
+	 * the main query, so blocks and plugins that print into the page (a note of a legal plugin next to the price) render
+	 * as on the site. Header and footer template parts stay out, they are the same on every page (see Read_Audit::site()),
+	 * and so do navigation blocks as in render_page(). oEmbed neither fetches nor caches anything. '' when the post type
+	 * has no template; the globals come back afterwards. What blocks print goes into the result.
+	 *
+	 * @param \WP_Post $post Published post.
+	 */
+	public static function render_post( \WP_Post $post ): string {
+		$template = self::template(
+			array(
+				'post'      => $post->ID,
+				'post_type' => $post->post_type,
+			)
+		);
+		if ( ! $template ) {
+			return '';
+		}
+		$saved = array( $GLOBALS['wp_query'] ?? null, $GLOBALS['wp_the_query'] ?? null, $GLOBALS['post'] ?? null, $GLOBALS['product'] ?? null );
+		$parts = array();
+		foreach ( array( 'header', 'footer' ) as $area ) {
+			foreach ( get_block_templates( array( 'area' => $area ), 'wp_template_part' ) as $part ) {
+				$parts[ (string) $part->slug ] = true;
+			}
+		}
+		$query = new \WP_Query(
+			array(
+				'p'           => $post->ID,
+				'post_type'   => $post->post_type,
+				'post_status' => 'publish',
+			)
+		);
+		// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- The main query of the rendered page, restored below.
+		$GLOBALS['wp_query'] = $query;
+		// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Same.
+		$GLOBALS['wp_the_query'] = $query;
+		$skip                    = static fn( $pre, array $block ) => 'core/navigation' === $block['blockName'] || ( 'core/template-part' === $block['blockName'] && ( in_array( $block['attrs']['area'] ?? '', array( 'header', 'footer' ), true ) || isset( $parts[ (string) ( $block['attrs']['slug'] ?? '' ) ] ) ) ) ? '' : $pre;
+		$meta                    = static fn( $check, $id, string $key ) => str_starts_with( $key, '_oembed_' ) ? true : $check;
+		add_filter( 'pre_render_block', $skip, 10, 2 );
+		add_filter( 'pre_oembed_result', '__return_empty_string' );
+		add_filter( 'update_post_metadata', $meta, 10, 3 );
+		ob_start();
+		$html = '';
+		try {
+			// As get_the_block_template_html() renders a single post: inside the loop, so the post is the global one. Once,
+			// not in a while loop: a block that runs the main loop itself rewinds it at its end.
+			if ( $query->have_posts() ) {
+				$query->the_post();
+				$html = do_blocks( do_shortcode( (string) $template->content ) );
+				// The end of the loop, so loop_end fires as on the page; a block that ran the loop itself rewound it.
+				if ( $query->in_the_loop ) {
+					$query->have_posts();
+				}
+			}
+		} catch ( \Throwable $e ) {
+			unset( $e );
+		} finally {
+			$html = (string) ob_get_clean() . $html;
+			remove_filter( 'pre_render_block', $skip, 10 );
+			remove_filter( 'pre_oembed_result', '__return_empty_string' );
+			remove_filter( 'update_post_metadata', $meta, 10 );
+			// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Restores the globals of the request.
+			[ $GLOBALS['wp_query'], $GLOBALS['wp_the_query'], $GLOBALS['post'] ] = $saved;
+			if ( $saved[2] instanceof \WP_Post ) {
+				setup_postdata( $saved[2] );
+			} elseif ( $saved[0] instanceof \WP_Query ) {
+				wp_reset_postdata();
+			}
+			// After setup_postdata(): WooCommerce sets the product of a post on the_post.
+			if ( null === $saved[3] ) {
+				unset( $GLOBALS['product'] );
+			} else {
+				// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited, WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- The global of WooCommerce, restored.
+				$GLOBALS['product'] = $saved[3];
+			}
+		}
 		return $html;
 	}
 

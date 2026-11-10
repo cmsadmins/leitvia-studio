@@ -14,14 +14,19 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Ability leitvia/audit-site: the content checks over published content, page by page, plus classic content,
- * deprecated patterns, token drift, internal links without a target, pages that look like legal texts without a
- * page kind and placeholders left on legal pages. The first page adds findings about the whole site under site: a site
+ * deprecated patterns, token drift, internal links without a target, links of the rendered page that lead nowhere,
+ * pages that look like legal texts without a page kind and placeholders left on legal pages. The first page adds findings about the whole site under site: a site
  * closed to search engines, a missing imprint, contact or editorial page, and recent news without a large image or
  * whose author has no biography.
  */
 final class Read_Audit {
 
 	public const MAX_LIMIT = 20;
+
+	/**
+	 * Seconds one page of the audit may take before it ends early with the cursor.
+	 */
+	public const TIME_BUDGET = 10;
 
 	/**
 	 * Slugs that look like a legal text, with the page kind they should carry.
@@ -89,7 +94,7 @@ final class Read_Audit {
 		Gateway\Abilities::read(
 			'leitvia/audit-site',
 			__( 'Audit site', 'leitvia-studio' ),
-			__( 'Runs the content checks (headings, alt text, link text, #anchor links, block validity, unregistered blocks, tokens, contrast, one h1 and landmarks) over published content, at most 20 posts per call in ID order. Also reports classic content without blocks, deprecated patterns, preset slugs missing from the active tokens, internal links that lead to no page or to the old address of a renamed post, pages that look like legal texts without a page kind, and placeholders left on legal pages: square brackets such as [Organization name] and sentences that say they are a placeholder. The first page (after 0) also returns site: an error when the site is closed to search engines outside a local or staging site, warnings for a missing imprint, contact or editorial page while there are posts, and for the latest 20 news posts without a featured image of at least 1200 px width or whose author has no biography. Pass next as after for the following page; next is null at the end.', 'leitvia-studio' ),
+			__( 'Runs the content checks (headings, alt text, link text, #anchor links, block validity, unregistered blocks, tokens, contrast, one h1 and landmarks) over published content, at most 20 posts per call in ID order. Also reports classic content without blocks, deprecated patterns, preset slugs missing from the active tokens, internal links that lead to no page or to the old address of a renamed post, links that lead nowhere (empty href, # without target) on the rendered page outside content and template parts, with their class, pages that look like legal texts without a page kind, and placeholders left on legal pages: square brackets such as [Organization name] and sentences that say they are a placeholder. The first page (after 0) also returns site: an error when the site is closed to search engines outside a local or staging site, an error per header or footer part with such links, warnings for a missing imprint, contact or editorial page while there are posts, and for the latest 20 news posts without a featured image of at least 1200 px width or whose author has no biography. Pass next as after for the following page; next is null at the end.', 'leitvia-studio' ),
 			array(
 				'type'                 => 'object',
 				'properties'           => array(
@@ -167,15 +172,24 @@ final class Read_Audit {
 		$more  = count( $ids ) > $limit;
 		$ids   = array_slice( array_map( 'intval', $ids ), 0, $limit );
 		$items = array();
+		$start = microtime( true );
+		$last  = (int) end( $ids );
+		$done  = 0;
 		foreach ( $ids as $id ) {
 			$post = get_post( $id );
 			if ( $post && Gateway\Scope::readable( $post ) ) {
 				$items[] = self::item( $post );
 			}
+			$done = $id;
+			// Each post renders its page; past the time budget the page ends early and the cursor goes on from here.
+			if ( microtime( true ) - $start > self::TIME_BUDGET ) {
+				$more = $more || $done !== $last;
+				break;
+			}
 		}
 		return array(
 			'items' => $items,
-			'next'  => $more ? (int) end( $ids ) : null,
+			'next'  => $more ? $done : null,
 		);
 	}
 
@@ -212,6 +226,18 @@ final class Read_Audit {
 				/* translators: 1: link, 2: current address. */
 				: self::finding( 'leitvia/broken-link', sprintf( __( 'The link %1$s leads to the old address of %2$s.', 'leitvia-studio' ), $href, $to ), __( 'Repair it with leitvia/repair-links and auto.', 'leitvia-studio' ) );
 		}
+		foreach ( wp_list_filter( self::empty_links( $post ), array( 'in' => 'page' ) ) as $link ) {
+			$findings[] = self::finding(
+				'leitvia/empty-link',
+				'' !== $link['source']
+					/* translators: 1: link text, 2: href, 3: class of the element the link comes from. */
+					? sprintf( __( 'The page shows the link "%1$s" with the address "%2$s", which leads nowhere. It is not in the content; it comes from the element with the class "%3$s" (template or plugin).', 'leitvia-studio' ), $link['text'], $link['href'], $link['source'] )
+					/* translators: 1: link text, 2: href. */
+					: sprintf( __( 'The page shows the link "%1$s" with the address "%2$s", which leads nowhere. It is not in the content; it comes from the template or a plugin.', 'leitvia-studio' ), $link['text'], $link['href'] ),
+				__( 'Find the plugin setting or the block of the template that prints the link and give it its target, for example the page a legal plugin links to. Plugin settings are for a person.', 'leitvia-studio' ),
+				'error'
+			);
+		}
 		if ( '' !== trim( $post->post_content ) && ! has_blocks( $post->post_content ) ) {
 			$findings[] = self::finding( 'leitvia/classic-content', __( 'The page holds classic content without blocks.', 'leitvia-studio' ), __( 'Turn it into blocks with leitvia/update-content and content.', 'leitvia-studio' ) );
 		}
@@ -241,7 +267,8 @@ final class Read_Audit {
 
 	/**
 	 * Findings about the whole site. Error: closed to search engines (blog_public 0) on a production site; local,
-	 * development and staging sites and the Playground are left alone. Warning: no published imprint, contact or
+	 * development and staging sites and the Playground are left alone. Error: a header or footer template part with
+	 * links that lead nowhere (Content_Checks::empty_links()), such as the placeholder links of a footer pattern. Warning: no published imprint, contact or
 	 * editorial page (by page kind or slug) while there are published posts; one of the latest news posts without a
 	 * featured image of at least 1200 px width; an author of those without a biography.
 	 *
@@ -256,6 +283,10 @@ final class Read_Audit {
 		 */
 		if ( ! get_option( 'blog_public' ) && ! apply_filters( 'leitvia_studio_preview_site', 'production' !== wp_get_environment_type() ) ) {
 			$findings[] = self::finding( 'leitvia/search-blocked', __( 'The site asks search engines not to index it, so no page appears in search results or Google News.', 'leitvia-studio' ), __( 'A person turns off "Discourage search engines from indexing this site" under Settings, Reading.', 'leitvia-studio' ), 'error' );
+		}
+		foreach ( self::part_links() as $part => $texts ) {
+			/* translators: 1: slug of the template part, 2: texts of the links. */
+			$findings[] = self::finding( 'leitvia/empty-link', sprintf( __( 'The template part %1$s has links that lead nowhere (empty href or # without target): %2$s.', 'leitvia-studio' ), $part, implode( ', ', $texts ) ), __( 'Give each link its target with leitvia/update-template-part, or remove it.', 'leitvia-studio' ), 'error' );
 		}
 		$posts = get_posts(
 			array(
@@ -296,6 +327,34 @@ final class Read_Audit {
 			}
 		}
 		return $findings;
+	}
+
+	/**
+	 * Texts of the links that lead nowhere per header and footer template part, by slug; parts without such links are
+	 * left out. Navigation blocks are not rendered, as in Content_Checks::render_post().
+	 *
+	 * @return array<string, list<string>>
+	 */
+	private static function part_links(): array {
+		$skip  = static fn( $pre, array $block ) => 'core/navigation' === $block['blockName'] ? '' : $pre;
+		$parts = array();
+		add_filter( 'pre_render_block', $skip, 10, 2 );
+		ob_start();
+		try {
+			foreach ( array( 'header', 'footer' ) as $area ) {
+				foreach ( get_block_templates( array( 'area' => $area ), 'wp_template_part' ) as $part ) {
+					$links = Gateway\Content_Checks::empty_links( do_blocks( (string) $part->content ) );
+					$texts = array_values( array_unique( array_map( static fn( array $link ): string => '' !== $link['text'] ? $link['text'] : '"' . $link['href'] . '"', $links ) ) );
+					if ( $texts ) {
+						$parts[ (string) $part->slug ] = $texts;
+					}
+				}
+			}
+		} finally {
+			ob_end_clean();
+			remove_filter( 'pre_render_block', $skip, 10 );
+		}
+		return $parts;
 	}
 
 	/**
@@ -350,6 +409,27 @@ final class Read_Audit {
 			}
 		}
 		return $broken;
+	}
+
+	/**
+	 * Links of a post that lead nowhere (Content_Checks::empty_links()) on its rendered page, each with in: content when
+	 * the content holds it, page when the template or a plugin prints it. A post visitors cannot see, or one without a
+	 * template, has the links of its content only.
+	 *
+	 * @param \WP_Post $post Post.
+	 * @return list<array{href: string, text: string, source: string, in: string}>
+	 */
+	public static function empty_links( \WP_Post $post ): array {
+		// The page shows texts of the content through wptexturize(), so curly quotes count as the same text.
+		$key     = static fn( array $link ): string => $link['href'] . '|' . wptexturize( $link['text'] );
+		$content = Gateway\Content_Checks::empty_links( $post->post_content );
+		$html    = is_post_publicly_viewable( $post ) ? Gateway\Content_Checks::render_post( $post ) : '';
+		$known   = array_flip( array_map( $key, $content ) );
+		$links   = array();
+		foreach ( '' !== $html ? Gateway\Content_Checks::empty_links( $html ) : $content as $link ) {
+			$links[ $key( $link ) ] ??= $link + array( 'in' => isset( $known[ $key( $link ) ] ) ? 'content' : 'page' );
+		}
+		return array_values( $links );
 	}
 
 	/**

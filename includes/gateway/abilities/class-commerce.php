@@ -19,7 +19,8 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Abilities leitvia/list-products, leitvia/get-product, leitvia/create-product, leitvia/update-product,
- * leitvia/update-product-category and leitvia/set-merchandising, registered only while WooCommerce is active. Writes go through Pipeline::run() in the
+ * leitvia/update-product-category, leitvia/set-merchandising, leitvia/list-product-attributes and
+ * leitvia/update-product-attribute, registered only while WooCommerce is active. Writes go through Pipeline::run() in the
  * area products (default "draft"); the pipeline writes products with the CRUD of WooCommerce (save()). Prices, taxes
  * and shipping are content kinds and land at most as a suggestion unless a person unlocked them. Orders, refunds,
  * coupons and customers are out of scope; nothing here reads sales or customer figures.
@@ -56,6 +57,11 @@ final class Commerce {
 		'tax'      => array( 'tax_status', 'tax_class' ),
 		'shipping' => array( 'shipping_class_id' ),
 	);
+
+	/**
+	 * Values of a global product attribute that list-product-attributes reads and update-product-attribute takes.
+	 */
+	public const MAX_VALUES = 200;
 
 	/**
 	 * Props holding IDs.
@@ -321,6 +327,254 @@ final class Commerce {
 			),
 			array( self::class, 'describe_merchandising' )
 		);
+		Abilities::read(
+			'leitvia/list-product-attributes',
+			__( 'List product attributes', 'leitvia-studio' ),
+			__( 'Lists the global product attributes with their values and hash. Per attribute ID, name, slug (taxonomy pa_*) and sort order, per value ID, name and slug, in the order the shop shows them. Attributes a single product defines for itself are part of leitvia/get-product.', 'leitvia-studio' ),
+			array(),
+			array(
+				'type'       => 'object',
+				'properties' => array( 'attributes' => $objects ),
+			),
+			static fn() => array( 'attributes' => self::list_attributes() )
+		);
+		Abilities::write(
+			'leitvia/update-product-attribute',
+			__( 'Update product attribute', 'leitvia-studio' ),
+			__( 'Renames a global product attribute and its values and sorts the values, in one operation. Read the attribute with leitvia/list-product-attributes and send its hash as base_hash. Values are named by their ID; order lists every value ID in the new order and sorts the attribute by it (order_by menu_order). Slugs stay, so filters and links keep working.', 'leitvia-studio' ),
+			'maintain',
+			$set,
+			array(
+				'properties'           => array(
+					'attribute' => $id,
+					'name'      => array(
+						'type'      => 'string',
+						'minLength' => 1,
+						'maxLength' => 200,
+					),
+					'values'    => array(
+						'type'        => 'array',
+						'maxItems'    => self::MAX_VALUES,
+						'items'       => array(
+							'type'                 => 'object',
+							'properties'           => array(
+								'value' => $id,
+								'name'  => array(
+									'type'      => 'string',
+									'minLength' => 1,
+									'maxLength' => 200,
+								),
+							),
+							'required'             => array( 'value', 'name' ),
+							'additionalProperties' => false,
+						),
+						'description' => __( 'New names of values: value is the ID from leitvia/list-product-attributes.', 'leitvia-studio' ),
+					),
+					'order'     => array(
+						'type'        => 'array',
+						'maxItems'    => self::MAX_VALUES,
+						'items'       => $id,
+						'description' => __( 'Every value ID of the attribute, in the new order.', 'leitvia-studio' ),
+					),
+					'order_by'  => array(
+						'type'        => 'string',
+						'enum'        => array( 'menu_order', 'name', 'name_num', 'id' ),
+						'description' => __( 'How the shop sorts the values: menu_order (the custom order), name, name_num (numbers in names as numbers) or id.', 'leitvia-studio' ),
+					),
+				),
+				'required'             => array( 'attribute' ),
+				'additionalProperties' => false,
+			),
+			array( self::class, 'describe_update_attribute' )
+		);
+	}
+
+	/**
+	 * Global product attributes with their values, see attribute_state(), plus slug and hash.
+	 *
+	 * @return list<array<string, mixed>>
+	 */
+	public static function list_attributes(): array {
+		$out = array();
+		foreach ( wc_get_attribute_taxonomies() as $row ) {
+			$id    = (int) $row->attribute_id;
+			$state = self::attribute_state( $id );
+			if ( ! $state ) {
+				continue;
+			}
+			$taxonomy = wc_attribute_taxonomy_name( (string) $row->attribute_name );
+			$values   = array();
+			foreach ( $state['attribute']['values'] as $value ) {
+				$term     = get_term( (int) $value['id'], $taxonomy );
+				$values[] = array(
+					'id'   => (int) $value['id'],
+					'name' => (string) $value['name'],
+					'slug' => $term instanceof \WP_Term ? $term->slug : '',
+				);
+			}
+			$out[] = array(
+				'id'       => $id,
+				'name'     => (string) $state['attribute']['name'],
+				'slug'     => $taxonomy,
+				'order_by' => (string) $state['attribute']['order_by'],
+				'values'   => $values,
+				'hash'     => Hashes::of( $state ),
+			);
+		}
+		return $out;
+	}
+
+	/**
+	 * State of a global product attribute for the pipeline: array( 'attribute' => name, order_by and values ), the values
+	 * with ID, name and order (term meta order of WooCommerce) in the order of that meta, then name; an empty array when
+	 * the attribute does not exist.
+	 * ponytail: at most MAX_VALUES values; an attribute with more needs paging.
+	 *
+	 * @param int $id Attribute ID.
+	 * @return array<string, mixed>
+	 */
+	public static function attribute_state( int $id ): array {
+		$attribute = $id ? wc_get_attribute( $id ) : null;
+		if ( ! $attribute ) {
+			return array();
+		}
+		$terms  = get_terms(
+			array(
+				'taxonomy'   => (string) $attribute->slug,
+				'hide_empty' => false,
+				'number'     => self::MAX_VALUES,
+				'orderby'    => 'term_id',
+			)
+		);
+		$values = array();
+		foreach ( is_array( $terms ) ? $terms : array() as $term ) {
+			$values[] = array(
+				'id'    => (int) $term->term_id,
+				'name'  => (string) $term->name,
+				'order' => (int) get_term_meta( (int) $term->term_id, 'order', true ),
+			);
+		}
+		usort( $values, static fn( array $a, array $b ): int => array( $a['order'], $a['name'], $a['id'] ) <=> array( $b['order'], $b['name'], $b['id'] ) );
+		return array(
+			'attribute' => array(
+				'name'     => (string) $attribute->name,
+				'order_by' => (string) $attribute->order_by,
+				'values'   => $values,
+			),
+		);
+	}
+
+	/**
+	 * Hash of a global product attribute over its state, '' when it does not exist.
+	 *
+	 * @param int $id Attribute ID.
+	 */
+	public static function attribute_hash( int $id ): string {
+		$state = self::attribute_state( $id );
+		return $state ? Hashes::of( $state ) : '';
+	}
+
+	/**
+	 * Writes name and sort order of an attribute with wc_update_attribute() (slug, type and archives stay), then the
+	 * names and the order meta of its values. Called by the pipeline, also to restore a snapshot.
+	 *
+	 * @param int                  $id     Attribute ID.
+	 * @param array<string, mixed> $fields Fields of the state, see attribute_state().
+	 */
+	public static function save_attribute( int $id, array $fields ): bool {
+		$attribute = wc_get_attribute( $id );
+		if ( ! $attribute ) {
+			return false;
+		}
+		$saved = wc_update_attribute(
+			$id,
+			wp_slash(
+				array(
+					'name'         => (string) $fields['name'],
+					'slug'         => (string) $attribute->slug,
+					'type'         => (string) $attribute->type,
+					'order_by'     => (string) $fields['order_by'],
+					'has_archives' => (bool) $attribute->has_archives,
+				)
+			)
+		);
+		if ( is_wp_error( $saved ) ) {
+			return false;
+		}
+		foreach ( (array) $fields['values'] as $value ) {
+			$term = get_term( (int) $value['id'], (string) $attribute->slug );
+			if ( ! $term instanceof \WP_Term ) {
+				return false;
+			}
+			if ( $term->name !== (string) $value['name'] && is_wp_error( wp_update_term( $term->term_id, $term->taxonomy, wp_slash( array( 'name' => (string) $value['name'] ) ) ) ) ) {
+				return false;
+			}
+			update_term_meta( $term->term_id, 'order', (int) $value['order'] );
+		}
+		return true;
+	}
+
+	/**
+	 * Operation of update-product-attribute: names as plain text, a value of another attribute or an order that leaves
+	 * out or repeats a value is invalid, and an order sorts by it (order_by menu_order).
+	 *
+	 * @param array<string, mixed> $input Input.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public static function describe_update_attribute( array $input ) {
+		$id     = (int) ( $input['attribute'] ?? 0 );
+		$target = array( 'attribute' => $id );
+		$name   = isset( $input['name'] ) ? sanitize_text_field( (string) $input['name'] ) : null;
+		$names  = array();
+		foreach ( (array) ( $input['values'] ?? array() ) as $value ) {
+			$names[ (int) ( $value['value'] ?? 0 ) ] = sanitize_text_field( (string) ( $value['name'] ?? '' ) );
+		}
+		$order = isset( $input['order'] ) ? array_map( 'intval', (array) $input['order'] ) : null;
+		$by    = isset( $input['order_by'] ) ? (string) $input['order_by'] : ( null !== $order ? 'menu_order' : null );
+		if ( null === $name && ! $names && null === $order && null === $by ) {
+			return Block_Edit::invalid( 'change', __( 'Name what to change: name, values, order or order_by.', 'leitvia-studio' ), $target );
+		}
+		if ( '' === $name || in_array( '', $names, true ) ) {
+			return Block_Edit::invalid( 'name', __( 'A name needs text; HTML is removed from names.', 'leitvia-studio' ), $target );
+		}
+		if ( null !== $order && 'menu_order' !== $by ) {
+			return Block_Edit::invalid( 'order_by', __( 'An order of the values needs order_by menu_order; leave order_by out to sort by the order.', 'leitvia-studio' ), $target );
+		}
+		return array(
+			'area'   => self::AREA,
+			'target' => $target,
+			'record' => true,
+			'change' => static function ( array $state ) use ( $name, $names, $order, $by, $target ) {
+				$current = (array) $state['attribute'];
+				$ids     = array_map( 'intval', array_column( (array) $current['values'], 'id' ) );
+				if ( array_diff( array_keys( $names ), $ids ) ) {
+					return Block_Edit::invalid( 'values', __( 'A value ID does not belong to this attribute. Use the IDs from leitvia/list-product-attributes.', 'leitvia-studio' ), $target, 'leitvia/list-product-attributes' );
+				}
+				$sorted = $order;
+				if ( null !== $sorted ) {
+					sort( $sorted );
+					$all = $ids;
+					sort( $all );
+					if ( $sorted !== $all ) {
+						return Block_Edit::invalid( 'order', __( 'The order has to list every value ID of the attribute exactly once.', 'leitvia-studio' ), $target, 'leitvia/list-product-attributes' );
+					}
+				}
+				$position = null === $order ? array() : array_flip( $order );
+				foreach ( $current['values'] as &$value ) {
+					$value['name']  = $names[ (int) $value['id'] ] ?? $value['name'];
+					$value['order'] = $position[ (int) $value['id'] ] ?? $value['order'];
+				}
+				unset( $value );
+				if ( null !== $order ) {
+					usort( $current['values'], static fn( array $a, array $b ): int => $a['order'] <=> $b['order'] );
+				}
+				$state['attribute'] = array(
+					'name'     => $name ?? $current['name'],
+					'order_by' => $by ?? $current['order_by'],
+				) + $current;
+				return $state;
+			},
+		);
 	}
 
 	/**
@@ -477,7 +731,29 @@ final class Commerce {
 			);
 		}
 		$set = $product->set_props( $props );
-		return is_wp_error( $set ) ? $set : $product->save();
+		if ( is_wp_error( $set ) ) {
+			return $set;
+		}
+		// WooCommerce hands the texts to wp_insert_post() and wp_update_post() as they are, which unslash them: without
+		// slashes core's KSES would read the JSON of a block comment with lost backslashes and drop its attributes (a
+		// synced pattern without ref and content). The props stay unslashed (variation titles, change detection, hooks);
+		// only the sanitizing of that one call gets them slashed, before KSES. Each filter removes itself after its first
+		// run, so a post that a hook writes meanwhile stays as it is. Inside save_post WooCommerce writes the row directly.
+		$slash = static function ( $text ) use ( &$slash ) {
+			remove_filter( (string) current_filter(), $slash, 0 );
+			return wp_slash( $text );
+		};
+		$hooks = doing_action( 'save_post' ) ? array() : array( 'title_save_pre', 'content_save_pre', 'excerpt_save_pre' );
+		foreach ( $hooks as $hook ) {
+			add_filter( $hook, $slash, 0 );
+		}
+		try {
+			return $product->save();
+		} finally {
+			foreach ( $hooks as $hook ) {
+				remove_filter( $hook, $slash, 0 );
+			}
+		}
 	}
 
 	/**

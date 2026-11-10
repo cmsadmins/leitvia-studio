@@ -275,6 +275,10 @@ final class Command {
 			$first = false;
 			$items = array_merge( $items, (array) $page['items'] );
 			$after = $page['next'];
+			// Every page renders its posts; the runtime cache would otherwise keep all of them for the whole run.
+			if ( function_exists( 'wp_cache_flush_runtime' ) ) {
+				wp_cache_flush_runtime();
+			}
 		} while ( null !== $after );
 		$summary = array();
 		foreach ( $items as $item ) {

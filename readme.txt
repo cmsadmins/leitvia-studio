@@ -4,7 +4,7 @@ Tags: ai, mcp, block theme, accessibility, design tokens
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.36
+Stable tag: 1.3.37
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -212,6 +212,12 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * Privacy policy: https://leitvia.com/privacy-policy/
 
 == Changelog ==
+
+= 1.3.37 =
+* New abilities leitvia/list-product-attributes and leitvia/update-product-attribute for global WooCommerce attributes (pa_*): name, value names and the order of the values in one operation with hash, snapshot, package and rollback; slugs stay. Value names and order follow the autonomy, the name and the sort order of the attribute itself need manage_product_terms like the attributes screen of WooCommerce, otherwise they go into a package.
+* update-product and create-product: descriptions run through the same block processing as update-content, so synced patterns keep ref and content with their overrides; a stored Custom HTML block of a person stays, a new one is rejected. Texts reach core's KSES with their slashes only for the one save, the product object, variation titles and hooks see them unslashed.
+* A write that would lose block attributes (also in the short description of a product) fails with leitvia_attributes_lost, names block, position and keys and keeps the old state.
+* leitvia/audit-site renders each page with its template and reports links without a target (empty href, # without an anchor) outside the content as leitvia/empty-link with the class of their source; header and footer once under site. Rendering restores the global post, query and product, fires loop_end, fetches no oEmbed and stops a page of results after 10 seconds with the cursor for the rest. link-text reports an empty href, repair-links lists such links under empty.
 
 = 1.3.36 =
 * In a post split into parts (core/nextpage) a write gives a link to #anchor whose anchor lies in another part the path of that part plus the anchor (Table_Of_Contents::anchor_url(), without the host), once the post is published with pretty permalinks; drafts and plain permalinks keep the link. Only blocks the write changes are touched.

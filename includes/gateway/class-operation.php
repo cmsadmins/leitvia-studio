@@ -15,11 +15,12 @@ defined( 'ABSPATH' ) || exit;
  *
  * Targets: array( 'post' => <ID> ) for an existing post, array( 'post' => 0, 'post_type' => <type> ) for a new one,
  * array( 'option' => <name> ) for an option of Pipeline::OPTIONS, Pipeline::MODEL_OPTION or Pipeline::addon_options(), array( 'term' => <ID> ) for a
- * term of a taxonomy in Scope::taxonomies(). 'block' names the affected
+ * term of a taxonomy in Scope::taxonomies(), array( 'attribute' => <ID> ) for a global product attribute of WooCommerce. 'block' names the affected
  * block for rejections; 'replace' marks content that replaces the whole post content, which may then hold no classic
  * block even where the old content was classic; 'token_set' on the user global styles makes the pipeline write them with Compiler::activate().
  * State of a post: the keys of Pipeline::POST_FIELDS (a product adds 'product', see Abilities\Commerce::props()). State
- * of an option: array( 'value' => <value> ). State of a term: array( 'term' => <fields> ), see Pipeline::term_state().
+ * of an option: array( 'value' => <value> ). State of a term: array( 'term' => <fields> ), see Pipeline::term_state(). State of
+ * an attribute: array( 'attribute' => <fields> ), see Abilities\Commerce::attribute_state().
  */
 final class Operation {
 
@@ -75,9 +76,23 @@ final class Operation {
 	}
 
 	/**
+	 * ID of the global product attribute of the target, 0 for any other target.
+	 */
+	public function attribute(): int {
+		return (int) ( $this->target['attribute'] ?? 0 );
+	}
+
+	/**
+	 * Whether the target is no post: an option, a term or an attribute.
+	 */
+	public function no_post(): bool {
+		return '' !== $this->option() || isset( $this->target['term'] ) || isset( $this->target['attribute'] );
+	}
+
+	/**
 	 * Whether the operation creates a post.
 	 */
 	public function creates(): bool {
-		return '' === $this->option() && 0 === $this->post_id() && ! isset( $this->target['term'] );
+		return 0 === $this->post_id() && ! $this->no_post();
 	}
 }

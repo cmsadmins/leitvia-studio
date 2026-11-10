@@ -122,9 +122,10 @@ final class Pipeline {
 				'object_type' => match ( true ) {
 					'' !== $op->option() => 'option',
 					$op->term() > 0      => 'term',
+					$op->attribute() > 0 => 'attribute',
 					default              => (string) ( get_post_type( $op->post_id() ) ? get_post_type( $op->post_id() ) : ( $op->target['post_type'] ?? '' ) ),
 				},
-				'object_id'   => $error ? max( $op->post_id(), $op->term() ) : (int) ( $result['target']['post'] ?? $result['target']['term'] ?? 0 ),
+				'object_id'   => $error ? max( $op->post_id(), $op->term(), $op->attribute() ) : (int) ( $result['target']['post'] ?? $result['target']['term'] ?? $result['target']['attribute'] ?? 0 ),
 				'package_id'  => $error ? 0 : (int) $result['package'],
 				'details'     => ( $error ? array() : array_intersect_key( $result, array_flip( array( 'mode', 'level', 'kinds', 'snapshot' ) ) ) + array_intersect_key( $op->target, array( 'option' => true ) ) ) + ( Abilities::batching() ? array( 'batched' => true ) : array() ),
 			)
@@ -154,6 +155,9 @@ final class Pipeline {
 		if ( isset( $op->target['term'] ) ) {
 			return Hashes::term( $op->term() );
 		}
+		if ( isset( $op->target['attribute'] ) ) {
+			return Commerce::attribute_hash( $op->attribute() );
+		}
 		return Hashes::document( $post_id ?? $op->post_id() );
 	}
 
@@ -166,7 +170,7 @@ final class Pipeline {
 	 * @param string|null $template Template the operation writes, null when it writes none.
 	 */
 	public static function matches( Operation $op, string $stored, ?string $template = null ): bool {
-		if ( '' !== $op->option() || isset( $op->target['term'] ) ) {
+		if ( $op->no_post() ) {
 			$current = self::hash( $op );
 			return '' !== $current && hash_equals( $current, $stored );
 		}
@@ -254,8 +258,9 @@ final class Pipeline {
 					$after[ $field ] = self::office( $after[ $field ] );
 				}
 			}
-			// Block markup agents often get wrong is repaired the same way, see Normalize; a package shows the repair.
-			if ( isset( $after['post_content'] ) && is_string( $after['post_content'] ) && ( $before['post_content'] ?? null ) !== $after['post_content'] && ! isset( $after['product'] ) ) {
+			// Block markup agents often get wrong is repaired the same way, see Normalize, in product descriptions as in
+			// any other content; a package shows the repair.
+			if ( isset( $after['post_content'] ) && is_string( $after['post_content'] ) && ( $before['post_content'] ?? null ) !== $after['post_content'] ) {
 				$after['post_content'] = Normalize::markup( $after['post_content'], is_string( $before['post_content'] ?? null ) ? $before['post_content'] : '', $op->post_id() );
 			}
 			if ( isset( $after['term']['description'] ) && is_string( $after['term']['description'] ) && ( $before['term']['description'] ?? null ) !== $after['term']['description'] ) {
@@ -267,7 +272,10 @@ final class Pipeline {
 			self::json( $after )       => self::unsafe_json( (string) $after['post_content'] ),
 			// Term descriptions and product texts are classic HTML; the markup checks apply all the same.
 			isset( $after['term'] )    => self::unsafe( (string) ( $after['term']['description'] ?? '' ), true ),
-			isset( $after['product'] ) => self::unsafe( (string) $after['post_content'], true ) ?? self::unsafe( (string) $after['post_excerpt'], true ),
+			// Names of an attribute and its values are plain text, see Commerce::describe_update_attribute().
+			isset( $after['attribute'] ) => null,
+			// A block a product description holds already stays as it is, as in other content.
+			isset( $after['product'] ) => self::unsafe( (string) $after['post_content'], true, (string) ( $before['post_content'] ?? '' ) ) ?? self::unsafe( (string) $after['post_excerpt'], true ),
 			// Content that replaces classic content whole keeps no classic block (target replace, see update-content).
 			// Only blocks the write changes count: a block stored as it is (a block of a plugin that is gone, with markup
 			// KSES would cut) stays byte for byte, see stored_unsafe().
@@ -448,6 +456,9 @@ final class Pipeline {
 		if ( isset( $op->target['term'] ) ) {
 			return array( 'term' => $op->term() );
 		}
+		if ( isset( $op->target['attribute'] ) ) {
+			return array( 'attribute' => $op->attribute() );
+		}
 		return array( 'post' => $op->post_id() ) + array_intersect_key( $op->target, array( 'block' => true ) );
 	}
 
@@ -474,6 +485,16 @@ final class Pipeline {
 				return $out;
 			}
 			return current_user_can( 'edit_term', $op->term() ) ? self::term_state( $op->term() ) : $forbidden;
+		}
+		if ( isset( $op->target['attribute'] ) ) {
+			$state = Scope::commerce() ? Commerce::attribute_state( $op->attribute() ) : array();
+			if ( ! $state ) {
+				return $out;
+			}
+			// The capability of the terms of its taxonomy, as for a product category.
+			$attribute = wc_get_attribute( $op->attribute() );
+			$taxonomy  = $attribute ? get_taxonomy( $attribute->slug ) : false;
+			return $taxonomy && current_user_can( $taxonomy->cap->edit_terms ) ? $state : $forbidden;
 		}
 		if ( $op->creates() ) {
 			$type   = (string) ( $op->target['post_type'] ?? '' );
@@ -624,13 +645,13 @@ final class Pipeline {
 			// Only the meta keys of META; an existing post takes no other meta through the pipeline.
 			$after['meta_input'] = array_intersect_key( (array) $after['meta_input'], $start['meta_input'] );
 		}
-		foreach ( array( 'product', 'term', 'terms' ) as $key ) {
+		foreach ( array( 'product', 'term', 'terms', 'attribute' ) as $key ) {
 			// Only the props, term fields and taxonomies the state knows.
 			if ( isset( $start[ $key ] ) ) {
 				$after[ $key ] = array_intersect_key( (array) $after[ $key ], $start[ $key ] ) + $start[ $key ];
 			}
 		}
-		if ( '' !== $op->option() || isset( $op->target['term'] ) ) {
+		if ( $op->no_post() ) {
 			return $after;
 		}
 		$after['post_type'] = $start['post_type'];
@@ -713,7 +734,7 @@ final class Pipeline {
 	 * @param array<string, mixed> $after State after.
 	 */
 	private static function stored_unsafe( Operation $op, array $after ): bool {
-		if ( '' !== $op->option() || isset( $op->target['term'] ) || isset( $after['product'] ) || self::json( $after ) || ! is_string( $after['post_content'] ?? null ) ) {
+		if ( $op->no_post() || self::json( $after ) || ! is_string( $after['post_content'] ?? null ) ) {
 			return false;
 		}
 		$content = $after['post_content'];
@@ -898,14 +919,15 @@ final class Pipeline {
 	}
 
 	/**
-	 * Whether every string in block attributes passes wp_kses_post() and holds no script URL. Core escapes URLs when it
+	 * Whether every string in block attributes, keys included, passes wp_kses_post() and holds no script URL. Core escapes URLs when it
 	 * renders, but the editor shows attributes of the comment as they are.
 	 *
 	 * @param array<mixed> $attrs Attributes.
 	 */
 	private static function attributes_safe( array $attrs ): bool {
-		foreach ( $attrs as $value ) {
+		foreach ( $attrs as $key => $value ) {
 			$safe = match ( true ) {
+				is_string( $key ) && ! self::kses_safe( $key ) => false,
 				is_array( $value )  => self::attributes_safe( $value ),
 				is_string( $value ) => self::kses_safe( $value ) && ! self::script_url( $value ),
 				default             => true,
@@ -984,7 +1006,7 @@ final class Pipeline {
 	 * @return list<array<string, mixed>>
 	 */
 	private static function check( Operation $op, array $after ): array {
-		if ( '' !== $op->option() || isset( $op->target['term'] ) || self::json( $after ) ) {
+		if ( $op->no_post() || self::json( $after ) ) {
 			return array();
 		}
 		$context = array(
@@ -1036,8 +1058,8 @@ final class Pipeline {
 		if ( 'autonomous' === $level ) {
 			return $warnings ? 'package' : 'live';
 		}
-		// Terms have no draft; visitors see every change of one.
-		if ( 'draft' !== $level || '' !== $op->option() || isset( $op->target['term'] ) ) {
+		// Terms and attributes have no draft; visitors see every change of one.
+		if ( 'draft' !== $level || $op->no_post() ) {
 			return 'package';
 		}
 		if ( $op->creates() && ! in_array( $after['post_type'], self::NO_DRAFT, true ) ) {
@@ -1058,7 +1080,14 @@ final class Pipeline {
 		$target = self::target( $op );
 		if ( '' !== $op->option() ) {
 			$allowed = current_user_can( 'manage_options' );
-		} elseif ( isset( $op->target['term'] ) ) {
+		} elseif ( $op->attribute() ) {
+			// before() checked edit_product_terms, which covers values; name and sort order of the attribute itself are
+			// settings of the taxonomy, as on the attributes screen of WooCommerce.
+			$changes   = ( $before['attribute']['name'] ?? null ) !== ( $after['attribute']['name'] ?? null ) || ( $before['attribute']['order_by'] ?? null ) !== ( $after['attribute']['order_by'] ?? null );
+			$attribute = wc_get_attribute( $op->attribute() );
+			$taxonomy  = $attribute ? get_taxonomy( $attribute->slug ) : false;
+			$allowed   = ! $changes || ( $taxonomy && current_user_can( $taxonomy->cap->manage_terms ) );
+		} elseif ( $op->no_post() ) {
 			// before() checked edit_term.
 			$allowed = true;
 		} else {
@@ -1066,7 +1095,13 @@ final class Pipeline {
 			$object    = get_post_type_object( (string) $after['post_type'] );
 			$allowed   = ! $publishes || ( $object && current_user_can( $object->cap->publish_posts ) );
 		}
-		return $allowed ? null : Rejection::make( 'leitvia_forbidden', __( 'Your user may not publish this.', 'leitvia-studio' ), 403, 'capability', $target, '', 'never' );
+		if ( $allowed ) {
+			return null;
+		}
+		if ( $op->attribute() ) {
+			return Rejection::make( 'leitvia_forbidden', __( 'Your user may not change this object.', 'leitvia-studio' ), 403, 'capability', $target, '', 'never' );
+		}
+		return Rejection::make( 'leitvia_forbidden', __( 'Your user may not publish this.', 'leitvia-studio' ), 403, 'capability', $target, '', 'never' );
 	}
 
 	/**
@@ -1085,10 +1120,11 @@ final class Pipeline {
 		$option = $op->option();
 		$type   = match ( true ) {
 			'' !== $option  => 'option',
-			$op->term() > 0 => 'term',
-			default         => (string) $after['post_type'],
+			$op->term() > 0      => 'term',
+			$op->attribute() > 0 => 'attribute',
+			default              => (string) $after['post_type'],
 		};
-		$id = max( $op->post_id(), $op->term() );
+		$id = max( $op->post_id(), $op->term(), $op->attribute() );
 		if ( ! $op->creates() ) {
 			$result['snapshot'] = Store::snapshot( $type, $id, $op->base_hash, $before, (int) $result['package'] );
 			if ( ! $result['snapshot'] ) {
@@ -1137,6 +1173,8 @@ final class Pipeline {
 				$failed = false;
 			} elseif ( $op->term() ) {
 				$failed = ! self::update_term( $id, (array) $after['term'] );
+			} elseif ( $op->attribute() ) {
+				$failed = ! Commerce::save_attribute( $id, (array) $after['attribute'] );
 			} elseif ( isset( $op->target['token_set'] ) ) {
 				// The compiler writes the same presets the change computed, plus the active set and its drift hash.
 				$activated = Compiler::activate( (int) $op->target['token_set'] );
@@ -1156,6 +1194,13 @@ final class Pipeline {
 		}
 		remove_action( 'clean_post_cache', $capture, 1 );
 		remove_filter( 'safecss_filter_attr_allow_css', array( self::class, 'allow_colors' ), 10 );
+		// A save that drops block attributes (core's KSES parses JSON that lost its backslashes as no attributes at
+		// all) never passes silently: the write fails and names what got lost.
+		$lost = $failed || $snapshot || $op->no_post() || self::json( $after ) || ! is_string( $after['post_content'] ?? null ) ? array() : self::lost_attributes( (string) $after['post_content'], (string) get_post_field( 'post_content', $id, 'raw' ) );
+		if ( ! $lost && ! $failed && ! $snapshot && isset( $after['product'] ) ) {
+			$lost = self::lost_attributes( (string) $after['post_excerpt'], (string) get_post_field( 'post_excerpt', $id, 'raw' ) );
+		}
+		$failed = $failed || (bool) $lost;
 		if ( $failed ) {
 			self::without_kses( static fn() => self::restore( $op, $before, $created ) );
 			if ( '' !== $private ) {
@@ -1172,6 +1217,9 @@ final class Pipeline {
 		if ( false !== $kses ) {
 			add_filter( 'content_save_pre', 'wp_filter_post_kses', $kses );
 		}
+		if ( $lost ) {
+			return Rejection::make( 'leitvia_attributes_lost', __( 'Saving would drop attributes of these blocks, so nothing was changed. Send each block comment with its attributes as valid JSON, as serialize_block() writes it.', 'leitvia-studio' ), 422, 'attributes', $result['target'], '', 'once', array( 'lost' => $lost ) );
+		}
 		if ( $failed ) {
 			return self::failed( $result['target'] );
 		}
@@ -1181,6 +1229,56 @@ final class Pipeline {
 		}
 		$result['hash'] = self::hash( $op, $id );
 		return $result;
+	}
+
+	/**
+	 * Attributes of the blocks of the sent markup that the stored markup lacks, per block in document order: block
+	 * name, its position among all blocks (from 0) and the dotted keys; empty when every attribute arrived. A block
+	 * the stored markup lacks lists all its keys. Added attributes (the block IDs) do not count.
+	 *
+	 * @param string $sent   Block markup of the write.
+	 * @param string $stored Block markup as stored.
+	 * @return list<array{block: string, index: int, attributes: list<string>}>
+	 */
+	public static function lost_attributes( string $sent, string $stored ): array {
+		if ( ! str_contains( $sent, '<!-- wp:' ) ) {
+			return array();
+		}
+		$flat  = static function ( array $blocks ) use ( &$flat ): array {
+			$out = array();
+			foreach ( $blocks as $block ) {
+				if ( null !== $block['blockName'] ) {
+					$out[] = $block;
+				}
+				array_push( $out, ...$flat( (array) $block['innerBlocks'] ) );
+			}
+			return $out;
+		};
+		$keys  = static function ( array $want, array $have, string $prefix ) use ( &$keys ): array {
+			$missing = array();
+			foreach ( $want as $key => $value ) {
+				if ( ! array_key_exists( $key, $have ) ) {
+					$missing[] = $prefix . $key;
+				} elseif ( is_array( $value ) && is_array( $have[ $key ] ) ) {
+					array_push( $missing, ...$keys( $value, $have[ $key ], $prefix . $key . '.' ) );
+				}
+			}
+			return $missing;
+		};
+		$after = $flat( parse_blocks( $stored ) );
+		$lost  = array();
+		foreach ( $flat( parse_blocks( $sent ) ) as $index => $block ) {
+			$same    = ( $after[ $index ]['blockName'] ?? null ) === $block['blockName'];
+			$missing = $keys( (array) $block['attrs'], $same ? (array) $after[ $index ]['attrs'] : array(), '' );
+			if ( $missing || ! $same ) {
+				$lost[] = array(
+					'block'      => (string) $block['blockName'],
+					'index'      => $index,
+					'attributes' => $missing,
+				);
+			}
+		}
+		return $lost;
 	}
 
 	/**
@@ -1258,6 +1356,8 @@ final class Pipeline {
 				update_option( $op->option(), $before['value'] );
 			} elseif ( $op->term() ) {
 				self::update_term( $op->term(), (array) $before['term'] );
+			} elseif ( $op->attribute() ) {
+				Commerce::save_attribute( $op->attribute(), (array) $before['attribute'] );
 			} elseif ( $op->creates() ) {
 				if ( $created ) {
 					wp_delete_post( $created, true );

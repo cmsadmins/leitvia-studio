@@ -153,7 +153,7 @@ final class Maintain {
 		Abilities::write(
 			'leitvia/repair-links',
 			__( 'Repair links', 'leitvia-studio' ),
-			__( 'Repairs internal links of one post: from pairs of old and new link, or with auto through the old slugs WordPress keeps for redirects. The base hash is the hash of the post from leitvia/get-page-outline. Only links of this site change. External links are never requested, only listed in the report, as are internal links that lead nowhere and cannot be resolved.', 'leitvia-studio' ),
+			__( 'Repairs internal links of one post: from pairs of old and new link, or with auto through the old slugs WordPress keeps for redirects. The base hash is the hash of the post from leitvia/get-page-outline. Only links of this site change. External links are never requested, only listed in the report, as are internal links that lead nowhere and cannot be resolved. Links with an empty href or a # without target are listed under empty, with in (content or page) and their class.', 'leitvia-studio' ),
 			'maintain',
 			$add,
 			array(
@@ -322,6 +322,7 @@ final class Maintain {
 			'repaired'   => array(),
 			'external'   => array(),
 			'unresolved' => array(),
+			'empty'      => array(),
 		);
 		return array(
 			'area'   => 'corrections',
@@ -362,8 +363,10 @@ final class Maintain {
 				}
 				$report['external']   = array_values( array_unique( $report['external'] ) );
 				$report['unresolved'] = array_values( array_unique( $report['unresolved'] ) );
+				$saved                = get_post( (int) $target['post'] );
+				$report['empty']      = $saved ? Read_Audit::empty_links( $saved ) : array();
 				if ( ! $report['repaired'] ) {
-					return Rejection::make( 'leitvia_invalid_input', __( 'No link needs or allows a repair. The report lists external links and internal links that could not be resolved.', 'leitvia-studio' ), 422, 'nothing_to_repair', $target, '', 'never', array( 'report' => $report ) );
+					return Rejection::make( 'leitvia_invalid_input', __( 'No link needs or allows a repair. The report lists external links, internal links that could not be resolved and links that lead nowhere.', 'leitvia-studio' ), 422, 'nothing_to_repair', $target, '', 'never', array( 'report' => $report ) );
 				}
 				return array( 'post_content' => $tags->get_updated_html() ) + $state;
 			},

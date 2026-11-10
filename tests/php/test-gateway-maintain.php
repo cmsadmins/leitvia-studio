@@ -502,7 +502,7 @@ class Test_Gateway_Maintain extends WP_UnitTestCase {
 
 	/**
 	 * Pairs and auto through old slugs repair internal links live as a correction; external links are reported and never
-	 * requested; nothing to repair is refused with the report.
+	 * requested; nothing to repair is refused with the report. Links without an address are listed under empty.
 	 */
 	public function test_repair_links(): void {
 		$this->set_permalink_structure( '/%postname%/' );
@@ -527,7 +527,7 @@ class Test_Gateway_Maintain extends WP_UnitTestCase {
 			)
 		);
 		$home    = home_url();
-		$content = self::paragraph( '<a href="/old-name/#part">Moved article</a>, <a href="https://example.org/page">Example site</a>, <a href="' . $home . '/gone/">Gone page</a> and <a href="' . $home . '/about">About us</a>' );
+		$content = self::paragraph( '<a href="/old-name/#part">Moved article</a>, <a href="https://example.org/page">Example site</a>, <a href="' . $home . '/gone/">Gone page</a>, <a href="">Shipping</a> and <a href="' . $home . '/about">About us</a>' );
 		$page    = $this->page( $content );
 		$before  = get_post_field( 'post_content', $page );
 
@@ -573,6 +573,10 @@ class Test_Gateway_Maintain extends WP_UnitTestCase {
 		$this->assertCount( 2, $result['report']['repaired'] );
 		$this->assertSame( array( 'https://example.org/page' ), $result['report']['external'] );
 		$this->assertSame( array( $home . '/gone/' ), $result['report']['unresolved'] );
+		$empty = array_values( wp_list_filter( $result['report']['empty'], array( 'text' => 'Shipping' ) ) );
+		$this->assertCount( 1, $empty, 'a link without address is listed, from the content' );
+		$this->assertSame( '', $empty[0]['href'] );
+		$this->assertSame( 'content', $empty[0]['in'] );
 
 		$data = $this->assert_rejected(
 			'leitvia_invalid_input',
@@ -587,6 +591,7 @@ class Test_Gateway_Maintain extends WP_UnitTestCase {
 		);
 		$this->assertSame( 'nothing_to_repair', $data['reason'] );
 		$this->assertSame( array( 'https://example.org/page' ), $data['report']['external'] );
+		$this->assertNotEmpty( wp_list_filter( $data['report']['empty'], array( 'text' => 'Shipping' ) ) );
 
 		$this->roll_back( $result );
 		$this->assertSame( $before, get_post_field( 'post_content', $page ) );
@@ -990,5 +995,56 @@ class Test_Gateway_Maintain extends WP_UnitTestCase {
 
 		$this->roll_back( $result );
 		$this->assertStringContainsString( '"patternName":"leitvia/cta-banner"', get_post_field( 'post_content', $page ) );
+	}
+
+	/**
+	 * A write whose save drops block attributes (here a filter in place of core's KSES reading broken JSON) fails with
+	 * leitvia_attributes_lost, names block, position and keys, and leaves the page as it was; inner blocks count, added
+	 * attributes such as the block IDs do not.
+	 */
+	public function test_lost_attributes_fail_the_write(): void {
+		$this->assertSame( array(), \LeitviaStudio\Gateway\Pipeline::lost_attributes( '<!-- wp:paragraph {"align":"center"} --><p>A</p><!-- /wp:paragraph -->', '<!-- wp:paragraph {"align":"center","metadata":{"leitviaId":"par00001"}} --><p>A</p><!-- /wp:paragraph -->' ) );
+		$this->assertSame(
+			array(
+				array(
+					'block'      => 'core/paragraph',
+					'index'      => 1,
+					'attributes' => array( 'style.color' ),
+				),
+			),
+			\LeitviaStudio\Gateway\Pipeline::lost_attributes(
+				'<!-- wp:group --><div class="wp-block-group"><!-- wp:paragraph {"style":{"color":{"text":"#000"},"typography":{"fontSize":"1rem"}}} --><p>A</p><!-- /wp:paragraph --></div><!-- /wp:group -->',
+				'<!-- wp:group --><div class="wp-block-group"><!-- wp:paragraph {"style":{"typography":{"fontSize":"1rem"}}} --><p>A</p><!-- /wp:paragraph --></div><!-- /wp:group -->'
+			)
+		);
+
+		update_option( Gateway::OPTION, array( 'profile' => 'full' ) + Gateway::DEFAULTS );
+		$page   = $this->page( self::paragraph( 'Before' ) );
+		$before = get_post_field( 'post_content', $page );
+		// Only the new text loses its attribute; restoring the stored one works.
+		$drop = static function ( $content ) {
+			if ( ! str_contains( (string) $content, 'After' ) ) {
+				return $content;
+			}
+			$blocks = parse_blocks( wp_unslash( (string) $content ) );
+			unset( $blocks[0]['attrs']['align'] );
+			return wp_slash( serialize_blocks( $blocks ) );
+		};
+		add_filter( 'content_save_pre', $drop, 99 );
+		$data = $this->assert_rejected(
+			'leitvia_attributes_lost',
+			self::call(
+				'leitvia/update-content',
+				$page,
+				array(
+					'post'    => $page,
+					'content' => '<!-- wp:paragraph {"align":"center"} --><p class="has-text-align-center">After</p><!-- /wp:paragraph -->',
+				)
+			)
+		);
+		remove_filter( 'content_save_pre', $drop, 99 );
+		$this->assertSame( 'attributes', $data['reason'] );
+		$this->assertSame( array( 'align' ), $data['lost'][0]['attributes'] );
+		$this->assertSame( $before, get_post_field( 'post_content', $page ) );
 	}
 }

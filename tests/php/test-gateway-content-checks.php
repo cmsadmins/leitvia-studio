@@ -5,6 +5,7 @@
  * @package LeitviaStudio
  */
 
+use LeitviaStudio\Gateway\Abilities\Read_Audit;
 use LeitviaStudio\Gateway\Content_Checks;
 use LeitviaStudio\Gateway\Gateway;
 use LeitviaStudio\Gateway\Hashes;
@@ -99,7 +100,7 @@ class Test_Gateway_Content_Checks extends WP_UnitTestCase {
 		return array(
 			'headings'       => array( 'leitvia/headings', 'headings', array( 'error head0001', 'error p:1', 'error p:2' ) ),
 			'alt-text'       => array( 'leitvia/alt-text', 'alt-text', array( 'error img00001', 'error p:1', 'warning p:2', 'error p:3.0' ) ),
-			'link-text'      => array( 'leitvia/link-text', 'link-text', array( 'error par00001', 'error p:1', 'error p:1', 'error p:2.0' ) ),
+			'link-text'      => array( 'leitvia/link-text', 'link-text', array( 'error par00001', 'error p:1', 'error p:1', 'error p:2.0', 'error p:3' ) ),
 			'block-validity' => array( 'leitvia/block-validity', 'block-validity', array( 'error htm00001', 'error p:2', 'error p:3' ) ),
 			'tokens'         => array( 'leitvia/content-tokens', 'content-tokens', array( 'error grp00001', 'error grp00001', 'error p:0.0', 'error p:0.0' ) ),
 			'contrast'       => array( 'leitvia/content-contrast', 'content-contrast', array( 'error grp00001' ) ),
@@ -631,7 +632,8 @@ class Test_Gateway_Content_Checks extends WP_UnitTestCase {
 	 * (warnings). Later pages carry no site findings.
 	 */
 	public function test_audit_site_findings(): void {
-		$site = static fn(): array => wp_get_ability( 'leitvia/audit-site' )->execute( array( 'limit' => 1 ) )['site'];
+		// Links of the template parts that lead nowhere have a test of their own.
+		$site = static fn(): array => array_values( array_filter( wp_get_ability( 'leitvia/audit-site' )->execute( array( 'limit' => 1 ) )['site'], static fn( array $finding ): bool => 'leitvia/empty-link' !== $finding['check'] ) );
 		update_option( 'blog_public', '0' );
 		add_filter( 'leitvia_studio_preview_site', '__return_false' );
 		$this->assertSame( array( 'leitvia/search-blocked' ), array_column( $site(), 'check' ), 'no posts, no page or news findings' );
@@ -741,5 +743,161 @@ class Test_Gateway_Content_Checks extends WP_UnitTestCase {
 			)
 		);
 		$this->assertSame( 'leitvia/get-tokens', $rejected->get_error_data()['next_ability'] );
+	}
+
+	/**
+	 * Links that lead nowhere: an empty href, # alone and #id without an element of that id, each with its text and the
+	 * class of the link or of the nearest element around it; ids the template gives every page, ids later in the page,
+	 * real addresses and anchors without href pass.
+	 */
+	public function test_empty_links(): void {
+		$html = '<div class="legal-note"><p><a href="">More <strong>information</strong></a></p></div>'
+			. '<footer class="site-footer"><a class="to-top" href="#">Up</a> <a href="#faq">FAQ</a> <a href="#main">Skip</a> <a href="#here">Here</a></footer>'
+			. '<h2 id="here">Here</h2><a href="/shipping/">Shipping</a><a>No address</a>';
+		$this->assertSame(
+			array(
+				array(
+					'href'   => '',
+					'text'   => 'More information',
+					'source' => 'legal-note',
+				),
+				array(
+					'href'   => '#',
+					'text'   => 'Up',
+					'source' => 'to-top',
+				),
+				array(
+					'href'   => '#faq',
+					'text'   => 'FAQ',
+					'source' => 'site-footer',
+				),
+			),
+			Content_Checks::empty_links( $html )
+		);
+	}
+
+	/**
+	 * Audit-site renders each published page with its template and reports, once, a link that leads nowhere and that
+	 * the content does not hold (a plugin that prints a link without its page), with the class it comes from. A link of
+	 * the content stays with leitvia/link-text; Read_Audit::empty_links() lists both, with where they are. Links of
+	 * header and footer template parts are a finding of the site, one per part.
+	 */
+	public function test_audit_reports_empty_links_of_the_rendered_page(): void {
+		$plugin = static fn( string $html ): string => $html . '<p class="legal-note"><a href="">More information</a></p>';
+		add_filter( 'render_block_core/post-content', $plugin );
+		$post   = self::factory()->post->create( array( 'post_content' => '<!-- wp:paragraph --><p>Read the <a href="#">guide</a>.</p><!-- /wp:paragraph -->' ) );
+		$item   = wp_get_ability( 'leitvia/audit-site' )->execute( array( 'after' => $post - 1 ) )['items'][0];
+		$links  = Read_Audit::empty_links( get_post( $post ) );
+		remove_filter( 'render_block_core/post-content', $plugin );
+		$empty = array_values( wp_list_filter( $item['findings'], array( 'check' => 'leitvia/empty-link' ) ) );
+		$this->assertCount( 1, $empty );
+		$this->assertSame( 'error', $empty[0]['severity'] );
+		$this->assertStringContainsString( '"More information"', $empty[0]['message'] );
+		$this->assertStringContainsString( '"legal-note"', $empty[0]['message'] );
+		$this->assertContains( 'leitvia/link-text', array_column( $item['findings'], 'check' ) );
+		$this->assertSame(
+			array( '#|guide|content', '|More information|page' ),
+			array_map( static fn( array $link ): string => $link['href'] . '|' . $link['text'] . '|' . $link['in'], $links )
+		);
+
+		$draft = self::factory()->post->create(
+			array(
+				'post_status'  => 'draft',
+				'post_content' => '<!-- wp:paragraph --><p><a href="">Draft link</a></p><!-- /wp:paragraph -->',
+			)
+		);
+		$this->assertSame( array( '|Draft link|content' ), array_map( static fn( array $link ): string => $link['href'] . '|' . $link['text'] . '|' . $link['in'], Read_Audit::empty_links( get_post( $draft ) ) ) );
+
+		$footer = self::factory()->post->create(
+			array(
+				'post_type'    => 'wp_template_part',
+				'post_name'    => 'footer',
+				'post_title'   => 'Footer',
+				'post_content' => '<!-- wp:paragraph --><p><a href="#">Imprint</a> <a href="/privacy/">Privacy</a></p><!-- /wp:paragraph -->',
+			)
+		);
+		wp_set_object_terms( $footer, get_stylesheet(), 'wp_theme' );
+		wp_set_object_terms( $footer, 'footer', 'wp_template_part_area' );
+		$parts   = static fn(): array => array_values( wp_list_filter( Read_Audit::site(), array( 'check' => 'leitvia/empty-link' ) ) );
+		$footers = array_values( array_filter( $parts(), static fn( array $finding ): bool => str_contains( $finding['message'], 'template part footer ' ) ) );
+		$this->assertCount( 1, $footers );
+		$this->assertStringContainsString( ': Imprint.', $footers[0]['message'] );
+		wp_update_post(
+			array(
+				'ID'           => $footer,
+				'post_content' => '<!-- wp:paragraph --><p><a href="/imprint/">Imprint</a></p><!-- /wp:paragraph -->',
+			)
+		);
+		$this->assertSame( array(), array_filter( $parts(), static fn( array $finding ): bool => str_contains( $finding['message'], 'template part footer ' ) ) );
+	}
+
+	/**
+	 * Content_Checks::render_post() puts back every global it touches (main query, post with its post data, product),
+	 * ends the loop with loop_end, fetches and caches no oEmbed, and renders template parts other than header and
+	 * footer, so their links count for the page.
+	 */
+	public function test_render_post_restores_globals(): void {
+		$theme  = get_stylesheet();
+		$create = static function ( string $type, string $slug, string $content, string $area = '' ) use ( $theme ): void {
+			$id = self::factory()->post->create(
+				array(
+					'post_type'    => $type,
+					'post_name'    => $slug,
+					'post_title'   => $slug,
+					'post_content' => $content,
+				)
+			);
+			wp_set_object_terms( $id, $theme, 'wp_theme' );
+			if ( '' !== $area ) {
+				wp_set_object_terms( $id, $area, 'wp_template_part_area' );
+			}
+		};
+		$create( 'wp_template_part', 'footer', '<!-- wp:paragraph --><p><a href="#">Imprint</a></p><!-- /wp:paragraph -->', 'footer' );
+		$create( 'wp_template_part', 'aside-note', '<!-- wp:paragraph --><p><a href="">Side link</a></p><!-- /wp:paragraph -->', 'uncategorized' );
+		$create( 'wp_template', 'single', '<!-- wp:template-part {"slug":"aside-note"} /--><!-- wp:post-content /--><!-- wp:template-part {"slug":"footer"} /-->' );
+		$url  = 'https://www.youtube.com/watch?v=leitvia01';
+		$post = self::factory()->post->create( array( 'post_content' => "<!-- wp:embed {\"url\":\"$url\",\"type\":\"video\",\"providerNameSlug\":\"youtube\"} -->\n<figure class=\"wp-block-embed is-type-video is-provider-youtube wp-block-embed-youtube\"><div class=\"wp-block-embed__wrapper\">\n$url\n</div></figure>\n<!-- /wp:embed -->" ) );
+
+		$other = get_post( self::factory()->post->create() );
+		$query = new WP_Query( array( 'p' => $other->ID ) );
+		// phpcs:disable WordPress.WP.GlobalVariablesOverride.Prohibited -- The globals of the test request.
+		$GLOBALS['wp_query']     = $query;
+		$GLOBALS['wp_the_query'] = $query;
+		$GLOBALS['post']         = $other;
+		$GLOBALS['product']      = 'shop product';
+		// phpcs:enable
+		setup_postdata( $other );
+		$ends     = 0;
+		$requests = 0;
+		$end      = static function () use ( &$ends ): void {
+			++$ends;
+		};
+		$http     = static function () use ( &$requests ) {
+			++$requests;
+			return new WP_Error( 'blocked' );
+		};
+		add_action( 'loop_end', $end );
+		add_filter( 'pre_http_request', $http );
+		$html = Content_Checks::render_post( get_post( $post ) );
+		remove_action( 'loop_end', $end );
+		remove_filter( 'pre_http_request', $http );
+
+		$this->assertStringContainsString( 'Side link', $html );
+		$this->assertStringNotContainsString( 'Imprint', $html );
+		$this->assertSame( 1, $ends );
+		$this->assertSame( 0, $requests );
+		$this->assertSame( array(), array_filter( array_keys( get_post_meta( $post ) ), static fn( string $key ): bool => str_starts_with( $key, '_oembed_' ) ) );
+		$this->assertSame( $query, $GLOBALS['wp_query'] );
+		$this->assertSame( $query, $GLOBALS['wp_the_query'] );
+		$this->assertSame( $other, $GLOBALS['post'] );
+		$this->assertSame( $other->ID, $GLOBALS['id'] );
+		$this->assertSame( 'shop product', $GLOBALS['product'] );
+
+		// Without a post: none comes back, from a main query without posts.
+		unset( $GLOBALS['post'], $GLOBALS['product'] );
+		$GLOBALS['wp_query'] = new WP_Query(); // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Same.
+		Content_Checks::render_post( get_post( $post ) );
+		$this->assertArrayNotHasKey( 'product', $GLOBALS );
+		$this->assertNull( $GLOBALS['post'] ?? null );
 	}
 }
