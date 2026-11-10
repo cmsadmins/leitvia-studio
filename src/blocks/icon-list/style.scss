@@ -9,7 +9,10 @@
 	list-style: none;
 }
 
+// overflow-wrap anywhere: a long word or address in the text breaks inside the item; break-word alone would keep the
+// item as wide as the word (flex item) and widen the page at 320 px.
 .wp-block-leitvia-icon-list-item {
+	overflow-wrap: anywhere;
 	display: flex;
 	gap: var(--wp--preset--spacing--xs, 0.5rem);
 	align-items: flex-start;

@@ -42,7 +42,10 @@ $heights: (
 	}
 }
 
+// A long place name or address breaks inside its item at 320 px (overflow-wrap anywhere; the grid item would otherwise
+// grow with the word).
 .wp-block-leitvia-map__places {
+	overflow-wrap: anywhere;
 	display: grid;
 	gap: var(--wp--preset--spacing--s, 1rem);
 	padding-inline-start: 0;

@@ -4,7 +4,7 @@ Tags: ai, mcp, block theme, accessibility, design tokens
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.39
+Stable tag: 1.3.40
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -212,6 +212,9 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * Privacy policy: https://leitvia.com/privacy-policy/
 
 == Changelog ==
+
+= 1.3.40 =
+* Map and icon list: a long place name, address or word breaks inside its item at 320 px instead of widening the page.
 
 = 1.3.39 =
 * create-product and update-product: the long description has no fixed length any more, as the content of update-content. The limit of 20,000 characters counted the block markup, so a structured description with cards, icon lists and columns reached it at about 950 words. The short description keeps its 5,000 characters.
