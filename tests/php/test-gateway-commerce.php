@@ -16,7 +16,7 @@ use LeitviaStudio\Gateway\Store;
 
 /**
  * Abilities list-products, get-product, create-product, update-product, update-product-category, set-merchandising,
- * list-product-attributes and update-product-attribute: reads without sales or customer figures, writes through the pipeline in the area products, prices, taxes and shipping at most
+ * list-product-attributes, update-product-attribute, list-product-reviews and update-product-review: reads without sales or customer figures, writes through the pipeline in the area products, prices, taxes and shipping at most
  * "suggest", orders, refunds, coupons and customers out of scope, rollback for products. The group woocommerce runs
  * with WooCommerce loaded (npm run test:php:commerce).
  */
@@ -33,9 +33,9 @@ class Test_Gateway_Commerce extends WP_UnitTestCase {
 
 
 	/**
-	 * Names of the eight abilities.
+	 * Names of the ten abilities.
 	 */
-	private const ABILITIES = array( 'leitvia/list-products', 'leitvia/get-product', 'leitvia/create-product', 'leitvia/update-product', 'leitvia/update-product-category', 'leitvia/set-merchandising', 'leitvia/list-product-attributes', 'leitvia/update-product-attribute' );
+	private const ABILITIES = array( 'leitvia/list-products', 'leitvia/get-product', 'leitvia/create-product', 'leitvia/update-product', 'leitvia/update-product-category', 'leitvia/set-merchandising', 'leitvia/list-product-attributes', 'leitvia/update-product-attribute', 'leitvia/list-product-reviews', 'leitvia/update-product-review' );
 
 	/**
 	 * Agent user.
@@ -1130,5 +1130,163 @@ class Test_Gateway_Commerce extends WP_UnitTestCase {
 			)
 		);
 		$this->assertSame( 'html_block', $data['reason'] );
+	}
+
+	/**
+	 * A review of the product, approved unless said otherwise, with this rating (0 for none).
+	 *
+	 * @param int    $product  Product ID.
+	 * @param int    $rating   Rating, 0 for none.
+	 * @param string $approved comment_approved.
+	 */
+	private static function review( int $product, int $rating, string $approved = '1' ): int {
+		$id = (int) wp_insert_comment(
+			array(
+				'comment_post_ID'      => $product,
+				'comment_type'         => 'review',
+				'comment_approved'     => $approved,
+				'comment_author'       => 'Ann',
+				'comment_author_email' => 'ann@example.org',
+				'comment_author_IP'    => '192.0.2.1',
+				'comment_content'      => 'A fine tray.',
+			)
+		);
+		if ( $rating ) {
+			update_comment_meta( $id, 'rating', $rating );
+		}
+		WC_Comments::clear_transients( $product );
+		return $id;
+	}
+
+	/**
+	 * Reviews: list-product-reviews reads approved reviews with rating, verified, status and hash but no email or IP
+	 * address; held ones only for a person with moderate_comments. update-product-review sets rating and verified
+	 * live in profile full with rollback, as a package in standard; the product counts its average again. A new status
+	 * needs moderate_comments.
+	 *
+	 * @group woocommerce
+	 */
+	public function test_product_reviews(): void {
+		$product = self::product();
+		$unrated = self::review( $product, 0 );
+		$rated   = self::review( $product, 4 );
+		$held    = self::review( $product, 5, '0' );
+		$list    = static fn( array $input = array() ) => wp_get_ability( 'leitvia/list-product-reviews' )->execute( $input );
+
+		$all = $list( array( 'product' => $product ) );
+		$this->assertSame( array( $unrated, $rated ), array_column( $all['reviews'], 'id' ) );
+		$this->assertSame( 2, $all['total'] );
+		$this->assertSame( 1, $all['unrated_total'] );
+		$this->assertSame( array( 0, 4 ), array_column( $all['reviews'], 'rating' ) );
+		$this->assertSame( array( 'approved', 'approved' ), array_column( $all['reviews'], 'status' ) );
+		$this->assertSame( 'Ann', $all['reviews'][0]['author'] );
+		$this->assertSame( 'A fine tray.', $all['reviews'][0]['content'] );
+		$this->assertSame( Commerce::review_hash( $unrated ), $all['reviews'][0]['hash'] );
+		$this->assertStringNotContainsString( 'ann@example.org', (string) wp_json_encode( $all ) );
+		$this->assertStringNotContainsString( '192.0.2.1', (string) wp_json_encode( $all ) );
+		$this->assertSame( array( $unrated ), array_column( $list( array( 'unrated' => true ) )['reviews'], 'id' ) );
+		// Agents lack moderate_comments: held reviews stay hidden.
+		$this->assertSame( array( $unrated, $rated ), array_column( $list( array( 'status' => 'hold' ) )['reviews'], 'id' ) );
+		$this->assertSame( 4.0, (float) wc_get_product( $product )->get_average_rating() );
+
+		self::settings( array( 'profile' => 'full' ) );
+		$update = static fn( int $review, array $input ) => wp_get_ability( 'leitvia/update-product-review' )->execute(
+			$input + array(
+				'review'    => $review,
+				'base_hash' => Commerce::review_hash( $review ),
+			)
+		);
+		$result = $this->assert_ok( $update( $unrated, array( 'rating' => 5 ) ) );
+		$this->assertSame( 'live', $result['mode'] );
+		$this->assertSame( array( 'review' => $unrated ), $result['target'] );
+		$this->assertSame( '5', get_comment_meta( $unrated, 'rating', true ) );
+		$this->assertSame( 'A fine tray.', get_comment( $unrated )->comment_content );
+		$this->assertSame( Commerce::review_hash( $unrated ), $result['hash'] );
+		$this->assertSame( 4.5, (float) wc_get_product( $product )->get_average_rating() );
+		$this->assertSame( 0, $list( array( 'product' => $product ) )['unrated_total'] );
+		$snapshot = Store::get_snapshot( $result['snapshot'] );
+		$this->assertSame( 'review', $snapshot['object_type'] );
+		$this->assertSame( 0, $snapshot['state']['review']['rating'] );
+
+		// Without moderate_comments only lost stars come back: another rating, the verified flag and a status are
+		// moderation, and held reviews do not exist for agents.
+		foreach ( array( array( 'status' => 'spam' ), array( 'rating' => 1 ), array( 'verified' => true ) ) as $input ) {
+			$this->assert_rejected( 'leitvia_forbidden', $update( $rated, $input ) );
+		}
+		$this->assert_rejected( 'leitvia_out_of_scope', $update( $held, array( 'rating' => 1 ) ) );
+		$this->assertSame( '1', get_comment( $rated )->comment_approved );
+		$this->assertSame( '4', get_comment_meta( $rated, 'rating', true ) );
+
+		$this->assert_ok( wp_get_ability( 'leitvia/rollback' )->execute( array( 'id' => $result['package'] ) ) );
+		$this->assertSame( 'rolled_back', Packages::state( $result['package'] ) );
+		$this->assertSame( '', get_comment_meta( $unrated, 'rating', true ) );
+		$this->assertSame( 4.0, (float) wc_get_product( $product )->get_average_rating() );
+
+		self::settings( array() );
+		$result = $this->assert_ok( $update( $unrated, array( 'rating' => 3 ) ) );
+		$this->assertSame( 'package', $result['mode'] );
+		$this->assertSame( '', get_comment_meta( $unrated, 'rating', true ) );
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+		$this->assertSame( 'applied', $this->assert_ok( Packages::apply( $result['package'] ) )['state'] );
+		$this->assertSame( '3', get_comment_meta( $unrated, 'rating', true ) );
+
+		// A person with moderate_comments sees held reviews and approves them.
+		$this->assertSame( array( $held ), array_column( $list( array( 'status' => 'hold' ) )['reviews'], 'id' ) );
+		self::settings( array( 'profile' => 'full' ) );
+		$this->assert_ok( $update( $held, array( 'status' => 'approved' ) ) );
+		$this->assertSame( '1', get_comment( $held )->comment_approved );
+		$this->assertSame( 3, wc_get_product( $product )->get_review_count() );
+		$this->assertSame( 4.0, (float) wc_get_product( $product )->get_average_rating() );
+		$this->assert_ok( $update( $held, array( 'verified' => true ) ) );
+		$this->assertSame( '1', get_comment_meta( $held, 'verified', true ) );
+
+		// Trash through core: its meta lets the admin restore the review as it was; a rollback takes it back out.
+		$trashed = $this->assert_ok( $update( $rated, array( 'status' => 'trash' ) ) );
+		$this->assertSame( 'trash', get_comment( $rated )->comment_approved );
+		$this->assertSame( '1', get_comment_meta( $rated, '_wp_trash_meta_status', true ) );
+		$this->assertSame( 'trash', $list( array( 'status' => 'trash' ) )['status'] );
+		$this->assert_ok( wp_get_ability( 'leitvia/rollback' )->execute( array( 'id' => $trashed['package'] ) ) );
+		$this->assertSame( '1', get_comment( $rated )->comment_approved );
+		$this->assertSame( '', get_comment_meta( $rated, '_wp_trash_meta_status', true ) );
+	}
+
+	/**
+	 * Update-product-review refuses an empty change, a stale hash, a comment of a post and a reply to a review.
+	 *
+	 * @group woocommerce
+	 */
+	public function test_product_review_rejections(): void {
+		$product = self::product();
+		$review  = self::review( $product, 0 );
+		$reply   = (int) wp_insert_comment(
+			array(
+				'comment_post_ID' => $product,
+				'comment_parent'  => $review,
+				'comment_content' => 'Thank you.',
+			)
+		);
+		$comment = (int) self::factory()->comment->create( array( 'comment_post_ID' => self::factory()->post->create() ) );
+		$call    = static fn( int $id, array $input ) => wp_get_ability( 'leitvia/update-product-review' )->execute(
+			$input + array(
+				'review'    => $id,
+				'base_hash' => Commerce::review_hash( $id ),
+			)
+		);
+		$this->assertSame( 'change', $this->assert_rejected( 'leitvia_invalid_input', $call( $review, array() ) )['reason'] );
+		$this->assert_rejected(
+			'leitvia_stale_hash',
+			$call(
+				$review,
+				array(
+					'rating'    => 5,
+					'base_hash' => 'stale',
+				)
+			)
+		);
+		foreach ( array( $reply, $comment ) as $id ) {
+			$this->assertSame( '', Commerce::review_hash( $id ) );
+			$this->assert_rejected( 'leitvia_out_of_scope', $call( $id, array( 'rating' => 5 ) ) );
+		}
+		$this->assertSame( array( $review ), array_column( wp_get_ability( 'leitvia/list-product-reviews' )->execute( array() )['reviews'], 'id' ) );
 	}
 }

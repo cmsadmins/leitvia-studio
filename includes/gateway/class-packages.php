@@ -137,7 +137,7 @@ final class Packages {
 		if ( $found ) {
 			return (int) $found[0];
 		}
-		$post   = (int) ( $result['target']['post'] ?? $result['target']['term'] ?? $result['target']['attribute'] ?? 0 );
+		$post   = (int) ( $result['target']['post'] ?? $result['target']['term'] ?? $result['target']['attribute'] ?? $result['target']['review'] ?? 0 );
 		$target = $op->no_post() ? $op->target : array( 'post' => $post ) + $op->target;
 		$entry  = array(
 			'ability'   => $op->ability,
@@ -192,7 +192,7 @@ final class Packages {
 	}
 
 	/**
-	 * Whether two operation targets name the same option, term, attribute or post.
+	 * Whether two operation targets name the same option, term, attribute, review or post.
 	 *
 	 * @param array<string, mixed> $a Target.
 	 * @param array<string, mixed> $b Target.
@@ -202,6 +202,7 @@ final class Packages {
 			isset( $target['option'] ) => 'option:' . $target['option'],
 			isset( $target['term'] )      => 'term:' . (int) $target['term'],
 			isset( $target['attribute'] ) => 'attribute:' . (int) $target['attribute'],
+			isset( $target['review'] )    => 'review:' . (int) $target['review'],
 			default                    => 'post:' . (int) ( $target['post'] ?? 0 ),
 		};
 		return $key( $a ) === $key( $b );
@@ -473,7 +474,7 @@ final class Packages {
 				continue;
 			}
 			$operations[ $index ]['applied'] = array(
-				'post'     => (int) ( $result['target']['post'] ?? $result['target']['term'] ?? $result['target']['attribute'] ?? 0 ),
+				'post'     => (int) ( $result['target']['post'] ?? $result['target']['term'] ?? $result['target']['attribute'] ?? $result['target']['review'] ?? 0 ),
 				'hash'     => (string) $result['hash'],
 				'snapshot' => (int) $result['snapshot'],
 			) + array_intersect_key( $result, array( 'slug_changed' => true ) );
@@ -894,11 +895,12 @@ final class Packages {
 			return null;
 		}
 		$before = (array) $snapshot['state'];
-		// applied.post holds the ID of a post, a term or an attribute.
+		// applied.post holds the ID of a post, a term, an attribute or a review.
 		$target = match ( true ) {
 			isset( $entry['target']['option'] ) => array( 'option' => (string) $entry['target']['option'] ),
 			isset( $entry['target']['term'] )      => array( 'term' => (int) $entry['applied']['post'] ),
 			isset( $entry['target']['attribute'] ) => array( 'attribute' => (int) $entry['applied']['post'] ),
+			isset( $entry['target']['review'] )    => array( 'review' => (int) $entry['applied']['post'] ),
 			default                             => array( 'post' => (int) $entry['applied']['post'] ),
 		};
 		if ( ! $before && isset( $target['post'] ) ) {

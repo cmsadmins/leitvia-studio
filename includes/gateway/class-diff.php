@@ -31,7 +31,7 @@ final class Diff {
 	/**
 	 * Post fields compared as text besides the content.
 	 */
-	private const FIELDS = array( 'post_title', 'post_excerpt', 'post_status', 'post_name', 'post_parent', 'menu_order', 'post_date', 'terms', 'meta_input', 'product', 'term', 'attribute', 'value' );
+	private const FIELDS = array( 'post_title', 'post_excerpt', 'post_status', 'post_name', 'post_parent', 'menu_order', 'post_date', 'terms', 'meta_input', 'product', 'term', 'attribute', 'review', 'value' );
 
 	/**
 	 * Diff of a stored operation against the current state of its target.
@@ -119,6 +119,9 @@ final class Diff {
 		}
 		if ( isset( $op->target['attribute'] ) ) {
 			return Abilities\Commerce::attribute_state( $op->attribute() );
+		}
+		if ( isset( $op->target['review'] ) ) {
+			return Abilities\Commerce::review_state( $op->review() );
 		}
 		return Pipeline::state( $op->post_id() );
 	}

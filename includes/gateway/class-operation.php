@@ -15,12 +15,14 @@ defined( 'ABSPATH' ) || exit;
  *
  * Targets: array( 'post' => <ID> ) for an existing post, array( 'post' => 0, 'post_type' => <type> ) for a new one,
  * array( 'option' => <name> ) for an option of Pipeline::OPTIONS, Pipeline::MODEL_OPTION or Pipeline::addon_options(), array( 'term' => <ID> ) for a
- * term of a taxonomy in Scope::taxonomies(), array( 'attribute' => <ID> ) for a global product attribute of WooCommerce. 'block' names the affected
+ * term of a taxonomy in Scope::taxonomies(), array( 'attribute' => <ID> ) for a global product attribute of WooCommerce, array( 'review' => <ID> )
+ * for a product review (a comment of the type review). 'block' names the affected
  * block for rejections; 'replace' marks content that replaces the whole post content, which may then hold no classic
  * block even where the old content was classic; 'token_set' on the user global styles makes the pipeline write them with Compiler::activate().
  * State of a post: the keys of Pipeline::POST_FIELDS (a product adds 'product', see Abilities\Commerce::props()). State
  * of an option: array( 'value' => <value> ). State of a term: array( 'term' => <fields> ), see Pipeline::term_state(). State of
- * an attribute: array( 'attribute' => <fields> ), see Abilities\Commerce::attribute_state().
+ * an attribute: array( 'attribute' => <fields> ), see Abilities\Commerce::attribute_state(). State of a review:
+ * array( 'review' => <fields> ), see Abilities\Commerce::review_state().
  */
 final class Operation {
 
@@ -83,10 +85,17 @@ final class Operation {
 	}
 
 	/**
-	 * Whether the target is no post: an option, a term or an attribute.
+	 * Comment ID of the product review of the target, 0 for any other target.
+	 */
+	public function review(): int {
+		return (int) ( $this->target['review'] ?? 0 );
+	}
+
+	/**
+	 * Whether the target is no post: an option, a term, an attribute or a review.
 	 */
 	public function no_post(): bool {
-		return '' !== $this->option() || isset( $this->target['term'] ) || isset( $this->target['attribute'] );
+		return '' !== $this->option() || isset( $this->target['term'] ) || isset( $this->target['attribute'] ) || isset( $this->target['review'] );
 	}
 
 	/**

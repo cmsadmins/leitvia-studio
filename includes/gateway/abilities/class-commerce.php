@@ -1,6 +1,6 @@
 <?php
 /**
- * Commerce abilities: products, their categories and tags, and merchandising.
+ * Commerce abilities: products, their categories and tags, attributes, reviews and merchandising.
  *
  * @package LeitviaStudio
  */
@@ -19,11 +19,12 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Abilities leitvia/list-products, leitvia/get-product, leitvia/create-product, leitvia/update-product,
- * leitvia/update-product-category, leitvia/set-merchandising, leitvia/list-product-attributes and
- * leitvia/update-product-attribute, registered only while WooCommerce is active. Writes go through Pipeline::run() in the
+ * leitvia/update-product-category, leitvia/set-merchandising, leitvia/list-product-attributes,
+ * leitvia/update-product-attribute, leitvia/list-product-reviews and leitvia/update-product-review, registered only while WooCommerce is active. Writes go through Pipeline::run() in the
  * area products (default "draft"); the pipeline writes products with the CRUD of WooCommerce (save()). Prices, taxes
  * and shipping are content kinds and land at most as a suggestion unless a person unlocked them. Orders, refunds,
- * coupons and customers are out of scope; nothing here reads sales or customer figures.
+ * coupons and customers are out of scope; nothing here reads sales or customer figures, and reviews come without email
+ * address, IP address or user account of the reviewer.
  */
 final class Commerce {
 
@@ -62,6 +63,17 @@ final class Commerce {
 	 * Values of a global product attribute that list-product-attributes reads and update-product-attribute takes.
 	 */
 	public const MAX_VALUES = 200;
+
+	/**
+	 * Statuses of a product review in list-product-reviews and update-product-review, with the status core's comment
+	 * functions take for each.
+	 */
+	public const REVIEW_STATUSES = array(
+		'approved' => 'approve',
+		'hold'     => 'hold',
+		'spam'     => 'spam',
+		'trash'    => 'trash',
+	);
 
 	/**
 	 * Props holding IDs.
@@ -386,6 +398,273 @@ final class Commerce {
 				'additionalProperties' => false,
 			),
 			array( self::class, 'describe_update_attribute' )
+		);
+		$status = array(
+			'type' => 'string',
+			'enum' => array_keys( self::REVIEW_STATUSES ),
+		);
+		Abilities::read(
+			'leitvia/list-product-reviews',
+			__( 'List product reviews', 'leitvia-studio' ),
+			__( 'Lists product reviews with rating and hash, 20 per page, oldest first; per review ID, product, author name, date, text, rating (1 to 5, 0 for none), verified owner and status. unrated lists only reviews without a rating; unrated_total counts them. Without the capability of the reviews screen of WooCommerce (moderate_comments) only approved reviews of published products, which visitors see anyway; status in the output names the status listed. No email address, IP address or user account of a reviewer.', 'leitvia-studio' ),
+			array(
+				'type'                 => 'object',
+				'properties'           => array(
+					'product' => $id,
+					'status'  => $status,
+					'unrated' => array( 'type' => 'boolean' ),
+					'page'    => $id,
+				),
+				'additionalProperties' => false,
+			),
+			array(
+				'type'       => 'object',
+				'properties' => array(
+					'reviews'       => $objects,
+					'total'         => array( 'type' => 'integer' ),
+					'pages'         => array( 'type' => 'integer' ),
+					'unrated_total' => array( 'type' => 'integer' ),
+					'status'        => $string,
+				),
+			),
+			static fn( $input ) => self::list_reviews( is_array( $input ) ? $input : array() )
+		);
+		Abilities::write(
+			'leitvia/update-product-review',
+			__( 'Update product review', 'leitvia-studio' ),
+			__( 'Sets rating, verified flag or status of a product review. Its text and author stay. Read the review with leitvia/list-product-reviews and send its hash as base_hash. The average rating and the review count of the product follow. Without the capability of the reviews screen of WooCommerce (moderate_comments) only a missing rating of an approved review can be set.', 'leitvia-studio' ),
+			'maintain',
+			$set,
+			array(
+				'properties'           => array(
+					'review'   => $id,
+					'rating'   => array(
+						'type'    => 'integer',
+						'minimum' => 1,
+						'maximum' => 5,
+					),
+					'verified' => array( 'type' => 'boolean' ),
+					'status'   => $status,
+				),
+				'required'             => array( 'review' ),
+				'additionalProperties' => false,
+			),
+			array( self::class, 'describe_update_review' )
+		);
+	}
+
+	/**
+	 * Output of list-product-reviews: reviews (comments of the type review, top level; older shops stored them as plain
+	 * comments) of products in scope. Without the capability of the reviews screen only approved ones.
+	 *
+	 * @param array<string, mixed> $input Input.
+	 * @return array<string, mixed>
+	 */
+	public static function list_reviews( array $input ): array {
+		$status = (string) ( $input['status'] ?? 'approved' );
+		if ( ! self::may_moderate_reviews() ) {
+			$status = 'approved';
+		}
+		$args = array(
+			'type__in'    => array( 'review', 'comment' ),
+			'post_type'   => 'product',
+			// Counts and pages match the list: reviews of published products only.
+			'post_status' => 'publish',
+			'parent'      => 0,
+			'status'      => self::REVIEW_STATUSES[ $status ] ?? 'approve',
+			'orderby'     => 'comment_ID',
+			'order'       => 'ASC',
+		);
+		if ( ! empty( $input['product'] ) ) {
+			$args['post_id'] = (int) $input['product'];
+		}
+		$unrated = array(
+			'meta_query' => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- Filter of the agent.
+				'relation' => 'OR',
+				array(
+					'key'     => 'rating',
+					'compare' => 'NOT EXISTS',
+				),
+				array(
+					'key'     => 'rating',
+					'value'   => array( '', '0' ),
+					'compare' => 'IN',
+				),
+			),
+		);
+		if ( ! empty( $input['unrated'] ) ) {
+			$args += $unrated;
+		}
+		$total   = (int) get_comments( $args + array( 'count' => true ) );
+		$page    = max( 1, (int) ( $input['page'] ?? 1 ) );
+		$reviews = array();
+		foreach ( get_comments(
+			$args + array(
+				'number' => 20,
+				'offset' => ( $page - 1 ) * 20,
+			)
+		) as $comment ) {
+			$state = self::review_state( (int) $comment->comment_ID );
+			if ( $state ) {
+				$reviews[] = array(
+					'id'      => (int) $comment->comment_ID,
+					'product' => (int) $comment->comment_post_ID,
+					'author'  => (string) $comment->comment_author,
+					'date'    => (string) get_comment_date( 'c', $comment ),
+					'content' => (string) $comment->comment_content,
+				) + $state['review'] + array( 'hash' => Hashes::of( $state ) );
+			}
+		}
+		return array(
+			'reviews'       => $reviews,
+			'total'         => $total,
+			'pages'         => (int) ceil( $total / 20 ),
+			'unrated_total' => (int) get_comments( $unrated + $args + array( 'count' => true ) ),
+			'status'        => $status,
+		);
+	}
+
+	/**
+	 * State of a product review for the pipeline: array( 'review' => rating (0 for none), verified and status, one of
+	 * REVIEW_STATUSES ); an empty array for any other comment or a product out of scope.
+	 *
+	 * @param int $id Comment ID.
+	 * @return array<string, mixed>
+	 */
+	public static function review_state( int $id ): array {
+		$comment = $id ? get_comment( $id ) : null;
+		if ( ! $comment instanceof \WP_Comment || ! in_array( $comment->comment_type, array( 'review', 'comment' ), true ) || (int) $comment->comment_parent || 'product' !== get_post_type( (int) $comment->comment_post_ID ) || ! Scope::readable( (int) $comment->comment_post_ID ) ) {
+			return array();
+		}
+		$status = array_search(
+			wp_get_comment_status( $comment ),
+			array(
+				'approved' => 'approved',
+				'hold'     => 'unapproved',
+				'spam'     => 'spam',
+				'trash'    => 'trash',
+			),
+			true
+		);
+		return array(
+			'review' => array(
+				'rating'   => (int) get_comment_meta( $id, 'rating', true ),
+				'verified' => (bool) get_comment_meta( $id, 'verified', true ),
+				'status'   => false === $status ? 'hold' : $status,
+			),
+		);
+	}
+
+	/**
+	 * Hash of a product review over its state, '' when it is none.
+	 *
+	 * @param int $id Comment ID.
+	 */
+	public static function review_hash( int $id ): string {
+		$state = self::review_state( $id );
+		return $state ? Hashes::of( $state ) : '';
+	}
+
+	/**
+	 * Whether the current user may edit this review, as on the reviews screen of WooCommerce: its capability for
+	 * editing (edit_products) and edit_comment of the review, which core maps to editing the product.
+	 *
+	 * @param int $id Comment ID.
+	 */
+	public static function may_edit_review( int $id ): bool {
+		// The filter of WooCommerce, so a shop that changed who handles reviews changes it here too.
+		$capability = (string) apply_filters( 'woocommerce_product_reviews_page_capability', 'edit_products', 'moderate' ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Hook of WooCommerce.
+		return current_user_can( $capability ) && current_user_can( 'edit_comment', $id );
+	}
+
+	/**
+	 * Whether the current user may see and moderate all reviews, as the reviews screen of WooCommerce asks
+	 * (moderate_comments). Agents lack it: held and spam reviews can hold personal data a visitor never saw.
+	 */
+	public static function may_moderate_reviews(): bool {
+		$capability = (string) apply_filters( 'woocommerce_product_reviews_page_capability', 'moderate_comments', 'view' ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Hook of WooCommerce.
+		return current_user_can( $capability );
+	}
+
+	/**
+	 * Writes the fields of a review that differ from its state: rating (0 removes it), verified and status, then
+	 * lets WooCommerce count average rating and reviews of the product again. Called by the pipeline, also to restore
+	 * a snapshot.
+	 *
+	 * @param int                  $id     Comment ID.
+	 * @param array<string, mixed> $fields Fields of the state, see review_state().
+	 */
+	public static function save_review( int $id, array $fields ): bool {
+		$state = self::review_state( $id );
+		if ( ! $state ) {
+			return false;
+		}
+		$old    = (array) $state['review'];
+		$rating = (int) $fields['rating'];
+		if ( $rating !== $old['rating'] ) {
+			$saved = $rating > 0 ? update_comment_meta( $id, 'rating', $rating ) : delete_comment_meta( $id, 'rating' );
+			if ( ! $saved ) {
+				return false;
+			}
+		}
+		if ( (bool) $fields['verified'] !== $old['verified'] ) {
+			update_comment_meta( $id, 'verified', (int) (bool) $fields['verified'] );
+		}
+		$status = (string) $fields['status'];
+		if ( $status !== $old['status'] && ! self::set_review_status( $id, $old['status'], $status ) ) {
+			return false;
+		}
+		// The pipeline writes reviews only while WooCommerce is active, see Scope::commerce().
+		\WC_Comments::clear_transients( (int) get_comment( $id )?->comment_post_ID );
+		return true;
+	}
+
+	/**
+	 * Moves a review from one status to another with the functions of core for trash and spam, so their meta, the
+	 * restore of the trash in the admin and the emptying of the trash work as for a review a person moved.
+	 *
+	 * @param int    $id   Comment ID.
+	 * @param string $from Status of REVIEW_STATUSES.
+	 * @param string $to   Status of REVIEW_STATUSES.
+	 */
+	private static function set_review_status( int $id, string $from, string $to ): bool {
+		if ( 'trash' === $from && ! wp_untrash_comment( $id ) ) {
+			return false;
+		}
+		if ( 'spam' === $from && ! wp_unspam_comment( $id ) ) {
+			return false;
+		}
+		return match ( $to ) {
+			'trash' => (bool) wp_trash_comment( $id ),
+			'spam'  => (bool) wp_spam_comment( $id ),
+			default => self::review_state( $id )['review']['status'] === $to || (bool) wp_set_comment_status( $id, self::REVIEW_STATUSES[ $to ] ?? 'hold' ),
+		};
+	}
+
+	/**
+	 * Operation of update-product-review in the area products.
+	 *
+	 * @param array<string, mixed> $input Input.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public static function describe_update_review( array $input ) {
+		$target = array( 'review' => (int) ( $input['review'] ?? 0 ) );
+		$fields = array_intersect_key( $input, array_flip( array( 'rating', 'verified', 'status' ) ) );
+		if ( ! $fields ) {
+			return Block_Edit::invalid( 'change', __( 'Name what to change: rating, verified or status.', 'leitvia-studio' ), $target );
+		}
+		return array(
+			'area'   => self::AREA,
+			'target' => $target,
+			'record' => true,
+			'change' => static function ( array $state ) use ( $fields ): array {
+				$state['review'] = array(
+					'rating'   => (int) ( $fields['rating'] ?? $state['review']['rating'] ),
+					'verified' => (bool) ( $fields['verified'] ?? $state['review']['verified'] ),
+					'status'   => (string) ( $fields['status'] ?? $state['review']['status'] ),
+				);
+				return $state;
+			},
 		);
 	}
 

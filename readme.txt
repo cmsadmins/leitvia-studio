@@ -4,7 +4,7 @@ Tags: ai, mcp, block theme, accessibility, design tokens
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.37
+Stable tag: 1.3.38
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -212,6 +212,9 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * Privacy policy: https://leitvia.com/privacy-policy/
 
 == Changelog ==
+
+= 1.3.38 =
+* New abilities leitvia/list-product-reviews and leitvia/update-product-review: read the reviews of a product with rating, verified owner, status and hash (never email address, IP address or user account), and set the rating, the verified flag or the status with hash, snapshot, package and rollback; WooCommerce counts the average rating and the review count again. Rights as on the reviews screen of WooCommerce: editing needs edit_products and edit_comment. Without moderate_comments, which agents do not have, a write only adds a missing rating to an approved review; another rating, the verified flag, a new status and held, spam or trashed reviews are moderation. Trash and spam go through the functions of core, so the admin restores such a review as it was.
 
 = 1.3.37 =
 * New abilities leitvia/list-product-attributes and leitvia/update-product-attribute for global WooCommerce attributes (pa_*): name, value names and the order of the values in one operation with hash, snapshot, package and rollback; slugs stay. Value names and order follow the autonomy, the name and the sort order of the attribute itself need manage_product_terms like the attributes screen of WooCommerce, otherwise they go into a package.

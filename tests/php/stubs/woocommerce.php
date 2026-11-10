@@ -85,6 +85,10 @@ class WC_Product_Attribute {
 	public function get_variation(): bool {}
 }
 
+class WC_Comments {
+	public static function clear_transients( int $post_id ): void {}
+}
+
 class WC_Tax {
 	/** @return list<string> */
 	public static function get_tax_class_slugs(): array {}

@@ -123,9 +123,10 @@ final class Pipeline {
 					'' !== $op->option() => 'option',
 					$op->term() > 0      => 'term',
 					$op->attribute() > 0 => 'attribute',
+					$op->review() > 0    => 'review',
 					default              => (string) ( get_post_type( $op->post_id() ) ? get_post_type( $op->post_id() ) : ( $op->target['post_type'] ?? '' ) ),
 				},
-				'object_id'   => $error ? max( $op->post_id(), $op->term(), $op->attribute() ) : (int) ( $result['target']['post'] ?? $result['target']['term'] ?? $result['target']['attribute'] ?? 0 ),
+				'object_id'   => $error ? max( $op->post_id(), $op->term(), $op->attribute(), $op->review() ) : (int) ( $result['target']['post'] ?? $result['target']['term'] ?? $result['target']['attribute'] ?? $result['target']['review'] ?? 0 ),
 				'package_id'  => $error ? 0 : (int) $result['package'],
 				'details'     => ( $error ? array() : array_intersect_key( $result, array_flip( array( 'mode', 'level', 'kinds', 'snapshot' ) ) ) + array_intersect_key( $op->target, array( 'option' => true ) ) ) + ( Abilities::batching() ? array( 'batched' => true ) : array() ),
 			)
@@ -157,6 +158,9 @@ final class Pipeline {
 		}
 		if ( isset( $op->target['attribute'] ) ) {
 			return Commerce::attribute_hash( $op->attribute() );
+		}
+		if ( isset( $op->target['review'] ) ) {
+			return Commerce::review_hash( $op->review() );
 		}
 		return Hashes::document( $post_id ?? $op->post_id() );
 	}
@@ -274,6 +278,8 @@ final class Pipeline {
 			isset( $after['term'] )    => self::unsafe( (string) ( $after['term']['description'] ?? '' ), true ),
 			// Names of an attribute and its values are plain text, see Commerce::describe_update_attribute().
 			isset( $after['attribute'] ) => null,
+			// A review changes by its rating, verified flag and status only; its text stays.
+			isset( $after['review'] )    => null,
 			// A block a product description holds already stays as it is, as in other content.
 			isset( $after['product'] ) => self::unsafe( (string) $after['post_content'], true, (string) ( $before['post_content'] ?? '' ) ) ?? self::unsafe( (string) $after['post_excerpt'], true ),
 			// Content that replaces classic content whole keeps no classic block (target replace, see update-content).
@@ -386,7 +392,7 @@ final class Pipeline {
 		if ( 'draft' === $mode && $op->creates() && in_array( $after['post_status'], self::PUBLIC_STATUSES, true ) ) {
 			$after['post_status'] = 'draft';
 		}
-		$denied = self::publish_denied( $op, $before, $after );
+		$denied = self::publish_denied( $op, $before, $after, $rollback );
 		if ( $denied ) {
 			return $denied;
 		}
@@ -459,6 +465,9 @@ final class Pipeline {
 		if ( isset( $op->target['attribute'] ) ) {
 			return array( 'attribute' => $op->attribute() );
 		}
+		if ( isset( $op->target['review'] ) ) {
+			return array( 'review' => $op->review() );
+		}
 		return array( 'post' => $op->post_id() ) + array_intersect_key( $op->target, array( 'block' => true ) );
 	}
 
@@ -495,6 +504,17 @@ final class Pipeline {
 			$attribute = wc_get_attribute( $op->attribute() );
 			$taxonomy  = $attribute ? get_taxonomy( $attribute->slug ) : false;
 			return $taxonomy && current_user_can( $taxonomy->cap->edit_terms ) ? $state : $forbidden;
+		}
+		if ( isset( $op->target['review'] ) ) {
+			$state = Scope::commerce() ? Commerce::review_state( $op->review() ) : array();
+			if ( ! $state ) {
+				return $out;
+			}
+			// A review agents cannot list (held, spam, trash) does not exist for them.
+			if ( 'approved' !== $state['review']['status'] && ! Commerce::may_moderate_reviews() ) {
+				return $out;
+			}
+			return Commerce::may_edit_review( $op->review() ) ? $state : $forbidden;
 		}
 		if ( $op->creates() ) {
 			$type   = (string) ( $op->target['post_type'] ?? '' );
@@ -645,7 +665,7 @@ final class Pipeline {
 			// Only the meta keys of META; an existing post takes no other meta through the pipeline.
 			$after['meta_input'] = array_intersect_key( (array) $after['meta_input'], $start['meta_input'] );
 		}
-		foreach ( array( 'product', 'term', 'terms', 'attribute' ) as $key ) {
+		foreach ( array( 'product', 'term', 'terms', 'attribute', 'review' ) as $key ) {
 			// Only the props, term fields and taxonomies the state knows.
 			if ( isset( $start[ $key ] ) ) {
 				$after[ $key ] = array_intersect_key( (array) $after[ $key ], $start[ $key ] ) + $start[ $key ];
@@ -1072,11 +1092,12 @@ final class Pipeline {
 	/**
 	 * A rejection when the user may not make the post public or change the option, else null.
 	 *
-	 * @param Operation            $op     Operation.
-	 * @param array<string, mixed> $before State before.
-	 * @param array<string, mixed> $after  State after.
+	 * @param Operation            $op       Operation.
+	 * @param array<string, mixed> $before   State before.
+	 * @param array<string, mixed> $after    State after.
+	 * @param bool                 $rollback Whether the write restores a snapshot.
 	 */
-	private static function publish_denied( Operation $op, array $before, array $after ): ?\WP_Error {
+	private static function publish_denied( Operation $op, array $before, array $after, bool $rollback = false ): ?\WP_Error {
 		$target = self::target( $op );
 		if ( '' !== $op->option() ) {
 			$allowed = current_user_can( 'manage_options' );
@@ -1087,6 +1108,14 @@ final class Pipeline {
 			$attribute = wc_get_attribute( $op->attribute() );
 			$taxonomy  = $attribute ? get_taxonomy( $attribute->slug ) : false;
 			$allowed   = ! $changes || ( $taxonomy && current_user_can( $taxonomy->cap->manage_terms ) );
+		} elseif ( $op->review() ) {
+			// before() checked the capability WooCommerce asks for editing reviews. Without moderate_comments a write
+			// only adds the stars a review lost (a rating where there was none); a new status, a new verified flag or
+			// another rating changes what a customer said or how it counts, which is moderation.
+			$old = (array) ( $before['review'] ?? array() );
+			$new = (array) ( $after['review'] ?? array() );
+			// A rollback puts back a state the review had.
+			$allowed = $rollback || Commerce::may_moderate_reviews() || ( ( $old['status'] ?? null ) === ( $new['status'] ?? null ) && ( $old['verified'] ?? null ) === ( $new['verified'] ?? null ) && ( 0 === ( $old['rating'] ?? 0 ) || ( $old['rating'] ?? null ) === ( $new['rating'] ?? null ) ) );
 		} elseif ( $op->no_post() ) {
 			// before() checked edit_term.
 			$allowed = true;
@@ -1098,7 +1127,7 @@ final class Pipeline {
 		if ( $allowed ) {
 			return null;
 		}
-		if ( $op->attribute() ) {
+		if ( $op->attribute() || $op->review() ) {
 			return Rejection::make( 'leitvia_forbidden', __( 'Your user may not change this object.', 'leitvia-studio' ), 403, 'capability', $target, '', 'never' );
 		}
 		return Rejection::make( 'leitvia_forbidden', __( 'Your user may not publish this.', 'leitvia-studio' ), 403, 'capability', $target, '', 'never' );
@@ -1122,9 +1151,10 @@ final class Pipeline {
 			'' !== $option  => 'option',
 			$op->term() > 0      => 'term',
 			$op->attribute() > 0 => 'attribute',
+			$op->review() > 0    => 'review',
 			default              => (string) $after['post_type'],
 		};
-		$id = max( $op->post_id(), $op->term(), $op->attribute() );
+		$id = max( $op->post_id(), $op->term(), $op->attribute(), $op->review() );
 		if ( ! $op->creates() ) {
 			$result['snapshot'] = Store::snapshot( $type, $id, $op->base_hash, $before, (int) $result['package'] );
 			if ( ! $result['snapshot'] ) {
@@ -1175,6 +1205,8 @@ final class Pipeline {
 				$failed = ! self::update_term( $id, (array) $after['term'] );
 			} elseif ( $op->attribute() ) {
 				$failed = ! Commerce::save_attribute( $id, (array) $after['attribute'] );
+			} elseif ( $op->review() ) {
+				$failed = ! Commerce::save_review( $id, (array) $after['review'] );
 			} elseif ( isset( $op->target['token_set'] ) ) {
 				// The compiler writes the same presets the change computed, plus the active set and its drift hash.
 				$activated = Compiler::activate( (int) $op->target['token_set'] );
@@ -1358,6 +1390,8 @@ final class Pipeline {
 				self::update_term( $op->term(), (array) $before['term'] );
 			} elseif ( $op->attribute() ) {
 				Commerce::save_attribute( $op->attribute(), (array) $before['attribute'] );
+			} elseif ( $op->review() ) {
+				Commerce::save_review( $op->review(), (array) $before['review'] );
 			} elseif ( $op->creates() ) {
 				if ( $created ) {
 					wp_delete_post( $created, true );
