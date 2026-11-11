@@ -1,0 +1,18 @@
+{
+	"extends": "leitvia",
+	"patterns": [
+		{
+			"slug": "leitvia-child-test/content-starter",
+			"title": "Starter section",
+			"description": "Pattern of the child theme fixture.",
+			"area": "content",
+			"useWhen": "In tests.",
+			"composition": { "tone": "surface", "density": "regular", "layout": "centered", "weight": "light", "role": "context", "width": "reading" }
+		},
+		{
+			"slug": "leitvia/cta-banner",
+			"title": "Overridden",
+			"area": "cta"
+		}
+	]
+}

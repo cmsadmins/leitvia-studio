@@ -49,20 +49,79 @@ final class Model_Controller extends \WP_REST_Controller {
 			'leitvia-studio/v1',
 			'/model/validate',
 			array(
-				'methods'             => \WP_REST_Server::CREATABLE,
-				'callback'            => array( $this, 'validate_model' ),
-				'permission_callback' => $manage,
-				'args'                => $body,
+				array(
+					'methods'             => \WP_REST_Server::CREATABLE,
+					'callback'            => array( $this, 'validate_model' ),
+					'permission_callback' => $manage,
+					'args'                => $body,
+				),
+				'schema' => array( self::class, 'validation_schema' ),
 			)
 		);
 		register_rest_route(
 			'leitvia-studio/v1',
 			'/model/schema',
 			array(
-				'methods'             => \WP_REST_Server::READABLE,
-				'callback'            => static fn() => rest_ensure_response( Model::schema() ),
-				'permission_callback' => static fn(): bool => current_user_can( 'edit_posts' ),
+				array(
+					'methods'             => \WP_REST_Server::READABLE,
+					'callback'            => static fn() => rest_ensure_response( Model::schema() ),
+					'permission_callback' => static fn(): bool => current_user_can( 'edit_posts' ),
+				),
+				'schema' => array( self::class, 'schema_schema' ),
 			)
+		);
+	}
+
+	/**
+	 * Schema of the answer of POST /model/validate; a declaration with problems ends in leitvia_studio_invalid_model.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function validation_schema(): array {
+		return array(
+			'$schema'    => 'http://json-schema.org/draft-04/schema#',
+			'title'      => 'leitvia-studio-model-validation',
+			'type'       => 'object',
+			'properties' => array(
+				'valid' => array(
+					'description' => __( 'True when the declaration would be stored as it is.', 'leitvia-studio' ),
+					'type'        => 'boolean',
+					'readonly'    => true,
+				),
+			),
+		);
+	}
+
+	/**
+	 * Schema of the answer of GET /model/schema, which is itself the JSON schema of a declaration.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function schema_schema(): array {
+		$string = array(
+			'type'     => 'string',
+			'readonly' => true,
+		);
+		return array(
+			'$schema'     => 'http://json-schema.org/draft-04/schema#',
+			'title'       => 'leitvia-studio-model-schema',
+			'description' => __( 'JSON schema of a content model declaration.', 'leitvia-studio' ),
+			'type'        => 'object',
+			'properties'  => array(
+				'$schema'     => $string,
+				'title'       => $string,
+				'description' => $string,
+				'required'    => array(
+					'type'     => 'array',
+					'items'    => array( 'type' => 'string' ),
+					'readonly' => true,
+				),
+				'properties'  => array(
+					'description' => __( 'Schema per top-level key of a declaration: version, postTypes, taxonomies, relations and settings.', 'leitvia-studio' ),
+					'type'        => 'object',
+					'readonly'    => true,
+				),
+			),
 		);
 	}
 

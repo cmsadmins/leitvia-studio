@@ -258,6 +258,20 @@ add_filter(
 
 `GET /leitvia-studio/v1/patterns` takes `source` (`theme`, `addon`, `user`), `orderby` (`modified`, the default, or `title`) and `order` (`desc`, the default, or `asc`); equal values sort by title. Each item carries `added` and `modified` as ISO 8601 dates in UTC, empty when unknown, and `status_label` and `effective_status_label` in the language of the user.
 
+## Child theme
+
+Files belong into the child theme `leitvia-child` (package `packages/leitvia-child`, zip `leitvia-child-<version>.zip`), never into Leitvia itself, which a theme update replaces: patterns, templates and template parts written by developers, agencies or agents with the WordPress skills `wp-block-themes` and `wp-patterns`. It inherits every preset, style variation and pattern of Leitvia and ships no CSS and no presets of its own; a new preset needs a role in the contract of Leitvia first.
+
+Its patterns follow the rules of the theme patterns (role presets only, no hex and no px, header with Title, Slug `leitvia-child/<area>-<name>`, Categories, Description and Keywords; `scripts/lint-theme.mjs` checks them). Each one has an entry in `leitvia-contract.json` of the child theme, a contract with `"extends": "leitvia"` and only `patterns`:
+
+```json
+{ "extends": "leitvia", "patterns": [ { "slug": "leitvia-child/content-starter", "title": "Starter section", "description": "…", "area": "content", "useWhen": "…", "composition": { "tone": "surface", "density": "regular", "layout": "centered", "weight": "light", "role": "context", "width": "reading" } } ] }
+```
+
+`Contract::for_active_theme()` reads the child theme first, as before. A contract without `extends` still replaces the one of the parent theme. One with `extends` adds its entries to the `patterns` of the contract it extends, so the composition check, `leitvia/compose-page` and the Lab score them like theme patterns, and a child pattern is no `unknownPattern`. A slug the parent already lists keeps the entry of the parent. The child theme contract is invalid with its error when its `patterns` are broken, when the parent has no contract or when `extends` names another theme than the `theme` of that contract.
+
+Switching between Leitvia and a child theme of Leitvia (`switch_theme`, `Contract\Child_Theme`) copies the user global styles, with the active token set, and the templates and template parts saved in the database to the new stylesheet, when the new theme has none of its own: global styles only when it has none, templates and parts per slug. Template part blocks in the copies name the new theme. The originals stay, so switching back finds them; nothing in the target is overwritten. Navigation menus belong to no theme, token overlays compile again for the new stylesheet, and the copies enter the usage index of the Lab on `save_post`.
+
 ## Gateway hooks
 
 Add-ons dock onto the gateway through hooks, for example to run one workflow on several sites; none of them bypasses the pipeline.

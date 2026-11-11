@@ -65,26 +65,29 @@ final class Tokens_Controller extends \WP_REST_Controller {
 			'leitvia-studio/v1',
 			'/token-sets/(?P<id>\d+)/export',
 			array(
-				'methods'             => \WP_REST_Server::READABLE,
-				'callback'            => array( $this, 'export' ),
-				'permission_callback' => array( $this, 'set_permissions_check' ),
-				'args'                => array(
-					'id'       => array(
-						'type'     => 'integer',
-						'minimum'  => 1,
-						'required' => true,
-					),
-					'download' => array(
-						'type'    => 'boolean',
-						'default' => false,
-					),
-					'target'   => array(
-						'description' => 'Sync target that exports the file; another one than leitvia/download always sends a file.',
-						'type'        => 'string',
-						'pattern'     => '^[a-z0-9-]+/[a-z0-9-]+$',
-						'default'     => 'leitvia/download',
+				array(
+					'methods'             => \WP_REST_Server::READABLE,
+					'callback'            => array( $this, 'export' ),
+					'permission_callback' => array( $this, 'set_permissions_check' ),
+					'args'                => array(
+						'id'       => array(
+							'type'     => 'integer',
+							'minimum'  => 1,
+							'required' => true,
+						),
+						'download' => array(
+							'type'    => 'boolean',
+							'default' => false,
+						),
+						'target'   => array(
+							'description' => 'Sync target that exports the file; another one than leitvia/download always sends a file.',
+							'type'        => 'string',
+							'pattern'     => '^[a-z0-9-]+/[a-z0-9-]+$',
+							'default'     => 'leitvia/download',
+						),
 					),
 				),
+				'schema' => array( self::class, 'document_schema' ),
 			)
 		);
 		register_rest_route(
@@ -146,10 +149,62 @@ final class Tokens_Controller extends \WP_REST_Controller {
 			'leitvia-studio/v1',
 			'/token-sources',
 			array(
-				'methods'             => \WP_REST_Server::READABLE,
-				'callback'            => array( $this, 'sources' ),
-				'permission_callback' => array( $this, 'permissions_check' ),
+				array(
+					'methods'             => \WP_REST_Server::READABLE,
+					'callback'            => array( $this, 'sources' ),
+					'permission_callback' => array( $this, 'permissions_check' ),
+				),
+				'schema' => array( self::class, 'source_schema' ),
 			)
+		);
+	}
+
+	/**
+	 * Schema of the answer of /token-sets/<id>/export: the stored DTCG document, or the file a sync target made of it.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function document_schema(): array {
+		return array(
+			'$schema'     => 'http://json-schema.org/draft-04/schema#',
+			'title'       => 'leitvia-studio-token-document',
+			'description' => __( 'DTCG document: groups and tokens with $value and $type, as stored.', 'leitvia-studio' ),
+			'type'        => 'object',
+			'properties'  => array(
+				'$extensions' => array(
+					'description' => __( 'Extensions of the document, com.leitvia.contractVersion among them.', 'leitvia-studio' ),
+					'type'        => 'object',
+					'readonly'    => true,
+				),
+			),
+		);
+	}
+
+	/**
+	 * Schema of one entry of /token-sources.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function source_schema(): array {
+		$string = array(
+			'type'     => 'string',
+			'readonly' => true,
+		);
+		return array(
+			'$schema'    => 'http://json-schema.org/draft-04/schema#',
+			'title'      => 'leitvia-studio-token-source',
+			'type'       => 'object',
+			'properties' => array(
+				'name'      => array( 'description' => __( 'Name of the source in the registry token_sources.', 'leitvia-studio' ) ) + $string,
+				'label'     => $string,
+				'owner'     => $string,
+				'documents' => array(
+					'description' => __( 'Documents of the source, each with title and DTCG document; POST /token-sets takes one by its index.', 'leitvia-studio' ),
+					'type'        => 'array',
+					'items'       => array( 'type' => 'object' ),
+					'readonly'    => true,
+				),
+			),
 		);
 	}
 

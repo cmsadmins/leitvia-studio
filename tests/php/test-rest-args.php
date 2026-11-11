@@ -5,6 +5,8 @@
  * @package LeitviaStudio
  */
 
+use LeitviaStudio\Gateway\Mcp;
+
 /**
  * Core refuses a parameter of the wrong type with rest_invalid_param before the callback runs, and the routes describe
  * their answers.
@@ -149,6 +151,27 @@ class Test_Rest_Args extends WP_UnitTestCase {
 			$path = '/leitvia-studio/v1' . $route;
 			$data = rest_get_server()->get_data_for_route( $path, rest_get_server()->get_routes()[ $path ], 'help' );
 			$this->assertSame( $title, $data['schema']['title'] ?? null, $route );
+		}
+	}
+
+	/**
+	 * Every route of Studio names a schema in OPTIONS, so a new route without one fails here. The namespace index of
+	 * core and the MCP server of the adapter are not Studio routes.
+	 */
+	public function test_every_route_has_a_schema(): void {
+		$server = rest_get_server();
+		$skip   = array( '/' . Mcp::ROUTE_NAMESPACE, '/' . Mcp::ROUTE_NAMESPACE . '/' . Mcp::ROUTE );
+		$routes = array_filter(
+			$server->get_routes( Mcp::ROUTE_NAMESPACE ),
+			static fn( string $path ): bool => ! in_array( $path, $skip, true ),
+			ARRAY_FILTER_USE_KEY
+		);
+		$this->assertArrayHasKey( '/leitvia-studio/v1/notes/dismiss', $routes );
+		$this->assertArrayHasKey( '/leitvia-studio/v1/packages/(?P<id>\d+)/rollback', $routes );
+		foreach ( $routes as $path => $handlers ) {
+			$data = $server->get_data_for_route( $path, $handlers, 'help' );
+			$this->assertNotEmpty( $data['schema']['title'] ?? '', $path );
+			$this->assertContains( $data['schema']['type'] ?? null, array( 'object', 'array' ), $path );
 		}
 	}
 }

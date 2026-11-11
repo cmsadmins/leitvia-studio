@@ -82,20 +82,27 @@ final class Gateway_Access_Controller {
 			$base,
 			'/gateway/access/(?P<id>\d+)',
 			array(
-				'methods'             => \WP_REST_Server::DELETABLE,
-				'callback'            => array( self::class, 'revoke' ),
-				'permission_callback' => $can,
-				'args'                => $id,
+				array(
+					'methods'             => \WP_REST_Server::DELETABLE,
+					'callback'            => array( self::class, 'revoke' ),
+					'permission_callback' => $can,
+					'args'                => $id,
+				),
+				'schema' => array( self::class, 'revoke_schema' ),
 			)
 		);
 		register_rest_route(
 			$base,
 			'/gateway/access/(?P<id>\d+)/password',
 			array(
-				'methods'             => \WP_REST_Server::CREATABLE,
-				'callback'            => array( self::class, 'password' ),
-				'permission_callback' => $can,
-				'args'                => $id,
+				array(
+					'methods'             => \WP_REST_Server::CREATABLE,
+					'callback'            => array( self::class, 'password' ),
+					'permission_callback' => $can,
+					'args'                => $id,
+				),
+				// Agent and password, as after POST /gateway/access.
+				'schema' => array( self::class, 'access_schema' ),
 			)
 		);
 		register_rest_route(
@@ -161,6 +168,31 @@ final class Gateway_Access_Controller {
 				'password'  => array(
 					'description' => __( 'The application password, after POST and nowhere else.', 'leitvia-studio' ),
 					'type'        => 'string',
+					'readonly'    => true,
+				),
+			),
+		);
+	}
+
+	/**
+	 * Schema of the answer of DELETE /gateway/access/<id>.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function revoke_schema(): array {
+		return array(
+			'$schema'    => 'http://json-schema.org/draft-04/schema#',
+			'title'      => 'leitvia-studio-gateway-revoke',
+			'type'       => 'object',
+			'properties' => array(
+				'agent'   => array(
+					'description' => __( 'The agent; the user and its content stay.', 'leitvia-studio' ),
+					'type'        => 'object',
+					'readonly'    => true,
+				),
+				'revoked' => array(
+					'description' => __( 'Number of application passwords deleted.', 'leitvia-studio' ),
+					'type'        => 'integer',
 					'readonly'    => true,
 				),
 			),

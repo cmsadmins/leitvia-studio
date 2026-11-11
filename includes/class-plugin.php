@@ -54,6 +54,7 @@ final class Plugin {
 
 		// Modules hook in here, one call per module.
 		add_action( 'switch_theme', array( self::class, 'forget_contract' ) );
+		add_action( 'switch_theme', array( Contract\Child_Theme::class, 'carry_over' ), 10, 3 );
 		add_action( 'switch_blog', array( self::class, 'forget_contract' ) );
 		add_action( 'rest_api_init', static fn() => ( new Rest\Contract_Controller() )->register_routes() );
 		add_action( 'init', array( Lab\Pattern_Meta::class, 'register' ) );

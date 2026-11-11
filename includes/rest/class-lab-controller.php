@@ -94,6 +94,7 @@ final class Lab_Controller extends \WP_REST_Controller {
 						) + Pattern_Meta::schema()['_leitvia_lab_checks']['properties']['axe'],
 					),
 				),
+				'schema' => array( self::class, 'checks_schema' ),
 			)
 		);
 		$ref = array(
@@ -138,25 +139,31 @@ final class Lab_Controller extends \WP_REST_Controller {
 			'leitvia-studio/v1',
 			'/patterns/(?P<id>\d+)/export',
 			array(
-				'methods'             => \WP_REST_Server::READABLE,
-				'callback'            => static fn( \WP_REST_Request $request ) => rest_ensure_response( Pattern_IO::export( (int) $request['id'] ) ),
-				'permission_callback' => array( $this, 'edit_pattern_permissions_check' ),
-				'args'                => $id,
+				array(
+					'methods'             => \WP_REST_Server::READABLE,
+					'callback'            => static fn( \WP_REST_Request $request ) => rest_ensure_response( Pattern_IO::export( (int) $request['id'] ) ),
+					'permission_callback' => array( $this, 'edit_pattern_permissions_check' ),
+					'args'                => $id,
+				),
+				'schema' => array( self::class, 'file_schema' ),
 			)
 		);
 		register_rest_route(
 			'leitvia-studio/v1',
 			'/patterns/(?P<id>\d+)/annotations',
 			array(
-				'methods'             => \WP_REST_Server::READABLE,
-				'callback'            => static fn( \WP_REST_Request $request ) => rest_ensure_response(
-					array(
-						'names'       => Preview::names( (string) get_post_field( 'post_content', (int) $request['id'] ) ),
-						'annotations' => Preview::annotations( (int) $request['id'] ),
-					)
+				array(
+					'methods'             => \WP_REST_Server::READABLE,
+					'callback'            => static fn( \WP_REST_Request $request ) => rest_ensure_response(
+						array(
+							'names'       => Preview::names( (string) get_post_field( 'post_content', (int) $request['id'] ) ),
+							'annotations' => Preview::annotations( (int) $request['id'] ),
+						)
+					),
+					'permission_callback' => array( $this, 'edit_pattern_permissions_check' ),
+					'args'                => $id,
 				),
-				'permission_callback' => array( $this, 'edit_pattern_permissions_check' ),
-				'args'                => $id,
+				'schema' => array( self::class, 'annotations_schema' ),
 			)
 		);
 		register_rest_route(
@@ -172,22 +179,7 @@ final class Lab_Controller extends \WP_REST_Controller {
 					},
 					// Types of the pattern file only, nothing required: the filter leitvia_studio_import_pattern_file may
 					// turn another format into one. Pattern_IO::import() checks the file itself.
-					'args'                => array(
-						'__file'     => array(
-							'description' => __( 'wp_block for a pattern file.', 'leitvia-studio' ),
-							'type'        => 'string',
-						),
-						'title'      => array( 'type' => 'string' ),
-						'content'    => array(
-							'description' => __( 'Block markup of the pattern.', 'leitvia-studio' ),
-							'type'        => 'string',
-						),
-						'syncStatus' => array( 'type' => 'string' ),
-						'leitvia'    => array(
-							'description' => __( 'Lab metadata, categories and variants of the pattern.', 'leitvia-studio' ),
-							'type'        => 'object',
-						),
-					),
+					'args'                => self::file_schema()['properties'],
 				),
 				'schema' => array( $this, 'get_public_item_schema' ),
 			)
@@ -196,28 +188,34 @@ final class Lab_Controller extends \WP_REST_Controller {
 			'leitvia-studio/v1',
 			'/usage',
 			array(
-				'methods'             => \WP_REST_Server::READABLE,
-				'callback'            => array( $this, 'usage' ),
-				// A wp_block reference also needs read rights on that pattern.
-				'permission_callback' => static fn( \WP_REST_Request $request ): bool => current_user_can( 'edit_posts' )
-					&& ( ! preg_match( '/^block:(\d+)$/D', (string) $request['ref'], $match ) || current_user_can( 'read_post', (int) $match[1] ) ),
-				'args'                => array( 'ref' => $ref ),
+				array(
+					'methods'             => \WP_REST_Server::READABLE,
+					'callback'            => array( $this, 'usage' ),
+					// A wp_block reference also needs read rights on that pattern.
+					'permission_callback' => static fn( \WP_REST_Request $request ): bool => current_user_can( 'edit_posts' )
+						&& ( ! preg_match( '/^block:(\d+)$/D', (string) $request['ref'], $match ) || current_user_can( 'read_post', (int) $match[1] ) ),
+					'args'                => array( 'ref' => $ref ),
+				),
+				'schema' => array( self::class, 'usage_schema' ),
 			)
 		);
 		register_rest_route(
 			'leitvia-studio/v1',
 			'/usage/reindex',
 			array(
-				'methods'             => \WP_REST_Server::CREATABLE,
-				'callback'            => static fn( \WP_REST_Request $request ) => rest_ensure_response( Usage_Index::reindex( (int) $request['after'] ) ),
-				'permission_callback' => static fn(): bool => current_user_can( Admin::SCREENS['leitvia-studio']['capability'] ),
-				'args'                => array(
-					'after' => array(
-						'type'    => 'integer',
-						'minimum' => 0,
-						'default' => 0,
+				array(
+					'methods'             => \WP_REST_Server::CREATABLE,
+					'callback'            => static fn( \WP_REST_Request $request ) => rest_ensure_response( Usage_Index::reindex( (int) $request['after'] ) ),
+					'permission_callback' => static fn(): bool => current_user_can( Admin::SCREENS['leitvia-studio']['capability'] ),
+					'args'                => array(
+						'after' => array(
+							'type'    => 'integer',
+							'minimum' => 0,
+							'default' => 0,
+						),
 					),
 				),
+				'schema' => array( self::class, 'reindex_schema' ),
 			)
 		);
 		register_rest_field(
@@ -752,6 +750,131 @@ final class Lab_Controller extends \WP_REST_Controller {
 		);
 		unset( $params['context'] );
 		return $params;
+	}
+
+	/**
+	 * Schema of a pattern file as export answers and import takes it; a variant in leitvia.variants has the same form.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function file_schema(): array {
+		return array(
+			'$schema'    => 'http://json-schema.org/draft-04/schema#',
+			'title'      => 'leitvia-studio-pattern-file',
+			'type'       => 'object',
+			'properties' => array(
+				'__file'     => array(
+					'description' => __( 'wp_block for a pattern file.', 'leitvia-studio' ),
+					'type'        => 'string',
+				),
+				'title'      => array( 'type' => 'string' ),
+				'content'    => array(
+					'description' => __( 'Block markup of the pattern.', 'leitvia-studio' ),
+					'type'        => 'string',
+				),
+				'syncStatus' => array( 'type' => 'string' ),
+				'leitvia'    => array(
+					'description' => __( 'Lab metadata, categories and variants of the pattern.', 'leitvia-studio' ),
+					'type'        => 'object',
+				),
+			),
+		);
+	}
+
+	/**
+	 * Schema of the answer of /patterns/<id>/checks: every stored result of the pattern, axe with the time of its run.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function checks_schema(): array {
+		return array(
+			'$schema' => 'http://json-schema.org/draft-04/schema#',
+			'title'   => 'leitvia-studio-pattern-checks',
+		) + array_diff_key( Pattern_Meta::schema()['_leitvia_lab_checks'], array( 'default' => true ) );
+	}
+
+	/**
+	 * Schema of the answer of /patterns/<id>/annotations.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function annotations_schema(): array {
+		return array(
+			'$schema'    => 'http://json-schema.org/draft-04/schema#',
+			'title'      => 'leitvia-studio-pattern-annotations',
+			'type'       => 'object',
+			'properties' => array(
+				'names'       => array(
+					'description' => __( 'Names the blocks of the pattern got with Rename in the editor; annotations point to them.', 'leitvia-studio' ),
+					'type'        => 'array',
+					'items'       => array( 'type' => 'string' ),
+					'readonly'    => true,
+				),
+				'annotations' => array(
+					'description' => __( 'Annotations with number, target, text and whether the target is gone.', 'leitvia-studio' ),
+					'type'        => 'array',
+					'items'       => array( 'type' => 'object' ),
+					'readonly'    => true,
+				),
+			),
+		);
+	}
+
+	/**
+	 * Schema of the answer of /usage.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function usage_schema(): array {
+		$list = array(
+			'type'     => 'array',
+			'items'    => array( 'type' => 'object' ),
+			'readonly' => true,
+		);
+		return array(
+			'$schema'    => 'http://json-schema.org/draft-04/schema#',
+			'title'      => 'leitvia-studio-pattern-usage',
+			'type'       => 'object',
+			'properties' => array(
+				'used_by'      => array( 'description' => __( 'Posts that use the pattern, with id, type, title, status and edit link.', 'leitvia-studio' ) ) + $list,
+				'used_by_more' => array(
+					'description' => __( 'Whether more posts use the pattern than the list shows.', 'leitvia-studio' ),
+					'type'        => 'boolean',
+					'readonly'    => true,
+				),
+				'uses'         => array( 'description' => __( 'Patterns the pattern uses, with reference, title, status and replacement.', 'leitvia-studio' ) ) + $list,
+				'index_built'  => array(
+					'description' => __( 'Whether every post went through the usage index once.', 'leitvia-studio' ),
+					'type'        => 'boolean',
+					'readonly'    => true,
+				),
+			),
+		);
+	}
+
+	/**
+	 * Schema of the answer of /usage/reindex, one batch.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function reindex_schema(): array {
+		return array(
+			'$schema'    => 'http://json-schema.org/draft-04/schema#',
+			'title'      => 'leitvia-studio-usage-reindex',
+			'type'       => 'object',
+			'properties' => array(
+				'done' => array(
+					'description' => __( 'Whether this was the last batch.', 'leitvia-studio' ),
+					'type'        => 'boolean',
+					'readonly'    => true,
+				),
+				'next' => array(
+					'description' => __( 'Last post ID of this batch, the value of after for the next one.', 'leitvia-studio' ),
+					'type'        => 'integer',
+					'readonly'    => true,
+				),
+			),
+		);
 	}
 
 	/**

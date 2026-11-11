@@ -4,7 +4,7 @@ Tags: ai, mcp, block theme, accessibility, design tokens
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.43
+Stable tag: 1.3.44
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -222,6 +222,10 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * Privacy policy: https://leitvia.com/privacy-policy/
 
 == Changelog ==
+
+= 1.3.44 =
+* Every REST route of Studio describes its answer in a schema, and OPTIONS shows it; a test keeps it that way for new routes.
+* Child themes of Leitvia: a child theme contract with "extends": "leitvia" adds its patterns to the contract of the parent. Switching between Leitvia and its child theme copies global styles, the active token set and edited templates and template parts to the new theme, without overwriting anything there.
 
 = 1.3.43 =
 * The abilities pass the checks of the WordPress agent skills: every required input has a description, the output of every write says what mode, level, hash, package and snapshot mean, and the annotations match what the abilities do (apply-package, apply-recipe, define-content-type, repair-links and set-alt-text are destructive, plan-page with AI reaches an outside service).

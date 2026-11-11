@@ -67,19 +67,22 @@ final class Packages_Controller extends \WP_REST_Controller {
 			$base,
 			'/packages/(?P<id>\d+)/apply',
 			array(
-				'methods'             => \WP_REST_Server::CREATABLE,
-				'callback'            => static fn( \WP_REST_Request $request ) => rest_ensure_response( Packages::apply( (int) $request['id'], array_map( 'intval', (array) $request['operations'] ) ) ),
-				'permission_callback' => $can,
-				'args'                => $id + array(
-					'operations' => array(
-						'type'    => 'array',
-						'items'   => array(
-							'type'    => 'integer',
-							'minimum' => 1,
+				array(
+					'methods'             => \WP_REST_Server::CREATABLE,
+					'callback'            => static fn( \WP_REST_Request $request ) => rest_ensure_response( Packages::apply( (int) $request['id'], array_map( 'intval', (array) $request['operations'] ) ) ),
+					'permission_callback' => $can,
+					'args'                => $id + array(
+						'operations' => array(
+							'type'    => 'array',
+							'items'   => array(
+								'type'    => 'integer',
+								'minimum' => 1,
+							),
+							'default' => array(),
 						),
-						'default' => array(),
 					),
 				),
+				'schema' => array( self::class, 'decision_schema' ),
 			)
 		);
 		foreach ( array( 'reject', 'rollback' ) as $action ) {
@@ -87,13 +90,55 @@ final class Packages_Controller extends \WP_REST_Controller {
 				$base,
 				'/packages/(?P<id>\d+)/' . $action,
 				array(
-					'methods'             => \WP_REST_Server::CREATABLE,
-					'callback'            => static fn( \WP_REST_Request $request ) => rest_ensure_response( Packages::$action( (int) $request['id'] ) ),
-					'permission_callback' => $can,
-					'args'                => $id,
+					array(
+						'methods'             => \WP_REST_Server::CREATABLE,
+						'callback'            => static fn( \WP_REST_Request $request ) => rest_ensure_response( Packages::$action( (int) $request['id'] ) ),
+						'permission_callback' => $can,
+						'args'                => $id,
+					),
+					'schema' => array( self::class, 'decision_schema' ),
 				)
 			);
 		}
+	}
+
+	/**
+	 * Schema of the answers of apply, reject and rollback: the package, its new state and what happened per operation.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function decision_schema(): array {
+		$ids  = array(
+			'type'     => 'array',
+			'items'    => array( 'type' => 'integer' ),
+			'readonly' => true,
+		);
+		$list = array(
+			'type'     => 'array',
+			'items'    => array( 'type' => 'object' ),
+			'readonly' => true,
+		);
+		return array(
+			'$schema'    => 'http://json-schema.org/draft-04/schema#',
+			'title'      => 'leitvia-studio-package-decision',
+			'type'       => 'object',
+			'properties' => array(
+				'package'     => array(
+					'description' => __( 'ID of the package.', 'leitvia-studio' ),
+					'type'        => 'integer',
+					'readonly'    => true,
+				),
+				'state'       => array(
+					'type'     => 'string',
+					'enum'     => Packages::STATES,
+					'readonly' => true,
+				),
+				'applied'     => array( 'description' => __( 'IDs of the operations written now, after apply.', 'leitvia-studio' ) ) + $ids,
+				'conflicts'   => array( 'description' => __( 'Operations whose target changed since the package was made, with both hashes, after apply.', 'leitvia-studio' ) ) + $list,
+				'errors'      => array( 'description' => __( 'Operations the pipeline refused, with code, message and findings, after apply.', 'leitvia-studio' ) ) + $list,
+				'rolled_back' => array( 'description' => __( 'IDs of the operations rolled back, after rollback.', 'leitvia-studio' ) ) + $ids,
+			),
+		);
 	}
 
 	/**

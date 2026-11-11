@@ -54,10 +54,25 @@ final class Contract {
 	private bool $exists = false;
 
 	/**
+	 * Theme whose contract this file adds to (key extends), empty for a contract of its own.
+	 *
+	 * @var string
+	 */
+	private string $extends = '';
+
+	/**
+	 * Patterns of a contract that adds to the contract of the parent theme.
+	 *
+	 * @var list<array<string, mixed>>
+	 */
+	private array $additions = array();
+
+	/**
 	 * Loads the contract of the active theme: child theme first, then the parent theme.
 	 *
 	 * The first existing file wins, valid or not. A broken child theme contract does not fall back to the parent
-	 * theme contract; its error stays visible, so the child theme author sees and fixes it.
+	 * theme contract; its error stays visible, so the child theme author sees and fixes it. A child theme contract
+	 * with "extends": "<theme>" holds only patterns and adds them to the next contract found, see add().
 	 */
 	public static function for_active_theme(): self {
 		$candidates = array_unique(
@@ -75,12 +90,43 @@ final class Contract {
 		 */
 		$candidates = (array) apply_filters( 'leitvia_studio_contract_path', array_values( $candidates ) );
 
+		// A child theme contract with extends adds its patterns to the next contract (the parent theme) instead of
+		// replacing it, so a child theme lists only its own patterns.
+		$addition = null;
 		foreach ( $candidates as $path ) {
-			if ( self::is_local_file( $path ) ) {
-				return self::from_file( $path );
+			if ( ! self::is_local_file( $path ) ) {
+				continue;
+			}
+			$contract = self::from_file( $path );
+			if ( null === $addition && '' !== $contract->extends ) {
+				$addition = $contract;
+				continue;
+			}
+			return $addition ? $contract->add( $addition ) : $contract;
+		}
+		return $addition ? $addition->without_parent() : new self();
+	}
+
+	/**
+	 * The contract with the patterns of a child theme contract after its own; a slug the contract already lists keeps
+	 * its entry. The child theme contract with its error when it is broken or extends another theme.
+	 *
+	 * @param self $addition Contract with extends, from from_file().
+	 */
+	private function add( self $addition ): self {
+		if ( '' !== $addition->error || ! $this->is_valid() ) {
+			return $this->is_valid() ? $addition : $this;
+		}
+		if ( ( $this->data['theme'] ?? null ) !== $addition->extends ) {
+			return $addition->without_parent();
+		}
+		$known = array_column( $this->data['patterns'], 'slug' );
+		foreach ( $addition->additions as $pattern ) {
+			if ( ! in_array( $pattern['slug'], $known, true ) ) {
+				$this->data['patterns'][] = $pattern;
 			}
 		}
-		return new self();
+		return $this;
 	}
 
 	/**
@@ -105,6 +151,18 @@ final class Contract {
 		$data = is_string( $json ) ? json_decode( $json, true ) : null;
 		if ( ! is_array( $data ) ) {
 			$contract->error = __( 'The theme contract is not valid JSON.', 'leitvia-studio' );
+			return $contract;
+		}
+
+		if ( isset( $data['extends'] ) ) {
+			$contract->extends = is_string( $data['extends'] ) && '' !== $data['extends'] ? $data['extends'] : '-';
+			if ( '-' === $contract->extends || ! self::is_list_of( $data['patterns'] ?? null, static fn( array $pattern ): bool => is_string( $pattern['slug'] ?? null ) ) ) {
+				/* translators: %s: field name in the theme contract. */
+				$contract->error = sprintf( __( 'The field %s of the theme contract has an invalid structure.', 'leitvia-studio' ), '-' === $contract->extends ? 'extends' : 'patterns' );
+				return $contract;
+			}
+			// Valid only together with the contract of the theme it extends, see add().
+			$contract->additions = $data['patterns'];
 			return $contract;
 		}
 
@@ -160,6 +218,17 @@ final class Contract {
 	}
 
 	/**
+	 * A child theme contract without the contract it extends: found, but not valid.
+	 */
+	private function without_parent(): self {
+		if ( '' === $this->error ) {
+			/* translators: %s: theme slug, for example leitvia. */
+			$this->error = sprintf( __( 'The child theme contract extends %s, but the parent theme has no contract of that theme.', 'leitvia-studio' ), $this->extends );
+		}
+		return $this;
+	}
+
+	/**
 	 * Whether the value is a list of arrays that all pass the check.
 	 *
 	 * @param mixed    $value Value to check.
@@ -185,10 +254,11 @@ final class Contract {
 	}
 
 	/**
-	 * Whether the contract exists and passed validation.
+	 * Whether the contract exists and passed validation. A child theme contract with extends from from_file() alone is
+	 * not: it is valid only together with the contract it extends.
 	 */
 	public function is_valid(): bool {
-		return $this->exists && '' === $this->error;
+		return $this->exists && '' === $this->error && array() !== $this->data;
 	}
 
 	/**

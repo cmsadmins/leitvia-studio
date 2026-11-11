@@ -329,6 +329,18 @@ final class Admin {
 					},
 					'permission_callback' => static fn(): bool => current_user_can( 'read' ),
 				),
+				'schema' => static fn(): array => array(
+					'$schema'    => 'http://json-schema.org/draft-04/schema#',
+					'title'      => 'leitvia-studio-notes',
+					'type'       => 'object',
+					'properties' => array(
+						'dismissed' => array(
+							'description' => __( 'Whether the product notes stay hidden for the current user.', 'leitvia-studio' ),
+							'type'        => 'boolean',
+							'readonly'    => true,
+						),
+					),
+				),
 			)
 		);
 	}
