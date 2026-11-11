@@ -5,6 +5,13 @@ A gateway for AI agents, a pattern lab, design tokens and site recipes for WordP
 - Website and documentation: https://leitvia.com
 - Theme: [Leitvia](https://github.com/cmsadmins/leitvia)
 - Agent skills: [Leitvia Skills](https://github.com/cmsadmins/leitvia-skills)
+- Child theme for patterns and templates kept as files: [Leitvia Child](https://github.com/cmsadmins/leitvia-child)
+- Starter plugin for blocks of your own: [Leitvia Block Starter](https://github.com/cmsadmins/leitvia-block-starter)
+- Developer guide: https://leitvia.com/docs/developers/
+
+## WordPress standards
+
+Leitvia supports the standards WordPress sets for AI agents and will keep supporting them: the skills of [WordPress/agent-skills](https://github.com/WordPress/agent-skills), the Abilities API with its REST routes under `/wp-json/wp-abilities/v1` and the default server of the MCP Adapter. The [developer guide](https://leitvia.com/docs/developers/) shows how the packages fit together, with real calls. Every ability carries complete annotations and described input fields, and every REST route of Studio returns its schema on OPTIONS.
 
 ## Install
 

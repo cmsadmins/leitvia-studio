@@ -97,6 +97,40 @@ class Test_Child_Theme extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The ability leitvia/list-patterns reads the patterns of the contract, so a registered child theme pattern is listed
+	 * as a theme pattern next to those of Leitvia.
+	 */
+	public function test_list_patterns_includes_child_patterns(): void {
+		$slug = 'leitvia-child-test/content-starter';
+		register_block_pattern(
+			$slug,
+			array(
+				'title'   => 'Starter section',
+				'content' => '<!-- wp:paragraph --><p>Starter</p><!-- /wp:paragraph -->',
+			)
+		);
+		add_filter( 'leitvia_studio_contract_path', static fn() => array( self::FIXTURES . 'child.json', get_template_directory() . '/leitvia-contract.json' ) );
+		\LeitviaStudio\Plugin::forget_contract();
+
+		$items = array();
+		for ( $page = 1, $pages = 1; $page <= $pages; $page++ ) {
+			$result = \LeitviaStudio\Gateway\Abilities\Read_Design::list_patterns(
+				array(
+					'per_page' => 50,
+					'page'     => $page,
+				)
+			);
+			$pages  = $result['pages'];
+			$items  = array_merge( $items, $result['items'] );
+		}
+		unregister_block_pattern( $slug );
+		$by_slug = array_column( $items, null, 'slug' );
+
+		$this->assertSame( 'theme', $by_slug[ $slug ]['source'] ?? null );
+		$this->assertSame( 'theme', $by_slug['leitvia/cta-banner']['source'] ?? null );
+	}
+
+	/**
 	 * A child theme pattern listed in the child theme contract is no unknownPattern.
 	 */
 	public function test_child_pattern_is_known_to_the_composition_check(): void {

@@ -116,7 +116,7 @@ Users with the role "Leitvia Agent" read through any REST route, but they change
 
 = Does Leitvia work with the official WordPress agent skills? =
 
-Yes, and it will keep doing so. Leitvia follows the standards WordPress sets for AI agents: the skills of WordPress/agent-skills (https://github.com/WordPress/agent-skills), the Abilities API under `/wp-json/wp-abilities/v1` and the default server of the MCP Adapter. An agent with only the WordPress skills finds the abilities with `GET /wp-json/wp-abilities/v1/abilities?category=leitvia`. The Leitvia skills (https://leitvia.com/docs/) come first on a Leitvia site, and no agent writes files in the theme. Core preset slugs such as the colors base and contrast or spacing 50 map to the roles of the design contract (design.md of the theme).
+Yes, and it will keep doing so. Leitvia follows the standards WordPress sets for AI agents: the skills of WordPress/agent-skills (https://github.com/WordPress/agent-skills), the Abilities API under `/wp-json/wp-abilities/v1` and the default server of the MCP Adapter. An agent with only the WordPress skills finds the abilities with `GET /wp-json/wp-abilities/v1/abilities?category=leitvia`. The Leitvia skills (https://leitvia.com/docs/) come first on a Leitvia site, and no agent writes files in the theme. Core preset slugs such as the colors base and contrast or spacing 50 map to the roles of the design contract (design.md of the theme). Theme files of your own go into the child theme Leitvia Child, blocks into a plugin built from Leitvia Block Starter. The developer guide (https://leitvia.com/docs/developers/) shows the calls with real answers.
 
 = How are images protected that wait in a change package? =
 
