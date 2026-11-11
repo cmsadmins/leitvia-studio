@@ -238,6 +238,7 @@ class Test_Extensions extends WP_UnitTestCase {
 		$this->assertSame( 'leitvia', $ability->get_category() );
 		$this->assertFalse( $ability->get_meta_item( 'public' ) );
 		$this->assertFalse( $ability->get_meta_item( 'show_in_rest' ) );
+		// Not shown in REST, so not on the default MCP server either.
 		$this->assertNull( $ability->get_meta()['mcp']['public'] ?? null );
 		$this->assertArrayNotHasKey( 'leitvia/no-annotations', wp_get_abilities() );
 		$this->assertNull( leitvia_studio()->registry( 'abilities' )->get( 'leitvia/no-annotations' ), 'rejected on register()' );

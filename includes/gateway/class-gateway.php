@@ -94,6 +94,7 @@ final class Gateway {
 		add_action( Store::CRON, array( Store::class, 'prune' ) );
 		add_filter( 'wp_privacy_personal_data_exporters', array( Store::class, 'register_exporter' ) );
 		add_filter( 'wp_privacy_personal_data_erasers', array( Store::class, 'register_eraser' ) );
+		add_filter( 'rest_post_dispatch', array( Abilities::class, 'retry_after' ) );
 		// After Registrar::force_inherit and Token_Sets::force_private (10); IDs only change post_content.
 		add_filter( 'wp_insert_post_data', array( Block_Ids::class, 'on_save' ), 20, 2 );
 		add_action( 'leitvia_studio_init', array( Abilities\Read_Structure::class, 'register' ) );
@@ -175,9 +176,9 @@ final class Gateway {
 		}
 		$route = untrailingslashit( $request->get_route() );
 		// Abilities of the Studio registry run through the pipeline, those of add-ons too (my-addon/…); core abilities
-		// and those of other plugins do not.
+		// and those of other plugins do not, neither over REST nor through the default MCP server.
 		$name = preg_match( '#^/wp-abilities/v1/abilities/([a-z0-9-]+/[a-z0-9-]+)/run$#', $route, $match ) ? $match[1] : '';
-		if ( ( '' !== $name && null !== leitvia_studio()->registry( 'abilities' )->get( $name ) ) || '/' . Mcp::ROUTE_NAMESPACE . '/' . Mcp::ROUTE === $route ) {
+		if ( ( '' !== $name && null !== leitvia_studio()->registry( 'abilities' )->get( $name ) ) || Mcp::allows_agent( $request ) ) {
 			return $result;
 		}
 		/* translators: %s: short product name */

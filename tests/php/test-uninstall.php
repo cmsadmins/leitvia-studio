@@ -42,6 +42,9 @@ class Test_Uninstall extends WP_UnitTestCase {
 			$this->assertSame( array( 'block:' . $content[ $site ]['block'] ), get_post_meta( $content[ $site ]['page'], '_leitvia_uses', false ) );
 			$this->assertSame( (string) $content[ $site ]['block'], get_post_meta( $content[ $site ]['page'], '_leitvia_easy_language_of', true ) );
 			$this->assertSame( 'imprint', get_post_meta( $content[ $site ]['page'], '_leitvia_page_kind', true ) );
+			foreach ( array( 'leitvia_ai_generated', '_leitvia_sources', '_leitvia_recipe_hash' ) as $key ) {
+				$this->assertTrue( metadata_exists( 'post', $content[ $site ]['page'], $key ), $key . ' stays' );
+			}
 			$this->assertSame( 'approved', get_post_meta( $content[ $site ]['block'], '_leitvia_lab_status', true ), 'Lab metadata stays' );
 			$this->assertSame( '1', get_post_meta( $content[ $site ]['session'], '_leitvia_model_trashed_with_entry', true ) );
 			$this->assertFalse( get_option( 'leitvia_studio_usage_index_built' ) );
@@ -107,6 +110,9 @@ class Test_Uninstall extends WP_UnitTestCase {
 			$this->assertSame( array(), get_post_meta( $content[ $site ]['page'], '_leitvia_uses', false ) );
 			$this->assertFalse( metadata_exists( 'post', $content[ $site ]['page'], '_leitvia_easy_language_of' ) );
 			$this->assertFalse( metadata_exists( 'post', $content[ $site ]['page'], '_leitvia_page_kind' ) );
+			foreach ( array( 'leitvia_ai_generated', '_leitvia_sources', '_leitvia_recipe_hash' ) as $key ) {
+				$this->assertFalse( metadata_exists( 'post', $content[ $site ]['page'], $key ), $key . ' goes' );
+			}
 			$this->assertSame( '', get_post_meta( $content[ $site ]['session'], '_leitvia_model_trashed_with_entry', true ) );
 			$this->assertFalse( get_option( 'leitvia_studio_usage_index_built' ) );
 			// The model declaration goes, content created with it stays.
@@ -209,6 +215,9 @@ class Test_Uninstall extends WP_UnitTestCase {
 			add_post_meta( $page, '_leitvia_uses', 'block:' . $block );
 			add_post_meta( $page, '_leitvia_easy_language_of', $block );
 			add_post_meta( $page, '_leitvia_page_kind', 'imprint' );
+			add_post_meta( $page, 'leitvia_ai_generated', '1' );
+			add_post_meta( $page, '_leitvia_sources', array( 'https://example.com/source' ) );
+			add_post_meta( $page, '_leitvia_recipe_hash', 'abc' );
 			$event = self::factory()->post->create( array( 'post_type' => 'event' ) );
 			add_post_meta( $event, 'event_venue', 'Hall 1' );
 			$session = self::factory()->post->create(

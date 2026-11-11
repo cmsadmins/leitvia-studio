@@ -101,9 +101,10 @@ final class Content {
 						'description' => __( 'post, page or a post type of the content model.', 'leitvia-studio' ),
 					),
 					'title'          => array(
-						'type'      => 'string',
-						'minLength' => 1,
-						'maxLength' => 200,
+						'type'        => 'string',
+						'minLength'   => 1,
+						'maxLength'   => 200,
+						'description' => __( 'Title of the new post.', 'leitvia-studio' ),
 					),
 					'content'        => array(
 						'type'        => 'string',
@@ -241,7 +242,9 @@ final class Content {
 			__( 'Returns the versions of WordPress, PHP, the theme and the plugins and the updates WordPress knows of, read from its last update check; nothing is requested. Needs a user who may view the Site Health checks, usually an administrator, or the agent role.', 'leitvia-studio' ),
 			array(),
 			array( 'type' => 'object' ),
-			static fn() => self::health()
+			static fn() => self::health(),
+			false,
+			static fn(): bool => Abilities::can_use() && ( current_user_can( 'view_site_health_checks' ) || Gateway::is_agent() )
 		);
 	}
 

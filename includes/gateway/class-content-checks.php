@@ -587,8 +587,9 @@ final class Content_Checks {
 	}
 
 	/**
-	 * Check leitvia/content-tokens: Token_Lint per block (no hex, px, !important or digit presets). A raw px value gets
-	 * its size in rem in the message: the check takes rem, for a width without a preset.
+	 * Check leitvia/content-tokens: Token_Lint per block (no hex, px, !important, digit presets or presets the theme does
+	 * not have). A raw px value gets its size in rem in the message: the check takes rem, for a width without a preset.
+	 * An unknown preset gets the roles of its type.
 	 *
 	 * @param string               $content Block markup.
 	 * @param array<string, mixed> $context Context.
@@ -607,6 +608,9 @@ final class Content_Checks {
 				if ( 'no-px' === $lint['rule'] ) {
 					/* translators: 1: value in px, 2: the same value in rem. */
 					$message = sprintf( __( 'px is no design token: use %2$s instead of %1$s, or a preset from leitvia/get-tokens.', 'leitvia-studio' ), $lint['match'], round( (float) $lint['match'] / 16, 3 ) . 'rem' );
+				} elseif ( 'no-unknown-preset' === $lint['rule'] ) {
+					/* translators: 1: preset reference without quotes, such as textColor:vivid-red, 2: comma-separated role slugs. */
+					$message = sprintf( __( 'The theme has no preset "%1$s", so it renders nothing. Use one of the roles: %2$s.', 'leitvia-studio' ), str_replace( '"', '', $lint['match'] ), Token_Lint::roles_for( $lint['match'] ) );
 				}
 				$findings[] = self::finding( 'leitvia/content-tokens', 'error', $id, $message, __( 'Use the presets from leitvia/get-tokens.', 'leitvia-studio' ) );
 			}

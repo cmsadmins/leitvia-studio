@@ -1,10 +1,13 @@
 # Paths are relative to this file.
 parameters:
   level: 8
+  # Lowest PHP version of Studio (Requires PHP in readme.txt).
+  phpVersion: 80200
   paths:
     - leitvia-studio.php
     - uninstall.php
     - includes
+    - patterns
   # WP-CLI signatures for includes/cli; the same file stands in for WP-CLI in PHPUnit.
   # WooCommerce signatures for the product comparison block.
   # Core constants the WordPress stubs leave out, such as WPINC.

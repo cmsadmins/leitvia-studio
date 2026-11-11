@@ -21,6 +21,12 @@ final class Model_Controller extends \WP_REST_Controller {
 	 */
 	public function register_routes(): void {
 		$manage = static fn(): bool => current_user_can( 'manage_options' );
+		// The top level of the schema as arguments: core refuses a wrong type with rest_invalid_param before the
+		// callback. Model::validate() checks the rest and names the path of every problem.
+		$body = array_map(
+			static fn( array $property ): array => array( 'type' => $property['type'] ),
+			(array) Model::schema()['properties']
+		);
 		register_rest_route(
 			'leitvia-studio/v1',
 			'/model',
@@ -34,7 +40,9 @@ final class Model_Controller extends \WP_REST_Controller {
 					'methods'             => \WP_REST_Server::EDITABLE,
 					'callback'            => array( $this, 'put_model' ),
 					'permission_callback' => $manage,
+					'args'                => $body,
 				),
+				'schema' => array( $this, 'get_public_item_schema' ),
 			)
 		);
 		register_rest_route(
@@ -44,6 +52,7 @@ final class Model_Controller extends \WP_REST_Controller {
 				'methods'             => \WP_REST_Server::CREATABLE,
 				'callback'            => array( $this, 'validate_model' ),
 				'permission_callback' => $manage,
+				'args'                => $body,
 			)
 		);
 		register_rest_route(
@@ -55,6 +64,39 @@ final class Model_Controller extends \WP_REST_Controller {
 				'permission_callback' => static fn(): bool => current_user_can( 'edit_posts' ),
 			)
 		);
+	}
+
+	/**
+	 * Schema of the answer of GET and PUT /model.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function get_item_schema() {
+		if ( ! $this->schema ) {
+			$this->schema = array(
+				'$schema'    => 'http://json-schema.org/draft-04/schema#',
+				'title'      => 'leitvia-studio-model',
+				'type'       => 'object',
+				'properties' => array(
+					'model'  => array(
+						'description' => __( 'The declaration, code and Model screen merged; every entry carries source "code" or "ui".', 'leitvia-studio' ),
+						'type'        => 'object',
+						'readonly'    => true,
+					),
+					'counts' => array(
+						'description' => __( 'Number of entries per post type and of terms per taxonomy.', 'leitvia-studio' ),
+						'type'        => 'object',
+						'readonly'    => true,
+					),
+					'errors' => array(
+						'description' => __( 'Problems that keep a declaration from code unregistered.', 'leitvia-studio' ),
+						'type'        => 'array',
+						'readonly'    => true,
+					),
+				),
+			);
+		}
+		return $this->add_additional_fields_schema( $this->schema );
 	}
 
 	/**

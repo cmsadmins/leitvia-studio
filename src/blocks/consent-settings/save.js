@@ -1,11 +1,10 @@
 import { RichText, useBlockProps } from '@wordpress/block-editor';
-import { __ } from '@wordpress/i18n';
 
 // The list of allowed providers exists only with JavaScript (script module @leitvia/consent); without it the block
-// says that no consent is stored.
+// says that no consent is stored. The texts stay English whatever the language of the editor, so the block validates
+// in every admin language; Consent::filter_settings_block() translates them on render.
 export default function save( { attributes } ) {
-	// translators: %s: provider name, for example YouTube.
-	const revoked = __( '%s is no longer allowed.', 'leitvia-studio' );
+	const revoked = '%s is no longer allowed.';
 	return (
 		<div
 			{ ...useBlockProps.save() }
@@ -20,17 +19,13 @@ export default function save( { attributes } ) {
 			/>
 			<div className="wp-block-leitvia-consent-settings__state">
 				<p data-wp-bind--hidden="!state.noScript">
-					{ __(
-						'Without JavaScript, this site stores no consent: content from other providers stays a link.',
-						'leitvia-studio'
-					) }
+					Without JavaScript, this site stores no consent: content
+					from other providers stays a link.
 				</p>
 				<div hidden data-wp-bind--hidden="state.noScript">
 					<p data-wp-bind--hidden="state.hasList">
-						{ __(
-							'You have not allowed any provider on this site in this browser.',
-							'leitvia-studio'
-						) }
+						You have not allowed any provider on this site in this
+						browser.
 					</p>
 					<ul
 						className="wp-block-leitvia-consent-settings__list"
@@ -48,7 +43,7 @@ export default function save( { attributes } ) {
 									className="wp-element-button"
 									data-wp-on--click="actions.revoke"
 								>
-									{ __( 'Revoke', 'leitvia-studio' ) }{ ' ' }
+									Revoke{ ' ' }
 									<span
 										className="screen-reader-text"
 										data-wp-text="context.item.label"

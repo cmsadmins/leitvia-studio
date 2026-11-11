@@ -681,6 +681,79 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Agents plan by annotations and schemas (lints of WordPress/agent-skills): every ability states readonly,
+	 * destructive, idempotent and openWorldHint as booleans, a read is never destructive, and only plan-page (AI
+	 * connector) and lookups of add-ons reach the open world. Every required field has a description, no enum is
+	 * empty, and a default at the root is an empty object, so a call without input passes the validation of core.
+	 */
+	public function test_annotations_and_schemas_are_complete(): void {
+		$count = 0;
+		foreach ( wp_get_abilities() as $ability ) {
+			$name = $ability->get_name();
+			if ( ! str_starts_with( $name, 'leitvia/' ) ) {
+				continue;
+			}
+			++$count;
+			$notes = (array) $ability->get_meta_item( 'annotations', array() );
+			foreach ( array( 'readonly', 'destructive', 'idempotent', 'openWorldHint' ) as $key ) {
+				$this->assertIsBool( $notes[ $key ] ?? null, $name . ' ' . $key );
+			}
+			if ( $notes['readonly'] ) {
+				$this->assertFalse( $notes['destructive'], $name );
+				$this->assertTrue( $notes['idempotent'], $name );
+			}
+			$this->assertSame( 'leitvia/plan-page' === $name, $notes['openWorldHint'], $name );
+			$schema = $ability->get_input_schema();
+			if ( array_key_exists( 'default', $schema ) ) {
+				$this->assertEquals( new stdClass(), $schema['default'], $name );
+			}
+			foreach ( self::schema_problems( $schema, '' ) as $problem ) {
+				$this->fail( $name . ': ' . $problem );
+			}
+		}
+		// 48 without WooCommerce, which adds the commerce abilities.
+		$this->assertGreaterThanOrEqual( 45, $count );
+		// A call without input reads with the defaults instead of failing on null.
+		$this->assertNotWPError( wp_get_ability( 'leitvia/list-patterns' )->execute() );
+		$this->assertNotWPError( wp_get_ability( 'leitvia/get-contract' )->execute() );
+	}
+
+	/**
+	 * Required fields without description and empty enums in a schema and the schemas below it.
+	 *
+	 * @param mixed  $schema JSON schema.
+	 * @param string $path   Path so far.
+	 * @return list<string>
+	 */
+	private static function schema_problems( $schema, string $path ): array {
+		if ( ! is_array( $schema ) ) {
+			return array();
+		}
+		$problems = array();
+		if ( array_key_exists( 'enum', $schema ) && ! $schema['enum'] ) {
+			$problems[] = 'empty enum at ' . $path;
+		}
+		$properties = (array) ( $schema['properties'] ?? array() );
+		foreach ( (array) ( $schema['required'] ?? array() ) as $field ) {
+			if ( '' === trim( (string) ( $properties[ $field ]['description'] ?? '' ) ) ) {
+				$problems[] = 'required field ' . $path . '.' . $field . ' has no description';
+			}
+		}
+		foreach ( $properties as $key => $property ) {
+			$problems = array_merge( $problems, self::schema_problems( $property, $path . '.' . $key ) );
+		}
+		foreach ( array( 'items', 'additionalProperties' ) as $key ) {
+			$problems = array_merge( $problems, self::schema_problems( $schema[ $key ] ?? null, $path . '[]' ) );
+		}
+		foreach ( array( 'oneOf', 'anyOf' ) as $key ) {
+			foreach ( (array) ( $schema[ $key ] ?? array() ) as $at => $part ) {
+				$problems = array_merge( $problems, self::schema_problems( $part, $path . '.' . $key . $at ) );
+			}
+		}
+		return $problems;
+	}
+
+	/**
 	 * First block with a name in markup.
 	 *
 	 * @param string $markup Markup.
@@ -940,6 +1013,11 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 		$limit = static fn( int $limit, bool $is_read ): int => $is_read ? 1 : $limit;
 		add_filter( 'leitvia_studio_rate_limit', $limit, 10, 2 );
 		$this->assertSame( 'leitvia_rate_limited', $call()->get_error_code() );
+		// Over REST the answer 429 carries the seconds of the retry rule in Retry-After; serve_request() applies the filter.
+		$request  = new WP_REST_Request( 'GET', '/wp-abilities/v1/abilities/leitvia/get-contract/run' );
+		$response = apply_filters( 'rest_post_dispatch', rest_ensure_response( rest_do_request( $request ) ), rest_get_server(), $request );
+		$this->assertSame( 429, $response->get_status() );
+		$this->assertMatchesRegularExpression( '/^[1-9][0-9]*$/', (string) ( $response->get_headers()['Retry-After'] ?? '' ) );
 		remove_filter( 'leitvia_studio_rate_limit', $limit );
 		$this->assertSame( 1, $read );
 		// Reads never use up the writes.

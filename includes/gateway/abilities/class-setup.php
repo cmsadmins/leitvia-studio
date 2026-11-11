@@ -70,9 +70,10 @@ final class Setup {
 			array(
 				'properties' => array(
 					'title'    => array(
-						'type'      => 'string',
-						'minLength' => 1,
-						'maxLength' => 200,
+						'type'        => 'string',
+						'minLength'   => 1,
+						'maxLength'   => 200,
+						'description' => __( 'Name of the new token set.', 'leitvia-studio' ),
 					),
 					'document' => array(
 						'type'        => 'object',
@@ -86,14 +87,15 @@ final class Setup {
 		Abilities::write(
 			'leitvia/activate-token-set',
 			__( 'Activate token set', 'leitvia-studio' ),
-			__( 'Writes the presets of a token set into the global styles of the active theme. The set ID comes from leitvia/create-token-set or the sets of leitvia/get-tokens. The base hash is the hash of the global styles. No ability returns this hash: send base_hash empty and repeat the call once with current_hash from leitvia_stale_hash.', 'leitvia-studio' ),
+			__( 'Writes the presets of a token set into the global styles of the active theme. The set ID comes from leitvia/create-token-set or the sets of leitvia/get-tokens. The base hash is the hash of the global styles. leitvia/get-tokens returns it as hash.', 'leitvia-studio' ),
 			'setup',
 			$replace,
 			array(
 				'properties' => array(
 					'set' => array(
-						'type'    => 'integer',
-						'minimum' => 1,
+						'type'        => 'integer',
+						'minimum'     => 1,
+						'description' => __( 'Token set ID from the sets of leitvia/get-tokens or from leitvia/create-token-set.', 'leitvia-studio' ),
 					),
 				),
 				'required'   => array( 'set' ),
@@ -103,14 +105,15 @@ final class Setup {
 		Abilities::write(
 			'leitvia/set-variation',
 			__( 'Set style variation', 'leitvia-studio' ),
-			__( 'Applies a style variation of the contract to the global styles of the active theme: a full variation replaces them, a colors or typography variation replaces only its part. Names come from the style variations of leitvia/get-contract. The base hash is the hash of the global styles. No ability returns this hash: send base_hash empty and repeat the call once with current_hash from leitvia_stale_hash.', 'leitvia-studio' ),
+			__( 'Applies a style variation of the contract to the global styles of the active theme: a full variation replaces them, a colors or typography variation replaces only its part. Names come from the style variations of leitvia/get-contract. The base hash is the hash of the global styles. leitvia/get-tokens returns it as hash.', 'leitvia-studio' ),
 			'setup',
 			$replace,
 			array(
 				'properties' => array(
 					'variation' => array(
-						'type'    => 'string',
-						'pattern' => '^[a-z0-9-]+$',
+						'type'        => 'string',
+						'pattern'     => '^[a-z0-9-]+$',
+						'description' => __( 'Slug of a style variation from leitvia/get-contract.', 'leitvia-studio' ),
 					),
 				),
 				'required'   => array( 'variation' ),
@@ -126,8 +129,9 @@ final class Setup {
 			array(
 				'properties' => array(
 					'page' => array(
-						'type'    => 'integer',
-						'minimum' => 0,
+						'type'        => 'integer',
+						'minimum'     => 0,
+						'description' => __( 'ID of a page from leitvia/list-content, 0 to clear the setting.', 'leitvia-studio' ),
 					),
 				),
 				'required'   => array( 'page' ),
@@ -143,8 +147,9 @@ final class Setup {
 			array(
 				'properties' => array(
 					'page' => array(
-						'type'    => 'integer',
-						'minimum' => 0,
+						'type'        => 'integer',
+						'minimum'     => 0,
+						'description' => __( 'ID of a page from leitvia/list-content, 0 to clear the setting.', 'leitvia-studio' ),
 					),
 				),
 				'required'   => array( 'page' ),
@@ -175,9 +180,9 @@ final class Setup {
 		Abilities::write(
 			'leitvia/define-content-type',
 			__( 'Define content type', 'leitvia-studio' ),
-			__( 'Adds entries to the content model (postTypes, taxonomies, relations, settings) and keeps the others. An entry that exists is merged: the input sets its own keys and fields, fields, repeaters and supports it does not name stay, and the postTypes of a taxonomy are joined; relations and settings are replaced whole. Nothing is removed through this ability: an entry, field, repeater or supports value can only be removed by a person on the Model screen. Read the declaration with leitvia/get-content-model first. The base hash is the hash of the content model. No ability returns this hash: send base_hash empty and repeat the call once with current_hash from leitvia_stale_hash. showInAbilities stays a decision of a person: agents may not set it.', 'leitvia-studio' ),
+			__( 'Adds entries to the content model (postTypes, taxonomies, relations, settings) and keeps the others. An entry that exists is merged: the input sets its own keys and fields, fields, repeaters and supports it does not name stay, and the postTypes of a taxonomy are joined; relations and settings are replaced whole. Nothing is removed through this ability: an entry, field, repeater or supports value can only be removed by a person on the Model screen. Read the declaration with leitvia/get-content-model first. The base hash is the hash of the content model. leitvia/get-content-model returns it as hash. showInAbilities stays a decision of a person: agents may not set it.', 'leitvia-studio' ),
 			'setup',
-			$add,
+			$replace,
 			array(
 				'properties' => array(
 					'declaration' => array(
@@ -193,14 +198,16 @@ final class Setup {
 			'type'                 => 'object',
 			'properties'           => array(
 				'label' => array(
-					'type'      => 'string',
-					'minLength' => 1,
-					'maxLength' => 100,
+					'type'        => 'string',
+					'minLength'   => 1,
+					'maxLength'   => 100,
+					'description' => __( 'Text of the link; it names the target.', 'leitvia-studio' ),
 				),
 				'url'   => array(
-					'type'      => 'string',
-					'minLength' => 1,
-					'maxLength' => 2000,
+					'type'        => 'string',
+					'minLength'   => 1,
+					'maxLength'   => 2000,
+					'description' => __( 'Address of this site, https, mailto: or tel:.', 'leitvia-studio' ),
 				),
 				'items' => array(
 					'type'     => 'array',
@@ -209,14 +216,16 @@ final class Setup {
 						'type'                 => 'object',
 						'properties'           => array(
 							'label' => array(
-								'type'      => 'string',
-								'minLength' => 1,
-								'maxLength' => 100,
+								'type'        => 'string',
+								'minLength'   => 1,
+								'maxLength'   => 100,
+								'description' => __( 'Text of the link; it names the target.', 'leitvia-studio' ),
 							),
 							'url'   => array(
-								'type'      => 'string',
-								'minLength' => 1,
-								'maxLength' => 2000,
+								'type'        => 'string',
+								'minLength'   => 1,
+								'maxLength'   => 2000,
+								'description' => __( 'Address of this site, https, mailto: or tel:.', 'leitvia-studio' ),
 							),
 						),
 						'required'             => array( 'label', 'url' ),
@@ -230,7 +239,7 @@ final class Setup {
 		Abilities::write(
 			'leitvia/update-navigation',
 			__( 'Update navigation', 'leitvia-studio' ),
-			__( 'Replaces the links of a navigation menu, by default the one published last, which headers without a chosen menu show. Send items (with one level of sub items) or block markup of navigation links, submenus, page lists and mega menus. Links point to this site, use https, mailto: or tel:, and need a text that names their target. The change publishes the menu, a draft one too, since core shows no draft menu. The base hash is the hash of the menu, empty when the site has none. No ability returns this hash: send base_hash empty and repeat the call once with current_hash from leitvia_stale_hash.', 'leitvia-studio' ),
+			__( 'Replaces the links of a navigation menu, by default the one published last, which headers without a chosen menu show. Send items (with one level of sub items) or block markup of navigation links, submenus, page lists and mega menus. Links point to this site, use https, mailto: or tel:, and need a text that names their target. The change publishes the menu, a draft one too, since core shows no draft menu. The base hash is the hash of the menu, empty when the site has none. leitvia/get-contract returns it per published menu under hashes.navigation.', 'leitvia-studio' ),
 			'setup',
 			$replace,
 			array(
@@ -256,14 +265,15 @@ final class Setup {
 		Abilities::write(
 			'leitvia/update-template-part',
 			__( 'Update template part', 'leitvia-studio' ),
-			__( 'Replaces a template part of the contract, such as header, footer or sidebar, with a pattern made for its area or with changed block markup. Part names come from leitvia/get-contract; with Polylang <part>-<language> (header-de) is the part the theme shows for that language and is created in the area of its part. Patterns come from leitvia/list-patterns. The change publishes the part, a draft one too: core shows no draft part, so where the area level is draft it waits in a change package. The base hash is the hash of the template part. No ability returns this hash: send base_hash empty and repeat the call once with current_hash from leitvia_stale_hash.', 'leitvia-studio' ),
+			__( 'Replaces a template part of the contract, such as header, footer or sidebar, with a pattern made for its area or with changed block markup. Part names come from leitvia/get-contract; with Polylang <part>-<language> (header-de) is the part the theme shows for that language and is created in the area of its part. Patterns come from leitvia/list-patterns. The change publishes the part, a draft one too: core shows no draft part, so where the area level is draft it waits in a change package. The base hash is the hash of the template part. leitvia/get-contract returns it per part under hashes.templateParts.', 'leitvia-studio' ),
 			'setup',
 			$replace,
 			array(
 				'properties' => array(
 					'part'    => array(
-						'type'    => 'string',
-						'pattern' => '^[a-z0-9-]+$',
+						'type'        => 'string',
+						'pattern'     => '^[a-z0-9-]+$',
+						'description' => __( 'Name of a template part from leitvia/get-contract, such as header or footer.', 'leitvia-studio' ),
 					),
 					'pattern' => array( 'type' => 'string' ),
 					'content' => array(
@@ -278,15 +288,16 @@ final class Setup {
 		Abilities::write(
 			'leitvia/update-template',
 			__( 'Update template', 'leitvia-studio' ),
-			__( 'Replaces a template with a template pattern made for it or with changed block markup. Slugs, such as single, single-product or taxonomy-product_cat, come from the templates of leitvia/get-contract and the templates the theme ships; WooCommerce templates need WooCommerce. A pattern fits when its templateTypes hold the slug; the rejection leitvia_unknown_pattern lists the patterns that fit in patterns. Templates for single posts and pages keep a core/post-content block. The change publishes the template; where the area level is draft a new one waits in a change package. A rollback restores the template as it was, the one of the theme when there was no saved one. The base hash is the hash of the saved template, empty when the theme template has not been saved yet. No ability returns this hash: send base_hash empty and repeat the call once with current_hash from leitvia_stale_hash.', 'leitvia-studio' ),
+			__( 'Replaces a template with a template pattern made for it or with changed block markup. Slugs, such as single, single-product or taxonomy-product_cat, come from the templates of leitvia/get-contract and the templates the theme ships; WooCommerce templates need WooCommerce. A pattern fits when its templateTypes hold the slug; the rejection leitvia_unknown_pattern lists the patterns that fit in patterns. Templates for single posts and pages keep a core/post-content block. The change publishes the template; where the area level is draft a new one waits in a change package. A rollback restores the template as it was, the one of the theme when there was no saved one. The base hash is the hash of the saved template, empty when the theme template has not been saved yet. leitvia/get-contract returns it per template under hashes.templates.', 'leitvia-studio' ),
 			'setup',
 			$replace,
 			array(
 				'properties' => array(
 					// Template slugs of core and WooCommerce may hold an underscore: taxonomy-product_cat, taxonomy-product_tag.
 					'template' => array(
-						'type'    => 'string',
-						'pattern' => '^[a-z0-9_-]+$',
+						'type'        => 'string',
+						'pattern'     => '^[a-z0-9_-]+$',
+						'description' => __( 'Template slug from leitvia/get-contract or of the theme, such as single or taxonomy-product_cat.', 'leitvia-studio' ),
 					),
 					'pattern'  => array( 'type' => 'string' ),
 					'content'  => array(

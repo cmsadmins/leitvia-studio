@@ -157,9 +157,23 @@ final class Animation {
 		$tags->add_class( 'is-lv-motion-' . ( in_array( $motion, self::STRENGTHS, true ) ? $motion : $site ) );
 		wp_enqueue_style( generate_block_asset_handle( 'leitvia/reveal', 'style' ) );
 		if ( 'parallax' !== $effect ) {
-			wp_enqueue_script_module( 'leitvia-reveal-view-script-module' );
+			self::enqueue_module( 'leitvia/reveal' );
 		}
 		return $tags->get_updated_html();
+	}
+
+	/**
+	 * Enqueues the view script module of a registered block by the ID core gave it, not by a handle spelled out here:
+	 * core builds that ID itself and may change how.
+	 *
+	 * @param string $name Block name.
+	 */
+	public static function enqueue_module( string $name ): void {
+		$type   = \WP_Block_Type_Registry::get_instance()->get_registered( $name );
+		$module = $type ? (string) ( $type->view_script_module_ids[0] ?? '' ) : '';
+		if ( '' !== $module ) {
+			wp_enqueue_script_module( $module );
+		}
 	}
 
 	/**

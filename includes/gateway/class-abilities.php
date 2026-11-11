@@ -33,15 +33,18 @@ final class Abilities {
 	 * @param array<string, mixed> $input_schema  JSON schema of the input; core does not cast it outside REST.
 	 * @param array<string, mixed> $output_schema JSON schema of the output.
 	 * @param callable             $callback      Receives the input, returns the output or a WP_Error.
+	 * @param bool                 $open_world    Whether the ability may reach a service outside the site.
+	 * @param callable|null        $permission    Permission callback for an ability that needs more than can_use(); it
+	 *                                            answers yes or no like can_use().
 	 * @return bool Whether the registry accepted the ability.
 	 * @phpstan-param lowercase-string&non-falsy-string $name
 	 */
-	public static function read( string $name, string $label, string $description, array $input_schema, array $output_schema, callable $callback ): bool {
+	public static function read( string $name, string $label, string $description, array $input_schema, array $output_schema, callable $callback, bool $open_world = false, ?callable $permission = null ): bool {
 		$args = array(
 			'label'               => $label,
 			'description'         => $description,
 			'output_schema'       => $output_schema,
-			'permission_callback' => array( self::class, 'can_use' ),
+			'permission_callback' => $permission ?? array( self::class, 'can_use' ),
 			'execute_callback'    => static fn( $input = null ) => self::run( $name, $callback, $input ),
 			'meta'                => array(
 				// The MCP Adapter reads openWorldHint, not open_world.
@@ -49,14 +52,15 @@ final class Abilities {
 					'readonly'      => true,
 					'destructive'   => false,
 					'idempotent'    => true,
-					'openWorldHint' => false,
+					'openWorldHint' => $open_world,
 				),
 				'show_in_rest' => true,
 			),
 		);
 		if ( $input_schema ) {
-			// Without a required input a call without any (GET with no query arguments) reads with the defaults.
-			$args['input_schema'] = $input_schema + ( empty( $input_schema['required'] ) && 'object' === ( $input_schema['type'] ?? '' ) ? array( 'default' => array() ) : array() );
+			// Without a required input a call without any (GET with no query arguments) reads with the defaults. An empty
+			// object, not an empty array: core validates the default against type object, and [] encodes as a list.
+			$args['input_schema'] = $input_schema + ( empty( $input_schema['required'] ) && 'object' === ( $input_schema['type'] ?? '' ) ? array( 'default' => (object) array() ) : array() );
 		}
 		return leitvia_studio()->registry( 'abilities' )->register(
 			$name,
@@ -84,7 +88,8 @@ final class Abilities {
 	 * @param string               $label        Translated label.
 	 * @param string               $description  Translated description.
 	 * @param string               $group        setup, build or maintain.
-	 * @param array<string, bool>  $annotations  destructive and idempotent; readonly is always false.
+	 * @param array<string, bool>  $annotations  destructive and idempotent; readonly is always false, openWorldHint false
+	 *                                           unless given.
 	 * @param array<string, mixed> $input_schema JSON schema of the input, an object.
 	 * @param callable             $describe     Describes the operation.
 	 * @param bool                 $hash_needed  Whether base_hash is required; false for an ability whose list of items
@@ -118,7 +123,7 @@ final class Abilities {
 					'permission_callback' => array( self::class, 'can_use' ),
 					'execute_callback'    => static fn( $input = null ) => self::execute_write( $name, $describe, is_array( $input ) ? $input : array() ),
 					'meta'                => array(
-						'annotations'  => array( 'readonly' => false ) + $annotations,
+						'annotations'  => array( 'readonly' => false ) + $annotations + array( 'openWorldHint' => false ),
 						'show_in_rest' => true,
 					),
 				),
@@ -284,31 +289,44 @@ final class Abilities {
 	}
 
 	/**
-	 * Output schema of write abilities: the result of Pipeline::run().
+	 * Output schema of write abilities: the result of Pipeline::run(). Public for add-ons whose write abilities hand
+	 * their operation to execute_write().
 	 *
 	 * @return array<string, mixed>
 	 */
-	private static function write_output(): array {
+	public static function write_output(): array {
 		$strings = array(
 			'type'  => 'array',
 			'items' => array( 'type' => 'string' ),
 		);
 		return array(
 			'type'       => 'object',
+			'required'   => array( 'mode' ),
 			'properties' => array(
 				'mode'         => array(
-					'type' => 'string',
-					'enum' => array( 'live', 'draft', 'package', 'unchanged' ),
+					'type'        => 'string',
+					'enum'        => array( 'live', 'draft', 'package', 'unchanged' ),
+					'description' => __( 'What happened: live (written and visible), draft (written as a draft), package (nothing written yet: the change waits in a change package until a person applies it in the inbox; leitvia/get-package shows it), unchanged (the target already had this state).', 'leitvia-studio' ),
 				),
 				'level'        => array(
-					'type' => 'string',
-					'enum' => Gateway::LEVELS,
+					'type'        => 'string',
+					'enum'        => Gateway::LEVELS,
+					'description' => __( 'Autonomy level of the area that decided the mode.', 'leitvia-studio' ),
 				),
 				'kinds'        => $strings,
 				'target'       => array( 'type' => 'object' ),
-				'hash'         => array( 'type' => 'string' ),
-				'package'      => array( 'type' => 'integer' ),
-				'snapshot'     => array( 'type' => 'integer' ),
+				'hash'         => array(
+					'type'        => 'string',
+					'description' => __( 'Hash of the target after the write, the base_hash of the next change; empty when the change waits in a package.', 'leitvia-studio' ),
+				),
+				'package'      => array(
+					'type'        => 'integer',
+					'description' => __( 'ID of the change package the change waits in, or that leitvia/rollback undoes a live write with; 0 for none.', 'leitvia-studio' ),
+				),
+				'snapshot'     => array(
+					'type'        => 'integer',
+					'description' => __( 'ID of the snapshot of the state before the write; 0 for none.', 'leitvia-studio' ),
+				),
 				'findings'     => array(
 					'type'  => 'array',
 					'items' => array( 'type' => 'object' ),
@@ -349,9 +367,13 @@ final class Abilities {
 	 * @return mixed Output or WP_Error.
 	 */
 	public static function run( string $name, callable $callback, $input ) {
+		// The default of an input schema is an empty object, see read(); callbacks read arrays.
+		$input = $input instanceof \stdClass ? (array) $input : $input;
+		// verify-ignore: idempotent -- the rate limit counts the audit entries of the last minute; a read changes no content.
 		$limited = self::rate_limit( get_current_user_id(), true );
 		$result  = $limited ?? $callback( $input );
 		$error   = is_wp_error( $result );
+		// verify-ignore: readonly -- one audit entry per call without payload, the log of the gateway; no content or setting changes.
 		Store::audit(
 			array(
 				'ability'     => $name,
@@ -392,5 +414,24 @@ final class Abilities {
 		$wait = max( 1, MINUTE_IN_SECONDS - ( $now - (int) strtotime( $oldest . ' UTC' ) ) );
 		/* translators: %d: seconds */
 		return Rejection::make( 'leitvia_rate_limited', sprintf( __( 'Too many calls. Try again in %d seconds.', 'leitvia-studio' ), $wait ), 429, 'rate_limit', array(), '', 'after:' . $wait );
+	}
+
+	/**
+	 * Adds the header Retry-After to a REST answer 429 whose rejection carries the retry rule after:<seconds>, so HTTP
+	 * clients wait without reading the body. Runs on rest_post_dispatch.
+	 *
+	 * @param mixed $response REST response.
+	 * @return mixed
+	 */
+	public static function retry_after( $response ) {
+		if ( ! $response instanceof \WP_HTTP_Response || 429 !== $response->get_status() ) {
+			return $response;
+		}
+		$data  = $response->get_data();
+		$retry = is_array( $data ) && is_array( $data['data'] ?? null ) ? (string) ( $data['data']['retry'] ?? '' ) : '';
+		if ( str_starts_with( $retry, 'after:' ) ) {
+			$response->header( 'Retry-After', (string) max( 1, (int) substr( $retry, 6 ) ) );
+		}
+		return $response;
 	}
 }

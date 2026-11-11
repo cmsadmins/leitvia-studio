@@ -117,7 +117,7 @@ When the entry is registered, before any hand-over, Studio checks that
 
 MCP clients assume the worst case when annotations are missing, so `register()` rejects an entry without them with `_doing_it_wrong()` and it never reaches core.
 
-Studio never sets `meta.public`, `meta.show_in_rest` or `meta.mcp`. An ability is exposed to REST or other clients only when its own `args` say so; exposure is not a permission, `permission_callback` always applies. Studio bundles no MCP Adapter and does not require one: abilities reach MCP clients through the separately installed MCP Adapter plugin.
+Studio never sets `meta.public` or `meta.show_in_rest`. An ability is exposed to REST or other clients only when its own `args` say so. An entry with `meta.show_in_rest` gets `meta.mcp.public` true unless its `args` set it, so the default server of the MCP Adapter offers it next to the server `leitvia`; exposure is not a permission, `permission_callback` always applies. Studio bundles no MCP Adapter and does not require one: abilities reach MCP clients through the separately installed MCP Adapter plugin.
 
 Add-ons that call AI models use the WordPress AI Client (`wp_ai_client_prompt()`) and the site's Connectors; Studio ships no provider integration.
 
@@ -374,6 +374,12 @@ The block `leitvia/contact-form` allows 5 messages per connection and hour. All 
 
 ```php
 add_filter( 'leitvia_studio_contact_form_limit', static fn() => 50 );
+```
+
+A form takes submissions for 7 days after its page was rendered. A site that caches pages for longer raises the limit, in seconds:
+
+```php
+add_filter( 'leitvia_studio_contact_form_max_age', static fn() => 30 * DAY_IN_SECONDS );
 ```
 
 ## Brand

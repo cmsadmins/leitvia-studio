@@ -94,12 +94,7 @@ function mcpRow( mcp ) {
 				__( 'Active, version %s', 'leitvia-studio' ),
 				mcp.version
 			),
-			text: mcp.shared
-				? __(
-						'AI apps can also connect directly. Another plugin also shares Leitvia tools on the default server; only the leitvia server explains why a change was refused.',
-						'leitvia-studio'
-					)
-				: __( 'AI apps can also connect directly.', 'leitvia-studio' ),
+			text: __( 'AI apps can also connect directly.', 'leitvia-studio' ),
 		};
 	}
 	if ( mcp.active ) {

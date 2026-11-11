@@ -34,15 +34,12 @@ final class Maintain {
 	 */
 	public static function register(): void {
 		$post      = array(
-			'type'    => 'integer',
-			'minimum' => 1,
+			'type'        => 'integer',
+			'minimum'     => 1,
+			'description' => __( 'Post ID from leitvia/list-content.', 'leitvia-studio' ),
 		);
 		$overwrite = array(
 			'destructive' => true,
-			'idempotent'  => false,
-		);
-		$add       = array(
-			'destructive' => false,
 			'idempotent'  => false,
 		);
 		Abilities::write(
@@ -130,9 +127,10 @@ final class Maintain {
 			array( self::class, 'describe_update_content' )
 		);
 		$link  = array(
-			'type'      => 'string',
-			'minLength' => 1,
-			'maxLength' => 2000,
+			'type'        => 'string',
+			'minLength'   => 1,
+			'maxLength'   => 2000,
+			'description' => __( 'A link as it stands in the href of the post (from), or its new target (to).', 'leitvia-studio' ),
 		);
 		$image = array(
 			'type'        => 'integer',
@@ -140,9 +138,10 @@ final class Maintain {
 			'description' => __( 'Attachment ID of the image.', 'leitvia-studio' ),
 		);
 		$alt   = array(
-			'type'      => 'string',
-			'minLength' => 1,
-			'maxLength' => 500,
+			'type'        => 'string',
+			'minLength'   => 1,
+			'maxLength'   => 500,
+			'description' => __( 'Alt text that says what the image shows.', 'leitvia-studio' ),
 		);
 		$block = array(
 			'type'        => 'string',
@@ -155,7 +154,7 @@ final class Maintain {
 			__( 'Repair links', 'leitvia-studio' ),
 			__( 'Repairs internal links of one post: from pairs of old and new link, or with auto through the old slugs WordPress keeps for redirects. The base hash is the hash of the post from leitvia/get-page-outline. Only links of this site change. External links are never requested, only listed in the report, as are internal links that lead nowhere and cannot be resolved. Links with an empty href or a # without target are listed under empty, with in (content or page) and their class.', 'leitvia-studio' ),
 			'maintain',
-			$add,
+			$overwrite,
 			array(
 				'properties'           => array(
 					'post'  => $post,
@@ -187,7 +186,7 @@ final class Maintain {
 			__( 'Set alt text', 'leitvia-studio' ),
 			__( 'Sets the alt text of an image: without post and block on the attachment in the media library (base_hash of the attachment), with post and block on one image or cover block that shows it (base_hash of the post). leitvia/get-page-outline returns both hashes, for the attachment with its ID as post. Many images: items, one call and package. The alt text check applies.', 'leitvia-studio' ),
 			'maintain',
-			$add,
+			$overwrite,
 			array(
 				'properties'           => array(
 					'image' => $image,

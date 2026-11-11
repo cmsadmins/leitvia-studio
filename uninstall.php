@@ -14,7 +14,8 @@ if ( ! class_exists( \LeitviaStudio\Gateway\Packages::class ) ) {
 
 /**
  * Cleans one site: Studio options always; token sets, Lab metadata, the usage index, the content model declaration,
- * the easy language relation and profile picture assignments only with the setting delete_data_on_uninstall. Images in
+ * the easy language relation, the marks of agent writes and profile picture assignments only with the setting
+ * delete_data_on_uninstall. Images in
  * the media library always stay.
  */
 $leitvia_studio_uninstall_site = static function (): void {
@@ -60,6 +61,11 @@ $leitvia_studio_uninstall_site = static function (): void {
 		delete_post_meta_by_key( '_leitvia_easy_language_of' );
 		// The page kind that recipes and compose-page set (legal pages, contact); the pages stay.
 		delete_post_meta_by_key( '_leitvia_page_kind' );
+		// Marks of agent writes: AI generated content, its sources and the hash of the recipe that wrote a part. The
+		// posts stay. Per site, the closure runs once for every site of a network.
+		foreach ( array( 'leitvia_ai_generated', '_leitvia_sources', '_leitvia_recipe_hash' ) as $leitvia_studio_key ) {
+			delete_post_meta_by_key( $leitvia_studio_key );
+		}
 	}
 	// Gateway: change packages, audit log, snapshots, schema version, settings, the prune event, pending checks after
 	// writing with their tokens, the application passwords of agents and the role; agent users stay.

@@ -34,28 +34,31 @@ final class Recipes_Controller {
 			'leitvia-studio/v1',
 			'/recipes',
 			array(
-				'methods'             => \WP_REST_Server::READABLE,
-				'callback'            => array( $this, 'get_items' ),
-				'permission_callback' => static fn(): bool => current_user_can( 'edit_theme_options' ),
-				'args'                => array(
-					'recipe'         => array(
-						'type'        => 'string',
-						'description' => __( 'Only this recipe.', 'leitvia-studio' ),
-					),
-					'parts'          => array(
-						'type'  => 'array',
-						'items' => array(
-							'type' => 'string',
-							'enum' => Recipes::PARTS,
+				array(
+					'methods'             => \WP_REST_Server::READABLE,
+					'callback'            => array( $this, 'get_items' ),
+					'permission_callback' => static fn(): bool => current_user_can( 'edit_theme_options' ),
+					'args'                => array(
+						'recipe'         => array(
+							'type'        => 'string',
+							'description' => __( 'Only this recipe.', 'leitvia-studio' ),
+						),
+						'parts'          => array(
+							'type'  => 'array',
+							'items' => array(
+								'type' => 'string',
+								'enum' => Recipes::PARTS,
+							),
+						),
+						'pages'          => $names,
+						'buildingBlocks' => $names,
+						'dryRun'         => array(
+							'type'    => 'boolean',
+							'default' => false,
 						),
 					),
-					'pages'          => $names,
-					'buildingBlocks' => $names,
-					'dryRun'         => array(
-						'type'    => 'boolean',
-						'default' => false,
-					),
 				),
+				'schema' => array( self::class, 'schema' ),
 			)
 		);
 	}
@@ -160,6 +163,56 @@ final class Recipes_Controller {
 			'navigation'       => $has( 'navigation' ) ? $labels( (array) ( $recipe['navigation'] ?? array() ) ) : array(),
 			'footerNavigation' => $has( 'footer' ) ? $labels( (array) ( $recipe['footerNavigation'] ?? array() ) ) : array(),
 			'settings'         => $settings,
+		);
+	}
+
+	/**
+	 * Schema of one recipe in the list.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function schema(): array {
+		$string = array(
+			'type'     => 'string',
+			'readonly' => true,
+		);
+		return array(
+			'$schema'    => 'http://json-schema.org/draft-04/schema#',
+			'title'      => 'leitvia-studio-recipe',
+			'type'       => 'object',
+			'properties' => array(
+				'name'        => $string,
+				'owner'       => $string,
+				'label'       => $string,
+				'title'       => $string,
+				'description' => $string,
+				'requires'    => array(
+					'type'     => 'array',
+					'readonly' => true,
+				),
+				'pages'       => array(
+					'type'     => 'array',
+					'items'    => array( 'type' => 'string' ),
+					'readonly' => true,
+				),
+				'available'   => array(
+					'type'     => 'boolean',
+					'readonly' => true,
+				),
+				'reason'      => array( 'description' => __( 'Why the recipe cannot be applied, empty when it can.', 'leitvia-studio' ) ) + $string,
+				'source'      => array( 'enum' => array( 'core', 'addon' ) ) + $string,
+				'sourceLabel' => $string,
+				'plan'        => array(
+					'description' => __( 'What applying the recipe sets up, null when its file cannot be read.', 'leitvia-studio' ),
+					'type'        => array( 'object', 'null' ),
+					'readonly'    => true,
+				),
+				'dryRun'      => array(
+					'description' => __( 'The dry run of leitvia/apply-recipe, with dryRun only.', 'leitvia-studio' ),
+					'type'        => array( 'object', 'null' ),
+					'readonly'    => true,
+				),
+			),
 		);
 	}
 }

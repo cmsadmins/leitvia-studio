@@ -192,4 +192,43 @@ class Test_Consent extends WP_UnitTestCase {
 		update_option( 'leitvia_studio_settings', array( 'consent_embeds' => false ) );
 		$this->assertStringNotContainsString( 'leitvia-consent', apply_filters( 'the_content', $classic ) );
 	}
+
+	/**
+	 * The consent settings block saves English texts in every admin language (save.js) and renders them in the
+	 * language of the site. On the server the directives see the state without JavaScript: the note shows, the list
+	 * and its empty state stay hidden until the module runs.
+	 */
+	public function test_settings_block_follows_the_site_language_and_renders_without_javascript(): void {
+		$markup = (string) json_decode( (string) file_get_contents( dirname( __DIR__, 2 ) . '/src/blocks/consent-settings/catalog.json' ), true )['example']; // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Local file.
+		$german = array(
+			'Without JavaScript, this site stores no consent: content from other providers stays a link.' => 'Ohne JavaScript speichert diese Website keine Einwilligung.',
+			'Revoke' => 'Widerrufen',
+		);
+		$filter = static fn( string $translation, string $text, string $domain ): string => 'leitvia-studio' === $domain ? ( $german[ $text ] ?? $translation ) : $translation;
+
+		add_filter( 'gettext', $filter, 10, 3 );
+		$html = do_blocks( $markup );
+		remove_filter( 'gettext', $filter, 10 );
+		$this->assertStringContainsString( 'Ohne JavaScript speichert diese Website keine Einwilligung.', $html );
+		$this->assertStringContainsString( '>Widerrufen <', $html );
+		$this->assertStringNotContainsString( 'Without JavaScript', $html );
+
+		$hidden = array();
+		$tags   = new WP_HTML_Tag_Processor( $html );
+		while ( $tags->next_tag() ) {
+			$bind = $tags->get_attribute( 'data-wp-bind--hidden' );
+			if ( is_string( $bind ) ) {
+				$hidden[ $bind ] = null !== $tags->get_attribute( 'hidden' );
+			}
+		}
+		$this->assertSame(
+			array(
+				'!state.noScript' => false,
+				'state.noScript'  => true,
+				'state.hasList'   => false,
+				'!state.hasList'  => true,
+			),
+			$hidden
+		);
+	}
 }

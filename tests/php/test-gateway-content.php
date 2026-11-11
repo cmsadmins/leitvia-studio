@@ -451,11 +451,13 @@ class Test_Gateway_Content extends WP_UnitTestCase {
 		$this->assertWPError( self::call( 'leitvia/create-content', $input ) );
 		$this->assertWPError( self::call( 'leitvia/list-content' ) );
 
-		// Versions and updates: not for editors, also not with edit_theme_options; for whoever may view Site Health.
+		// Versions and updates: not for editors, also not with edit_theme_options; for whoever may view Site Health. The
+		// permission callback says so, before the ability runs.
 		$editor = self::factory()->user->create( array( 'role' => 'editor' ) );
 		get_userdata( $editor )->add_cap( 'edit_theme_options' );
 		wp_set_current_user( $editor );
-		$this->assert_rejected( 'leitvia_forbidden', self::call( 'leitvia/get-site-health' ) );
+		$this->assertFalse( wp_get_ability( 'leitvia/get-site-health' )->check_permissions() );
+		$this->assertWPError( self::call( 'leitvia/get-site-health' ) );
 		$admin = self::factory()->user->create( array( 'role' => 'administrator' ) );
 		if ( is_multisite() ) {
 			grant_super_admin( $admin );
@@ -622,10 +624,10 @@ class Test_Gateway_Content extends WP_UnitTestCase {
 			)
 		);
 		$this->assertIsArray( $result, $result instanceof WP_Error ? $result->get_error_message() : '' );
-		// The pipeline adds a leitviaId to each block; the styles stay as written.
+		// The pipeline adds a leitviaId to each block; the styles stay as written, a core preset alias becomes its role.
 		$saved = get_post( $result['target']['post'] )->post_content;
 		foreach ( $colors as $color ) {
-			$this->assertStringContainsString( 'style="color:' . $color . '"', $saved );
+			$this->assertStringContainsString( 'style="color:' . str_replace( '--contrast)', '--ink)', $color ) . '"', $saved );
 		}
 		$this->assertFalse( has_filter( 'safecss_filter_attr_allow_css' ) );
 		$this->assert_rejected(

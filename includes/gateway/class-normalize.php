@@ -24,8 +24,34 @@ defined( 'ABSPATH' ) || exit;
  *   gets the path of that part plus the anchor, see part_address(). Only a published post with pretty permalinks has
  *   a lasting address for its parts; a draft or plain permalinks (?p=1&page=2) keep the link, and the check
  *   leitvia/anchors warns.
+ * - Core preset slugs a default theme uses (textColor base, var:preset|spacing|50, has-large-font-size) become the role
+ *   they stand for in coreAliases of the theme contract, in the slug attributes, in style and in the class and style
+ *   attributes of the HTML. The theme keeps the aliases as CSS (assets/css/core-presets.css) for content that never
+ *   passed Studio; stored content names the role.
  */
 final class Normalize {
+
+	/**
+	 * Slug attributes of blocks => preset type.
+	 */
+	private const SLUG_ATTRS = array(
+		'textColor'       => 'color',
+		'backgroundColor' => 'color',
+		'borderColor'     => 'color',
+		'fontSize'        => 'font-size',
+		'fontFamily'      => 'font-family',
+	);
+
+	/**
+	 * Suffix of the class core writes for a preset slug (has-<slug>-<suffix>) => preset type.
+	 */
+	private const SLUG_CLASSES = array(
+		'background-color' => 'color',
+		'border-color'     => 'color',
+		'color'            => 'color',
+		'font-size'        => 'font-size',
+		'font-family'      => 'font-family',
+	);
 
 	/**
 	 * Content with the repairs; the content as it was, byte for byte, when nothing needed one. Only blocks the write
@@ -43,6 +69,7 @@ final class Normalize {
 		}
 		$known   = '' !== $before && has_blocks( $before ) ? array_fill_keys( Pipeline::own_parts( parse_blocks( $before ) ), true ) : array();
 		$hulls   = self::hulls();
+		$aliases = leitvia_studio_contract()->core_aliases();
 		$changed = false;
 		$out     = '';
 		$part    = 1;
@@ -50,7 +77,7 @@ final class Normalize {
 		foreach ( self::top_level( $content ) as [ $piece, $is_block ] ) {
 			$block   = $is_block ? parse_blocks( $piece )[0] ?? null : null;
 			$anchors = $target ? self::anchors( $target, $part ) : null;
-			if ( is_array( $block ) && self::block( $block, $hulls, $known, $anchors ) ) {
+			if ( is_array( $block ) && self::block( $block, $hulls, $known, $anchors, $aliases ) ) {
 				$piece   = serialize_block( $block );
 				$changed = true;
 			}
@@ -108,11 +135,12 @@ final class Normalize {
 	 * @param array<string, list<array{name: string, tag: string}>>                                                                                                $hulls   Wrappers by block name, see hulls().
 	 * @param array<string, true>                                                                                                                                  $known   Keys of stored blocks, which stay as they are.
 	 * @param (callable(string): string)|null                                                                                                                      $anchors Rewrites the anchor links of a piece of HTML, see anchors().
+	 * @param array<string, array<int|string, string>>                                                                                                             $aliases Core preset aliases, see Contract::core_aliases().
 	 * @return bool Whether anything changed.
 	 */
-	private static function block( array &$block, array $hulls, array $known = array(), ?callable $anchors = null ): bool {
-		$changed = false;
+	private static function block( array &$block, array $hulls, array $known = array(), ?callable $anchors = null, array $aliases = array() ): bool {
 		$stored  = isset( $known[ Pipeline::own_part( $block ) ] );
+		$changed = ! $stored && $aliases && self::presets( $block, $aliases );
 		foreach ( $block['innerContent'] as $i => $chunk ) {
 			$fixed = is_string( $chunk ) && ! $stored && null !== $anchors ? $anchors( $chunk ) : $chunk;
 			if ( is_string( $fixed ) && $fixed !== $chunk ) {
@@ -127,10 +155,97 @@ final class Normalize {
 				$inner['innerContent'][0]            = self::add_class( (string) ( $inner['innerContent'][0] ?? '' ), 'is-vertically-aligned-' . $align );
 				$changed                             = true;
 			}
-			$changed = self::block( $inner, $hulls, $known, $anchors ) || $changed;
+			$changed = self::block( $inner, $hulls, $known, $anchors, $aliases ) || $changed;
 		}
 		unset( $inner );
 		return ( ! $stored && self::hull( $block, $hulls ) ) || $changed;
+	}
+
+	/**
+	 * Rewrites the core preset slugs of one block, without its children, to their roles: slug attributes, preset
+	 * references in style, and the class and style attributes of its HTML.
+	 *
+	 * @param array{blockName: string|null, attrs: array<string, mixed>, innerBlocks: array<int, mixed>, innerHTML: string, innerContent: array<int, string|null>} $block   Parsed block.
+	 * @param array<string, array<int|string, string>>                                                                                                             $aliases Type => alias => role.
+	 * @return bool Whether anything changed.
+	 */
+	private static function presets( array &$block, array $aliases ): bool {
+		$attrs   = $block['attrs'];
+		$content = $block['innerContent'];
+		foreach ( self::SLUG_ATTRS as $attr => $type ) {
+			$slug = $block['attrs'][ $attr ] ?? null;
+			if ( is_string( $slug ) && isset( $aliases[ $type ][ $slug ] ) ) {
+				$block['attrs'][ $attr ] = $aliases[ $type ][ $slug ];
+			}
+		}
+		if ( isset( $block['attrs']['style'] ) && is_array( $block['attrs']['style'] ) ) {
+			array_walk_recursive(
+				$block['attrs']['style'],
+				static function ( &$value ) use ( $aliases ): void {
+					$value = is_string( $value ) ? self::preset_refs( $value, $aliases ) : $value;
+				}
+			);
+		}
+		foreach ( $block['innerContent'] as $i => $chunk ) {
+			if ( is_string( $chunk ) && ( str_contains( $chunk, 'has-' ) || str_contains( $chunk, '--wp--preset--' ) ) ) {
+				$block['innerContent'][ $i ] = self::preset_html( $chunk, $aliases );
+			}
+		}
+		return $block['attrs'] !== $attrs || $block['innerContent'] !== $content;
+	}
+
+	/**
+	 * A string with its preset references to aliases (var:preset|color|base, --wp--preset--color--base) on the role.
+	 *
+	 * @param string                                   $value   Attribute value or inline CSS.
+	 * @param array<string, array<int|string, string>> $aliases Type => alias => role.
+	 */
+	private static function preset_refs( string $value, array $aliases ): string {
+		if ( ! str_contains( $value, 'preset' ) ) {
+			return $value;
+		}
+		$types = implode( '|', array_map( 'preg_quote', array_keys( $aliases ) ) );
+		return (string) preg_replace_callback(
+			'/(var:preset\|(' . $types . ')\||--wp--preset--(' . $types . ')--)([a-z0-9-]+)(?![a-z0-9-])/',
+			static fn( array $m ): string => $m[1] . ( $aliases[ '' !== $m[2] ? $m[2] : $m[3] ][ $m[4] ] ?? $m[4] ),
+			$value
+		);
+	}
+
+	/**
+	 * HTML with the preset classes (has-base-color) and inline preset variables of aliases on the role. Only class and
+	 * style attributes change; text stays as written.
+	 *
+	 * @param string                                   $html    Piece of block HTML.
+	 * @param array<string, array<int|string, string>> $aliases Type => alias => role.
+	 */
+	private static function preset_html( string $html, array $aliases ): string {
+		$tags    = new \WP_HTML_Tag_Processor( $html );
+		$changed = false;
+		$classes = '/(?<![\w-])has-([a-z0-9-]+?)-(' . implode( '|', array_keys( self::SLUG_CLASSES ) ) . ')(?![\w-])/';
+		while ( $tags->next_tag() ) {
+			$class = $tags->get_attribute( 'class' );
+			if ( is_string( $class ) ) {
+				$fixed = (string) preg_replace_callback(
+					$classes,
+					static fn( array $m ): string => 'has-' . ( $aliases[ self::SLUG_CLASSES[ $m[2] ] ][ $m[1] ] ?? $m[1] ) . '-' . $m[2],
+					$class
+				);
+				if ( $fixed !== $class ) {
+					$tags->set_attribute( 'class', $fixed );
+					$changed = true;
+				}
+			}
+			$style = $tags->get_attribute( 'style' );
+			if ( is_string( $style ) ) {
+				$fixed = self::preset_refs( $style, $aliases );
+				if ( $fixed !== $style ) {
+					$tags->set_attribute( 'style', $fixed );
+					$changed = true;
+				}
+			}
+		}
+		return $changed ? $tags->get_updated_html() : $html;
 	}
 
 	/**

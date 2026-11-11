@@ -34,7 +34,22 @@ final class Packages {
 			'minimum'     => 1,
 			'description' => __( 'Change package ID.', 'leitvia-studio' ),
 		);
-		$object = array( 'type' => 'object' );
+		$object = array(
+			'type'       => 'object',
+			'properties' => array(
+				'id'         => array( 'type' => 'integer' ),
+				'title'      => array( 'type' => 'string' ),
+				'key'        => array( 'type' => 'string' ),
+				'state'      => array(
+					'type'        => 'string',
+					'description' => __( 'open, applied, partial, rejected or rolled_back.', 'leitvia-studio' ),
+				),
+				'operations' => array(
+					'type'        => 'object',
+					'description' => __( 'Number of operations per status: open, conflict, applied, rolled_back.', 'leitvia-studio' ),
+				),
+			),
+		);
 		Abilities::read(
 			'leitvia/list-packages',
 			__( 'List change packages', 'leitvia-studio' ),
@@ -60,7 +75,15 @@ final class Packages {
 			__( 'Get change package', 'leitvia-studio' ),
 			__( 'Returns a change package with its operations: status, the post each applied operation wrote, conflicts and, for open operations, a block diff against the current state (per block added, removed, moved or changed with text before and after and the changed attributes). applied.post is the ID a new post got, applied.hash its hash after the write.', 'leitvia-studio' ),
 			self::input( $id ),
-			$object,
+			array(
+				'properties' => $object['properties'] + array(
+					'items' => array(
+						'type'        => 'array',
+						'items'       => array( 'type' => 'object' ),
+						'description' => __( 'The operations with status, target, findings and, for open ones, the block diff.', 'leitvia-studio' ),
+					),
+				),
+			) + $object,
 			static fn( $input ) => self::own( (int) ( $input['id'] ?? 0 ) ) ?? Store::detail( (int) $input['id'] )
 		);
 		self::write(
@@ -95,18 +118,20 @@ final class Packages {
 
 	/**
 	 * Registers apply-package, reject-package or rollback: not read-only, run after the rate limit with an audit entry.
+	 * All three are destructive: applying overwrites the targets, discarding deletes the waiting files, a rollback undoes
+	 * changes.
 	 *
 	 * @param string               $name        Ability name.
 	 * @param string               $label       Label.
 	 * @param string               $description Description.
-	 * @param bool                 $destructive Whether it can undo changes.
+	 * @param bool                 $pick        Whether the call may choose operations (apply-package).
 	 * @param array<string, mixed> $id          Schema of the package ID.
 	 * @param callable             $callback    Receives the input.
 	 * @phpstan-param lowercase-string&non-falsy-string $name
 	 */
-	private static function write( string $name, string $label, string $description, bool $destructive, array $id, callable $callback ): void {
+	private static function write( string $name, string $label, string $description, bool $pick, array $id, callable $callback ): void {
 		$input = self::input( $id );
-		if ( ! $destructive ) {
+		if ( $pick ) {
 			$input['properties']['operations'] = array(
 				'type'        => 'array',
 				'items'       => array(
@@ -123,14 +148,15 @@ final class Packages {
 					'label'               => $label,
 					'description'         => $description,
 					'input_schema'        => $input,
-					'output_schema'       => array( 'type' => 'object' ),
+					'output_schema'       => self::write_output(),
 					'permission_callback' => array( Abilities::class, 'can_use' ),
 					'execute_callback'    => static fn( $input = null ) => Abilities::run( $name, static fn( $input ) => $callback( is_array( $input ) ? $input : array() ), $input ),
 					'meta'                => array(
 						'annotations'  => array(
-							'readonly'    => false,
-							'destructive' => $destructive,
-							'idempotent'  => false,
+							'readonly'      => false,
+							'destructive'   => true,
+							'idempotent'    => false,
+							'openWorldHint' => false,
 						),
 						'show_in_rest' => true,
 					),
@@ -138,6 +164,37 @@ final class Packages {
 				'group' => 'maintain',
 			),
 			'leitvia-studio'
+		);
+	}
+
+	/**
+	 * Output schema of apply-package, reject-package and rollback.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private static function write_output(): array {
+		$objects = array(
+			'type'  => 'array',
+			'items' => array( 'type' => 'object' ),
+		);
+		$ids     = array(
+			'type'  => 'array',
+			'items' => array( 'type' => 'integer' ),
+		);
+		return array(
+			'type'       => 'object',
+			'required'   => array( 'package', 'state' ),
+			'properties' => array(
+				'package'     => array( 'type' => 'integer' ),
+				'state'       => array(
+					'type' => 'string',
+					'enum' => Store::STATES,
+				),
+				'applied'     => $ids + array( 'description' => __( 'apply-package: IDs of the operations applied; leitvia/get-package shows the post and hash each one left.', 'leitvia-studio' ) ),
+				'conflicts'   => $objects + array( 'description' => __( 'apply-package: operations whose target changed since, with base_hash and current_hash; they stay open.', 'leitvia-studio' ) ),
+				'errors'      => $objects + array( 'description' => __( 'apply-package: operations that failed, with code, message and findings; they stay open.', 'leitvia-studio' ) ),
+				'rolled_back' => $ids + array( 'description' => __( 'rollback: IDs of the operations rolled back.', 'leitvia-studio' ) ),
+			),
 		);
 	}
 

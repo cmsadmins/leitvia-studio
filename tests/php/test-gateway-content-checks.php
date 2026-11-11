@@ -546,7 +546,7 @@ class Test_Gateway_Content_Checks extends WP_UnitTestCase {
 		$this->assertLessThan( 8 * MB_IN_BYTES, memory_get_usage() - $before );
 		$this->assertCount( 20, $page['items'] );
 		$this->assertSame( $first, $page['items'][0]['post'] );
-		$this->assertSame( array( 'leitvia/deprecated-pattern', 'leitvia/token-drift', 'leitvia/page-kind' ), array_column( $page['items'][0]['findings'], 'check' ) );
+		$this->assertSame( array( 'leitvia/content-tokens', 'leitvia/deprecated-pattern', 'leitvia/token-drift', 'leitvia/page-kind' ), array_column( $page['items'][0]['findings'], 'check' ) );
 		$this->assertSame( array(), $page['items'][1]['findings'] );
 		$this->assertSame( $published[18], $page['next'] );
 

@@ -164,7 +164,9 @@ final class Studio {
 	}
 
 	/**
-	 * Hands the abilities entries to core; register() already checked them. meta.public is never set here.
+	 * Hands the abilities entries to core; register() already checked them. meta.public is never set here. An entry
+	 * shown in REST gets meta.mcp.public true unless its args set it, so the default server of the MCP Adapter offers
+	 * the same abilities as the server leitvia; checks and autonomy run in the pipeline on both.
 	 * Runs on wp_abilities_api_init.
 	 */
 	public function register_abilities(): void {
@@ -172,7 +174,11 @@ final class Studio {
 			if ( wp_has_ability( $name ) ) {
 				continue;
 			}
-			wp_register_ability( $name, $item['args'] + array( 'category' => 'leitvia' ) );
+			$args = $item['args'] + array( 'category' => 'leitvia' );
+			if ( true === ( $args['meta']['show_in_rest'] ?? null ) && is_array( $args['meta']['mcp'] ?? array() ) ) {
+				$args['meta']['mcp']['public'] ??= true;
+			}
+			wp_register_ability( $name, $args );
 		}
 	}
 

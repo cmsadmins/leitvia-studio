@@ -49,20 +49,21 @@ final class Read_Plan {
 				'type'                 => 'object',
 				'properties'           => array(
 					'goal'   => array(
-						'type'      => 'string',
-						'minLength' => 1,
-						'maxLength' => 500,
+						'type'        => 'string',
+						'minLength'   => 1,
+						'maxLength'   => 500,
+						'description' => __( 'What the page is for, in a sentence; a page frame type it names (home, service) picks the frame.', 'leitvia-studio' ),
 					),
 					'points' => array(
 						'type'     => 'array',
 						'items'    => $text,
 						'maxItems' => self::MAX_POINTS,
 					),
+					// An empty enum would accept no value at all; without page frames the callback rejects any frame.
 					'frame'  => array(
 						'type'        => 'string',
-						'enum'        => $frames,
 						'description' => __( 'Type of a page frame; without it the frame named in the goal, else home.', 'leitvia-studio' ),
-					),
+					) + ( $frames ? array( 'enum' => $frames ) : array() ),
 					'ai'     => array(
 						'type'        => 'boolean',
 						'default'     => false,
@@ -96,7 +97,8 @@ final class Read_Plan {
 					),
 				),
 			),
-			array( self::class, 'plan' )
+			array( self::class, 'plan' ),
+			true
 		);
 	}
 

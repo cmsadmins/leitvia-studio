@@ -143,10 +143,12 @@ final class Recipes {
 						is_array( $input ) ? $input : array()
 					),
 					'meta'                => array(
+						// It replaces style variation, header, footer and navigation, and each run writes again.
 						'annotations'  => array(
-							'readonly'    => false,
-							'destructive' => false,
-							'idempotent'  => true,
+							'readonly'      => false,
+							'destructive'   => true,
+							'idempotent'    => false,
+							'openWorldHint' => false,
 						),
 						'show_in_rest' => true,
 					),

@@ -113,7 +113,7 @@ final class Read_Audit {
 					),
 				),
 				'additionalProperties' => false,
-				'default'              => array(),
+				'default'              => (object) array(),
 			),
 			array(
 				'type'       => 'object',
@@ -343,6 +343,7 @@ final class Read_Audit {
 		try {
 			foreach ( array( 'header', 'footer' ) as $area ) {
 				foreach ( get_block_templates( array( 'area' => $area ), 'wp_template_part' ) as $part ) {
+					// verify-ignore: readonly -- renders the part in memory for its links; render callbacks write at most caches.
 					$links = Gateway\Content_Checks::empty_links( do_blocks( (string) $part->content ) );
 					$texts = array_values( array_unique( array_map( static fn( array $link ): string => '' !== $link['text'] ? $link['text'] : '"' . $link['href'] . '"', $links ) ) );
 					if ( $texts ) {
@@ -421,6 +422,7 @@ final class Read_Audit {
 	 */
 	public static function empty_links( \WP_Post $post ): array {
 		// The page shows texts of the content through wptexturize(), so curly quotes count as the same text.
+		// verify-ignore: readonly -- render_post() renders the page in memory with do_blocks() for its links, no HTTP request; render callbacks write at most caches.
 		$key     = static fn( array $link ): string => $link['href'] . '|' . wptexturize( $link['text'] );
 		$content = Gateway\Content_Checks::empty_links( $post->post_content );
 		$html    = is_post_publicly_viewable( $post ) ? Gateway\Content_Checks::render_post( $post ) : '';

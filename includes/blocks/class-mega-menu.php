@@ -131,7 +131,7 @@ final class Mega_Menu {
 			return $content;
 		}
 		$tags->set_attribute( 'data-leitvia-collapsible', '' );
-		wp_enqueue_script_module( 'leitvia-mega-menu-view-script-module' );
+		Animation::enqueue_module( 'leitvia/mega-menu' );
 		wp_enqueue_style( 'leitvia-mega-menu-style' );
 		return $tags->get_updated_html();
 	}

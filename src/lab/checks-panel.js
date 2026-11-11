@@ -28,6 +28,10 @@ const RULES = {
 		'A numbered default preset of WordPress is used instead of a design token of the theme.',
 		'leitvia-studio'
 	),
+	'no-unknown-preset': __(
+		'A preset is used that the theme does not have, so it renders nothing. Use a colour, size or spacing of the design system.',
+		'leitvia-studio'
+	),
 };
 const ruleText = ( rule ) => RULES[ rule ] ?? rule;
 

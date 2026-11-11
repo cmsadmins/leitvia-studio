@@ -57,9 +57,10 @@ final class Build {
 			array(
 				'properties'           => array(
 					'title'    => array(
-						'type'      => 'string',
-						'minLength' => 1,
-						'maxLength' => 200,
+						'type'        => 'string',
+						'minLength'   => 1,
+						'maxLength'   => 200,
+						'description' => __( 'Title of the new page.', 'leitvia-studio' ),
 					),
 					'frame'    => array(
 						'type'        => 'string',
@@ -92,8 +93,9 @@ final class Build {
 		$edit = self::edit_schema( true );
 		unset( $edit['required'] );
 		$edit['properties']['post'] = array(
-			'type'    => 'integer',
-			'minimum' => 1,
+			'type'        => 'integer',
+			'minimum'     => 1,
+			'description' => __( 'Post ID from leitvia/list-content.', 'leitvia-studio' ),
 		);
 		$edit['required']           = array( 'post', 'block' );
 		Abilities::write(
@@ -121,11 +123,12 @@ final class Build {
 			array(
 				'properties'           => array(
 					'title'   => array(
-						'type'      => 'string',
-						'minLength' => 1,
-						'maxLength' => 200,
+						'type'        => 'string',
+						'minLength'   => 1,
+						'maxLength'   => 200,
+						'description' => __( 'Title of the pattern in the Lab.', 'leitvia-studio' ),
 					),
-					'content' => $content,
+					'content' => $content + array( 'description' => __( 'Block markup of the pattern.', 'leitvia-studio' ) ),
 					'synced'  => array( 'type' => 'boolean' ),
 				),
 				'required'             => array( 'title', 'content' ),
@@ -141,7 +144,10 @@ final class Build {
 			$create,
 			array(
 				'properties'           => array(
-					'original' => array( 'type' => 'string' ),
+					'original' => array(
+						'type'        => 'string',
+						'description' => __( 'The pattern to vary: block:<ID> of a Lab pattern or the slug of a theme pattern from leitvia/list-patterns.', 'leitvia-studio' ),
+					),
 					'title'    => array(
 						'type'      => 'string',
 						'maxLength' => 200,
@@ -235,10 +241,11 @@ final class Build {
 	 */
 	public static function sections_schema(): array {
 		return array(
-			'type'     => 'array',
-			'minItems' => 1,
-			'maxItems' => 30,
-			'items'    => array(
+			'type'        => 'array',
+			'minItems'    => 1,
+			'maxItems'    => 30,
+			'description' => __( 'Sections of the page in order, each a pattern with optional edits at block IDs of its outline.', 'leitvia-studio' ),
+			'items'       => array(
 				'type'                 => 'object',
 				'properties'           => array(
 					'pattern' => array(
@@ -295,8 +302,9 @@ final class Build {
 					'type'                 => 'object',
 					'properties'           => array(
 						'id'         => array(
-							'type'    => 'integer',
-							'minimum' => 1,
+							'type'        => 'integer',
+							'minimum'     => 1,
+							'description' => __( 'Attachment ID of the image, from leitvia/list-media or leitvia/add-media.', 'leitvia-studio' ),
 						),
 						'alt'        => array(
 							'type'      => 'string',
@@ -343,14 +351,16 @@ final class Build {
 			'description'          => __( 'New link around a passage of a paragraph, heading, list item, citation or summary, as text with the exact words and url. Other links and inline formatting stay; the first place outside a link counts.', 'leitvia-studio' ),
 			'properties'           => array(
 				'text' => array(
-					'type'      => 'string',
-					'minLength' => 1,
-					'maxLength' => 500,
+					'type'        => 'string',
+					'minLength'   => 1,
+					'maxLength'   => 500,
+					'description' => __( 'The exact words of the passage to link, without markup.', 'leitvia-studio' ),
 				),
 				'url'  => array(
-					'type'      => 'string',
-					'minLength' => 1,
-					'maxLength' => 2000,
+					'type'        => 'string',
+					'minLength'   => 1,
+					'maxLength'   => 2000,
+					'description' => __( 'Target of the link (mailto: and tel: work too).', 'leitvia-studio' ),
 				),
 			),
 			'required'             => array( 'text', 'url' ),

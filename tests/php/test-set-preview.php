@@ -282,6 +282,9 @@ class Test_Set_Preview extends WP_UnitTestCase {
 		);
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'subscriber' ) ) );
 		$this->assertWPError( $ability->execute( array( 'set' => $id ) ) );
+		// An editor may use the gateway but not edit theme options: the permission callback says no before it runs.
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'editor' ) ) );
+		$this->assertFalse( $ability->check_permissions( array( 'set' => $id ) ) );
 		self::unregister();
 	}
 

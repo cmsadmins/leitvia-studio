@@ -98,6 +98,34 @@ class Test_Gateway_Mcp extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Double of WP\MCP\Domain\Tools\McpTool: only the observability context with the ability behind the tool.
+	 *
+	 * @param string $ability Ability name.
+	 */
+	private static function tool( string $ability ): object {
+		return new class( $ability ) {
+			/**
+			 * Ability name.
+			 *
+			 * @param string $ability Ability name.
+			 */
+			public function __construct( private string $ability ) {}
+
+			/**
+			 * Context as McpTool::fromAbility() sets it.
+			 *
+			 * @return array<string, string>
+			 */
+			public function get_observability_context(): array {
+				return array(
+					'component_type' => 'tool',
+					'ability_name'   => $this->ability,
+				);
+			}
+		};
+	}
+
+	/**
 	 * Every leitvia ability shown in REST is a tool, among them the design reads and plan-page; none is public.
 	 */
 	public function test_abilities_lists_every_leitvia_ability(): void {
@@ -168,6 +196,29 @@ class Test_Gateway_Mcp extends WP_UnitTestCase {
 		$tools = Mcp::abilities();
 		$this->assertContains( 'demo-addon/read-thing', $tools );
 		$this->assertContains( 'leitvia/get-contract', $tools );
+		$this->assertTrue( wp_get_ability( 'demo-addon/read-thing' )->get_meta()['mcp']['public'] );
+	}
+
+	/**
+	 * The default server of the adapter offers exactly the tools of the server leitvia: discover-abilities lists an
+	 * ability when meta.mcp.public is true (McpAbilityExposure::is_public() of 0.7.1). Other abilities stay as they are.
+	 */
+	public function test_default_server_lists_the_leitvia_tools(): void {
+		$public = array();
+		foreach ( wp_get_abilities() as $ability ) {
+			if ( true === ( $ability->get_meta()['mcp']['public'] ?? null ) ) {
+				$public[] = $ability->get_name();
+			}
+		}
+		$tools = Mcp::abilities();
+		$this->assertNotEmpty( $tools );
+		$this->assertSame( array(), array_diff( $tools, $public ) );
+		foreach ( array_diff( $public, $tools ) as $name ) {
+			$this->assertNull( leitvia_studio()->registry( 'abilities' )->get( $name ), $name );
+		}
+		foreach ( $tools as $name ) {
+			$this->assertNotTrue( wp_get_ability( $name )->get_meta_item( 'public' ), $name );
+		}
 	}
 
 	/**
@@ -246,5 +297,106 @@ class Test_Gateway_Mcp extends WP_UnitTestCase {
 		);
 		$this->assertSame( $error, Mcp::error_details( $error, array(), 'x', null, self::server( 'mcp-adapter-default-server' ) ) );
 		$this->assertSame( array( 'ok' => true ), Mcp::error_details( array( 'ok' => true ), array(), 'x', null, self::server( 'leitvia' ) ) );
+	}
+
+	/**
+	 * On the default server code and data arrive too: for a Leitvia ability offered as a tool, and for execute-ability,
+	 * which keeps only the message. Tools and abilities of others stay as they are.
+	 */
+	public function test_error_details_on_default_server(): void {
+		$server   = self::server( 'mcp-adapter-default-server' );
+		$data     = array(
+			'status'       => 409,
+			'current_hash' => 'abc',
+		);
+		$error    = new WP_Error( 'leitvia_stale_hash', 'Stale.', $data );
+		$expected = array(
+			'code'    => 'leitvia_stale_hash',
+			'message' => 'Stale.',
+			'data'    => $data,
+		);
+
+		$direct = Mcp::error_details( $error, array(), 'leitvia-update-content', self::tool( 'leitvia/update-content' ), $server );
+		$this->assertWPError( $direct );
+		$this->assertSame( $expected, json_decode( $direct->get_error_message(), true ) );
+		$this->assertSame( $error, Mcp::error_details( $error, array(), 'other-tool', self::tool( 'other/tool' ), $server ) );
+
+		$this->assertSame( 10, has_filter( 'wp_ability_execute_result', array( Mcp::class, 'remember' ) ) );
+		$this->assertSame( $error, apply_filters( 'wp_ability_execute_result', $error, 'leitvia/update-content', array(), null ) );
+		$failed = array(
+			'success' => false,
+			'error'   => 'Stale.',
+		);
+		$call   = array(
+			'ability_name' => 'leitvia/update-content',
+			'parameters'   => array(),
+		);
+		$result = Mcp::error_details( $failed, $call, 'mcp-adapter-execute-ability', self::tool( Mcp::EXECUTE ), $server );
+		$this->assertFalse( $result['success'] );
+		$this->assertSame( $expected, json_decode( $result['error'], true ) );
+		// The rejection is used once.
+		$this->assertSame( $failed, Mcp::error_details( $failed, $call, 'mcp-adapter-execute-ability', self::tool( Mcp::EXECUTE ), $server ) );
+
+		apply_filters( 'wp_ability_execute_result', new WP_Error( 'other', 'Stale.' ), 'other/ability', array(), null );
+		$other = array(
+			'ability_name' => 'other/ability',
+			'parameters'   => array(),
+		);
+		$this->assertSame( $failed, Mcp::error_details( $failed, $other, 'mcp-adapter-execute-ability', self::tool( Mcp::EXECUTE ), $server ) );
+		$this->assertSame( array( 'success' => true ), Mcp::error_details( array( 'success' => true ), $call, 'mcp-adapter-execute-ability', self::tool( Mcp::EXECUTE ), $server ) );
+	}
+
+	/**
+	 * An agent reaches both servers, but through execute-ability of the default server only Leitvia abilities.
+	 */
+	public function test_agent_reaches_the_default_server_with_leitvia_abilities_only(): void {
+		$post  = static function ( string $route, $body ): WP_REST_Request {
+			$request = new WP_REST_Request( 'POST', $route );
+			$request->set_body( wp_json_encode( $body ) );
+			return $request;
+		};
+		$call  = static fn( string $tool, array $arguments = array() ): array => array(
+			'jsonrpc' => '2.0',
+			'id'      => 1,
+			'method'  => 'tools/call',
+			'params'  => array(
+				'name'      => $tool,
+				'arguments' => $arguments,
+			),
+		);
+		$route = Mcp::DEFAULT_ROUTE;
+		$this->assertNull( Gateway::rest_guard( null, rest_get_server(), $post( '/' . Mcp::ROUTE_NAMESPACE . '/' . Mcp::ROUTE, array() ) ) );
+		$this->assertNull( Gateway::rest_guard( null, rest_get_server(), $post( $route, array( 'jsonrpc' => '2.0', 'id' => 1, 'method' => 'initialize' ) ) ) ); // phpcs:ignore WordPress.Arrays.ArrayDeclarationSpacing.AssociativeArrayFound -- Short message.
+		$this->assertNull( Gateway::rest_guard( null, rest_get_server(), $post( $route, $call( 'mcp-adapter-discover-abilities' ) ) ) );
+		$this->assertNull(
+			Gateway::rest_guard(
+				null,
+				rest_get_server(),
+				$post(
+					$route,
+					$call(
+						'mcp-adapter-execute-ability',
+						array(
+							'ability_name' => 'leitvia/get-contract',
+							'parameters'   => array(),
+						)
+					)
+				)
+			)
+		);
+		foreach ( array(
+			$call(
+				'mcp-adapter-execute-ability',
+				array(
+					'ability_name' => 'core/get-site-info',
+					'parameters'   => array(),
+				)
+			),
+			$call( 'other-plugin-write' ),
+			array( $call( 'mcp-adapter-discover-abilities' ), $call( 'mcp-adapter-execute-ability' ) ),
+		) as $body ) {
+			$this->assertSame( 'leitvia_forbidden', Gateway::rest_guard( null, rest_get_server(), $post( $route, $body ) )->get_error_code(), wp_json_encode( $body ) );
+		}
+		$this->assertSame( 'leitvia_forbidden', Gateway::rest_guard( null, rest_get_server(), $post( '/mcp/other-server', array() ) )->get_error_code() );
 	}
 }

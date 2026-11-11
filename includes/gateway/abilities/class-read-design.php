@@ -47,7 +47,7 @@ final class Read_Design {
 			'type'                 => 'object',
 			'properties'           => array(),
 			'additionalProperties' => false,
-			'default'              => array(),
+			'default'              => (object) array(),
 		);
 		$slug    = array(
 			'type'        => 'string',
@@ -58,7 +58,7 @@ final class Read_Design {
 		Gateway\Abilities::read(
 			'leitvia/get-contract',
 			__( 'Get contract', 'leitvia-studio' ),
-			__( 'Returns the site this connection works on (address, REST base, name, language, whether it is part of a multisite network) and the design contract of the active theme: version, rules, color roles, contrast pairs, composition rules, page frames, template parts, templates, block styles and style variations. Compare site.url with the address of your task before the first write. Patterns come from list-patterns, blocks from list-blocks.', 'leitvia-studio' ),
+			__( 'Returns the site this connection works on (address, REST base, name, language, whether it is part of a multisite network) and the design contract of the active theme: version, rules, color roles, contrast pairs, composition rules, page frames, template parts, templates, block styles and style variations, plus the base hashes of template parts, templates and navigation menus. Compare site.url with the address of your task before the first write. Patterns come from list-patterns, blocks from list-blocks.', 'leitvia-studio' ),
 			$none,
 			array(
 				'type'       => 'object',
@@ -88,6 +88,19 @@ final class Read_Design {
 							'templates'        => $objects,
 							'blockStyles'      => $objects,
 							'variations'       => $objects,
+							'coreAliases'      => array(
+								'type'        => 'object',
+								'description' => __( 'Core preset slugs the theme maps to its roles, by preset type (color, spacing, font-size, font-family, shadow, border-radius): alias => role. Content is rewritten to the role on save; write the role.', 'leitvia-studio' ),
+							),
+						),
+					),
+					'hashes'   => array(
+						'type'        => 'object',
+						'description' => __( 'Base hashes: templateParts and templates by name and slug for leitvia/update-template-part and leitvia/update-template (empty while only the file of the theme exists), navigation with id and hash per published menu, newest first, for leitvia/update-navigation.', 'leitvia-studio' ),
+						'properties'  => array(
+							'templateParts' => array( 'type' => 'object' ),
+							'templates'     => array( 'type' => 'object' ),
+							'navigation'    => $objects,
 						),
 					),
 				),
@@ -98,11 +111,11 @@ final class Read_Design {
 		Gateway\Abilities::read(
 			'leitvia/get-tokens',
 			__( 'Get tokens', 'leitvia-studio' ),
-			__( 'Returns the active design tokens as a DTCG document (of the active token set, else of the current global styles), the token sets with their status, the active style variations, whether the global styles drifted from the active set and the contrast findings of the current palette.', 'leitvia-studio' ),
+			__( 'Returns the active design tokens as a DTCG document (of the active token set, else of the current global styles), the token sets with their status, the active style variations, whether the global styles drifted from the active set, the contrast findings of the current palette and the hash of the global styles, the base_hash of leitvia/activate-token-set and leitvia/set-variation.', 'leitvia-studio' ),
 			$none,
 			array(
 				'type'       => 'object',
-				'required'   => array( 'active', 'source', 'document', 'sets', 'variations', 'drift', 'contrast' ),
+				'required'   => array( 'active', 'source', 'document', 'sets', 'variations', 'drift', 'contrast', 'hash' ),
 				'properties' => array(
 					'active'     => array( 'type' => 'integer' ),
 					'source'     => array(
@@ -131,6 +144,10 @@ final class Read_Design {
 					),
 					'drift'      => array( 'type' => 'boolean' ),
 					'contrast'   => $objects,
+					'hash'       => array(
+						'type'        => 'string',
+						'description' => __( 'Hash of the global styles; empty while the theme has none saved.', 'leitvia-studio' ),
+					),
 				),
 			),
 			static fn() => self::tokens()
@@ -143,8 +160,9 @@ final class Read_Design {
 				'type'                 => 'object',
 				'properties'           => array(
 					'set'  => array(
-						'type'    => 'integer',
-						'minimum' => 1,
+						'type'        => 'integer',
+						'minimum'     => 1,
+						'description' => __( 'Token set ID from the sets of leitvia/get-tokens or from leitvia/create-token-set.', 'leitvia-studio' ),
 					),
 					'path' => array(
 						'type'      => 'string',
@@ -163,7 +181,9 @@ final class Read_Design {
 					'expires' => $string,
 				),
 			),
-			array( self::class, 'preview_token_set' )
+			array( self::class, 'preview_token_set' ),
+			false,
+			static fn(): bool => Gateway\Abilities::can_use() && current_user_can( 'edit_theme_options' )
 		);
 
 		Gateway\Abilities::read(
@@ -195,7 +215,7 @@ final class Read_Design {
 					),
 				),
 				'additionalProperties' => false,
-				'default'              => array(),
+				'default'              => (object) array(),
 			),
 			array(
 				'type'       => 'object',
@@ -248,15 +268,16 @@ final class Read_Design {
 		Gateway\Abilities::read(
 			'leitvia/get-content-model',
 			__( 'Get content model', 'leitvia-studio' ),
-			__( 'Returns the content model declaration: post types, taxonomies, fields, relations and site settings with their definitions, never content. valid is false when the declaration fails the schema and nothing of it is registered.', 'leitvia-studio' ),
+			__( 'Returns the content model declaration: post types, taxonomies, fields, relations and site settings with their definitions, never content. valid is false when the declaration fails the schema and nothing of it is registered. hash is the base_hash of leitvia/define-content-type.', 'leitvia-studio' ),
 			$none,
 			array(
 				'type'       => 'object',
-				'required'   => array( 'declaration', 'valid', 'error' ),
+				'required'   => array( 'declaration', 'valid', 'error', 'hash' ),
 				'properties' => array(
 					'declaration' => array( 'type' => 'object' ),
 					'valid'       => array( 'type' => 'boolean' ),
 					'error'       => $string,
+					'hash'        => $string,
 				),
 			),
 			static fn() => self::content_model()
@@ -277,7 +298,7 @@ final class Read_Design {
 					),
 				),
 				'additionalProperties' => false,
-				'default'              => array(),
+				'default'              => (object) array(),
 			),
 			array(
 				'type'       => 'object',
@@ -313,8 +334,54 @@ final class Read_Design {
 				'multisite' => is_multisite(),
 			),
 			'version'  => $contract->version(),
-			'contract' => array_diff_key( $contract->data(), array_flip( self::CONTRACT_SKIP ) ),
+			// The aliases as Studio applies them: by preset type, only those that point to a role.
+			'contract' => array( 'coreAliases' => $contract->core_aliases() ) + array_diff_key( $contract->data(), array_flip( self::CONTRACT_SKIP ) ),
+			'hashes'   => self::hashes( $contract->data() ),
 		);
+	}
+
+	/**
+	 * Base hashes of the targets of update-template-part, update-template and update-navigation, computed as the
+	 * pipeline does for them: the hash of the saved post, '' while a part or template exists only as a file of the
+	 * theme (the write then creates the post and needs no hash).
+	 *
+	 * @param array<string, mixed> $data Contract data.
+	 * @return array{templateParts: array<string, string>, templates: array<string, string>, navigation: list<array{id: int, hash: string}>}
+	 */
+	private static function hashes( array $data ): array {
+		$saved = static function ( string $slug, bool $part ): string {
+			$template = '' !== $slug ? get_block_template( get_stylesheet() . '//' . $slug, $part ? 'wp_template_part' : 'wp_template' ) : null;
+			return $template && $template->wp_id ? Gateway\Hashes::document( (int) $template->wp_id ) : '';
+		};
+		$out   = array(
+			'templateParts' => array(),
+			'templates'     => array(),
+			'navigation'    => array(),
+		);
+		foreach ( (array) ( $data['templateParts'] ?? array() ) as $part ) {
+			$out['templateParts'][ (string) ( $part['name'] ?? '' ) ] = $saved( (string) ( $part['name'] ?? '' ), true );
+		}
+		foreach ( (array) ( $data['templates'] ?? array() ) as $template ) {
+			$out['templates'][ (string) ( $template['slug'] ?? '' ) ] = $saved( (string) ( $template['slug'] ?? '' ), false );
+		}
+		unset( $out['templateParts'][''], $out['templates'][''] );
+		// Newest first, as update-navigation picks the menu published last when it gets none.
+		$menus = get_posts(
+			array(
+				'post_type'      => 'wp_navigation',
+				'post_status'    => 'publish',
+				'posts_per_page' => 20,
+				'fields'         => 'ids',
+				'no_found_rows'  => true,
+			)
+		);
+		foreach ( $menus as $menu ) {
+			$out['navigation'][] = array(
+				'id'   => (int) $menu,
+				'hash' => Gateway\Hashes::document( (int) $menu ),
+			);
+		}
+		return $out;
 	}
 
 	/**
@@ -356,7 +423,18 @@ final class Read_Design {
 			'variations' => self::active_variations(),
 			'drift'      => Compiler::drift(),
 			'contrast'   => Contrast::findings( array_values( Dtcg::effective( wp_get_global_settings(), 'color', 'palette' ) ), $contract->pairs() ),
+			'hash'       => self::styles_hash(),
 		);
+	}
+
+	/**
+	 * Hash of the global styles of the active theme, the target of activate-token-set and set-variation; '' while the
+	 * theme has none saved (the write then creates them and needs no hash).
+	 */
+	private static function styles_hash(): string {
+		$styles = \WP_Theme_JSON_Resolver::get_user_data_from_wp_global_styles( wp_get_theme() );
+		$id     = (int) ( $styles['ID'] ?? 0 );
+		return $id ? Gateway\Hashes::document( $id ) : '';
 	}
 
 	/**
@@ -586,7 +664,7 @@ final class Read_Design {
 	/**
 	 * The content model declaration and whether it passes the schema.
 	 *
-	 * @return array{declaration: array<string, mixed>, valid: bool, error: string}
+	 * @return array{declaration: array<string, mixed>, valid: bool, error: string, hash: string}
 	 */
 	public static function content_model(): array {
 		$declaration = Model::current();
@@ -595,6 +673,8 @@ final class Read_Design {
 			'declaration' => $declaration,
 			'valid'       => true === $valid,
 			'error'       => is_wp_error( $valid ) ? $valid->get_error_message() : '',
+			// As the pipeline hashes the option, see Pipeline::hash().
+			'hash'        => Gateway\Hashes::of( (string) wp_json_encode( get_option( Model::OPTION ) ) ),
 		);
 	}
 

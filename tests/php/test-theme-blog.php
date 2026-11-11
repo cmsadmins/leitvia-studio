@@ -32,7 +32,7 @@ class Test_Theme_Blog extends WP_UnitTestCase {
 			require_once get_theme_file_path( 'functions.php' );
 		}
 		add_filter( 'render_block_data', 'Leitvia\related_posts_query' );
-		add_filter( 'render_block_core/query', 'Leitvia\hide_empty_related_posts', 10, 2 );
+		add_filter( 'render_block', 'Leitvia\hide_empty_post_lists', 10, 2 );
 		if ( ! WP_Block_Styles_Registry::get_instance()->is_registered( 'core/list', 'download' ) ) {
 			Leitvia\register_block_style_variations();
 		}
@@ -287,6 +287,27 @@ class Test_Theme_Blog extends WP_UnitTestCase {
 		the_post();
 		$this->assertSame( '', trim( do_blocks( $markup ) ) );
 		wp_reset_postdata();
+	}
+
+	/**
+	 * A post teaser with a query renders nothing, heading included, while there is no post: as a Pattern block and as
+	 * inserted content with patternName. Teasers without a query and teasers with posts stay.
+	 */
+	public function test_empty_post_teasers_are_left_out(): void {
+		$inserted = static function ( string $slug ): string {
+			$blocks                                        = parse_blocks( self::content( $slug ) );
+			$blocks[0]['attrs']['metadata']['patternName'] = $slug;
+			return serialize_blocks( $blocks );
+		};
+		$this->assertSame( '', trim( do_blocks( '<!-- wp:pattern {"slug":"leitvia/teaser-posts-grid"} /-->' ) ) );
+		$this->assertSame( '', trim( do_blocks( $inserted( 'leitvia/teaser-posts-list' ) ) ) );
+		$this->assertSame( '', trim( do_blocks( $inserted( 'leitvia/teaser-featured-post' ) ) ), 'a query as root block' );
+		$this->assertStringContainsString( '<h2', do_blocks( '<!-- wp:pattern {"slug":"leitvia/teaser-cards-3"} /-->' ) );
+		$this->assertStringContainsString( '<h2', do_blocks( self::content( 'leitvia/teaser-posts-grid' ) ), 'without patternName the content stays' );
+
+		self::factory()->post->create( array( 'post_title' => 'Notes from the print shop' ) );
+		$this->assertStringContainsString( 'Notes from the print shop', do_blocks( '<!-- wp:pattern {"slug":"leitvia/teaser-posts-grid"} /-->' ) );
+		$this->assertStringContainsString( 'Notes from the print shop', do_blocks( $inserted( 'leitvia/teaser-posts-list' ) ) );
 	}
 
 	/**

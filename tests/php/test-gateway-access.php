@@ -129,8 +129,6 @@ class Test_Gateway_Access extends WP_UnitTestCase {
 		$this->assertSame( array( 'Claude Code' ), array_column( $list->get_data()['agents'], 'name' ) );
 		$this->assertSame( 1, $list->get_data()['agents'][0]['passwords'] );
 		$this->assertArrayHasKey( 'compatible', $list->get_data()['mcp'] );
-		// Without the MCP Adapter no other server lists Leitvia abilities.
-		$this->assertFalse( $list->get_data()['mcp']['shared'] );
 
 		$this->assertSame( 'agent-claude-code-2', get_userdata( self::rest( 'POST', '/gateway/access', array( 'name' => 'Claude Code' ) )->get_data()['agent']['id'] )->user_login );
 		$this->assertNotEmpty( self::audit( 'access/create' ) );

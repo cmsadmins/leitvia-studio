@@ -27,32 +27,38 @@ final class Tokens_Controller extends \WP_REST_Controller {
 			'leitvia-studio/v1',
 			'/token-sets/(?P<id>\d+)/activate',
 			array(
-				'methods'             => \WP_REST_Server::CREATABLE,
-				'callback'            => array( $this, 'activate' ),
-				'permission_callback' => array( $this, 'set_permissions_check' ),
-				'args'                => array(
-					'id' => array(
-						'type'     => 'integer',
-						'minimum'  => 1,
-						'required' => true,
+				array(
+					'methods'             => \WP_REST_Server::CREATABLE,
+					'callback'            => array( $this, 'activate' ),
+					'permission_callback' => array( $this, 'set_permissions_check' ),
+					'args'                => array(
+						'id' => array(
+							'type'     => 'integer',
+							'minimum'  => 1,
+							'required' => true,
+						),
 					),
 				),
+				'schema' => array( $this, 'get_public_item_schema' ),
 			)
 		);
 		register_rest_route(
 			'leitvia-studio/v1',
 			'/token-sets/(?P<id>\d+)/check',
 			array(
-				'methods'             => \WP_REST_Server::READABLE,
-				'callback'            => array( $this, 'check' ),
-				'permission_callback' => array( $this, 'set_permissions_check' ),
-				'args'                => array(
-					'id' => array(
-						'type'     => 'integer',
-						'minimum'  => 1,
-						'required' => true,
+				array(
+					'methods'             => \WP_REST_Server::READABLE,
+					'callback'            => array( $this, 'check' ),
+					'permission_callback' => array( $this, 'set_permissions_check' ),
+					'args'                => array(
+						'id' => array(
+							'type'     => 'integer',
+							'minimum'  => 1,
+							'required' => true,
+						),
 					),
 				),
+				'schema' => array( $this, 'get_public_item_schema' ),
 			)
 		);
 		register_rest_route(
@@ -85,42 +91,55 @@ final class Tokens_Controller extends \WP_REST_Controller {
 			'leitvia-studio/v1',
 			'/token-sets/import',
 			array(
-				'methods'             => \WP_REST_Server::CREATABLE,
-				'callback'            => array( $this, 'import' ),
-				'permission_callback' => array( $this, 'permissions_check' ),
-				'args'                => array(
-					'title'    => array(
-						'type'              => 'string',
-						'required'          => true,
-						'sanitize_callback' => 'sanitize_text_field',
+				array(
+					'methods'             => \WP_REST_Server::CREATABLE,
+					'callback'            => array( $this, 'import' ),
+					'permission_callback' => array( $this, 'permissions_check' ),
+					'args'                => array(
+						'title'    => array(
+							'type'              => 'string',
+							'required'          => true,
+							'sanitize_callback' => 'sanitize_text_field',
+							'validate_callback' => 'rest_validate_request_arg',
+						),
+						// The import dialog and Leitvia Pro send the file as JSON text, a copy sends the object.
+						'document' => array(
+							'description' => __( 'DTCG document as object or as JSON text.', 'leitvia-studio' ),
+							'type'        => array( 'object', 'string' ),
+							'required'    => true,
+						),
 					),
-					'document' => array( 'required' => true ),
 				),
+				'schema' => array( $this, 'get_public_item_schema' ),
 			)
 		);
 		register_rest_route(
 			'leitvia-studio/v1',
 			'/token-sets',
 			array(
-				'methods'             => \WP_REST_Server::CREATABLE,
-				'callback'            => array( $this, 'create_from_source' ),
-				'permission_callback' => array( $this, 'permissions_check' ),
-				'args'                => array(
-					'title'  => array(
-						'type'              => 'string',
-						'default'           => '',
-						'sanitize_callback' => 'sanitize_text_field',
-					),
-					'source' => array(
-						'type'     => 'string',
-						'required' => true,
-					),
-					'index'  => array(
-						'type'    => 'integer',
-						'minimum' => 0,
-						'default' => 0,
+				array(
+					'methods'             => \WP_REST_Server::CREATABLE,
+					'callback'            => array( $this, 'create_from_source' ),
+					'permission_callback' => array( $this, 'permissions_check' ),
+					'args'                => array(
+						'title'  => array(
+							'type'              => 'string',
+							'default'           => '',
+							'sanitize_callback' => 'sanitize_text_field',
+							'validate_callback' => 'rest_validate_request_arg',
+						),
+						'source' => array(
+							'type'     => 'string',
+							'required' => true,
+						),
+						'index'  => array(
+							'type'    => 'integer',
+							'minimum' => 0,
+							'default' => 0,
+						),
 					),
 				),
+				'schema' => array( $this, 'get_public_item_schema' ),
 			)
 		);
 		register_rest_route(
@@ -132,6 +151,50 @@ final class Tokens_Controller extends \WP_REST_Controller {
 				'permission_callback' => array( $this, 'permissions_check' ),
 			)
 		);
+	}
+
+	/**
+	 * Schema of the answers about one set: id after an import, active, valid, findings and settings after a check or
+	 * an activation.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function get_item_schema() {
+		if ( ! $this->schema ) {
+			$this->schema = array(
+				'$schema'    => 'http://json-schema.org/draft-04/schema#',
+				'title'      => 'leitvia-studio-token-set',
+				'type'       => 'object',
+				'properties' => array(
+					'id'       => array(
+						'description' => __( 'ID of the new set.', 'leitvia-studio' ),
+						'type'        => 'integer',
+						'readonly'    => true,
+					),
+					'active'   => array(
+						'description' => __( 'ID of the set that is active now.', 'leitvia-studio' ),
+						'type'        => 'integer',
+						'readonly'    => true,
+					),
+					'valid'    => array(
+						'type'     => 'boolean',
+						'readonly' => true,
+					),
+					'findings' => array(
+						'description' => __( 'Results of the checks, each with code, severity and message.', 'leitvia-studio' ),
+						'type'        => 'array',
+						'items'       => array( 'type' => 'object' ),
+						'readonly'    => true,
+					),
+					'settings' => array(
+						'description' => __( 'Compiled preset lists, null when the document does not compile.', 'leitvia-studio' ),
+						'type'        => array( 'object', 'null' ),
+						'readonly'    => true,
+					),
+				),
+			);
+		}
+		return $this->add_additional_fields_schema( $this->schema );
 	}
 
 	/**

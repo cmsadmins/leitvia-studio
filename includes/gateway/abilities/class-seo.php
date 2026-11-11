@@ -145,10 +145,11 @@ final class Seo {
 				'type'                 => 'object',
 				'properties'           => array(
 					'posts' => array(
-						'type'     => 'array',
-						'minItems' => 1,
-						'maxItems' => self::MAX_POSTS,
-						'items'    => array(
+						'type'        => 'array',
+						'minItems'    => 1,
+						'maxItems'    => self::MAX_POSTS,
+						'description' => __( 'IDs of posts, pages or entries from leitvia/list-content.', 'leitvia-studio' ),
+						'items'       => array(
 							'type'    => 'integer',
 							'minimum' => 1,
 						),
@@ -212,8 +213,9 @@ final class Seo {
 			array(
 				'properties'           => array(
 					'post'        => array(
-						'type'    => 'integer',
-						'minimum' => 1,
+						'type'        => 'integer',
+						'minimum'     => 1,
+						'description' => __( 'Post ID from leitvia/list-content.', 'leitvia-studio' ),
 					),
 					'title'       => array(
 						'type'      => 'string',

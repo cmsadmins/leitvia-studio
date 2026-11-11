@@ -16,6 +16,8 @@ class Test_Token_Lint extends WP_UnitTestCase {
 	 * PHP finds exactly what JavaScript finds, on every theme pattern and the artificial cases.
 	 */
 	public function test_parity_with_javascript(): void {
+		// The rule no-unknown-preset reads the roles and core aliases from the contract of the active theme.
+		switch_theme( 'leitvia' );
 		$fixture = wp_json_file_decode( __DIR__ . '/../fixtures/token-lint-cases.json', array( 'associative' => true ) );
 		$this->assertGreaterThan( 3, count( $fixture['cases'] ) );
 		foreach ( $fixture['cases'] as $case ) {

@@ -25,10 +25,55 @@ final class Building_Blocks_Controller {
 			'leitvia-studio/v1',
 			'/building-blocks',
 			array(
-				'methods'             => \WP_REST_Server::READABLE,
-				'callback'            => static fn(): \WP_REST_Response => new \WP_REST_Response( Building_Blocks::all() ),
-				'permission_callback' => array( Building_Blocks::class, 'can_set_up' ),
+				array(
+					'methods'             => \WP_REST_Server::READABLE,
+					'callback'            => static fn(): \WP_REST_Response => new \WP_REST_Response( Building_Blocks::all() ),
+					'permission_callback' => array( Building_Blocks::class, 'can_set_up' ),
+				),
+				'schema' => array( self::class, 'schema' ),
 			)
+		);
+	}
+
+	/**
+	 * Schema of one building block in the list.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function schema(): array {
+		$string = array(
+			'type'     => 'string',
+			'readonly' => true,
+		);
+		$list   = array(
+			'type'     => 'array',
+			'items'    => array( 'type' => 'string' ),
+			'readonly' => true,
+		);
+		return array(
+			'$schema'    => 'http://json-schema.org/draft-04/schema#',
+			'title'      => 'leitvia-studio-building-block',
+			'type'       => 'object',
+			'properties' => array(
+				'name'        => $string,
+				'owner'       => $string,
+				'title'       => $string,
+				'description' => $string,
+				'icon'        => $string,
+				'installed'   => array(
+					'description' => __( 'Whether every post type and taxonomy of the block is in the content model.', 'leitvia-studio' ),
+					'type'        => 'boolean',
+					'readonly'    => true,
+				),
+				'postTypes'   => $list,
+				'taxonomies'  => $list,
+				'patterns'    => $list,
+				'sampleCount' => array(
+					'description' => __( 'Number of sample entries the block brings.', 'leitvia-studio' ),
+					'type'        => 'integer',
+					'readonly'    => true,
+				),
+			),
 		);
 	}
 }

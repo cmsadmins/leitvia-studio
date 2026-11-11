@@ -260,7 +260,7 @@ class Test_Contact_Form extends WP_UnitTestCase {
 	}
 
 	/**
-	 * A fresh, a missing and a forged time field are refused with a message, and the input stays.
+	 * A fresh, a missing, a forged and a too old time field are refused with a message, and the input stays.
 	 */
 	public function test_time_field(): void {
 		foreach ( array(
@@ -268,6 +268,7 @@ class Test_Contact_Form extends WP_UnitTestCase {
 			'missing' => static fn(): string => '',
 			'forged'  => static fn(): string => ( time() - 60 ) . '.forged',
 			'shifted' => static fn( string $key ): string => ( time() - 60 ) . substr( Contact_Form::token( $key, time() ), 10 ),
+			'too old' => static fn( string $key ): string => Contact_Form::token( $key, time() - Contact_Form::MAX_AGE - 60 ),
 		) as $name => $token ) {
 			$attributes = array( 'buttonText' => $name );
 			$html       = $this->submit( $attributes, array( 'token' => $token( $this->key( $attributes ) ) ) );
@@ -277,6 +278,19 @@ class Test_Contact_Form extends WP_UnitTestCase {
 			$this->assertStringContainsString( 'value="Alex Example"', $html, $name );
 			$this->assertStringContainsString( 'Hello there</textarea>', $html, $name );
 		}
+	}
+
+	/**
+	 * The filter leitvia_studio_contact_form_max_age accepts an older time field, for pages cached longer than 7 days.
+	 */
+	public function test_max_age_filter(): void {
+		$attributes = array( 'buttonText' => 'Max age' );
+		$token      = Contact_Form::token( $this->key( $attributes ), time() - Contact_Form::MAX_AGE - 60 );
+		$filter     = static fn(): int => 30 * DAY_IN_SECONDS;
+		add_filter( 'leitvia_studio_contact_form_max_age', $filter );
+		$this->submit( $attributes, array( 'token' => $token ) );
+		remove_filter( 'leitvia_studio_contact_form_max_age', $filter );
+		$this->assertCount( 1, $this->mails );
 	}
 
 	/**

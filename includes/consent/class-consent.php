@@ -291,9 +291,19 @@ final class Consent {
 
 	/**
 	 * Hands the path of the site to the module, which stores consent under it: sites of a subdirectory network share an
-	 * origin and with it the local storage of the browser, but each has its own controller and privacy policy.
+	 * origin and with it the local storage of the browser, but each has its own controller and privacy policy. The rest
+	 * is the state without JavaScript, for the server to render the directives: the module sets noScript to false and
+	 * fills the list.
 	 */
 	public static function site_state(): void {
-		wp_interactivity_state( 'leitvia/consent', array( 'site' => trailingslashit( (string) wp_parse_url( home_url( '/' ), PHP_URL_PATH ) ) ) );
+		wp_interactivity_state(
+			'leitvia/consent',
+			array(
+				'site'     => trailingslashit( (string) wp_parse_url( home_url( '/' ), PHP_URL_PATH ) ),
+				'noScript' => true,
+				'list'     => array(),
+				'hasList'  => false,
+			)
+		);
 	}
 }

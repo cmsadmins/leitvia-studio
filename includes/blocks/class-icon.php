@@ -250,6 +250,7 @@ final class Icon {
 			$name = (string) ( $block->context['leitvia/iconListIcon'] ?? 'check' );
 		}
 		$svg = self::svg( $name );
-		return '' === $svg ? $content : (string) preg_replace( '/<li\b[^>]*>/', '$0' . $svg, $content, 1 );
+		// A callback, so a $ or a backslash in the markup of an icon is no back reference.
+		return '' === $svg ? $content : (string) preg_replace_callback( '/<li\b[^>]*>/', static fn( array $m ): string => $m[0] . $svg, $content, 1 );
 	}
 }

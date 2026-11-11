@@ -116,6 +116,7 @@ final class Commerce {
 			'destructive' => true,
 			'idempotent'  => false,
 		);
+		$product = $id + array( 'description' => __( 'Product or variation ID from leitvia/list-products.', 'leitvia-studio' ) );
 		Abilities::read(
 			'leitvia/list-products',
 			__( 'List products', 'leitvia-studio' ),
@@ -149,7 +150,7 @@ final class Commerce {
 			__( 'Returns one product or variation: texts, images with alt text, categories and tags with their hash, attributes, price (read only), tax and shipping class, stock status, merchandising and the hash to use as base_hash. No sales, order or customer figures.', 'leitvia-studio' ),
 			array(
 				'type'                 => 'object',
-				'properties'           => array( 'product' => $id ),
+				'properties'           => array( 'product' => $product ),
 				'required'             => array( 'product' ),
 				'additionalProperties' => false,
 			),
@@ -184,9 +185,10 @@ final class Commerce {
 			array(
 				'properties'           => array(
 					'title'             => array(
-						'type'      => 'string',
-						'minLength' => 1,
-						'maxLength' => 200,
+						'type'        => 'string',
+						'minLength'   => 1,
+						'maxLength'   => 200,
+						'description' => __( 'Name of the new product.', 'leitvia-studio' ),
 					),
 					'slug'              => array(
 						'type'    => 'string',
@@ -246,7 +248,7 @@ final class Commerce {
 			$set,
 			array(
 				'properties'           => array(
-					'product'           => $id,
+					'product'           => $product,
 					'title'             => array(
 						'type'      => 'string',
 						'minLength' => 1,
@@ -297,7 +299,7 @@ final class Commerce {
 			$set,
 			array(
 				'properties'           => array(
-					'term'        => $id,
+					'term'        => $id + array( 'description' => __( 'Term ID of a product category or tag from leitvia/list-products or leitvia/get-product.', 'leitvia-studio' ) ),
 					'name'        => array(
 						'type'      => 'string',
 						'minLength' => 1,
@@ -326,7 +328,7 @@ final class Commerce {
 			$set,
 			array(
 				'properties'           => array(
-					'product'     => $id,
+					'product'     => $product,
 					'featured'    => array( 'type' => 'boolean' ),
 					'upsells'     => $ids,
 					'cross_sells' => $ids,
@@ -356,7 +358,7 @@ final class Commerce {
 			$set,
 			array(
 				'properties'           => array(
-					'attribute' => $id,
+					'attribute' => $id + array( 'description' => __( 'Attribute ID from leitvia/list-product-attributes.', 'leitvia-studio' ) ),
 					'name'      => array(
 						'type'      => 'string',
 						'minLength' => 1,
@@ -368,11 +370,12 @@ final class Commerce {
 						'items'       => array(
 							'type'                 => 'object',
 							'properties'           => array(
-								'value' => $id,
+								'value' => $id + array( 'description' => __( 'Value ID from leitvia/list-product-attributes.', 'leitvia-studio' ) ),
 								'name'  => array(
-									'type'      => 'string',
-									'minLength' => 1,
-									'maxLength' => 200,
+									'type'        => 'string',
+									'minLength'   => 1,
+									'maxLength'   => 200,
+									'description' => __( 'New name of the value.', 'leitvia-studio' ),
 								),
 							),
 							'required'             => array( 'value', 'name' ),
@@ -435,7 +438,7 @@ final class Commerce {
 			$set,
 			array(
 				'properties'           => array(
-					'review'   => $id,
+					'review'   => $id + array( 'description' => __( 'Review ID from leitvia/list-product-reviews.', 'leitvia-studio' ) ),
 					'rating'   => array(
 						'type'    => 'integer',
 						'minimum' => 1,
@@ -490,7 +493,8 @@ final class Commerce {
 				),
 			),
 		);
-		if ( ! empty( $input['unrated'] ) ) {
+		// A GET call sends the flag as text ("false"); core does not cast it outside REST argument handling.
+		if ( filter_var( $input['unrated'] ?? false, FILTER_VALIDATE_BOOLEAN ) ) {
 			$args += $unrated;
 		}
 		$total   = (int) get_comments( $args + array( 'count' => true ) );

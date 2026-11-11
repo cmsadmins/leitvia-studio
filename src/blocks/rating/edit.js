@@ -7,14 +7,16 @@ import {
 	TextControl,
 	TextareaControl,
 } from '@wordpress/components';
+import useSiteLocale from '../pricing/locale';
 
 // Same markup as Rating::render(); the canvas shows what the page shows, without the Review node.
 export default function Edit( { attributes, setAttributes } ) {
 	const { label, reviewBody, reviewAuthor, itemName, itemType } = attributes;
 	const max = Math.min( 10, Math.max( 1, attributes.max ) );
 	const rating = Math.round( Math.min( max, attributes.rating ) * 2 ) / 2;
-	const format = ( n ) =>
-		n.toLocaleString( document.documentElement.lang || undefined );
+	// Figures in the language of the site, as Rating::render() prints them, not in the one of the admin.
+	const locale = useSiteLocale();
+	const format = ( n ) => n.toLocaleString( locale );
 	const set = ( key ) => ( next ) => setAttributes( { [ key ]: next } );
 	const types = [
 		[ '', __( 'None, no structured data', 'leitvia-studio' ) ],

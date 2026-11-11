@@ -143,6 +143,12 @@ class Test_Gateway_Read_Design extends WP_UnitTestCase {
 		}
 		$this->assertArrayNotHasKey( 'patterns', $result['contract'] );
 		$this->assertArrayNotHasKey( 'studioPatterns', $result['contract'] );
+		// Core slugs and the role each stands for, by preset type, as Normalize rewrites them on save.
+		$this->assertSame( leitvia_studio_contract()->core_aliases(), $result['contract']['coreAliases'] );
+		$this->assertSame( 'surface', $result['contract']['coreAliases']['color']['base'] );
+		$this->assertSame( 'l', $result['contract']['coreAliases']['spacing']['50'] );
+		$this->assertSame( 'lead', $result['contract']['coreAliases']['font-size']['large'] );
+		$this->assertArrayHasKey( 'hashes', $result );
 		// The site the connection works on, so an agent can check it before the first write.
 		$this->assertSame(
 			array(

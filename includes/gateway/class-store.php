@@ -179,7 +179,7 @@ final class Store {
 	public static function get_snapshot( int $id ): ?array {
 		global $wpdb;
 		$table = self::table( 'snapshots' );
-		$row   = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", $id ), ARRAY_A ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Own table.
+		$row   = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM %i WHERE id = %d', $table, $id ), ARRAY_A ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Own table.
 		if ( ! $row ) {
 			return null;
 		}
@@ -199,7 +199,7 @@ final class Store {
 	public static function calls_since( int $user_id, string $since, bool $read = false ): array {
 		global $wpdb;
 		$table = self::table( 'audit' );
-		$row   = $wpdb->get_row( $wpdb->prepare( "SELECT COUNT(*) AS calls, MIN(created_at) AS oldest FROM {$table} WHERE user_id = %d AND created_at > %s AND code <> 'leitvia_rate_limited' AND details NOT LIKE %s AND ( object_type = %s ) = %d", $user_id, $since, '%' . $wpdb->esc_like( '"batched":true' ) . '%', self::READ, (int) $read ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Own table; an indexed count, never cached.
+		$row   = $wpdb->get_row( $wpdb->prepare( "SELECT COUNT(*) AS calls, MIN(created_at) AS oldest FROM %i WHERE user_id = %d AND created_at > %s AND code <> 'leitvia_rate_limited' AND details NOT LIKE %s AND ( object_type = %s ) = %d", $table, $user_id, $since, '%' . $wpdb->esc_like( '"batched":true' ) . '%', self::READ, (int) $read ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Own table; an indexed count, never cached.
 		return array( (int) ( $row->calls ?? 0 ), $row->oldest ?? null );
 	}
 
@@ -212,8 +212,8 @@ final class Store {
 		global $wpdb;
 		$table  = self::table( 'audit' );
 		$since  = gmdate( 'Y-m-d H:i:s', time() - 30 * DAY_IN_SECONDS );
-		$rows   = $wpdb->get_results( $wpdb->prepare( "SELECT result, COUNT(*) AS calls FROM {$table} WHERE ability = 'leitvia/verify' AND created_at > %s GROUP BY result", $since ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Own table, read for the Agents screen only.
-		$last   = $wpdb->get_row( "SELECT result, created_at, object_id, details FROM {$table} WHERE ability = 'leitvia/verify' ORDER BY id DESC LIMIT 1" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Own table, no input.
+		$rows   = $wpdb->get_results( $wpdb->prepare( "SELECT result, COUNT(*) AS calls FROM %i WHERE ability = 'leitvia/verify' AND created_at > %s GROUP BY result", $table, $since ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Own table, read for the Agents screen only.
+		$last   = $wpdb->get_row( $wpdb->prepare( "SELECT result, created_at, object_id, details FROM %i WHERE ability = 'leitvia/verify' ORDER BY id DESC LIMIT 1", $table ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Own table.
 		$counts = array();
 		foreach ( (array) $rows as $row ) {
 			$counts[ (string) $row->result ] = (int) $row->calls;
@@ -331,7 +331,7 @@ final class Store {
 			);
 		}
 		$table = self::table( 'audit' );
-		$rows  = $wpdb->get_results( $wpdb->prepare( "SELECT id, created_at, ability, object_type, object_id, result, code FROM {$table} WHERE user_id = %d ORDER BY id LIMIT 100 OFFSET %d", $user->ID, ( max( 1, $page ) - 1 ) * 100 ), ARRAY_A ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Own table.
+		$rows  = $wpdb->get_results( $wpdb->prepare( 'SELECT id, created_at, ability, object_type, object_id, result, code FROM %i WHERE user_id = %d ORDER BY id LIMIT 100 OFFSET %d', $table, $user->ID, ( max( 1, $page ) - 1 ) * 100 ), ARRAY_A ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Own table.
 		$data  = array();
 		foreach ( $rows as $row ) {
 			$data[] = array(

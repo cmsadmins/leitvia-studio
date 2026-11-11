@@ -32,6 +32,12 @@ final class Contact_Form {
 	public const MIN_SECONDS = 3;
 
 	/**
+	 * Oldest time field accepted, in seconds. A page cached for longer than this needs a higher value through the filter
+	 * leitvia_studio_contact_form_max_age, or the cache must expire sooner.
+	 */
+	public const MAX_AGE = 7 * DAY_IN_SECONDS;
+
+	/**
 	 * Messages per IP address and hour. A site behind a proxy that hides REMOTE_ADDR raises it with the filter
 	 * leitvia_studio_contact_form_limit, since all visitors then share one counter.
 	 */
@@ -122,7 +128,14 @@ final class Contact_Form {
 		}
 		$token = self::posted( 'token' );
 		$time  = (int) strtok( $token, '.' );
-		if ( ! hash_equals( self::token( $key, $time ), $token ) || time() - $time < self::MIN_SECONDS ) {
+		/**
+		 * Oldest time field a submission may carry, in seconds; older ones are refused like a forged one.
+		 *
+		 * @param int $max_age Seconds, 7 days by default.
+		 */
+		$max_age = (int) apply_filters( 'leitvia_studio_contact_form_max_age', self::MAX_AGE );
+		$age     = time() - $time;
+		if ( ! hash_equals( self::token( $key, $time ), $token ) || $age < self::MIN_SECONDS || $age > $max_age ) {
 			return array( 'alert' => __( 'Your message was not sent yet. Please wait a moment and send it again.', 'leitvia-studio' ) ) + $result;
 		}
 		$values = $result['values'];

@@ -106,9 +106,10 @@ final class Building_Blocks {
 					),
 					'meta'                => array(
 						'annotations'  => array(
-							'readonly'    => false,
-							'destructive' => false,
-							'idempotent'  => true,
+							'readonly'      => false,
+							'destructive'   => false,
+							'idempotent'    => true,
+							'openWorldHint' => false,
 						),
 						'show_in_rest' => true,
 					),

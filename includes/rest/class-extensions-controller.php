@@ -31,9 +31,12 @@ final class Extensions_Controller {
 			'leitvia-studio/v1',
 			'/extensions',
 			array(
-				'methods'             => \WP_REST_Server::READABLE,
-				'callback'            => array( $this, 'get_items' ),
-				'permission_callback' => static fn(): bool => current_user_can( 'manage_options' ),
+				array(
+					'methods'             => \WP_REST_Server::READABLE,
+					'callback'            => array( $this, 'get_items' ),
+					'permission_callback' => static fn(): bool => current_user_can( 'manage_options' ),
+				),
+				'schema' => array( self::class, 'schema' ),
 			)
 		);
 	}
@@ -59,6 +62,32 @@ final class Extensions_Controller {
 				'extensions' => array_values( $this->studio->extensions()->all() ),
 				'registries' => $registries,
 			)
+		);
+	}
+
+	/**
+	 * Schema of the answer.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function schema(): array {
+		return array(
+			'$schema'    => 'http://json-schema.org/draft-04/schema#',
+			'title'      => 'leitvia-studio-extensions',
+			'type'       => 'object',
+			'properties' => array(
+				'extensions' => array(
+					'description' => __( 'Every registered add-on, compatible or not.', 'leitvia-studio' ),
+					'type'        => 'array',
+					'items'       => array( 'type' => 'object' ),
+					'readonly'    => true,
+				),
+				'registries' => array(
+					'description' => __( 'Per registry the entry names with their owner.', 'leitvia-studio' ),
+					'type'        => 'object',
+					'readonly'    => true,
+				),
+			),
 		);
 	}
 }

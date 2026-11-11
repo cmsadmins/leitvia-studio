@@ -20,6 +20,19 @@ final class Contract {
 	private const REQUIRED       = array( 'contractVersion', 'theme', 'roles', 'pairs', 'patterns' );
 
 	/**
+	 * Role group of the contract => preset type in var:preset|<type>|<slug> and --wp--preset--<type>--<slug>, as
+	 * PRESET_TYPES in scripts/lib/lint-rules.mjs.
+	 */
+	public const PRESET_TYPES = array(
+		'color'      => 'color',
+		'spacing'    => 'spacing',
+		'fontSize'   => 'font-size',
+		'fontFamily' => 'font-family',
+		'shadow'     => 'shadow',
+		'radius'     => 'border-radius',
+	);
+
+	/**
 	 * Decoded contract, empty unless valid.
 	 *
 	 * @var array<string, mixed>
@@ -218,6 +231,46 @@ final class Contract {
 	public function color_roles(): array {
 		$roles = $this->data['roles']['color'] ?? array();
 		return is_array( $roles ) ? array_map( 'strval', array_column( $roles, 'slug' ) ) : array();
+	}
+
+	/**
+	 * Role slugs by preset type (color, spacing, font-size, font-family, shadow, border-radius), in contract order.
+	 *
+	 * @return array<string, list<string>>
+	 */
+	public function preset_roles(): array {
+		$roles = array();
+		foreach ( self::PRESET_TYPES as $group => $type ) {
+			$list = $this->data['roles'][ $group ] ?? null;
+			if ( is_array( $list ) ) {
+				$roles[ $type ] = array_map( 'strval', array_column( $list, 'slug' ) );
+			}
+		}
+		return $roles;
+	}
+
+	/**
+	 * Core preset slugs a default theme uses (base, spacing 50, large) and the role each stands for, by preset type,
+	 * from coreAliases. An alias that points to no role is left out.
+	 *
+	 * @return array<string, array<int|string, string>> Type => alias => role; PHP keeps numeric aliases such as 50 as
+	 *         integer keys, a lookup by the string finds them.
+	 */
+	public function core_aliases(): array {
+		$roles   = $this->preset_roles();
+		$aliases = array();
+		foreach ( (array) ( $this->data['coreAliases'] ?? array() ) as $group => $map ) {
+			$type = self::PRESET_TYPES[ $group ] ?? null;
+			if ( null === $type || ! is_array( $map ) ) {
+				continue;
+			}
+			foreach ( $map as $alias => $role ) {
+				if ( is_string( $role ) && in_array( $role, $roles[ $type ] ?? array(), true ) ) {
+					$aliases[ $type ][ $alias ] = $role;
+				}
+			}
+		}
+		return $aliases;
 	}
 
 	/**

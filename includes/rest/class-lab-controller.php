@@ -64,9 +64,11 @@ final class Lab_Controller extends \WP_REST_Controller {
 							'type'              => 'string',
 							'default'           => '',
 							'sanitize_callback' => 'sanitize_text_field',
+							'validate_callback' => 'rest_validate_request_arg',
 						),
 					),
 				),
+				'schema' => array( $this, 'get_public_item_schema' ),
 			)
 		);
 		register_rest_route(
@@ -123,6 +125,7 @@ final class Lab_Controller extends \WP_REST_Controller {
 						),
 					),
 				),
+				'schema' => array( $this, 'get_public_item_schema' ),
 			)
 		);
 		$id = array(
@@ -160,12 +163,33 @@ final class Lab_Controller extends \WP_REST_Controller {
 			'leitvia-studio/v1',
 			'/patterns/import',
 			array(
-				'methods'             => \WP_REST_Server::CREATABLE,
-				'callback'            => array( $this, 'import' ),
-				'permission_callback' => static function (): bool {
-					$type = get_post_type_object( 'wp_block' );
-					return $type && current_user_can( $type->cap->create_posts );
-				},
+				array(
+					'methods'             => \WP_REST_Server::CREATABLE,
+					'callback'            => array( $this, 'import' ),
+					'permission_callback' => static function (): bool {
+						$type = get_post_type_object( 'wp_block' );
+						return $type && current_user_can( $type->cap->create_posts );
+					},
+					// Types of the pattern file only, nothing required: the filter leitvia_studio_import_pattern_file may
+					// turn another format into one. Pattern_IO::import() checks the file itself.
+					'args'                => array(
+						'__file'     => array(
+							'description' => __( 'wp_block for a pattern file.', 'leitvia-studio' ),
+							'type'        => 'string',
+						),
+						'title'      => array( 'type' => 'string' ),
+						'content'    => array(
+							'description' => __( 'Block markup of the pattern.', 'leitvia-studio' ),
+							'type'        => 'string',
+						),
+						'syncStatus' => array( 'type' => 'string' ),
+						'leitvia'    => array(
+							'description' => __( 'Lab metadata, categories and variants of the pattern.', 'leitvia-studio' ),
+							'type'        => 'object',
+						),
+					),
+				),
+				'schema' => array( $this, 'get_public_item_schema' ),
 			)
 		);
 		register_rest_route(
@@ -177,13 +201,7 @@ final class Lab_Controller extends \WP_REST_Controller {
 				// A wp_block reference also needs read rights on that pattern.
 				'permission_callback' => static fn( \WP_REST_Request $request ): bool => current_user_can( 'edit_posts' )
 					&& ( ! preg_match( '/^block:(\d+)$/D', (string) $request['ref'], $match ) || current_user_can( 'read_post', (int) $match[1] ) ),
-				'args'                => array(
-					'ref' => array(
-						'type'     => 'string',
-						'required' => true,
-						'pattern'  => '^(?:block:[1-9]\d*|pattern:[a-z0-9-]+/[a-z0-9-]+)$',
-					),
-				),
+				'args'                => array( 'ref' => $ref ),
 			)
 		);
 		register_rest_route(

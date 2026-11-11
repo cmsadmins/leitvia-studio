@@ -208,7 +208,10 @@ final class Pipeline {
 		$current = $op->creates() ? '' : self::hash( $op );
 		$stale   = static fn(): \WP_Error => Rejection::make(
 			'leitvia_stale_hash',
-			__( 'The target changed since it was read. Read it again and repeat the change on the current state.', 'leitvia-studio' ),
+			'' === $current
+				? __( 'The target changed since it was read. Read it again and repeat the change on the current state.', 'leitvia-studio' )
+				/* translators: %s: current hash of the target */
+				: sprintf( __( 'The target changed since it was read. Read it again and repeat the change on the current state with base_hash %s.', 'leitvia-studio' ), $current ),
 			409,
 			'stale_hash',
 			$target,

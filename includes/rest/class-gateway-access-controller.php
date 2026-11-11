@@ -75,6 +75,7 @@ final class Gateway_Access_Controller {
 						),
 					),
 				),
+				'schema' => array( self::class, 'access_schema' ),
 			)
 		);
 		register_rest_route(
@@ -110,8 +111,88 @@ final class Gateway_Access_Controller {
 					'methods'             => \WP_REST_Server::EDITABLE,
 					'callback'            => array( self::class, 'save_settings' ),
 					'permission_callback' => $can,
+					// The schema of the option; save_settings() checks the keys sent once more as one value.
+					'args'                => Gateway::schema()['properties'] + array(
+						'confirm' => array(
+							'description' => __( 'Confirms the switch to the profile "full".', 'leitvia-studio' ),
+							'type'        => 'boolean',
+						),
+					),
 				),
+				'schema' => array( self::class, 'settings_schema' ),
 			)
+		);
+	}
+
+	/**
+	 * Schema of the answers of /gateway/access: the list with GET, the new agent and its password with POST.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function access_schema(): array {
+		$object = array(
+			'type'     => 'object',
+			'readonly' => true,
+		);
+		return array(
+			'$schema'    => 'http://json-schema.org/draft-04/schema#',
+			'title'      => 'leitvia-studio-gateway-access',
+			'type'       => 'object',
+			'properties' => array(
+				'agents'    => array(
+					'description' => __( 'Agent users with id, name, login, number of application passwords and last use in UTC.', 'leitvia-studio' ),
+					'type'        => 'array',
+					'items'       => array( 'type' => 'object' ),
+					'readonly'    => true,
+				),
+				'passwords' => array(
+					'description' => __( 'Whether application passwords work on this site.', 'leitvia-studio' ),
+					'type'        => 'boolean',
+					'readonly'    => true,
+				),
+				'mcp'       => array( 'description' => __( 'State of the MCP Adapter.', 'leitvia-studio' ) ) + $object,
+				'checks'    => array(
+					'type'     => 'array',
+					'items'    => array( 'type' => 'string' ),
+					'readonly' => true,
+				),
+				'verify'    => $object,
+				'agent'     => array( 'description' => __( 'The new agent, after POST.', 'leitvia-studio' ) ) + $object,
+				'password'  => array(
+					'description' => __( 'The application password, after POST and nowhere else.', 'leitvia-studio' ),
+					'type'        => 'string',
+					'readonly'    => true,
+				),
+			),
+		);
+	}
+
+	/**
+	 * Schema of the answer of /gateway/settings.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function settings_schema(): array {
+		$list = array(
+			'type'     => 'array',
+			'items'    => array( 'type' => 'string' ),
+			'readonly' => true,
+		);
+		return array(
+			'$schema'    => 'http://json-schema.org/draft-04/schema#',
+			'title'      => 'leitvia-studio-gateway-settings',
+			'type'       => 'object',
+			'properties' => array(
+				'settings' => Gateway::schema(),
+				'areas'    => $list,
+				'levels'   => $list,
+				'kinds'    => $list,
+				'defaults' => array(
+					'description' => __( 'Level of each area without an override.', 'leitvia-studio' ),
+					'type'        => 'object',
+					'readonly'    => true,
+				),
+			),
 		);
 	}
 
@@ -130,11 +211,6 @@ final class Gateway_Access_Controller {
 					'required'   => self::MCP_ADAPTER,
 					'compatible' => '' !== $version && version_compare( $version, self::MCP_ADAPTER, '>=' ) && version_compare( $version, '0.8', '<' ),
 					'url'        => 'https://wordpress.org/plugins/mcp-adapter/',
-					// Another plugin (MCP Access of the AI plugin) may list Leitvia abilities on the default server too.
-					'shared'     => '' !== $version && function_exists( 'wp_get_abilities' ) && array() !== array_filter(
-						wp_get_abilities(),
-						static fn( $ability ): bool => str_starts_with( $ability->get_name(), 'leitvia/' ) && true === ( $ability->get_meta()['mcp']['public'] ?? false )
-					),
 				),
 				// Checks the pipeline runs before every write, add-on checks included, and the checks after writing.
 				'checks'    => array_values(

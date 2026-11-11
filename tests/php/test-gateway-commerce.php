@@ -1223,6 +1223,14 @@ class Test_Gateway_Commerce extends WP_UnitTestCase {
 		$this->assertStringNotContainsString( 'ann@example.org', (string) wp_json_encode( $all ) );
 		$this->assertStringNotContainsString( '192.0.2.1', (string) wp_json_encode( $all ) );
 		$this->assertSame( array( $unrated ), array_column( $list( array( 'unrated' => true ) )['reviews'], 'id' ) );
+		// A GET call sends the flag as text: "false" lists every review, "true" only the unrated one.
+		$this->assertSame( array( $unrated, $rated ), array_column( $list( array( 'unrated' => 'false' ) )['reviews'], 'id' ) );
+		$this->assertSame( array( $unrated ), array_column( $list( array( 'unrated' => 'true' ) )['reviews'], 'id' ) );
+		$get = new WP_REST_Request( 'GET', '/wp-abilities/v1/abilities/leitvia/list-product-reviews/run' );
+		$get->set_query_params( array( 'input' => array( 'unrated' => 'false' ) ) );
+		$response = rest_do_request( $get );
+		$this->assertSame( 200, $response->get_status(), (string) wp_json_encode( $response->get_data() ) );
+		$this->assertSame( array( $unrated, $rated ), array_column( $response->get_data()['reviews'], 'id' ) );
 		// Agents lack moderate_comments: held reviews stay hidden.
 		$this->assertSame( array( $unrated, $rated ), array_column( $list( array( 'status' => 'hold' ) )['reviews'], 'id' ) );
 		$this->assertSame( 4.0, (float) wc_get_product( $product )->get_average_rating() );
