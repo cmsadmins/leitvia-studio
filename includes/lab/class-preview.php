@@ -142,8 +142,9 @@ JS;
 				$theme_json = $theme_json->update_with( $config['style'] + array( 'version' => \WP_Theme_JSON::LATEST_SCHEMA ) );
 			}
 			if ( isset( $config['set'] ) ) {
-				// Laid over like an activation, so the roles of the set outrank the presets of a style variation.
-				$theme_json = new \WP_Theme_JSON_Data( Compiler::lay_over( $theme_json->get_data(), $config['set'] ), 'custom' );
+				// Laid over like an activation, so the roles of the set outrank the presets of a style variation, with the
+				// inverse style of its scheme (Compiler::styles()).
+				$theme_json = new \WP_Theme_JSON_Data( Compiler::inverse( Compiler::lay_over( $theme_json->get_data(), $config['set']['settings'] ), $config['set']['doc'] ), 'custom' );
 			}
 			return $theme_json;
 		};
@@ -315,12 +316,12 @@ JS;
 	}
 
 	/**
-	 * Theme.json data for the user data: the style variation under style, the compiled settings of the token set
-	 * under set.
+	 * Theme.json data for the user data: the style variation under style, the compiled settings and the document of the
+	 * token set under set.
 	 *
 	 * @param string $style Variation slug, the file name in the theme's styles/ folder or one level below; '' for none.
 	 * @param string $set   Token set ID, '' for none.
-	 * @return array{style?: array<string, mixed>, set?: array<string, mixed>}|\WP_Error
+	 * @return array{style?: array<string, mixed>, set?: array{settings: array<string, mixed>, doc: array<string, mixed>}}|\WP_Error
 	 */
 	private static function config( string $style, string $set ) {
 		$config = array();
@@ -364,10 +365,10 @@ JS;
 	}
 
 	/**
-	 * Compiled settings of a token set that passes the same checks as an activation.
+	 * Compiled settings and document of a token set that passes the same checks as an activation.
 	 *
 	 * @param int $id Token set ID.
-	 * @return array<string, mixed>|\WP_Error
+	 * @return array{settings: array<string, mixed>, doc: array<string, mixed>}|\WP_Error
 	 */
 	private static function token_set( int $id ) {
 		$invalid = new \WP_Error( 'leitvia_studio_invalid_token_set', __( 'The token set does not exist or is invalid.', 'leitvia-studio' ) );
@@ -379,6 +380,9 @@ JS;
 			return $invalid;
 		}
 		$settings = Dtcg::to_settings( $doc, leitvia_studio_contract() );
-		return is_wp_error( $settings ) ? $invalid : $settings;
+		return is_wp_error( $settings ) ? $invalid : array(
+			'settings' => $settings,
+			'doc'      => $doc,
+		);
 	}
 }

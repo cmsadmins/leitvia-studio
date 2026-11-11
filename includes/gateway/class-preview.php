@@ -7,6 +7,8 @@
 
 namespace LeitviaStudio\Gateway;
 
+use LeitviaStudio\Tokens\Set_Preview;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -29,8 +31,9 @@ final class Preview {
 
 	/**
 	 * Link to the preview of a package for the current user: the first post with an address that an open operation
-	 * changes, the front page when it only changes posts without one (global styles, template parts, navigation), ''
-	 * when it changes no existing post.
+	 * changes; when it only changes posts without one, the signed preview of the token set it activates (Set_Preview,
+	 * global styles have no address) or else the front page (template parts, navigation); '' when it changes no
+	 * existing post.
 	 *
 	 * @param int $id Package ID.
 	 */
@@ -39,6 +42,10 @@ final class Preview {
 		foreach ( array_keys( $states ) as $post_id ) {
 			$link = is_post_type_viewable( (string) get_post_type( $post_id ) ) ? get_permalink( $post_id ) : false;
 			if ( ! $link && array_key_last( $states ) === $post_id ) {
+				$set = self::token_set( $id );
+				if ( $set ) {
+					return $set;
+				}
 				$link = home_url( '/' );
 			}
 			if ( $link ) {
@@ -49,6 +56,22 @@ final class Preview {
 					),
 					$link
 				);
+			}
+		}
+		return self::token_set( $id );
+	}
+
+	/**
+	 * Signed preview address of the token set an open operation of a package activates, '' when there is none.
+	 *
+	 * @param int $id Package ID.
+	 */
+	private static function token_set( int $id ): string {
+		foreach ( Packages::operations( $id ) as $entry ) {
+			$set     = (int) ( $entry['target']['token_set'] ?? 0 );
+			$preview = $set && in_array( Packages::status( $entry ), array( 'open', 'conflict' ), true ) ? Set_Preview::url( $set ) : null;
+			if ( $preview ) {
+				return $preview['url'];
 			}
 		}
 		return '';

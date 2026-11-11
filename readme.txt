@@ -4,7 +4,7 @@ Tags: ai, mcp, block theme, accessibility, design tokens
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.40
+Stable tag: 1.3.41
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -180,7 +180,7 @@ The accessibility check bundles [axe-core](https://github.com/dequelabs/axe-core
 
 The headings of the Studio admin screens use [Open Sans](https://github.com/googlefonts/opensans) by The Open Sans Project Authors, weights 600 and 700, reduced to the Latin characters and stored as WOFF2 in `assets/fonts/open-sans/`. Open Sans is licensed under the SIL Open Font License 1.1; the license text is in `licenses/OPEN-SANS.txt`.
 
-Token sets can name [Libre Franklin](https://github.com/googlefonts/Libre-Franklin) by The Libre Franklin Project Authors (one variable file, weights 100 to 900, in `assets/fonts/libre-franklin/`, license `licenses/LIBRE-FRANKLIN.txt`) and [Young Serif](https://github.com/noirblancrouge/YoungSerif) by The Young Serif Project Authors (regular weight, in `assets/fonts/young-serif/`, license `licenses/YOUNG-SERIF.txt`). Both are reduced to the Latin characters, stored as WOFF2, licensed under the SIL Open Font License 1.1, served from your own site and loaded only on sites whose active token set uses them.
+Token sets can name [Libre Franklin](https://github.com/googlefonts/Libre-Franklin) by The Libre Franklin Project Authors (one variable file each for upright and italic, weights 100 to 900, in `assets/fonts/libre-franklin/`, license `licenses/LIBRE-FRANKLIN.txt`) and [Young Serif](https://github.com/noirblancrouge/YoungSerif) by The Young Serif Project Authors (regular weight without an italic cut, in `assets/fonts/young-serif/`, license `licenses/YOUNG-SERIF.txt`). Both are reduced to the Latin characters, stored as WOFF2, licensed under the SIL Open Font License 1.1, served from your own site and loaded only on sites whose active token set uses them.
 
 The Map block bundles [Leaflet](https://leafletjs.com/) 1.9.4 by Volodymyr Agafonkin and contributors into `build/blocks/map/leaflet.js`, loaded only after the visitor agrees to load the map, and ships its stylesheet as `build/blocks/map/leaflet.css`. Leaflet is licensed under the BSD 2-Clause License, which is compatible with the GPL; the license text is in `licenses/LEAFLET.txt`.
 
@@ -212,6 +212,11 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * Privacy policy: https://leitvia.com/privacy-policy/
 
 == Changelog ==
+
+= 1.3.41 =
+* New ability leitvia/preview-token-set: a signed address that shows any page of the site with a token set, for that request only and as its activation would (colors, fonts, sizes, widths). It opens without signing in, so agents and screenshot tools can use it; it expires after an hour, stops when its user loses edit_theme_options or the set no longer passes the checks, carries noindex and no-cache headers and changes nothing for other visitors. A change package that activates a token set links to this preview.
+* Token set checks: the warning font_no_italic names a body or heading font without an italic cut, which the browser would slant. Libre Franklin now ships with its italic cut.
+* Lab preview of a token set: the inverse style of group and cover follows the scheme of the set, as on activation.
 
 = 1.3.40 =
 * Map and icon list: a long place name, address or word breaks inside its item at 320 px instead of widening the page.

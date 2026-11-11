@@ -433,6 +433,22 @@ class Test_Gateway_Package_Flow extends WP_UnitTestCase {
 		);
 		$design = $this->queue( $styles, array( 'post_content' => '{"version":3,"isGlobalStylesUserThemeJSON":true}' ) );
 		$this->assertStringStartsWith( home_url( '/?' ), Preview::url( $design ), 'a post without an address previews on the front page' );
+
+		// The activation of a token set previews the set, signed, so it shows without the package filter.
+		wp_set_current_user( $this->admin );
+		\LeitviaStudio\Tokens\Token_Sets::register();
+		$set = \LeitviaStudio\Tokens\Token_Sets::create_from_active_theme( 'Preview' );
+		wp_set_current_user( $this->agent );
+		$target = array(
+			'post'      => $styles,
+			'token_set' => $set,
+		);
+		$result = Pipeline::run( new Operation( 'leitvia/test-write', 'design', $target, Hashes::document( $styles ), static fn( array $state ): array => array( 'post_content' => '{"version":3,"isGlobalStylesUserThemeJSON":true,"title":"Set"}' ) + $state, array(), 'activation' ) );
+		$this->assertIsArray( $result );
+		$link = Preview::url( $result['package'] );
+		$this->assertStringContainsString( \LeitviaStudio\Tokens\Set_Preview::ARG . '=' . $set, $link );
+		wp_parse_str( (string) wp_parse_url( $link, PHP_URL_QUERY ), $args );
+		$this->assertIsArray( \LeitviaStudio\Tokens\Set_Preview::check( $set, $args[ \LeitviaStudio\Tokens\Set_Preview::KEY ] ) );
 	}
 
 	/**

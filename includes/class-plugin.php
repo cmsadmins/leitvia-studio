@@ -85,6 +85,8 @@ final class Plugin {
 		add_action( 'leitvia_studio_init', array( Tokens\Contrast::class, 'register_check' ) );
 		add_action( 'leitvia_studio_init', array( Tokens\Sources::class, 'register' ) );
 		add_filter( 'rest_pre_insert_leitvia_tokens', array( Tokens\Token_Sets::class, 'validate_rest' ), 10, 2 );
+		// Token set preview on any front-end address, see Tokens\Set_Preview.
+		Tokens\Set_Preview::boot();
 		add_filter( 'wp_theme_json_data_user', array( Tokens\Overlays::class, 'apply' ), 20 );
 		add_filter( 'rest_pre_insert_leitvia_tokens', array( Tokens\Overlays::class, 'validate_rest' ), 10, 2 );
 		add_filter( 'wp_headers', array( Tokens\Overlays::class, 'headers' ) );

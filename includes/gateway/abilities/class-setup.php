@@ -64,7 +64,7 @@ final class Setup {
 		Abilities::write(
 			'leitvia/create-token-set',
 			__( 'Create token set', 'leitvia-studio' ),
-			__( 'Creates a token set from a DTCG document. Start from the document leitvia/get-tokens returns; base_hash is empty for the new set. It must compile against the contract and pass every token set check; contrast findings name the failing pair and the ratio it needs. Optional group size: page widths. Activate it with leitvia/activate-token-set.', 'leitvia-studio' ),
+			__( 'Creates a token set from a DTCG document. Start from the document leitvia/get-tokens returns; base_hash is empty for the new set. It must compile against the contract and pass every token set check; contrast findings name the failing pair and the ratio it needs. Optional group size: page widths. Look at it with leitvia/preview-token-set, activate it with leitvia/activate-token-set.', 'leitvia-studio' ),
 			'setup',
 			$add,
 			array(

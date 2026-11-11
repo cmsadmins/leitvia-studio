@@ -417,16 +417,19 @@ class Test_Compiler extends WP_UnitTestCase {
 		$this->assertSame( '100 900', $heading['fontFace'][0]['fontWeight'] );
 		$this->assertStringStartsWith( plugins_url( 'assets/fonts/libre-franklin/', LEITVIA_STUDIO_FILE ), $heading['fontFace'][0]['src'][0] );
 		$this->assertFileExists( dirname( LEITVIA_STUDIO_FILE ) . '/assets/fonts/libre-franklin/libre-franklin-latin-wght-normal.woff2' );
+		$this->assertSame( array( 'italic', 'normal' ), array_column( $heading['fontFace'], 'fontStyle' ) );
+		$this->assertFileExists( dirname( LEITVIA_STUDIO_FILE ) . '/assets/fonts/libre-franklin/libre-franklin-latin-wght-italic.woff2' );
 	}
 
 	/**
-	 * Young Serif ships with Studio for token sets, like Libre Franklin.
+	 * Young Serif ships with Studio for token sets, like Libre Franklin; it has no italic cut.
 	 */
 	public function test_studio_font_young_serif_is_bundled(): void {
 		$id                                     = self::set_with_accent( '#123456' );
 		$doc                                    = json_decode( get_post_meta( $id, Token_Sets::META, true ), true );
 		$doc['fontFamily']['heading']['$value'] = array( 'Young Serif', 'Georgia', 'serif' );
-		$this->assertSame( array(), Compiler::check( $doc ) );
+		// Bundled, but without an italic cut: only that warning.
+		$this->assertSame( array( 'font_no_italic' ), array_column( Compiler::check( $doc ), 'code' ) );
 		$heading = array_column( \LeitviaStudio\Tokens\Dtcg::to_settings( $doc, leitvia_studio_contract() )['typography']['fontFamilies']['theme'], null, 'slug' )['heading'];
 		$this->assertSame( 'Young Serif', $heading['fontFace'][0]['fontFamily'] );
 		$this->assertStringStartsWith( plugins_url( 'assets/fonts/young-serif/', LEITVIA_STUDIO_FILE ), $heading['fontFace'][0]['src'][0] );

@@ -14,13 +14,14 @@ use LeitviaStudio\Model\Model;
 use LeitviaStudio\Tokens\Compiler;
 use LeitviaStudio\Tokens\Contrast;
 use LeitviaStudio\Tokens\Dtcg;
+use LeitviaStudio\Tokens\Set_Preview;
 use LeitviaStudio\Tokens\Token_Sets;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Abilities leitvia/get-contract, leitvia/get-tokens, leitvia/list-patterns, leitvia/get-pattern,
- * leitvia/get-content-model and leitvia/list-blocks: what only Leitvia knows, read from the existing classes.
+ * Abilities leitvia/get-contract, leitvia/get-tokens, leitvia/preview-token-set, leitvia/list-patterns,
+ * leitvia/get-pattern, leitvia/get-content-model and leitvia/list-blocks: what only Leitvia knows, read from the existing classes.
  */
 final class Read_Design {
 
@@ -133,6 +134,36 @@ final class Read_Design {
 				),
 			),
 			static fn() => self::tokens()
+		);
+		Gateway\Abilities::read(
+			'leitvia/preview-token-set',
+			__( 'Preview token set', 'leitvia-studio' ),
+			__( 'Returns a signed address that shows the site with a token set, for that request only. The page looks as the activation of the set would make it (colors, fonts, sizes, widths); nothing changes for visitors and nothing is saved. Open it in a browser or screenshot tool without signing in; it expires after an hour, carries noindex and is not cached. Compare style variants this way instead of activating them. The set ID comes from leitvia/get-tokens or leitvia/create-token-set; path is an address of this site such as /about/, the front page when empty.', 'leitvia-studio' ),
+			array(
+				'type'                 => 'object',
+				'properties'           => array(
+					'set'  => array(
+						'type'    => 'integer',
+						'minimum' => 1,
+					),
+					'path' => array(
+						'type'      => 'string',
+						'maxLength' => 2000,
+						'pattern'   => '^/',
+					),
+				),
+				'required'             => array( 'set' ),
+				'additionalProperties' => false,
+			),
+			array(
+				'type'       => 'object',
+				'required'   => array( 'url', 'expires' ),
+				'properties' => array(
+					'url'     => $string,
+					'expires' => $string,
+				),
+			),
+			array( self::class, 'preview_token_set' )
 		);
 
 		Gateway\Abilities::read(
@@ -325,6 +356,37 @@ final class Read_Design {
 			'variations' => self::active_variations(),
 			'drift'      => Compiler::drift(),
 			'contrast'   => Contrast::findings( array_values( Dtcg::effective( wp_get_global_settings(), 'color', 'palette' ) ), $contract->pairs() ),
+		);
+	}
+
+	/**
+	 * Output of preview-token-set: the signed preview address and its expiry (ISO 8601, UTC).
+	 *
+	 * @param array<string, mixed>|null $input Input with set and optional path.
+	 * @return array{url: string, expires: string}|\WP_Error
+	 */
+	public static function preview_token_set( $input ) {
+		$input = (array) $input;
+		$set   = (int) ( $input['set'] ?? 0 );
+		$path  = (string) ( $input['path'] ?? '' );
+		if ( Token_Sets::POST_TYPE !== get_post_type( $set ) || ! Gateway\Scope::readable( $set ) ) {
+			return Gateway\Block_Edit::invalid( 'set', __( 'There is no token set with this ID.', 'leitvia-studio' ), array( 'post' => $set ), 'leitvia/get-tokens' );
+		}
+		// A path of this site only; //host would be another site.
+		if ( '' !== $path && ( ! str_starts_with( $path, '/' ) || str_starts_with( $path, '//' ) ) ) {
+			return Gateway\Block_Edit::invalid( 'path', __( 'The path must be an address of this site that starts with a single slash, such as /about/.', 'leitvia-studio' ), array( 'path' => $path ) );
+		}
+		$valid = Token_Sets::validate( (string) get_post_meta( $set, Token_Sets::META, true ) );
+		if ( is_wp_error( $valid ) ) {
+			return Gateway\Block_Edit::invalid( 'set', $valid->get_error_message(), array( 'post' => $set ), 'leitvia/get-tokens' );
+		}
+		$preview = Set_Preview::url( $set, $path );
+		if ( ! $preview ) {
+			return Gateway\Rejection::make( 'leitvia_forbidden', __( 'Previews of token sets need the right to edit theme options.', 'leitvia-studio' ), 403, 'capability', array( 'post' => $set ), '', 'never' );
+		}
+		return array(
+			'url'     => $preview['url'],
+			'expires' => gmdate( 'c', $preview['expires'] ),
 		);
 	}
 

@@ -64,7 +64,8 @@ final class Compiler {
 	}
 
 	/**
-	 * Warns about font families without font faces on this site: not bundled, not in the Font Library.
+	 * Warns about font families without font faces on this site (not bundled, not in the Font Library) and about
+	 * families of the body and heading roles without an italic face.
 	 *
 	 * @param array<string, mixed> $doc Token document.
 	 * @return list<array<string, mixed>>
@@ -85,9 +86,36 @@ final class Compiler {
 					'fix'      => __( 'Have the font files uploaded to the Font Library before the token set is activated, or name a bundled family.', 'leitvia-studio' ),
 					'data'     => array( 'slug' => $family['slug'] ),
 				);
+				continue;
+			}
+			// Without an italic face the browser slants the upright one for em and italic accents. Monospaced code is
+			// rarely italic, so the mono role is left out.
+			$styles = array_map( static fn( $face ): string => strtolower( (string) ( is_array( $face ) ? ( $face['fontStyle'] ?? 'normal' ) : '' ) ), (array) $family['fontFace'] );
+			if ( 'mono' !== $family['slug'] && ! array_filter( $styles, static fn( string $style ): bool => str_starts_with( $style, 'italic' ) || str_starts_with( $style, 'oblique' ) ) ) {
+				$first      = self::first_family( (string) ( $family['fontFamily'] ?? '' ) );
+				$findings[] = array(
+					'code'     => 'font_no_italic',
+					'severity' => 'warning',
+					/* translators: 1: font family name, 2: token role, for example heading. */
+					'message'  => sprintf( __( 'Font family %1$s (role %2$s) has no italic cut; the browser slants the upright letters for italic text.', 'leitvia-studio' ), $first, $family['slug'] ),
+					'fix'      => __( 'Keep the role free of italic text (emphasis, italic accents in headings), or name a family with an italic cut.', 'leitvia-studio' ),
+					'data'     => array(
+						'slug'   => $family['slug'],
+						'family' => $first,
+					),
+				);
 			}
 		}
 		return $findings;
+	}
+
+	/**
+	 * First family name of a font-family value, without quotes.
+	 *
+	 * @param string $value CSS font-family value.
+	 */
+	private static function first_family( string $value ): string {
+		return trim( (string) strtok( $value, ',' ), " \t\n\"'" );
 	}
 
 	/**

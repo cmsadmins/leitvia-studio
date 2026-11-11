@@ -186,7 +186,8 @@ final class Overlays {
 
 	/**
 	 * Whether overlays apply to this request: the front end once the request is parsed, never the admin, the REST API
-	 * (the Site Editor reads and saves there, so it never sees overlay values as its base) or a Lab preview of a set.
+	 * (the Site Editor reads and saves there, so it never sees overlay values as its base), a Lab preview of a set or a
+	 * preview of a set on the site (Set_Preview).
 	 */
 	public static function applies(): bool {
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- The nonce is checked right here.
@@ -194,7 +195,7 @@ final class Overlays {
 			&& current_user_can( 'edit_theme_options' )
 			&& wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'leitvia_studio_preview' );
 		// phpcs:enable WordPress.Security.NonceVerification.Recommended
-		$applies = ! is_admin() && did_action( 'parse_request' ) && ! wp_is_serving_rest_request() && ! $preview;
+		$applies = ! is_admin() && did_action( 'parse_request' ) && ! wp_is_serving_rest_request() && ! $preview && ! Set_Preview::active();
 		/**
 		 * Filters whether token overlays apply to the current request.
 		 *

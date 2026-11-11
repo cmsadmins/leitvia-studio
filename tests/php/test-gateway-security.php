@@ -644,7 +644,9 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 		add_filter( 'pre_http_request', static fn() => $answer );
 		$page    = $this->page( '<!-- wp:paragraph {"metadata":{"leitviaId":"aaaa1111"}} --><p>One</p><!-- /wp:paragraph -->' );
 		$package = $this->queue( $page, array( 'post_title' => 'Queued' ) );
+		$set     = \LeitviaStudio\Tokens\Token_Sets::create_from_active_theme( 'Read only' );
 		$inputs  = array(
+			'leitvia/preview-token-set' => array( 'set' => $set ),
 			'leitvia/get-page-outline'  => array( 'post' => $page ),
 			'leitvia/get-block'         => array(
 				'post'  => $page,
