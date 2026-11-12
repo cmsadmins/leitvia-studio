@@ -1,6 +1,11 @@
-== Changelog of Leitvia Studio, versions 1.0.0 to 1.3.40 ==
+== Changelog of Leitvia Studio, versions 1.0.0 to 1.3.41 ==
 
 Newer versions are listed in readme.txt.
+
+= 1.3.41 =
+* New ability leitvia/preview-token-set: a signed address that shows any page of the site with a token set, for that request only and as its activation would (colors, fonts, sizes, widths). It opens without signing in, so agents and screenshot tools can use it; it expires after an hour, stops when its user loses edit_theme_options or the set no longer passes the checks, carries noindex and no-cache headers and changes nothing for other visitors. A change package that activates a token set links to this preview.
+* Token set checks: the warning font_no_italic names a body or heading font without an italic cut, which the browser would slant. Libre Franklin now ships with its italic cut.
+* Lab preview of a token set: the inverse style of group and cover follows the scheme of the set, as on activation.
 
 = 1.3.40 =
 * Map and icon list: a long place name, address or word breaks inside its item at 320 px instead of widening the page.

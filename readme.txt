@@ -4,7 +4,7 @@ Tags: ai agent, mcp, abilities api, design tokens, block theme
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.45
+Stable tag: 1.3.46
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -48,7 +48,7 @@ Core preset slugs such as base, contrast or spacing 50 map to the roles of the d
 
 == Privacy ==
 
-Leitvia Studio sends no visitor data anywhere and sets no cookies. Embeds from other sites (the Embed block and its variations such as YouTube, and iframes from other sites in classic content and in Custom HTML blocks) show a placeholder until the visitor clicks "Load content from <provider>"; only then does the visitor's browser contact the provider. When a visitor ticks "Always allow <provider> on this site", the list of allowed providers is stored in the visitor's browser (localStorage, key `leitvia-consent`), never on the server; the Consent Settings block lists and revokes these entries. Without JavaScript the placeholder only links to the content on the provider's site. The setting "Ask visitors before loading embedded content from other sites" turns the placeholder off; deactivating Leitvia Studio also brings back the embeds as WordPress renders them. When you save a post, WordPress itself asks the provider for the embed code (oEmbed), as without the plugin; that request comes from your server and carries no visitor data.
+Leitvia Studio sends no visitor data anywhere and sets no cookies. Embeds from other sites (the Embed block and its variations such as YouTube, and iframes from other sites in classic content and in Custom HTML blocks) show a placeholder until the visitor clicks "Load content from" followed by the name of the provider (for example "Load content from YouTube"); only then does the visitor's browser contact the provider. When a visitor ticks "Always allow YouTube on this site" (with the name of the provider), the list of allowed providers is stored in the visitor's browser (localStorage, key `leitvia-consent`), never on the server; the Consent Settings block lists and revokes these entries. Without JavaScript the placeholder only links to the content on the provider's site. The setting "Ask visitors before loading embedded content from other sites" turns the placeholder off; deactivating Leitvia Studio also brings back the embeds as WordPress renders them. When you save a post, WordPress itself asks the provider for the embed code (oEmbed), as without the plugin; that request comes from your server and carries no visitor data.
 
 The list carries the path of the site in its key (`leitvia-consent:/` for a site at the root, `leitvia-consent:/club/` for a site below `/club/`), because sites of a subdirectory network or installations in folders of one domain share the local storage of the browser. Consent given on one of them never applies to another. A list stored by an older version under `leitvia-consent` carries over on a site at the root path only.
 
@@ -62,7 +62,7 @@ This plugin does not connect to any external service by default. The check after
 
 AI provider of the site owner: only when an agent or a user calls the ability "Plan page" (leitvia/plan-page) with ai set to true, Leitvia Studio sends one request through the AI client of WordPress to the AI connector an administrator set up under Settings, Connectors (for example OpenAI, Anthropic or Google). Leitvia Studio has no provider of its own and stores no keys. The request holds the goal and the content points given in that call, the page frame and composition rules of the contract, and the names and metadata of the patterns; no posts, no user data and no other content of the database. Without that call, nothing is sent. The terms and privacy policy of the provider the administrator chose apply.
 
-Embedded content: when a visitor clicks "Load content from <provider>" in the placeholder of an embed, or has chosen to always allow that provider, the visitor's browser loads the embedded content from the provider. The provider receives the visitor's IP address, browser details and the page address, and may set cookies. Nothing is loaded before that action. The providers Leitvia Studio names, with their privacy policies (other embed providers are named after their host):
+Embedded content: when a visitor clicks "Load content from" with the name of the provider in the placeholder of an embed, or has chosen to always allow that provider, the visitor's browser loads the embedded content from the provider. The provider receives the visitor's IP address, browser details and the page address, and may set cookies. Nothing is loaded before that action. The providers Leitvia Studio names, with their privacy policies (other embed providers are named after their host):
 
 * YouTube (Google): [privacy policy](https://policies.google.com/privacy), [terms](https://www.youtube.com/t/terms)
 * Vimeo: [privacy policy](https://vimeo.com/privacy), [terms](https://vimeo.com/terms)
@@ -271,6 +271,10 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 
 == Changelog ==
 
+= 1.3.46 =
+* The readme spells out the labels of the consent placeholder ("Load content from YouTube") instead of a placeholder in angle brackets, which the readme parser of WordPress.org removed.
+* German: the AI connector is called Konnektor and its screen Einstellungen, Konnektoren, as in WordPress itself; the approvals of the AI plugin are Konnektor-Freigaben.
+
 = 1.3.45 =
 * The plugin is listed as Leitvia Studio: AI Agents, MCP and Design Tokens for Block Themes; the slug stays leitvia-studio, and the screens keep the name Leitvia Studio. The readme answers the common questions on AI agents, MCP clients, privacy and accessibility, and keeps the last five versions, older ones are in changelog.txt.
 * Fields, site values, Lab notes and token documents clean their text for its type on every write, not only over REST: tags and scripts are never stored, line breaks stay only in text areas, and a URL, email address, number, date or option keeps only a value of its type.
@@ -295,9 +299,4 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 = 1.3.42 =
 * Icons train front and bike (116 Lucide icons), for the stops of the route in Leitvia Pro.
 
-= 1.3.41 =
-* New ability leitvia/preview-token-set: a signed address that shows any page of the site with a token set, for that request only and as its activation would (colors, fonts, sizes, widths). It opens without signing in, so agents and screenshot tools can use it; it expires after an hour, stops when its user loses edit_theme_options or the set no longer passes the checks, carries noindex and no-cache headers and changes nothing for other visitors. A change package that activates a token set links to this preview.
-* Token set checks: the warning font_no_italic names a body or heading font without an italic cut, which the browser would slant. Libre Franklin now ships with its italic cut.
-* Lab preview of a token set: the inverse style of group and cover follows the scheme of the set, as on activation.
-
-Older versions, 1.0.0 to 1.3.40: [changelog.txt](https://github.com/cmsadmins/leitvia-studio/blob/main/changelog.txt).
+Older versions, 1.0.0 to 1.3.41: [changelog.txt](https://github.com/cmsadmins/leitvia-studio/blob/main/changelog.txt).
