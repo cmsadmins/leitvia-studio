@@ -139,6 +139,7 @@ final class Plugin {
 		Model\Author_Name::boot();
 		add_filter( 'render_block_core/list', array( Model\Bindings::class, 'list_items' ), 10, 3 );
 		add_filter( 'get_block_type_uses_context', array( Model\Bindings::class, 'list_context' ), 10, 2 );
+		add_filter( 'block_bindings_source_value', array( Model\Bindings::class, 'core_post_meta' ), 10, 5 );
 		add_action( 'save_post', array( Lab\Usage_Index::class, 'index' ), 10, 2 );
 		add_action( 'init', array( Admin\Admin::class, 'register_status_column' ), 20 );
 		add_action( 'after_setup_theme', array( News\Image_Sizes::class, 'register' ) );

@@ -10,6 +10,7 @@ namespace LeitviaStudio\Gateway\Abilities;
 use LeitviaStudio\Gateway;
 use LeitviaStudio\Lab\Status;
 use LeitviaStudio\Lab\Usage_Index;
+use LeitviaStudio\Model\Bindings;
 use LeitviaStudio\Model\Model;
 use LeitviaStudio\Tokens\Compiler;
 use LeitviaStudio\Tokens\Contrast;
@@ -265,19 +266,63 @@ final class Read_Design {
 			static fn( $input ) => self::pattern( (string) ( $input['slug'] ?? '' ) )
 		);
 
+		$names = array(
+			'type'  => 'array',
+			'items' => $string,
+		);
 		Gateway\Abilities::read(
 			'leitvia/get-content-model',
 			__( 'Get content model', 'leitvia-studio' ),
-			__( 'Returns the content model declaration: post types, taxonomies, fields, relations and site settings with their definitions, never content. valid is false when the declaration fails the schema and nothing of it is registered. hash is the base_hash of leitvia/define-content-type.', 'leitvia-studio' ),
+			__( 'Returns the content model declaration: post types, taxonomies, fields, relations and site settings with their definitions, never content. valid is false when the declaration fails the schema and nothing of it is registered. hash is the base_hash of leitvia/define-content-type. bindings names the sources that show fields, relations and bindable settings in blocks (metadata.bindings) and the attributes WordPress binds per block; settings_values and settings_hash are the values of the bindable settings and the base_hash of leitvia/update-site-values.', 'leitvia-studio' ),
 			$none,
 			array(
 				'type'       => 'object',
-				'required'   => array( 'declaration', 'valid', 'error', 'hash' ),
+				'required'   => array( 'declaration', 'valid', 'error', 'hash', 'bindings', 'settings_values', 'settings_hash' ),
 				'properties' => array(
-					'declaration' => array( 'type' => 'object' ),
-					'valid'       => array( 'type' => 'boolean' ),
-					'error'       => $string,
-					'hash'        => $string,
+					'declaration'     => array(
+						'type'        => 'object',
+						'description' => __( 'Content model declaration as leitvia/define-content-type takes it.', 'leitvia-studio' ),
+					),
+					'valid'           => array(
+						'type'        => 'boolean',
+						'description' => __( 'Whether the declaration passes the schema; nothing of an invalid one is registered.', 'leitvia-studio' ),
+					),
+					'error'           => $string + array( 'description' => __( 'Why the declaration fails the schema, empty when it is valid.', 'leitvia-studio' ) ),
+					'hash'            => $string + array( 'description' => __( 'Hash of the declaration, the base_hash of leitvia/define-content-type.', 'leitvia-studio' ) ),
+					'bindings'        => array(
+						'type'        => 'object',
+						'description' => __( 'How blocks show values of the content model: metadata.bindings.<attribute> = {"source": …, "args": {…}} on a block of attributes.', 'leitvia-studio' ),
+						'required'    => array( 'sources', 'attributes' ),
+						'properties'  => array(
+							'sources'    => array(
+								'type'        => 'array',
+								'description' => __( 'Registered binding sources with their arguments. leitvia/meta and leitvia/relation read the entry of the page, of its template or of the post template of a query; pages and posts have no fields. Abilities insert patterns as copies, so core/pattern-overrides never applies to what they write.', 'leitvia-studio' ),
+								'items'       => array(
+									'type'       => 'object',
+									'required'   => array( 'name', 'label', 'args' ),
+									'properties' => array(
+										'name'  => $string + array( 'description' => __( 'Source name for metadata.bindings.', 'leitvia-studio' ) ),
+										'label' => $string + array( 'description' => __( 'Label of the source.', 'leitvia-studio' ) ),
+										'args'  => array(
+											'type'        => 'object',
+											'description' => __( 'Arguments of the source by name, each with what it does; empty when the source does not say.', 'leitvia-studio' ),
+											'additionalProperties' => $string,
+										),
+									),
+								),
+							),
+							'attributes' => array(
+								'type'                 => 'object',
+								'description'          => __( 'Attributes a binding sets, by block name, from the running WordPress; core/list content is Leitvia: one list item per line of a textarea field. Other attributes keep the saved markup.', 'leitvia-studio' ),
+								'additionalProperties' => $names,
+							),
+						),
+					),
+					'settings_values' => array(
+						'type'        => 'object',
+						'description' => __( 'Stored values of the site settings with bindable true, by key; null for a value never set. Visitors see them through leitvia/setting.', 'leitvia-studio' ),
+					),
+					'settings_hash'   => $string + array( 'description' => __( 'Hash of settings_values, the base_hash of leitvia/update-site-values.', 'leitvia-studio' ) ),
 				),
 			),
 			static fn() => self::content_model()
@@ -662,20 +707,61 @@ final class Read_Design {
 	}
 
 	/**
-	 * The content model declaration and whether it passes the schema.
+	 * The content model declaration and whether it passes the schema, with the binding sources and attributes and the
+	 * values of the bindable settings.
 	 *
-	 * @return array{declaration: array<string, mixed>, valid: bool, error: string, hash: string}
+	 * @return array<string, mixed>
 	 */
 	public static function content_model(): array {
 		$declaration = Model::current();
 		$valid       = Model::validate( $declaration );
+		$values      = Setup::site_settings();
 		return array(
-			'declaration' => $declaration,
-			'valid'       => true === $valid,
-			'error'       => is_wp_error( $valid ) ? $valid->get_error_message() : '',
+			'declaration'     => $declaration,
+			'valid'           => true === $valid,
+			'error'           => is_wp_error( $valid ) ? $valid->get_error_message() : '',
 			// As the pipeline hashes the option, see Pipeline::hash().
-			'hash'        => Gateway\Hashes::of( (string) wp_json_encode( get_option( Model::OPTION ) ) ),
+			'hash'            => Gateway\Hashes::of( (string) wp_json_encode( get_option( Model::OPTION ) ) ),
+			'bindings'        => array(
+				'sources'    => self::binding_sources(),
+				'attributes' => (object) Bindings::attribute_map(),
+			),
+			'settings_values' => (object) $values,
+			'settings_hash'   => Setup::settings_hash( $values ),
 		);
+	}
+
+	/**
+	 * Registered binding sources with name, label and the arguments of the sources of Studio and of core/post-meta.
+	 *
+	 * @return list<array{name: string, label: string, args: object}>
+	 */
+	private static function binding_sources(): array {
+		$key  = __( 'Key of a field of the content model of the entry.', 'leitvia-studio' );
+		$args = array(
+			'leitvia/meta'     => array(
+				'key'    => $key,
+				'prefix' => __( 'Text before a value that is not empty, not on url, id or datetime.', 'leitvia-studio' ),
+				'suffix' => __( 'Text after a value that is not empty, such as a currency, not on url, id or datetime.', 'leitvia-studio' ),
+			),
+			'leitvia/relation' => array(
+				'relation' => __( 'Key of a relation that starts at the type of the entry.', 'leitvia-studio' ),
+				'field'    => __( 'title (default), url, excerpt or a field key of the related type.', 'leitvia-studio' ),
+				'index'    => __( 'Which related entry of a multiple relation, from 0.', 'leitvia-studio' ),
+			),
+			'leitvia/setting'  => array( 'key' => __( 'Key of a site setting declared with bindable true; shows on any page.', 'leitvia-studio' ) ),
+			// Studio answers it for fields of the content model like leitvia/meta, see Bindings::core_post_meta().
+			'core/post-meta'   => array( 'key' => __( 'Meta key. Fields of the content model show as with leitvia/meta, relations show nothing; prefer leitvia/meta.', 'leitvia-studio' ) ),
+		);
+		$sources = array();
+		foreach ( get_all_registered_block_bindings_sources() as $name => $source ) {
+			$sources[] = array(
+				'name'  => (string) $name,
+				'label' => (string) $source->label,
+				'args'  => (object) ( $args[ $name ] ?? array() ),
+			);
+		}
+		return $sources;
 	}
 
 	/**

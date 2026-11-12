@@ -796,4 +796,116 @@ class Test_Gateway_Content extends WP_UnitTestCase {
 		$studio = array_values( array_filter( $health['plugins'], static fn( array $plugin ): bool => 'leitvia-studio/leitvia-studio.php' === $plugin['file'] ) );
 		$this->assertSame( '9.9.9', $studio[0]['update'] ?? null );
 	}
+
+	/**
+	 * Rows of a repeater: create-content adds them in order, list-content reads them, update-content replaces them
+	 * (fewer rows delete the rest), rollback brings them back. An unknown repeater, a key the repeater has not and a
+	 * value its field refuses change nothing.
+	 */
+	public function test_repeater_rows(): void {
+		$rows   = static fn( int $entry ): array => array_map(
+			static fn( WP_Post $row ): array => array( $row->post_title, (string) get_post_meta( $row->ID, 'session_time', true ), (string) get_post_meta( $row->ID, 'session_speaker', true ), $row->post_status ),
+			get_posts(
+				array(
+					'post_type'   => 'event_session',
+					'post_parent' => $entry,
+					'post_status' => 'any',
+					'numberposts' => -1,
+					'orderby'     => 'menu_order',
+					'order'       => 'ASC',
+				)
+			)
+		);
+		$agenda = array(
+			array(
+				'title'           => 'Welcome',
+				'session_time'    => '09:00',
+				'session_speaker' => 'Mara',
+			),
+			array(
+				'title'        => 'Walk',
+				'session_time' => '10:30',
+			),
+		);
+		$result = self::call(
+			'leitvia/create-content',
+			array(
+				'post_type' => 'event',
+				'title'     => 'Walk day',
+				'content'   => self::TEXT,
+				'rows'      => array( 'event_agenda' => $agenda ),
+			)
+		);
+		$this->assertIsArray( $result, $result instanceof WP_Error ? $result->get_error_message() : '' );
+		$id = (int) $result['target']['post'];
+		$this->assertSame(
+			array(
+				array( 'Welcome', '09:00', 'Mara', 'inherit' ),
+				array( 'Walk', '10:30', '', 'inherit' ),
+			),
+			$rows( $id )
+		);
+		$this->assertSame( Hashes::document( $id ), $result['hash'] );
+		$listed = Content::list( array( 'post_type' => 'event' ) )['items'][0];
+		$this->assertSame( array( 'Welcome', 'Walk' ), array_column( $listed['rows']['event_agenda'], 'title' ) );
+
+		$cases = array(
+			'unknown repeater' => array( 'event_extras' => array() ),
+			'unknown key'      => array( 'event_agenda' => array( array( 'session_room' => 'Hall' ) ) ),
+			'invalid value'    => array( 'event_agenda' => array( array( 'session_time' => 'nine' ) ) ),
+		);
+		foreach ( $cases as $case => $change ) {
+			$this->assert_rejected(
+				'leitvia_invalid_input',
+				self::call(
+					'leitvia/update-content',
+					array(
+						'post'      => $id,
+						'rows'      => $change,
+						'base_hash' => Hashes::document( $id ),
+					)
+				)
+			);
+			$this->assertCount( 2, $rows( $id ), $case );
+		}
+		$this->assert_rejected(
+			'leitvia_invalid_input',
+			self::call(
+				'leitvia/create-content',
+				array(
+					'post_type' => 'page',
+					'title'     => 'No rows',
+					'content'   => self::TEXT,
+					'rows'      => array( 'event_agenda' => $agenda ),
+				)
+			)
+		);
+
+		$update = self::call(
+			'leitvia/update-content',
+			array(
+				'post'      => $id,
+				'rows'      => array(
+					'event_agenda' => array(
+						array(
+							'title'        => 'Opening',
+							'session_time' => '08:45',
+						),
+					),
+				),
+				'base_hash' => Hashes::document( $id ),
+			)
+		);
+		$this->assertIsArray( $update, $update instanceof WP_Error ? $update->get_error_message() : '' );
+		$this->assertSame( array( array( 'Opening', '08:45', '', 'inherit' ) ), $rows( $id ) );
+
+		$this->assertIsArray( Packages::rollback( (int) $update['package'] ) );
+		$this->assertSame(
+			array(
+				array( 'Welcome', '09:00', 'Mara', 'inherit' ),
+				array( 'Walk', '10:30', '', 'inherit' ),
+			),
+			$rows( $id )
+		);
+	}
 }

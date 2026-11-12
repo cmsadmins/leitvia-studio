@@ -9,6 +9,8 @@ namespace LeitviaStudio\Gateway;
 
 use LeitviaStudio\Blocks\Table_Of_Contents;
 use LeitviaStudio\Lab\Token_Lint;
+use LeitviaStudio\Model\Bindings;
+use LeitviaStudio\Model\Model;
 use LeitviaStudio\Tokens\Contrast;
 
 defined( 'ABSPATH' ) || exit;
@@ -56,6 +58,7 @@ final class Content_Checks {
 		'leitvia/content-tokens'   => array( 'content', 'tokens' ),
 		'leitvia/content-contrast' => array( 'content', 'contrast' ),
 		'leitvia/query-context'    => array( 'content', 'query_context' ),
+		'leitvia/bindings'         => array( 'content', 'bindings' ),
 		'leitvia/page-structure'   => array( 'page', 'page' ),
 		'leitvia/template-parts'   => array( 'content', 'template_parts' ),
 	);
@@ -78,6 +81,7 @@ final class Content_Checks {
 			'leitvia/content-tokens'   => __( 'Design tokens in content', 'leitvia-studio' ),
 			'leitvia/content-contrast' => __( 'Color pairs in content', 'leitvia-studio' ),
 			'leitvia/query-context'    => __( 'Filters inside a query', 'leitvia-studio' ),
+			'leitvia/bindings'         => __( 'Block bindings', 'leitvia-studio' ),
 			'leitvia/page-structure'   => __( 'One h1 and landmarks', 'leitvia-studio' ),
 			'leitvia/template-parts'   => __( 'Header, main and footer of a template', 'leitvia-studio' ),
 		);
@@ -584,6 +588,258 @@ final class Content_Checks {
 			}
 		}
 		return $findings;
+	}
+
+	/**
+	 * Check leitvia/bindings: a binding WordPress or Studio would skip without a word, so the block shows its saved
+	 * content. Errors: a source that is not registered (nor bound by a registered pattern); an attribute core does not
+	 * bind for the block (the list of the running version, see Bindings::attributes()); a key the content model does
+	 * not declare for leitvia/meta, leitvia/relation and leitvia/setting (a setting needs bindable) or that
+	 * core/post-meta cannot read; a field on a page or post outside a query, which have no fields. The post type is
+	 * the one of the content, the one of the query around the block, or any type of the model in templates, template
+	 * parts, patterns and inheriting queries. A content model waiting in the package of the write counts as declared,
+	 * so a recipe can bind before a person applies its model. Pattern overrides stay out: a person uses them in synced
+	 * patterns, and a copy shows its text.
+	 *
+	 * @param string               $content Block markup.
+	 * @param array<string, mixed> $context Context, with the package key of the write.
+	 * @return list<array<string, mixed>>
+	 */
+	public static function bindings( string $content, array $context ): array {
+		if ( ! self::applies( $context ) || ! str_contains( $content, '"bindings"' ) ) {
+			return array();
+		}
+		$model    = null;
+		$findings = array();
+		foreach ( self::walk( $content ) as [ $block, $id, $query ] ) {
+			$bindings = $block['attrs']['metadata']['bindings'] ?? null;
+			if ( ! is_array( $bindings ) ) {
+				continue;
+			}
+			$name      = (string) $block['blockName'];
+			$supported = Bindings::attributes( $name );
+			$types     = self::binding_types( (string) ( $context['post_type'] ?? '' ), $query );
+			foreach ( $bindings as $attribute => $binding ) {
+				$source = is_array( $binding ) ? (string) ( $binding['source'] ?? '' ) : '';
+				if ( 'core/pattern-overrides' === $source ) {
+					continue;
+				}
+				$model ??= self::binding_model( $context );
+				$problem = self::binding_problem( $name, (string) $attribute, $source, is_array( $binding['args'] ?? null ) ? $binding['args'] : array(), $supported, $types, $model );
+				if ( $problem ) {
+					$findings[] = self::finding( 'leitvia/bindings', 'error', $id, $problem[0], $problem[1] );
+				}
+			}
+		}
+		return $findings;
+	}
+
+	/**
+	 * Post types whose entries a bound block shows: the type of the query around it, the type of the content, or null
+	 * for any type (templates, template parts, patterns and queries that inherit the main query).
+	 *
+	 * @param string                    $type  Post type of the content.
+	 * @param array<string, mixed>|null $query Nearest core/query around the block.
+	 * @return list<string>|null
+	 */
+	private static function binding_types( string $type, ?array $query ): ?array {
+		if ( null !== $query ) {
+			// Core's default query inherits, and a query attribute replaces that default as a whole.
+			$args = (array) ( $query['attrs']['query'] ?? array( 'inherit' => true ) );
+			return empty( $args['inherit'] ) ? array( (string) ( $args['postType'] ?? 'post' ) ) : null;
+		}
+		return in_array( $type, array( 'wp_template', 'wp_template_part', 'wp_block' ), true ) ? null : array( $type );
+	}
+
+	/**
+	 * The content model the bindings of a write may use: the current one, or the one that waits in the package of the
+	 * write (it holds the current one, see Abilities\Setup::describe_define_content_type()).
+	 *
+	 * @param array<string, mixed> $context Context.
+	 * @return array<string, mixed>
+	 */
+	private static function binding_model( array $context ): array {
+		$model   = Model::current();
+		$key     = (string) ( $context['package'] ?? '' );
+		$package = '' !== $key ? Packages::find( $key ) : 0;
+		foreach ( $package ? Packages::operations( $package ) : array() as $entry ) {
+			if ( Model::OPTION === ( $entry['target']['option'] ?? '' ) && ! isset( $entry['applied'] ) && is_array( $entry['state']['value'] ?? null ) ) {
+				$model = $entry['state']['value'];
+			}
+		}
+		return $model;
+	}
+
+	/**
+	 * Message and fix for a binding that renders nothing, null for one that works.
+	 *
+	 * @param string               $block     Block name.
+	 * @param string               $attribute Bound attribute.
+	 * @param string               $source    Source name.
+	 * @param array<string, mixed> $args      Source arguments.
+	 * @param string[]             $supported Attributes a binding can set on the block.
+	 * @param list<string>|null    $types     Post types of the entries, null for any.
+	 * @param array<string, mixed> $model     Content model.
+	 * @return array{0: string, 1: string}|null
+	 */
+	private static function binding_problem( string $block, string $attribute, string $source, array $args, array $supported, ?array $types, array $model ): ?array {
+		if ( ! get_block_bindings_source( $source ) && ! self::shipped_source( $source ) ) {
+			return array(
+				/* translators: %s: binding source, for example leitvia/meta */
+				sprintf( __( 'The binding source "%s" is not registered, so the block shows its saved content.', 'leitvia-studio' ), $source ),
+				/* translators: %s: list of binding sources */
+				sprintf( __( 'Use one of these sources: %s.', 'leitvia-studio' ), implode( ', ', array_keys( get_all_registered_block_bindings_sources() ) ) ),
+			);
+		}
+		if ( ! in_array( $attribute, $supported, true ) ) {
+			return array(
+				/* translators: 1: attribute, for example url; 2: block name, for example core/paragraph */
+				sprintf( __( 'WordPress does not bind the attribute %1$s of %2$s, so the block shows its saved content.', 'leitvia-studio' ), $attribute, $block ),
+				$supported
+					/* translators: %s: list of attributes */
+					? sprintf( __( 'Bind one of these attributes: %s.', 'leitvia-studio' ), implode( ', ', $supported ) )
+					/* translators: %s: list of block names */
+					: sprintf( __( 'Use a block WordPress binds: %s.', 'leitvia-studio' ), implode( ', ', array_keys( Bindings::attribute_map() ) ) ),
+			);
+		}
+		$key      = (string) ( $args['key'] ?? '' );
+		$in_model = self::model_types( $model );
+		// Post types that have fields at all: those of the model among the ones the block shows.
+		$entries = null === $types ? $in_model : array_values( array_intersect( $types, $in_model ) );
+		$named   = implode( ', ', null === $types ? $in_model : $types );
+		if ( ! $entries && in_array( $source, array( 'leitvia/meta', 'leitvia/relation' ), true ) ) {
+			return array(
+				/* translators: %s: post type, for example page */
+				sprintf( __( 'Entries of %s have no fields: fields belong to the post types of the content model, so the block shows its saved content.', 'leitvia-studio' ), $named ),
+				__( 'Bind a site setting with leitvia/setting (declared with bindable true), or show entries of a type of the content model in a core/query.', 'leitvia-studio' ),
+			);
+		}
+		switch ( $source ) {
+			case 'leitvia/meta':
+			case 'core/post-meta':
+				$declared = array();
+				foreach ( $entries as $type ) {
+					$declared = array_merge( $declared, array_keys( Bindings::fields( $type, $model ) ) );
+				}
+				$declared = array_values( array_unique( array_map( 'strval', $declared ) ) );
+				if ( 'core/post-meta' === $source && isset( $model['relations'][ $key ] ) ) {
+					return array(
+						/* translators: %s: relation key */
+						sprintf( __( 'core/post-meta shows nothing for the relation "%s": its value is a list of entries.', 'leitvia-studio' ), $key ),
+						/* translators: %s: relation key */
+						sprintf( __( 'Use leitvia/relation with relation %s and field title, url, excerpt or a field of the related type.', 'leitvia-studio' ), $key ),
+					);
+				}
+				if ( ( '' !== $key && in_array( $key, $declared, true ) ) || ( 'core/post-meta' === $source && self::foreign_meta( $key, $types ) ) ) {
+					return null;
+				}
+				return array(
+					/* translators: 1: field key; 2: post types */
+					sprintf( __( 'No field "%1$s" is declared for %2$s, so the block shows its saved content.', 'leitvia-studio' ), $key, $named ),
+					match ( true ) {
+						(bool) $declared => sprintf(
+							/* translators: %s: list of field keys */
+							__( 'Use leitvia/meta with the key of a declared field: %s. leitvia/get-content-model lists them.', 'leitvia-studio' ),
+							implode( ', ', $declared )
+						),
+						(bool) $entries  => __( 'Declare the field with leitvia/define-content-type first.', 'leitvia-studio' ),
+						default          => __( 'Bind a site setting with leitvia/setting (declared with bindable true), or show entries of a type of the content model in a core/query.', 'leitvia-studio' ),
+					},
+				);
+			case 'leitvia/relation':
+				$name      = (string) ( $args['relation'] ?? '' );
+				$relations = array_filter( (array) ( $model['relations'] ?? array() ), static fn( $entry ): bool => is_array( $entry ) && in_array( (string) ( $entry['from'] ?? '' ), $entries, true ) );
+				if ( ! isset( $relations[ $name ] ) ) {
+					return array(
+						/* translators: 1: relation key; 2: post types */
+						sprintf( __( 'No relation "%1$s" starts at %2$s, so the block shows its saved content.', 'leitvia-studio' ), $name, $named ),
+						$relations
+							/* translators: %s: list of relation keys */
+							? sprintf( __( 'Use the key of a declared relation: %s.', 'leitvia-studio' ), implode( ', ', array_keys( $relations ) ) )
+							: __( 'Declare the relation with leitvia/define-content-type first.', 'leitvia-studio' ),
+					);
+				}
+				$to     = (string) ( $relations[ $name ]['to'] ?? '' );
+				$field  = (string) ( $args['field'] ?? 'title' );
+				$fields = array_merge( array( 'title', 'url', 'excerpt' ), array_map( 'strval', array_keys( Bindings::fields( $to, $model ) ) ) );
+				return in_array( $field, $fields, true ) ? null : array(
+					/* translators: 1: field key; 2: post type */
+					sprintf( __( 'Entries of %2$s have no field "%1$s", so the block shows its saved content.', 'leitvia-studio' ), $field, $to ),
+					/* translators: %s: list of field keys */
+					sprintf( __( 'Use one of these fields: %s.', 'leitvia-studio' ), implode( ', ', $fields ) ),
+				);
+			case 'leitvia/setting':
+				$settings = (array) ( $model['settings'] ?? array() );
+				if ( '' !== $key && ! empty( $settings[ $key ]['bindable'] ) ) {
+					return null;
+				}
+				$bindable = array_map( 'strval', array_keys( array_filter( $settings, static fn( $setting ): bool => ! empty( $setting['bindable'] ) ) ) );
+				return array(
+					isset( $settings[ $key ] )
+						/* translators: %s: setting key */
+						? sprintf( __( 'The site setting "%s" is not bindable, so visitors never see it.', 'leitvia-studio' ), $key )
+						/* translators: %s: setting key */
+						: sprintf( __( 'No site setting "%s" is declared, so the block shows its saved content.', 'leitvia-studio' ), $key ),
+					$bindable
+						/* translators: %s: list of setting keys */
+						? sprintf( __( 'Use a setting declared with bindable true: %s.', 'leitvia-studio' ), implode( ', ', $bindable ) )
+						: __( 'Declare the setting with bindable true through leitvia/define-content-type first.', 'leitvia-studio' ),
+				);
+		}
+		return null;
+	}
+
+	/**
+	 * Whether a registered pattern binds to the source: the theme or add-on that ships the pattern registers the source
+	 * with its own code (leitvia/site-meta of the theme), which may not run where the patterns are registered, as in
+	 * tests. Only asked for a source that is not registered.
+	 *
+	 * @param string $source Source name.
+	 */
+	private static function shipped_source( string $source ): bool {
+		$needle = '"source":"' . $source . '"';
+		foreach ( \WP_Block_Patterns_Registry::get_instance()->get_all_registered() as $pattern ) {
+			if ( '' !== $source && str_contains( (string) ( $pattern['content'] ?? '' ), $needle ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Post types and repeater types of a content model.
+	 *
+	 * @param array<string, mixed> $model Content model.
+	 * @return list<string>
+	 */
+	private static function model_types( array $model ): array {
+		$types = array();
+		foreach ( (array) ( $model['postTypes'] ?? array() ) as $key => $type ) {
+			$types[] = (string) $key;
+			foreach ( (array) ( $type['repeaters'] ?? array() ) as $repeater ) {
+				$types[] = (string) ( $repeater['postType'] ?? '' );
+			}
+		}
+		return $types;
+	}
+
+	/**
+	 * Whether core/post-meta reads the key on the post types as core does: registered with show_in_rest for the type
+	 * or for all types, and not protected; on any registered type for null.
+	 *
+	 * @param string            $key   Meta key.
+	 * @param list<string>|null $types Post types, null for any.
+	 */
+	private static function foreign_meta( string $key, ?array $types ): bool {
+		if ( '' === $key || is_protected_meta( $key, 'post' ) ) {
+			return false;
+		}
+		foreach ( array_merge( array( '' ), $types ?? array_values( get_post_types() ) ) as $type ) {
+			if ( ! empty( get_registered_meta_keys( 'post', (string) $type )[ $key ]['show_in_rest'] ) ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**

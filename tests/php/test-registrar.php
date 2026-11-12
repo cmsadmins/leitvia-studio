@@ -379,7 +379,10 @@ class Test_Registrar extends WP_UnitTestCase {
 		$this->assertFalse( metadata_exists( 'post', $id, 'event_level' ) );
 
 		// An option removed from the declaration: core sends null back for the stored value, saving goes on, the value stays.
+		// A write of the old option is cleaned now, so the stored value comes in past the sanitize callback.
+		remove_all_filters( 'sanitize_post_meta_event_level_for_event' );
 		update_post_meta( $id, 'event_level', 'expert' );
+		Registrar::register();
 		$request = new WP_REST_Request( 'POST', '/wp/v2/event/' . $id );
 		$request->set_body_params(
 			array(

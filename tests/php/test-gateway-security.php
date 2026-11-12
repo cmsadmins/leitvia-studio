@@ -69,6 +69,9 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 		_set_cron_array( array() );
 		WP_Theme_JSON_Resolver::clean_cached_data();
 		wp_clean_theme_json_cache();
+		// The fixture of update-site-values declares a setting.
+		unregister_setting( LeitviaStudio\Model\Registrar::SETTINGS_GROUP, LeitviaStudio\Model\Registrar::SETTING_PREFIX . 'opening_hours' );
+		Model::forget();
 		parent::tear_down();
 		leitvia_studio()->reset_for_tests();
 	}
@@ -427,6 +430,22 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 					),
 				),
 			),
+			'leitvia/update-site-values'   => static function (): array {
+				$model                              = get_option( Model::OPTION );
+				$model                              = is_array( $model ) && $model ? $model : array( 'version' => 1 );
+				$model['settings']['opening_hours'] = array(
+					'type'     => 'text',
+					'label'    => 'Opening hours',
+					'bindable' => true,
+				);
+				update_option( Model::OPTION, $model );
+				Model::forget();
+				LeitviaStudio\Model\Registrar::register();
+				return array(
+					'values'    => array( 'opening_hours' => 'Mon to Fri 8 to 18' ),
+					'base_hash' => LeitviaStudio\Gateway\Abilities\Setup::settings_hash(),
+				);
+			},
 			'leitvia/update-navigation'    => static fn(): array => array(
 				'items' => array(
 					array(

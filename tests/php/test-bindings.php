@@ -389,11 +389,13 @@ class Test_Bindings extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Markup in a field shows as text.
+	 * Markup in a field shows as text, also a value stored before fields were sanitized on write.
 	 */
 	public function test_output_is_escaped(): void {
-		$event = $this->event( array( 'event_venue' => '<script>alert(1)</script><b>Hall</b>' ) );
-		$html  = $this->paragraph( 'leitvia/meta', array( 'key' => 'event_venue' ), $event );
+		$event = $this->event( array() );
+		remove_all_filters( 'sanitize_post_meta_event_venue_for_event' );
+		update_post_meta( $event, 'event_venue', '<script>alert(1)</script><b>Hall</b>' );
+		$html = $this->paragraph( 'leitvia/meta', array( 'key' => 'event_venue' ), $event );
 		$this->assertSame( '<p>&lt;script&gt;alert(1)&lt;/script&gt;&lt;b&gt;Hall&lt;/b&gt;</p>', $html );
 	}
 
@@ -449,5 +451,143 @@ class Test_Bindings extends WP_UnitTestCase {
 		$this->assertStringContainsString( '>Advanced</p>', $html );
 		$this->assertStringContainsString( '>Ada Brandt</p>', $html );
 		$this->assertStringNotContainsString( 'A blog post', $html );
+	}
+
+	/**
+	 * A date bound to datetime of core/post-date stays machine-readable with the German date format (j. F Y), so core
+	 * reads it with strtotime() and prints it in the format of the block; text keeps the site format. A time has no day
+	 * to name, a select gives its key to a machine-readable attribute.
+	 */
+	public function test_post_date_datetime_stays_iso(): void {
+		update_option( 'date_format', 'j. F Y' );
+		$switched = switch_to_locale( 'de_DE' );
+		try {
+			$event = $this->event(
+				array(
+					'event_start' => '2026-11-05T18:30:00',
+					'event_level' => 'advanced',
+				)
+			);
+			$html  = $this->render( '<!-- wp:post-date {"metadata":{"bindings":{"datetime":{"source":"leitvia/meta","args":{"key":"event_start","suffix":" Uhr"}}}}} /-->', $event );
+			$this->assertMatchesRegularExpression( '#<time datetime="2026-11-05T18:30:00[^"]*">5\. [^<]+ 2026</time>#', $html, 'core prints the date, no affixes on the attribute' );
+			$this->assertSame( '<p>5. ' . wp_date( 'F', (int) strtotime( '2026-11-05' ) ) . ' 2026 18:30</p>', $this->paragraph( 'leitvia/meta', array( 'key' => 'event_start' ), $event ) );
+
+			$date = new WP_Block( parse_blocks( '<!-- wp:post-date /-->' )[0], array( 'postId' => $event ) );
+			$this->assertSame( 'advanced', LeitviaStudio\Model\Bindings::meta_value( array( 'key' => 'event_level' ), $date, 'datetime' ) );
+			$row  = self::factory()->post->create(
+				array(
+					'post_type'   => 'event_session',
+					'post_parent' => $event,
+					'meta_input'  => array( 'session_time' => '09:30' ),
+				)
+			);
+			$date = new WP_Block( parse_blocks( '<!-- wp:post-date /-->' )[0], array( 'postId' => $row ) );
+			$this->assertSame( '', LeitviaStudio\Model\Bindings::meta_value( array( 'key' => 'session_time' ), $date, 'datetime' ) );
+		} finally {
+			if ( $switched ) {
+				restore_previous_locale();
+			}
+		}
+	}
+
+	/**
+	 * An image field gives the caption and the title of the media library to caption and title, and to a text its
+	 * title; never the URL as text.
+	 */
+	public function test_image_caption_and_title(): void {
+		$image = self::factory()->attachment->create_upload_object( dirname( __DIR__ ) . '/fixtures/avatar.png' );
+		wp_update_post(
+			array(
+				'ID'           => $image,
+				'post_title'   => 'Night poster',
+				'post_excerpt' => 'Poster of the night walk',
+			)
+		);
+		$event = $this->event( array( 'event_poster' => $image ) );
+		$block = new WP_Block( parse_blocks( '<!-- wp:image /-->' )[0], array( 'postId' => $event ) );
+		$args  = array( 'key' => 'event_poster' );
+		$this->assertSame( 'Poster of the night walk', LeitviaStudio\Model\Bindings::meta_value( $args, $block, 'caption' ) );
+		$this->assertSame( 'Night poster', LeitviaStudio\Model\Bindings::meta_value( $args, $block, 'title' ) );
+		$this->assertSame( '<p>Night poster</p>', $this->paragraph( 'leitvia/meta', $args, $event ) );
+		$this->assertSame( wp_get_attachment_url( $image ), LeitviaStudio\Model\Bindings::meta_value( $args, $block, 'url' ) );
+	}
+
+	/**
+	 * The source core/post-meta on a field of the content model shows what leitvia/meta shows: the label of an option,
+	 * the date in the site format. A relation keeps the saved content.
+	 */
+	public function test_core_post_meta_on_model_field_is_formatted(): void {
+		$person = self::factory()->post->create(
+			array(
+				'post_type'   => 'person',
+				'post_status' => 'publish',
+			)
+		);
+		$event  = $this->event(
+			array(
+				'event_start'    => '2026-11-05T18:30:00',
+				'event_level'    => 'advanced',
+				'event_speakers' => array( $person ),
+			)
+		);
+		$this->assertSame( '<p>Advanced</p>', $this->paragraph( 'core/post-meta', array( 'key' => 'event_level' ), $event ) );
+		$this->assertSame( '<p>05.11.2026 18:30</p>', $this->paragraph( 'core/post-meta', array( 'key' => 'event_start' ), $event ) );
+		$this->assertSame( '<p>Fallback</p>', $this->paragraph( 'core/post-meta', array( 'key' => 'event_speakers' ), $event ) );
+	}
+
+	/**
+	 * On a type without single pages core treats entries as not viewable and gives visitors nothing; core/post-meta
+	 * shows the field like leitvia/meta.
+	 */
+	public function test_core_post_meta_listed_only_type_shows_to_visitor(): void {
+		$model                     = get_option( Model::OPTION );
+		$model['postTypes']['faq'] = array(
+			'label'         => 'FAQs',
+			'singularLabel' => 'FAQ',
+			'public'        => true,
+			'singlePages'   => false,
+			'fields'        => array(
+				'faq_answer' => array(
+					'type'  => 'text',
+					'label' => 'Answer',
+				),
+			),
+		);
+		update_option( Model::OPTION, $model );
+		Model::forget();
+		Registrar::register();
+		$faq = self::factory()->post->create(
+			array(
+				'post_type'   => 'faq',
+				'post_status' => 'publish',
+				'meta_input'  => array( 'faq_answer' => 'Yes, every Sunday.' ),
+			)
+		);
+		$this->assertFalse( is_post_publicly_viewable( $faq ) );
+		$this->assertSame( '<p>Yes, every Sunday.</p>', $this->paragraph( 'core/post-meta', array( 'key' => 'faq_answer' ), $faq ) );
+		$this->assertSame( '<p>Yes, every Sunday.</p>', $this->paragraph( 'leitvia/meta', array( 'key' => 'faq_answer' ), $faq ) );
+		unregister_post_type( 'faq' );
+	}
+
+	/**
+	 * Meta of another plugin stays as core reads it.
+	 */
+	public function test_core_post_meta_foreign_key_untouched(): void {
+		register_post_meta(
+			'post',
+			'lv_test_raw',
+			array(
+				'type'         => 'string',
+				'single'       => true,
+				'show_in_rest' => true,
+			)
+		);
+		try {
+			$post = self::factory()->post->create( array( 'meta_input' => array( 'lv_test_raw' => 'advanced' ) ) );
+			$this->assertSame( '<p>advanced</p>', $this->paragraph( 'core/post-meta', array( 'key' => 'lv_test_raw' ), $post ) );
+			$this->assertSame( 'kept', apply_filters( 'block_bindings_source_value', 'kept', 'core/post-meta', array( 'key' => 'lv_test_raw' ), new WP_Block( parse_blocks( '<!-- wp:paragraph --><p></p><!-- /wp:paragraph -->' )[0], array( 'postId' => $post ) ), 'content' ) );
+		} finally {
+			unregister_post_meta( 'post', 'lv_test_raw' );
+		}
 	}
 }

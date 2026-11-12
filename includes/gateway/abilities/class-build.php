@@ -129,7 +129,10 @@ final class Build {
 						'description' => __( 'Title of the pattern in the Lab.', 'leitvia-studio' ),
 					),
 					'content' => $content + array( 'description' => __( 'Block markup of the pattern.', 'leitvia-studio' ) ),
-					'synced'  => array( 'type' => 'boolean' ),
+					'synced'  => array(
+						'type'        => 'boolean',
+						'description' => __( 'Whether a person inserts it in the editor as a synced pattern. Abilities insert every pattern as a copy, so pattern overrides never apply there; a value that every page shows, such as opening hours, is a site setting with bindable true (leitvia/update-site-values).', 'leitvia-studio' ),
+					),
 				),
 				'required'             => array( 'title', 'content' ),
 				'additionalProperties' => false,

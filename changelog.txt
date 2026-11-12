@@ -1,6 +1,149 @@
-== Changelog of Leitvia Studio, versions 1.0.0 to 1.3.19 ==
+== Changelog of Leitvia Studio, versions 1.0.0 to 1.3.40 ==
 
 Newer versions are listed in readme.txt.
+
+= 1.3.40 =
+* Map and icon list: a long place name, address or word breaks inside its item at 320 px instead of widening the page.
+
+= 1.3.39 =
+* create-product and update-product: the long description has no fixed length any more, as the content of update-content. The limit of 20,000 characters counted the block markup, so a structured description with cards, icon lists and columns reached it at about 950 words. The short description keeps its 5,000 characters.
+
+= 1.3.38 =
+* New abilities leitvia/list-product-reviews and leitvia/update-product-review: read the reviews of a product with rating, verified owner, status and hash (never email address, IP address or user account), and set the rating, the verified flag or the status with hash, snapshot, package and rollback; WooCommerce counts the average rating and the review count again. Rights as on the reviews screen of WooCommerce: editing needs edit_products and edit_comment. Without moderate_comments, which agents do not have, a write only adds a missing rating to an approved review; another rating, the verified flag, a new status and held, spam or trashed reviews are moderation. Trash and spam go through the functions of core, so the admin restores such a review as it was.
+
+= 1.3.37 =
+* New abilities leitvia/list-product-attributes and leitvia/update-product-attribute for global WooCommerce attributes (pa_*): name, value names and the order of the values in one operation with hash, snapshot, package and rollback; slugs stay. Value names and order follow the autonomy, the name and the sort order of the attribute itself need manage_product_terms like the attributes screen of WooCommerce, otherwise they go into a package.
+* update-product and create-product: descriptions run through the same block processing as update-content, so synced patterns keep ref and content with their overrides; a stored Custom HTML block of a person stays, a new one is rejected. Texts reach core's KSES with their slashes only for the one save, the product object, variation titles and hooks see them unslashed.
+* A write that would lose block attributes (also in the short description of a product) fails with leitvia_attributes_lost, names block, position and keys and keeps the old state.
+* leitvia/audit-site renders each page with its template and reports links without a target (empty href, # without an anchor) outside the content as leitvia/empty-link with the class of their source; header and footer once under site. Rendering restores the global post, query and product, fires loop_end, fetches no oEmbed and stops a page of results after 10 seconds with the cursor for the rest. link-text reports an empty href, repair-links lists such links under empty.
+
+= 1.3.36 =
+* In a post split into parts (core/nextpage) a write gives a link to #anchor whose anchor lies in another part the path of that part plus the anchor (Table_Of_Contents::anchor_url(), without the host), once the post is published with pretty permalinks; drafts and plain permalinks keep the link. Only blocks the write changes are touched.
+* New content check leitvia/anchors: warning leitvia_anchor_other_part for a link to an anchor of another part (the fix names the path) and leitvia_anchor_missing for an anchor in no part. leitvia/audit-site reports both.
+* Table_Of_Contents::anchor_part() and entries() also take a post with content not yet saved.
+
+= 1.3.35 =
+* Table of contents in a post split into parts (core/nextpage): every heading knows its part. With scope all (default) the list groups the headings under Part 1, Part 2 and so on, marks the part being read with aria-current and links headings of other parts to the address of their part plus the anchor; scope part lists the part being read alone. One table of contents in part 1 shows at the top of every part. Generated heading ids stay unique across all parts.
+* Table_Of_Contents::anchor_url( $post, $anchor ) gives add-ons the address of an anchor in a post with parts.
+* Token sets with a group this version does not read (a role of a later version, a typo) come back from creating and activating with the warning leitvia_studio_dtcg_unknown_group, naming the group and the version of Studio, instead of dropping the group without a word.
+
+= 1.3.34 =
+* Token sets may set the text width and the wide width with the optional roles size.content (30 to 80 rem) and size.wide (60 to 100 rem, not narrower than size.content); without them the widths of the theme stay.
+* New warnings when writing content: leitvia_image_fixed_height for an image with a height but no aspect ratio, which stretches it, and leitvia_unknown_shortcode for shortcodes no plugin handles, such as rests of page builders. leitvia/get-page-outline lists such shortcodes with their block, leitvia/audit-site reports both.
+* leitvia/update-block changes align and the block style of image, gallery, cover and media and text blocks, and width, height, aspectRatio, scale, size, link and lightbox of an image; null removes one, so a fixed height goes without rewriting the page.
+* Only blocks a write changes are checked for unsafe markup: a stored block of a plugin that is gone no longer holds back every write of its post and stays byte for byte, and the rejection names the block that is unsafe. A new block inside a stored one is checked; a copy of a stored block in the same post passes on purpose, since it brings no markup the post did not hold.
+* Writes repair markup agents often get wrong, visible in the package: a vertical alignment of columns reaches the columns without one of their own, and an add-on block whose catalog example wraps its inner blocks in a box (the scroll gallery) gets that box. Only blocks the write changes are repaired, stored blocks keep their markup byte for byte.
+* leitvia/update-template-part keeps the settings of the navigation (submenus on click, overlay, name) when new content leaves them out.
+* Map: the popup is at least 18rem wide (80 % of a small screen) and at most 24rem, without hyphens in the middle of a word; title in bold, address below it, the link on a line of its own.
+
+= 1.3.33 =
+* A rejection of unsafe content names the place: block ID, tag, attribute and a short excerpt, in the message and in the data. Harmless rests of word processors (mso-* styles, empty o:p) are removed from a text the write changes instead of rejecting it; a write of title, meta or status alone leaves the stored content as it is.
+* leitvia/get-block returns the markup of Custom HTML blocks and rejects an empty Custom HTML or classic block with leitvia_empty_block instead of an empty result.
+* Map: blocks that render the map on the server pass a link per marker for the popup, named with the place, and a view that fits all markers with an upper zoom limit (fit). A popup takes the keyboard focus, on its link or else on its text, and Escape gives it back to the marker. Markers closer than 24 px move apart, and the attribution stands below the map instead of in its corner (WCAG 2.5.8).
+* leitvia/update-template takes template slugs with an underscore, such as taxonomy-product_cat and taxonomy-product_tag of WooCommerce, so product categories get a template apart from the shop page.
+* The changelog of versions 1.0.0 to 1.3.19 is in changelog.txt.
+
+= 1.3.32 =
+* Table of contents with display companion: a chapter button at the bottom edge with the section being read and the reading progress opens a dialog with the list.
+* Timeline entries take a free label instead of a date.
+* leitvia/list-media filters by IDs (include) and finds files by name; leitvia/set-alt-text takes up to 100 items in one call and one package.
+* New checks: blocks without a registered type (warning in content), templates without header, footer or main, accent below 4.5:1 on extra surfaces (links there turn ink). The block check of templates skips blocks that take the post from their context.
+* leitvia/get-pattern returns template patterns; add-on abilities run over REST for agents; the plan of a page no longer ends with the series pager.
+* Icons: ship and footprints (114 Lucide icons); wide icons keep their proportion at 1em height.
+* Token sets may set radius.media, the corner of photos, to radius.none, s, m or l; any other value is rejected with invalid_choice.
+
+= 1.3.31 =
+* New ability leitvia/update-template: sets a template of the theme from a template pattern whose templateTypes name it, with snapshot, autonomy, package and rollback. Templates of single posts and pages keep the post content.
+* leitvia/update-content takes the field template and gives an existing page or post another template of the contract. The template counts towards the hash; hashes from before still match while the template stays.
+* New ability leitvia/crop-media: crops an image of the media library to a rectangle in percent and adds the result as a new attachment with the alt text of the original, which stays.
+* Token sets may bring up to eight named surfaces under color.surface-extra, for cards and bands; ink needs a contrast of 4.5:1 on each. The export keeps them.
+* create-token-set and activate-token-set report the warning font_not_bundled in their findings.
+* New filter leitvia_studio_icons: icon sets of the site for the icon blocks, next to the fixed Lucide names; filled icons render without a stroke.
+* New filter leitvia_studio_consent_scripts: scripts of other plugins, named by handle or host with the category statistics or marketing, wait for consent like embeds. Until then the browser does not ask the host, and the block Consent settings offers each category to allow and revoke.
+* New filter leitvia_studio_gateway_options: add-ons write options of their own through the pipeline, checked on each write and when a package is applied.
+
+= 1.3.30 =
+* The shortest time between loading a page and sending the contact form (Contact_Form::MIN_SECONDS) is public, so extensions with a form of their own that use the same signed time field check the same time.
+
+= 1.3.29 =
+* leitvia/add-media takes WebVTT files with captions: right to upload files, .vtt, UTF-8 and the signature WEBVTT. The attribute tracks of leitvia/update-block sets them on a video with kind, srclang and label, and the video prints a track element (WCAG 1.2.2).
+* leitvia/update-block and leitvia/update-content set the caption of images, videos, audio, galleries, tables and embeds, and with add_link a new link on a passage of a text.
+* leitvia/update-content takes status: it publishes a draft, schedules it or takes a post back, by the same package rules as any change.
+* core/query and core/video are in the block catalog. query in leitvia/update-block merges into the settings of a query, so perPage alone keeps the rest.
+* leitvia/update-block changes prefix, value, suffix and label of a counter and the text attributes of other static blocks. Saved counters, wizards and consent settings no longer lose their markup for users without unfiltered_html, and every catalog example passes the gateway.
+* New ability leitvia/reject-package discards an open change package; the package and the audit log stay.
+* New ability leitvia/set-privacy-page proposes the privacy policy page for a person to apply. leitvia/audit-site reports a contact form on a site without a published one (check leitvia/privacy-page).
+
+= 1.3.28 =
+* Without an SEO plugin Leitvia Studio takes its place: leitvia/update-seo and the seo field of leitvia/create-content store title, description and robots and print them in the head, without changing the heading of the page.
+* Category, tag, author, posts and post type archives get a canonical address with their page number while no SEO plugin is active.
+* The structured data of the organization carries address, phone and email from the new fields of the settings or the new ability leitvia/set-organization. With an SEO plugin Studio prints none of it.
+* German variants such as de_DE_formal, de_AT and de_CH use the German translation of the zip.
+* German paragraphs in bento tiles hyphenate. Consent placeholder, Consent settings and the saving line of pricing plans use neither du nor Sie in German.
+
+= 1.3.27 =
+* German on every site: the plugin header names the languages folder. Since WordPress 6.7 core ignored the former path, so PHP texts of blocks and the plugin stayed English on sites without a language pack, such as Name, Email address and the result count of the filter.
+* New pattern Counted key figures with the block Counter. Blocks that keep their content in HTML name their saved markup as example in the block catalog, and the check block-validity rejects them when they are empty or carry such attributes in the comment.
+* A query loop on a type with singlePages: false lists its entries instead of falling back to posts, with filters and in the post type control of the editor. Relations may point to such entries.
+* Contact form: new attributes nameLabel, emailLabel, messageLabel and requiredNote. Empty texts follow the language of the site.
+* The default texts saved by the blocks Map, Wizard and Consent settings follow the language of the site, own texts stay.
+* Rate limit: reads and changes count apart. New setting read_rate_per_minute (300) next to rate_per_minute (60) and new filter leitvia_studio_rate_limit, so reading during a build no longer blocks changes.
+
+= 1.3.26 =
+* New block Contact form: name, email address and message, sent on the server with wp_mail, without JavaScript and without another plugin. Recipient and subject stay in the block attributes and never reach the page. It stores nothing; spam protection uses a honeypot, a signed time field and a rate limit per salted IP hash. New pattern cta-contact-form.
+* New ability leitvia/set-posts-page makes an existing page the posts page. Like every setting it goes through a change package; the front page and unknown pages are rejected.
+* Author as input: leitvia/create-content and leitvia/update-content take author, leitvia/list-content shows it. No login name reaches the public any more: an author whose display name is the login, or an agent, appears with first and last name, otherwise with the site name, in the byline, author box, feed, schema and REST, and has no author page. The inbox and the review keep showing the stored display name.
+* Update note: post_author now counts into the document hash of a post. Change packages that are open during the update report a conflict; review them or create them again.
+* Update note: content types and their taxonomies no longer inherit the front of the permalink structure. Addresses like /blog/<type>/... lose the prefix once after the update, the rewrite rules are built again. The content model option withFront keeps the old address.
+* New content model option singlePages: false gives the entries of a public type no address of their own, lists and bindings keep showing them.
+* leitvia/compose-page removes and repeats blocks of a pattern with the edits remove and repeat, so a section fits fewer or more entries without own markup. Locks, the last child, the outer block and duplicate HTML IDs are rejected.
+* leitvia/apply-recipe takes slugs per recipe page. Parents, navigation, footer, reading settings and the links of the edits follow.
+* leitvia/create-content and leitvia/update-content take the names of new terms in hierarchical taxonomies too. In a change package the name stays visible, the term is created when it is applied. Agents get manage_categories for this.
+* Token sets use the fonts of the Font Library of WordPress, whose files lie on the site. The warning font_not_bundled names the way.
+* A textarea field binds to core/list, one item per line; an empty field shows no list.
+* Query filter works without a page reload and without an Apply button; without JavaScript it stays a form.
+* New check leitvia/query-context: a filter outside a query, in a query that inherits or without queryId is an error, a duplicate queryId a warning. Query filter and Load more report a missing query, the editor warns on an inheriting query. Query filter has the attributes applyLabel and resetLabel.
+* The zip brings its translations: .mo and script JSON in languages/, loaded through the header Domain Path and load_script_translation_file. A language pack in WP_LANG_DIR wins.
+* leitvia/list-content counts what it shows: the draft of the privacy page is listed for agents, drafts they may not read are missing from items, total and pages alike. Writes return slug_changed when WordPress gives another address, at the latest on publishing.
+* leitvia/check-composition no longer counts the introduction before the first pattern as a section on templates that show the title themselves.
+* The check content-tokens names a px value in rem and points to leitvia/get-tokens.
+
+= 1.3.25 =
+* Security: the stored role Leitvia Agent holds no capability any more. Studio gives an agent its rights only while it runs, so with a deactivated plugin or a removed plugin folder the agent has the rights of a user without a role: it can change its own profile and nothing on the site, also over the REST routes of core. A role from an older version is emptied on the next load.
+* Deleting Studio in the admin removes the application passwords of agents. On a network it removes those bound to a site of the network.
+
+= 1.3.24 =
+* Script modules of Leitvia load at the end of the page at low priority, behind everything the first paint needs.
+* The styles of the Highlight format and of the copy button of code blocks can be printed inside the document.
+
+= 1.3.23 =
+* Effect library for Animation: besides fade, rise and one after another now zoom, slide from the start or end (follows the writing direction), wipe up, wipe from the start, blur, mask (an image is revealed from the inside) and parallax (the background of a cover or the line of a timeline moves a little with the scroll position, only where the browser supports scroll-driven animation). Pure CSS on opacity, transform, clip-path and filter, so nothing shifts the layout; the script stays one small module.
+* Strength per block (leitviaMotion): subtle moves 2.5rem in 800 ms, bold twice the way in 1200 ms, for lively brands, images and galleries.
+* New setting Motion in Studio, Settings: off, subtle (default) or bold. Off loads neither style nor script of the effects and marks the page with leitvia-motion-off, so the theme leaves out its hover motion too.
+* The accessibility bar has a switch Motion off (WCAG 2.2.2, 2.3.3): it stops the effects on scroll, the marquee, the counter and the hover motion of the theme at once, and is kept for the next page before the first paint. Marquee and counter also stay still with the site setting off.
+* The Animation panel in the editor offers every effect and the strength, with a Preview button.
+* Agents can set leitviaAnimation and leitviaMotion with leitvia/update-block on every block, static core blocks included; the saved markup stays as it is.
+* Seven Studio patterns use the new effects (Bento features, FAQ, Icon benefits, Spotlight, Spotlight scene, Timeline, Type entries).
+
+= 1.3.22 =
+* Animation and Reveal start where you look: a block appears once a fifth of it has passed a line 12 % above the bottom edge of the window (a block taller than the window needs a third of the window height), not with its first pixel, so on a phone the effect no longer runs below the edge.
+* One after another watches each child on its own: stacked cards on a phone appear one by one as each comes into view; children that come into view together, as in a row on a large screen, start 100 ms apart.
+* Softer timing: 800 ms on the curve of GSAP power3.out (CSS linear(), with a close cubic-bezier where linear() is missing), the lift stays 2.5rem.
+* A jump to an anchor, by a link in the page or the address, shows the target and every animated block above it at once, as keyboard focus does. The script stays a module of under 0.8 KB gzip.
+
+= 1.3.21 =
+* Sticky header: on pages whose header uses a sticky style of the theme, a script module of under 0.4 KB measures the header, so focused elements and jump targets stop exactly below it, and lets a header taller than a quarter of the window scroll away.
+* Animation and Reveal: a block now fades in once when it scrolls into view (600 ms; Rise also moves up 2.5rem, One after another starts each child 100 ms later) instead of following the scroll position, so the effect is clearly visible, also in Firefox and Safari.
+* Only blocks that start below the visible area wait hidden; what is in view on load, pages without JavaScript and visitors with reduced motion see the content at once. Keyboard focus inside a waiting block shows it right away.
+* The script is a module of under 0.4 KB gzip and loads only on pages with an animated block.
+
+= 1.3.20 =
+* Icon set grows from 76 to 112 Lucide icons, among them chef hat, heart with pulse, gavel, hard hat, trophy, code, shopping bag, newspaper, ear and languages for the topics of the kits.
+* Every icon SVG carries the class leitvia-icon--<name>, so a theme can style a single icon.
+* Code copy: a named code block gives its button the name "Copy code: <name>", so many code blocks on one page have distinct button names.
+* A group saved as a list (ul or ol) keeps its list role in Safari when a grid or flex layout hides the bullets.
+
+Older versions: changelog.txt in the plugin folder.
 
 = 1.3.19 =
 * New pattern FAQ with structured data: heading and intro above five questions in the FAQ block, one open at a time.

@@ -59,7 +59,8 @@ final class Pattern_Meta {
 	}
 
 	/**
-	 * Sanitizes the free text of changelog and annotation entries, line breaks stay; other keys pass unchanged.
+	 * Sanitizes every string of a meta value, also inside entries: the free text of changelog and annotation entries
+	 * keeps its line breaks, every other string becomes plain text. Numbers and booleans pass unchanged.
 	 *
 	 * @param mixed  $value    Meta value.
 	 * @param string $meta_key Meta key.
@@ -67,15 +68,19 @@ final class Pattern_Meta {
 	 */
 	public static function sanitize_entries( $value, string $meta_key ) {
 		$field = self::FREE_TEXT[ $meta_key ] ?? '';
-		if ( '' === $field || ! is_array( $value ) ) {
-			return $value;
-		}
-		foreach ( $value as &$entry ) {
-			if ( is_array( $entry ) && is_string( $entry[ $field ] ?? null ) ) {
-				$entry[ $field ] = sanitize_textarea_field( $entry[ $field ] );
+		$clean = static function ( $item, $key = null ) use ( &$clean, $field ) {
+			if ( is_array( $item ) ) {
+				foreach ( $item as $name => $child ) {
+					$item[ $name ] = $clean( $child, $name );
+				}
+				return $item;
 			}
-		}
-		return $value;
+			if ( ! is_string( $item ) ) {
+				return $item;
+			}
+			return '' !== $field && $key === $field ? sanitize_textarea_field( $item ) : sanitize_text_field( $item );
+		};
+		return $clean( $value );
 	}
 
 	/**

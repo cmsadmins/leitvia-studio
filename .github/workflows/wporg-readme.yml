@@ -1,0 +1,42 @@
+name: Update readme and assets on WordPress.org
+
+# Runs in the mirror cmsadmins/leitvia-studio. Pushes readme.txt (trunk and the stable tag) and .wordpress-org/ to SVN
+# without a release. The mirror snapshot raises the stable tag before its release is deployed, so the push waits
+# until that tag exists on SVN.
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "readme.txt"
+      - ".wordpress-org/**"
+  workflow_dispatch:
+
+jobs:
+  readme:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check SVN repository and stable tag
+        id: svn
+        run: |
+          STABLE=$(grep -m1 -E "^Stable tag:" readme.txt | sed -E 's/^Stable tag:[[:space:]]*//' | tr -d '[:space:]')
+          if curl -sfI "https://plugins.svn.wordpress.org/leitvia-studio/tags/$STABLE/" >/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Stable tag $STABLE is not on SVN yet; the release deploy brings readme and assets."
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Push readme and assets to WordPress.org
+        if: steps.svn.outputs.exists == 'true'
+        uses: 10up/action-wordpress-plugin-asset-update@stable
+        env:
+          SVN_USERNAME: ${{ secrets.SVN_USERNAME }}
+          SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
+          SLUG: leitvia-studio
+          ASSETS_DIR: .wordpress-org
+          README_NAME: readme.txt
+          # Trunk holds the built zip, the mirror only the sources; only readme and assets go up from here.
+          IGNORE_OTHER_FILES: true

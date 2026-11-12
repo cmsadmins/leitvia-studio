@@ -11,6 +11,8 @@ use LeitviaStudio\Gateway\Gateway;
 use LeitviaStudio\Gateway\Hashes;
 use LeitviaStudio\Gateway\Operation;
 use LeitviaStudio\Gateway\Pipeline;
+use LeitviaStudio\Model\Model;
+use LeitviaStudio\Model\Registrar;
 
 /**
  * Each check passes its good fixture and finds its bad one; registry, pipeline and audit-site.
@@ -33,10 +35,11 @@ class Test_Gateway_Content_Checks extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Drops the cached theme.json data of the theme.
+	 * Drops the cached theme.json data of the theme and the cached content model.
 	 */
 	public function tear_down(): void {
 		wp_clean_theme_json_cache();
+		Model::forget();
 		parent::tear_down();
 	}
 
@@ -135,7 +138,7 @@ class Test_Gateway_Content_Checks extends WP_UnitTestCase {
 	public function test_registry(): void {
 		$checks = leitvia_studio()->registry( 'checks' );
 		$this->assertSame(
-			array( 'leitvia/headings', 'leitvia/alt-text', 'leitvia/link-text', 'leitvia/block-validity', 'leitvia/unregistered', 'leitvia/shortcodes', 'leitvia/image-height', 'leitvia/anchors', 'leitvia/content-tokens', 'leitvia/content-contrast', 'leitvia/query-context', 'leitvia/template-parts' ),
+			array( 'leitvia/headings', 'leitvia/alt-text', 'leitvia/link-text', 'leitvia/block-validity', 'leitvia/unregistered', 'leitvia/shortcodes', 'leitvia/image-height', 'leitvia/anchors', 'leitvia/content-tokens', 'leitvia/content-contrast', 'leitvia/query-context', 'leitvia/bindings', 'leitvia/template-parts' ),
 			array_keys( $checks->all( array( 'scope' => 'content' ) ) )
 		);
 		$this->assertSame( array( 'leitvia/page-structure', 'leitvia/composition' ), array_keys( $checks->all( array( 'scope' => 'page' ) ) ) );
@@ -899,5 +902,163 @@ class Test_Gateway_Content_Checks extends WP_UnitTestCase {
 		Content_Checks::render_post( get_post( $post ) );
 		$this->assertArrayNotHasKey( 'product', $GLOBALS );
 		$this->assertNull( $GLOBALS['post'] ?? null );
+	}
+
+	/**
+	 * Uses the content model of the fixture events.json.
+	 */
+	private static function events_model(): void {
+		update_option( Model::OPTION, json_decode( (string) file_get_contents( dirname( __DIR__ ) . '/fixtures/model/events.json' ), true ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Test fixture.
+		Model::forget();
+		Registrar::register();
+	}
+
+	/**
+	 * Fixes of leitvia/bindings by block ID for markup in a context.
+	 *
+	 * @param string               $content Markup.
+	 * @param string               $type    Post type of the context.
+	 * @param array<string, mixed> $context More context.
+	 * @return array<string, string>
+	 */
+	private static function binding_fixes( string $content, string $type = 'event', array $context = array() ): array {
+		$findings = Content_Checks::bindings( $content, $context + array( 'post_type' => $type ) );
+		foreach ( $findings as $finding ) {
+			\PHPUnit\Framework\Assert::assertSame( array( 'leitvia/bindings', 'error' ), array( $finding['check'], $finding['severity'] ) );
+		}
+		return array_column( $findings, 'fix', 'block' );
+	}
+
+	/**
+	 * Block markup bound by metadata.bindings.
+	 *
+	 * @param string $source    Source.
+	 * @param string $args      Arguments as JSON.
+	 * @param string $attribute Attribute.
+	 * @param string $block     Block name without core/.
+	 */
+	private static function bound( string $source, string $args, string $attribute = 'content', string $block = 'paragraph' ): string {
+		$attrs = '{"metadata":{"bindings":{"' . $attribute . '":{"source":"' . $source . '","args":' . $args . '}}}}';
+		return 'paragraph' === $block ? '<!-- wp:paragraph ' . $attrs . ' --><p></p><!-- /wp:paragraph -->' : '<!-- wp:' . $block . ' ' . $attrs . ' /-->';
+	}
+
+	/**
+	 * Bindings that work pass: fields of the type, a field of the type of a query on a page, relations, bindable
+	 * settings on any page, core/post-meta on a field, attributes core binds, core/list of Leitvia, pattern overrides
+	 * and sources of core; templates and patterns take a field of any type.
+	 */
+	public function test_bindings_that_render(): void {
+		self::events_model();
+		$query = static fn( string $inner ): string => '<!-- wp:query {"queryId":3,"query":{"postType":"event","inherit":false}} --><div class="wp-block-query"><!-- wp:post-template -->' . $inner . '<!-- /wp:post-template --></div><!-- /wp:query -->';
+		$good  = array(
+			'event'       => array(
+				self::bound( 'leitvia/meta', '{"key":"event_venue"}' ),
+				self::bound( 'leitvia/meta', '{"key":"event_start"}', 'datetime', 'post-date' ),
+				self::bound( 'leitvia/meta', '{"key":"event_poster"}', 'url', 'image' ),
+				self::bound( 'leitvia/relation', '{"relation":"event_speakers","field":"person_role"}' ),
+				self::bound( 'leitvia/relation', '{"relation":"event_speakers","field":"url"}', 'url', 'button' ),
+				self::bound( 'core/post-meta', '{"key":"event_level"}' ),
+				self::bound( 'leitvia/setting', '{"key":"company_phone"}' ),
+				'<!-- wp:list {"metadata":{"bindings":{"content":{"source":"leitvia/meta","args":{"key":"event_venue"}}}}} --><ul class="wp-block-list"></ul><!-- /wp:list -->',
+				'<!-- wp:list-item {"metadata":{"bindings":{"content":{"source":"leitvia/meta","args":{"key":"event_venue"}}}}} --><li></li><!-- /wp:list-item -->',
+			),
+			'page'        => array(
+				self::bound( 'leitvia/setting', '{"key":"company_phone"}' ),
+				$query( self::bound( 'leitvia/meta', '{"key":"event_venue"}' ) ),
+				self::bound( 'core/post-data', '{"field":"date"}', 'datetime', 'post-date' ),
+				'<!-- wp:paragraph {"metadata":{"name":"Tip","bindings":{"__default":{"source":"core/pattern-overrides"}}}} --><p>Tip</p><!-- /wp:paragraph -->',
+			),
+			'wp_template' => array( self::bound( 'leitvia/meta', '{"key":"person_role"}' ) ),
+			'wp_block'    => array( self::bound( 'leitvia/meta', '{"key":"session_speaker"}' ) ),
+		);
+		foreach ( $good as $type => $blocks ) {
+			foreach ( $blocks as $markup ) {
+				$this->assertSame( array(), self::binding_fixes( $markup, $type ), $type . ' ' . $markup );
+			}
+		}
+	}
+
+	/**
+	 * Each binding that would render the saved content without a word is an error whose fix names the alternatives:
+	 * an unknown source, an attribute core does not bind, an undeclared field, relation, relation field or setting, a
+	 * setting without bindable, a field on a page outside a query, a relation through core/post-meta.
+	 */
+	public function test_bindings_that_render_nothing(): void {
+		self::events_model();
+		$cases = array(
+			'unknown source'           => array( 'event', self::bound( 'acme/values', '{"key":"event_venue"}' ), 'leitvia/meta' ),
+			'attribute not bound'      => array( 'event', self::bound( 'leitvia/meta', '{"key":"event_venue"}', 'url' ), 'Bind one of these attributes: content.' ),
+			'block not bound'          => array( 'event', self::bound( 'leitvia/meta', '{"key":"event_poster"}', 'url', 'cover' ), 'core/image' ),
+			'undeclared field'         => array( 'event', self::bound( 'leitvia/meta', '{"key":"event_colour"}' ), 'event_venue' ),
+			'field of another type'    => array( 'event', self::bound( 'leitvia/meta', '{"key":"person_role"}' ), 'event_venue' ),
+			'field on a page'          => array( 'page', self::bound( 'leitvia/meta', '{"key":"event_venue"}' ), 'leitvia/setting' ),
+			'relation on a post'       => array( 'post', self::bound( 'leitvia/relation', '{"relation":"event_speakers"}' ), 'core/query' ),
+			'core meta on a page'      => array( 'page', self::bound( 'core/post-meta', '{"key":"event_venue"}' ), 'leitvia/setting' ),
+			'undeclared relation'      => array( 'event', self::bound( 'leitvia/relation', '{"relation":"event_hosts"}' ), 'event_speakers' ),
+			'undeclared related field' => array( 'event', self::bound( 'leitvia/relation', '{"relation":"event_speakers","field":"event_venue"}' ), 'person_role' ),
+			'setting not bindable'     => array( 'page', self::bound( 'leitvia/setting', '{"key":"company_email"}' ), 'company_phone' ),
+			'undeclared setting'       => array( 'page', self::bound( 'leitvia/setting', '{"key":"opening_hours"}' ), 'company_phone' ),
+			'relation as core meta'    => array( 'event', self::bound( 'core/post-meta', '{"key":"event_speakers"}' ), 'leitvia/relation' ),
+			'undeclared in template'   => array( 'wp_template', self::bound( 'leitvia/meta', '{"key":"event_colour"}' ), 'person_role' ),
+		);
+		foreach ( $cases as $case => [ $type, $markup, $fix ] ) {
+			$fixes = self::binding_fixes( $markup, $type );
+			$this->assertSame( array( 'p:0' ), array_keys( $fixes ), $case );
+			$this->assertStringContainsString( $fix, $fixes['p:0'], $case );
+		}
+		// The block of a query loop is found by its path.
+		$query = '<!-- wp:query {"queryId":3,"query":{"postType":"person","inherit":false}} --><div class="wp-block-query"><!-- wp:post-template -->' . self::bound( 'leitvia/meta', '{"key":"event_venue"}' ) . '<!-- /wp:post-template --></div><!-- /wp:query -->';
+		$this->assertSame( array( 'p:0.0.0' ), array_keys( self::binding_fixes( $query, 'page' ) ) );
+	}
+
+	/**
+	 * A content model that waits in the package of the write counts as declared, as in a recipe run before a person
+	 * applied the model; other packages do not count.
+	 */
+	public function test_bindings_see_the_model_of_the_package(): void {
+		self::events_model();
+		$model                              = Model::current();
+		$model['settings']['opening_hours'] = array(
+			'type'     => 'text',
+			'label'    => 'Opening hours',
+			'bindable' => true,
+		);
+		$this->assertIsInt(
+			LeitviaStudio\Gateway\Packages::add(
+				'kit-run',
+				array(
+					'ability'   => 'leitvia/define-content-type',
+					'area'      => 'structure',
+					'target'    => array( 'option' => Model::OPTION ),
+					'base_hash' => '',
+					'level'     => 'suggest',
+					'kinds'     => array(),
+					'state'     => array( 'value' => $model ),
+					'findings'  => array(),
+				)
+			)
+		);
+		$markup = self::bound( 'leitvia/setting', '{"key":"opening_hours"}' );
+		$this->assertSame( array(), self::binding_fixes( $markup, 'page', array( 'package' => 'kit-run' ) ) );
+		$this->assertCount( 1, self::binding_fixes( $markup, 'page', array( 'package' => 'other-run' ) ) );
+		$this->assertCount( 1, self::binding_fixes( $markup, 'page' ) );
+	}
+
+	/**
+	 * The pipeline rejects a page whose paragraph binds a field, with leitvia_check_failed and the check.
+	 */
+	public function test_pipeline_rejects_a_binding_that_renders_nothing(): void {
+		self::events_model();
+		$page   = self::factory()->post->create(
+			array(
+				'post_type'   => 'page',
+				'post_status' => 'draft',
+			)
+		);
+		$change = static fn( array $state ): array => array( 'post_content' => self::bound( 'leitvia/meta', '{"key":"event_venue"}' ) ) + $state;
+		$result = Pipeline::run( new Operation( 'leitvia/test-write', 'content', array( 'post' => $page ), Hashes::document( $page ), $change ) );
+		$this->assertWPError( $result );
+		$this->assertSame( 'leitvia_check_failed', $result->get_error_code() );
+		$this->assertContains( 'leitvia/bindings', array_column( $result->get_error_data()['findings'], 'check' ) );
 	}
 }

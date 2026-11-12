@@ -18,3 +18,13 @@ parameters:
     - tests/php/stubs/woocommerce.php
   # Own cache per checkout: parallel runs collided writing the shared system temp folder.
   tmpDir: ../../.cache/phpstan-studio
+  # PHPStan reads no docblock of a method of an anonymous class, so the array shapes of these two return types stay
+  # unseen; the docblocks name them. With its result cache the error does not always come up, so an unmatched entry
+  # is no error.
+  ignoreErrors:
+    - identifier: missingType.iterableValue
+      path: includes/consent/class-consent.php
+      reportUnmatched: false
+    - identifier: missingType.iterableValue
+      path: includes/gateway/class-block-edit.php
+      reportUnmatched: false

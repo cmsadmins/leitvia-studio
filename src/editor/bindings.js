@@ -488,16 +488,50 @@ export function registerBindings( data ) {
 		list.map( ( source ) => [ source.name, source ] )
 	);
 
-	// Writes the field labels into empty bound text attributes of one block; renders nothing.
-	function Fallback( { clientId, name, bindings } ) {
+	const postTypes = data.postTypes ?? {};
+	const relations = data.relations ?? {};
+
+	// core/post-meta bound to a field of the content model becomes leitvia/meta: the same value, but typed text is
+	// stored as the field type needs (an option key, a number) instead of raw. Core's source cannot be replaced.
+	const adopted = ( bindings, postType ) => {
+		let changed = false;
+		const next = {};
+		for ( const [ attribute, binding ] of Object.entries( bindings ) ) {
+			const key = binding?.args?.key;
+			if (
+				binding?.source === 'core/post-meta' &&
+				postTypes[ postType ]?.fields?.[ key ] &&
+				! relations[ key ]
+			) {
+				next[ attribute ] = { ...binding, source: 'leitvia/meta' };
+				changed = true;
+			} else {
+				next[ attribute ] = binding;
+			}
+		}
+		return changed ? next : null;
+	};
+
+	// Writes the field labels into empty bound text attributes of one block and adopts core/post-meta bindings of
+	// model fields; renders nothing.
+	function Fallback( { clientId, name, bindings, context } ) {
 		const registry = useRegistry();
 		useEffect( () => {
 			const saved = registry
 				.select( blockEditorStore )
 				.getBlockAttributes( clientId );
-			const postType = registry
-				.select( editorStore )
-				.getCurrentPostType();
+			const postType =
+				context?.postType ??
+				registry.select( editorStore ).getCurrentPostType();
+			const own = adopted( bindings, postType );
+			if ( own ) {
+				const dispatch = registry.dispatch( blockEditorStore );
+				dispatch.__unstableMarkNextChangeAsNotPersistent();
+				dispatch.updateBlockAttributes( clientId, {
+					metadata: { ...saved?.metadata, bindings: own },
+				} );
+				return;
+			}
 			const fallback = {};
 			for ( const [ attribute, binding ] of Object.entries( bindings ) ) {
 				const source = byName[ binding?.source ];
@@ -518,7 +552,7 @@ export function registerBindings( data ) {
 				dispatch.__unstableMarkNextChangeAsNotPersistent();
 				dispatch.updateBlockAttributes( clientId, fallback );
 			}
-		}, [ bindings, clientId, name, registry ] );
+		}, [ bindings, clientId, context?.postType, name, registry ] );
 		return null;
 	}
 
@@ -533,6 +567,7 @@ export function registerBindings( data ) {
 							clientId={ props.clientId }
 							name={ props.name }
 							bindings={ bindings }
+							context={ props.context }
 						/>
 					) }
 					<BlockEdit { ...props } />

@@ -372,7 +372,11 @@ final class Block_Edit {
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	private static function change( array $block, array $change, array $target ) {
-		$name    = (string) $block['blockName'];
+		$name  = (string) $block['blockName'];
+		$bound = self::bound( $block, $change, $target );
+		if ( $bound ) {
+			return $bound;
+		}
 		$rebuild = Rejection::make( 'leitvia_static_markup', __( 'This change needs markup that cannot be rebuilt safely. Insert the pattern again with leitvia/compose-page, or change a block that supports it.', 'leitvia-studio' ), 422, 'static_markup', $target, 'leitvia/compose-page' );
 		if ( isset( $change['attributes'] ) ) {
 			$block = self::attributes( $block, (array) $change['attributes'], $target, $rebuild );
@@ -428,6 +432,48 @@ final class Block_Edit {
 		}
 		$block['innerHTML'] = implode( '', array_filter( (array) $block['innerContent'], 'is_string' ) );
 		return $block;
+	}
+
+	/**
+	 * Rejection for a change of an attribute a binding fills: visitors see the bound value, not the edit. Pattern
+	 * overrides stay editable, since a copy shows its own text.
+	 *
+	 * @param array<string, mixed> $block  Parsed block.
+	 * @param array<string, mixed> $change Change.
+	 * @param array<string, mixed> $target Target.
+	 */
+	private static function bound( array $block, array $change, array $target ): ?\WP_Error {
+		$bindings = $block['attrs']['metadata']['bindings'] ?? null;
+		if ( ! is_array( $bindings ) ) {
+			return null;
+		}
+		$text     = array(
+			'core/button'  => 'text',
+			'core/quote'   => 'citation',
+			'core/details' => 'summary',
+		)[ (string) $block['blockName'] ] ?? 'content';
+		$touched  = array_keys( (array) ( $change['attributes'] ?? array() ) );
+		$touched += isset( $change['text'] ) ? array( 'text' => $text ) : array();
+		$touched += isset( $change['url'] ) && 'core/button' === $block['blockName'] ? array( 'url' => 'url' ) : array();
+		$touched += isset( $change['caption'] ) ? array( 'caption' => 'caption' ) : array();
+		$touched  = array_merge( array_values( $touched ), isset( $change['image'] ) ? array( 'id', 'url', 'alt' ) : array() );
+		foreach ( $touched as $attribute ) {
+			$binding = $bindings[ $attribute ] ?? null;
+			$source  = is_array( $binding ) ? (string) ( $binding['source'] ?? '' ) : '';
+			if ( '' === $source || 'core/pattern-overrides' === $source ) {
+				continue;
+			}
+			$args = (array) ( $binding['args'] ?? array() );
+			$key  = (string) ( $args['key'] ?? $args['relation'] ?? '' );
+			return self::invalid(
+				'bound',
+				/* translators: 1: attribute, for example content; 2: binding source, for example leitvia/meta; 3: field key */
+				sprintf( __( 'The attribute %1$s of this block shows "%3$s" from %2$s, so visitors would not see the change. Change the value there.', 'leitvia-studio' ), $attribute, $source, $key ),
+				$target,
+				'leitvia/setting' === $source ? 'leitvia/update-site-values' : ( str_starts_with( $source, 'leitvia/' ) || 'core/post-meta' === $source ? 'leitvia/update-content' : '' )
+			);
+		}
+		return null;
 	}
 
 	/**

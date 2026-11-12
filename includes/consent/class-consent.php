@@ -227,7 +227,7 @@ final class Consent {
 			/**
 			 * Byte offset and length of the current token.
 			 *
-			 * @return array{0: int, 1: int}
+			 * @return list{int, int}
 			 */
 			public function span(): array {
 				$this->set_bookmark( 'leitvia-iframe' );

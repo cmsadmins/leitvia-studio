@@ -88,7 +88,7 @@ final class Content {
 		Abilities::write(
 			'leitvia/create-content',
 			__( 'Create content', 'leitvia-studio' ),
-			__( 'Creates a post, a page or an entry of the content model from block markup or patterns; base_hash is empty. Post types come from leitvia/get-content-model, sections work as in leitvia/compose-page. The content runs through the same checks as leitvia/update-content. Terms take IDs, names or slugs; a name no term has yet creates the term with the content, in categories at the top level and only for a user who may manage them, and in a change package it stays a name until the package is applied. Fields follow the content model; required fields must be set before publishing. The featured image needs alt text (leitvia/set-alt-text) or the decorative mark, or names the file of an image that waits in the same package from leitvia/add-media. The status is capped by the autonomy level. ai_generated adds a visible note to the text.', 'leitvia-studio' ),
+			__( 'Creates a post, a page or an entry of the content model from block markup or patterns; base_hash is empty. Post types come from leitvia/get-content-model, sections work as in leitvia/compose-page. The content runs through the same checks as leitvia/update-content. Terms take IDs, names or slugs; a name no term has yet creates the term with the content, in categories at the top level and only for a user who may manage them, and in a change package it stays a name until the package is applied. Fields follow the content model; required fields must be set before publishing. rows fill the repeaters of an entry. The featured image needs alt text (leitvia/set-alt-text) or the decorative mark, or names the file of an image that waits in the same package from leitvia/add-media. The status is capped by the autonomy level. ai_generated adds a visible note to the text.', 'leitvia-studio' ),
 			'build',
 			array(
 				'destructive' => false,
@@ -138,6 +138,7 @@ final class Content {
 					'author'         => self::author_schema(),
 					'terms'          => self::terms_schema(),
 					'fields'         => self::fields_schema(),
+					'rows'           => self::rows_schema(),
 					'featured_image' => self::image_schema( true ),
 					'status'         => array(
 						'type' => 'string',
@@ -182,7 +183,7 @@ final class Content {
 		Abilities::read(
 			'leitvia/list-content',
 			__( 'List content', 'leitvia-studio' ),
-			__( 'Lists posts, pages and entries of the content model, newest first, with hash, terms and the open package that waits for each. Per item: ID, type, status, title, slug, date, modified, author (ID) and author_name as visitors see it, excerpt, terms, fields, link, hash and package. Filter by type, status, search text, modified since and published after a date. Only content agents may read; no comments, users or form entries.', 'leitvia-studio' ),
+			__( 'Lists posts, pages and entries of the content model, newest first, with hash, terms and the open package that waits for each. Per item: ID, type, status, title, slug, date, modified, author (ID) and author_name as visitors see it, excerpt, terms, fields, rows of repeaters, link, hash and package. Filter by type, status, search text, modified since and published after a date. Only content agents may read; no comments, users or form entries.', 'leitvia-studio' ),
 			array(
 				'type'                 => 'object',
 				'properties'           => array(
@@ -321,6 +322,23 @@ final class Content {
 	}
 
 	/**
+	 * Schema of the rows of repeaters, shared by create-content and update-content.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function rows_schema(): array {
+		return array(
+			'type'                 => 'object',
+			'description'          => __( 'Rows of the repeaters of an entry by repeater key, such as {"event_agenda": [{"title": "Welcome", "session_time": "09:00"}]}: title and the field keys of the repeater from leitvia/get-content-model. A list replaces the rows of its repeater in this order, an empty list removes them; repeaters you leave out stay.', 'leitvia-studio' ),
+			'additionalProperties' => array(
+				'type'     => 'array',
+				'maxItems' => 100,
+				'items'    => array( 'type' => 'object' ),
+			),
+		);
+	}
+
+	/**
 	 * Schema of a featured image.
 	 *
 	 * @param bool $file Whether the image may name a file waiting in the package (create-content only).
@@ -396,9 +414,163 @@ final class Content {
 	}
 
 	/**
-	 * Part of the state of a post of a content type: post_date, post_author, terms by taxonomy (IDs) and, under meta_input, the
-	 * featured image, the template, the fields of the content model and the SEO meta update-seo writes (Seo::keys()).
-	 * Empty for other post types.
+	 * Repeaters of an entry type of the content model whose row type Studio registered, by repeater key.
+	 *
+	 * @param string $type Post type.
+	 * @return array<string, array<string, mixed>>
+	 */
+	public static function repeaters( string $type ): array {
+		$repeaters = array();
+		foreach ( (array) ( Model::current()['postTypes'][ $type ]['repeaters'] ?? array() ) as $key => $repeater ) {
+			if ( is_array( $repeater ) && Registrar::owns_post_type( (string) ( $repeater['postType'] ?? '' ) ) ) {
+				$repeaters[ (string) $key ] = $repeater;
+			}
+		}
+		return $repeaters;
+	}
+
+	/**
+	 * Row posts of a repeater of an entry in their order, trashed ones left out.
+	 *
+	 * @param int    $id   Entry ID.
+	 * @param string $type Row post type.
+	 * @return list<int>
+	 */
+	private static function row_ids( int $id, string $type ): array {
+		return array_values(
+			array_map(
+				'intval',
+				get_posts(
+					array(
+						'post_type'   => $type,
+						'post_parent' => $id,
+						'post_status' => 'any',
+						'fields'      => 'ids',
+						'numberposts' => -1,
+						'orderby'     => array(
+							'menu_order' => 'ASC',
+							'ID'         => 'ASC',
+						),
+					)
+				)
+			)
+		);
+	}
+
+	/**
+	 * Rows of a repeater of an entry as the state holds them: title and the declared fields per row, in their order.
+	 *
+	 * @param int                  $id       Entry ID.
+	 * @param array<string, mixed> $repeater Repeater declaration.
+	 * @return list<array<string, mixed>>
+	 */
+	private static function rows( int $id, array $repeater ): array {
+		$rows = array();
+		foreach ( self::row_ids( $id, (string) $repeater['postType'] ) as $row ) {
+			$values = array( 'title' => (string) get_post_field( 'post_title', $row, 'raw' ) );
+			foreach ( array_keys( (array) ( $repeater['fields'] ?? array() ) ) as $key ) {
+				$values[ (string) $key ] = get_post_meta( $row, (string) $key, true );
+			}
+			$rows[] = $values;
+		}
+		return $rows;
+	}
+
+	/**
+	 * Writes the rows of a state over the rows of the entry: the first rows are updated in place, more rows are added,
+	 * fewer rows delete the rest (forced, agents cannot see the trash). A repeater whose rows did not change is left
+	 * as it is.
+	 *
+	 * @param int                  $id    Entry ID.
+	 * @param array<string, mixed> $state State.
+	 */
+	public static function set_rows( int $id, array $state ): bool {
+		$repeaters = isset( $state['rows'] ) ? self::repeaters( (string) get_post_type( $id ) ) : array();
+		foreach ( (array) ( $state['rows'] ?? array() ) as $key => $rows ) {
+			$repeater = $repeaters[ (string) $key ] ?? null;
+			$rows     = array_values( (array) $rows );
+			if ( ! $repeater || self::rows( $id, $repeater ) == $rows ) { // phpcs:ignore Universal.Operators.StrictComparisons.LooseEqual -- Stored states went through JSON, rows read back hold strings.
+				continue;
+			}
+			$type     = (string) $repeater['postType'];
+			$existing = self::row_ids( $id, $type );
+			foreach ( $rows as $index => $row ) {
+				$row     = (array) $row;
+				$data    = array(
+					'post_type'   => $type,
+					'post_parent' => $id,
+					'post_status' => 'inherit',
+					'menu_order'  => $index,
+					'post_title'  => (string) ( $row['title'] ?? '' ),
+				);
+				$written = isset( $existing[ $index ] ) ? wp_update_post( wp_slash( array( 'ID' => $existing[ $index ] ) + $data ), true ) : wp_insert_post( wp_slash( $data ), true );
+				if ( is_wp_error( $written ) ) {
+					return false;
+				}
+				foreach ( array_keys( (array) ( $repeater['fields'] ?? array() ) ) as $field ) {
+					$value = $row[ $field ] ?? '';
+					if ( in_array( $value, array( '', null ), true ) ) {
+						delete_post_meta( (int) $written, (string) $field );
+					} else {
+						update_post_meta( (int) $written, (string) $field, wp_slash( $value ) );
+					}
+				}
+			}
+			foreach ( array_slice( $existing, count( $rows ) ) as $gone ) {
+				wp_delete_post( $gone, true );
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * Rows of the input for a repeater: objects with title and the field keys of the repeater, each value checked as a
+	 * field, required fields set.
+	 *
+	 * @param string               $key      Repeater key.
+	 * @param array<string, mixed> $repeater Repeater declaration.
+	 * @param mixed                $rows     Rows of the input.
+	 * @param array<string, mixed> $target   Target for rejections.
+	 * @return list<array<string, mixed>>|\WP_Error
+	 */
+	private static function input_rows( string $key, array $repeater, $rows, array $target ) {
+		$type   = (string) $repeater['postType'];
+		$fields = (array) ( $repeater['fields'] ?? array() );
+		$out    = array();
+		foreach ( array_values( (array) $rows ) as $index => $row ) {
+			$at = $target + array(
+				'repeater' => $key,
+				'row'      => $index,
+			);
+			if ( ! is_array( $row ) ) {
+				return Block_Edit::invalid( 'rows', __( 'Each row is an object with title and the field keys of the repeater.', 'leitvia-studio' ), $at, 'leitvia/get-content-model' );
+			}
+			$unknown = array_diff( array_map( 'strval', array_keys( $row ) ), array_merge( array( 'title' ), array_map( 'strval', array_keys( $fields ) ) ) );
+			if ( $unknown ) {
+				/* translators: %s: list of keys */
+				return Block_Edit::invalid( 'rows', sprintf( __( 'The repeater has no field with these keys: %s. Read the content model for its fields.', 'leitvia-studio' ), implode( ', ', $unknown ) ), $at, 'leitvia/get-content-model' );
+			}
+			$values = array( 'title' => sanitize_text_field( (string) ( $row['title'] ?? '' ) ) );
+			foreach ( $fields as $field => $declaration ) {
+				$value = array_key_exists( $field, $row ) ? self::field( $type, (string) $field, (array) $declaration, $row[ $field ], $at ) : '';
+				if ( is_wp_error( $value ) ) {
+					return $value;
+				}
+				if ( ! empty( $declaration['required'] ) && in_array( $value, array( '', null ), true ) ) {
+					/* translators: %s: field label */
+					return Block_Edit::invalid( 'rows', sprintf( __( 'Every row needs the required field %s.', 'leitvia-studio' ), (string) ( $declaration['label'] ?? $field ) ), $at, 'leitvia/get-content-model' );
+				}
+				$values[ (string) $field ] = $value;
+			}
+			$out[] = $values;
+		}
+		return $out;
+	}
+
+	/**
+	 * Part of the state of a post of a content type: post_date, post_author, terms by taxonomy (IDs), under meta_input
+	 * the featured image, the template, the fields of the content model and the SEO meta update-seo writes (Seo::keys()),
+	 * and the rows of its repeaters under rows. Empty for other post types.
 	 *
 	 * @param int    $id   Post ID.
 	 * @param string $type Post type.
@@ -425,11 +597,14 @@ final class Content {
 		foreach ( array_merge( array_keys( self::fields( $type ) ), Seo::keys() ) as $key ) {
 			$state['meta_input'][ $key ] = get_post_meta( $id, $key, true );
 		}
+		foreach ( self::repeaters( $type ) as $key => $repeater ) {
+			$state['rows'][ $key ] = self::rows( $id, $repeater );
+		}
 		return $state;
 	}
 
 	/**
-	 * Fields of a state for wp_insert_post(): without terms and without empty meta the post does not have yet, with
+	 * Fields of a state for wp_insert_post(): without terms and rows, without empty meta the post does not have yet, with
 	 * post_date_gmt when the date changes, so a draft keeps the date it was given.
 	 *
 	 * @param int                  $id    Post ID, 0 for a new post.
@@ -437,7 +612,7 @@ final class Content {
 	 * @return array<string, mixed>
 	 */
 	public static function prepare( int $id, array $state ): array {
-		unset( $state['terms'] );
+		unset( $state['terms'], $state['rows'] );
 		foreach ( (array) ( $state['meta_input'] ?? array() ) as $key => $value ) {
 			if ( in_array( $value, array( '', 0, null, array() ), true ) && ! ( $id && metadata_exists( 'post', $id, (string) $key ) ) ) {
 				unset( $state['meta_input'][ $key ] );
@@ -494,11 +669,11 @@ final class Content {
 	}
 
 	/**
-	 * State with date, terms, fields and featured image of the input: each checked, a key the state of the post type
-	 * does not have is invalid. Shared by create-content and update-content.
+	 * State with date, terms, fields, rows and featured image of the input: each checked, a key the state of the post
+	 * type does not have is invalid. Shared by create-content and update-content.
 	 *
 	 * @param array<string, mixed> $state  State, see state().
-	 * @param array<string, mixed> $input  Input with date, author, terms, fields and featured_image.
+	 * @param array<string, mixed> $input  Input with date, author, terms, fields, rows and featured_image.
 	 * @param array<string, mixed> $target Target for rejections.
 	 * @return array<string, mixed>|\WP_Error
 	 */
@@ -532,6 +707,16 @@ final class Content {
 				return $value;
 			}
 			$state['meta_input'][ $key ] = $value;
+		}
+		$repeaters = self::repeaters( $type );
+		foreach ( (array) ( $input['rows'] ?? array() ) as $key => $rows ) {
+			$rows = isset( $repeaters[ $key ] ) && array_key_exists( (string) $key, (array) ( $state['rows'] ?? array() ) )
+				? self::input_rows( (string) $key, $repeaters[ $key ], $rows, $target )
+				: Block_Edit::invalid( 'rows', __( 'The post type has no repeater with this key. Read the content model for its repeaters.', 'leitvia-studio' ), $target + array( 'repeater' => (string) $key ), 'leitvia/get-content-model' );
+			if ( is_wp_error( $rows ) ) {
+				return $rows;
+			}
+			$state['rows'][ $key ] = $rows;
 		}
 		if ( isset( $input['featured_image']['id'] ) ) {
 			$image = (int) $input['featured_image']['id'];
@@ -682,6 +867,7 @@ final class Content {
 					'post_date'    => (string) $date,
 					'terms'        => array_fill_keys( self::taxonomies( $type ), array() ),
 					'meta_input'   => array_fill_keys( array_keys( self::fields( $type ) ), '' ) + ( post_type_supports( $type, 'thumbnail' ) ? array( '_thumbnail_id' => 0 ) : array() ),
+					'rows'         => array_fill_keys( array_keys( self::repeaters( $type ) ), array() ),
 				) + array_intersect_key( $input, array( 'comment_status' => true ) ) + $state;
 				$state = self::change( $state, array_diff_key( $input, array( 'date' => true ) ), array( 'post' => 0 ) );
 				if ( is_wp_error( $state ) ) {
@@ -698,7 +884,8 @@ final class Content {
 				}
 				$state['meta_input'] = array_filter( (array) $state['meta_input'], static fn( $value ): bool => ! in_array( $value, array( '', 0, null, array() ), true ) ) + $meta;
 				$state['terms']      = array_filter( (array) $state['terms'] );
-				return array_filter( $state, static fn( $value, string $key ): bool => ! in_array( $key, array( 'post_date', 'terms', 'meta_input' ), true ) || ( array() !== $value && '' !== $value ), ARRAY_FILTER_USE_BOTH );
+				$state['rows']       = array_filter( (array) $state['rows'] );
+				return array_filter( $state, static fn( $value, string $key ): bool => ! in_array( $key, array( 'post_date', 'terms', 'meta_input', 'rows' ), true ) || ( array() !== $value && '' !== $value ), ARRAY_FILTER_USE_BOTH );
 			},
 		);
 	}
@@ -915,7 +1102,9 @@ final class Content {
 					$terms[ $taxonomy ] = $names;
 				}
 			}
-			$fields  = array_intersect_key( (array) ( self::state( $post->ID, $post->post_type )['meta_input'] ?? array() ), self::fields( $post->post_type ) );
+			$state   = self::state( $post->ID, $post->post_type );
+			$fields  = array_intersect_key( (array) ( $state['meta_input'] ?? array() ), self::fields( $post->post_type ) );
+			$rows    = array_filter( (array) ( $state['rows'] ?? array() ) );
 			$excerpt = '' !== $post->post_excerpt ? $post->post_excerpt : wp_strip_all_tags( excerpt_remove_blocks( strip_shortcodes( $post->post_content ) ) );
 			$items[] = array(
 				'id'          => $post->ID,
@@ -932,7 +1121,7 @@ final class Content {
 				'link'        => (string) get_permalink( $post ),
 				'hash'        => Hashes::document( $post->ID ),
 				'package'     => $waits[ $post->ID ] ?? null,
-			) + ( $fields ? array( 'fields' => $fields ) : array() );
+			) + ( $fields ? array( 'fields' => $fields ) : array() ) + ( $rows ? array( 'rows' => $rows ) : array() );
 		}
 		return array(
 			'items' => $items,

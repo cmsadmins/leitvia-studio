@@ -9,3 +9,4 @@ composer.lock
 node_modules/
 vendor/
 .wordpress-org/
+.github/

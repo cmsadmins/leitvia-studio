@@ -205,7 +205,9 @@ final class Registrar {
 				$schema['maxItems'] = 1;
 			}
 			// Targets are checked over REST, where a user picks them (check_rest_meta()); imports keep every ID.
-			self::register_meta( $relation['from'], $key, self::meta_args( 'array', $schema, $relation['label'] ) );
+			$args                      = self::meta_args( 'array', $schema, $relation['label'] );
+			$args['sanitize_callback'] = static fn( $ids ): array => array_values( array_filter( array_map( 'absint', (array) $ids ) ) );
+			self::register_meta( $relation['from'], $key, $args );
 		}
 
 		foreach ( $model['settings'] ?? array() as $key => $setting ) {
@@ -222,10 +224,10 @@ final class Registrar {
 					'label'             => $setting['label'],
 					'description'       => $setting['description'] ?? '',
 					'show_in_rest'      => array( 'schema' => $schema ),
-					'sanitize_callback' => static function ( $value ) use ( $schema, $name ) {
+					'sanitize_callback' => static function ( $value ) use ( $schema, $name, $setting ) {
 						return is_wp_error( rest_validate_value_from_schema( $value, $schema, $name ) )
 							? get_option( $name )
-							: rest_sanitize_value_from_schema( $value, $schema, $name );
+							: self::sanitize( $setting, rest_sanitize_value_from_schema( $value, $schema, $name ) );
 					},
 					'show_in_abilities' => $setting['showInAbilities'] ?? false,
 				)
@@ -805,12 +807,53 @@ final class Registrar {
 	 */
 	private static function register_fields( string $post_type, array $fields ): void {
 		foreach ( $fields as $key => $field ) {
-			list( $type, $schema ) = self::schema_for( $field );
-			$args                  = self::meta_args( $type, $schema, $field['label'] );
-			if ( 'image' === $field['type'] ) {
-				$args['sanitize_callback'] = static fn( $id ): int => wp_attachment_is_image( (int) $id ) ? (int) $id : 0;
-			}
+			list( $type, $schema )     = self::schema_for( $field );
+			$args                      = self::meta_args( $type, $schema, $field['label'] );
+			$args['sanitize_callback'] = static fn( $value ) => self::sanitize( $field, $value );
 			self::register_meta( $post_type, $key, $args );
+		}
+	}
+
+	/**
+	 * A value cleaned for the type of a field, on every write (REST, abilities, update_post_meta, options): the REST
+	 * schema checks the shape but leaves the text of strings as sent, so tags and line breaks go here. A value that
+	 * does not fit the type becomes the empty value of the type.
+	 *
+	 * @param array<string, mixed> $field Field declaration.
+	 * @param mixed                $value Value.
+	 * @return mixed
+	 */
+	public static function sanitize( array $field, $value ) {
+		$text = is_scalar( $value ) ? (string) $value : '';
+		if ( '' === $text && 'boolean' !== $field['type'] ) {
+			// An emptied field stays empty, also for numbers and images.
+			return '';
+		}
+		switch ( $field['type'] ) {
+			case 'textarea':
+				return sanitize_textarea_field( $text );
+			case 'email':
+				return sanitize_email( $text );
+			case 'url':
+				return esc_url_raw( $text );
+			case 'integer':
+				return is_numeric( $value ) ? (int) $value : 0;
+			case 'number':
+				return is_numeric( $value ) ? (float) $value : 0.0;
+			case 'boolean':
+				return (bool) rest_sanitize_boolean( is_scalar( $value ) ? (string) $value : '' );
+			case 'select':
+				return in_array( $text, array_map( 'strval', array_keys( (array) ( $field['options'] ?? array() ) ) ), true ) ? $text : '';
+			case 'date':
+				return preg_match( '/^\d{4}-\d{2}-\d{2}$/', $text ) ? $text : '';
+			case 'time':
+				return preg_match( '/^\d{2}:\d{2}$/', $text ) ? $text : '';
+			case 'datetime':
+				return false !== rest_parse_date( $text ) ? sanitize_text_field( $text ) : '';
+			case 'image':
+				return wp_attachment_is_image( (int) $value ) ? (int) $value : 0;
+			default:
+				return sanitize_text_field( $text );
 		}
 	}
 

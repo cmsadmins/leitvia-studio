@@ -446,7 +446,29 @@ final class Dtcg {
 		if ( ! is_string( $value ) || true !== self::validate_size( $value ) ) {
 			return '';
 		}
-		return (string) wp_json_encode( json_decode( $value ), self::JSON_FLAGS );
+		return (string) wp_json_encode( self::plain( json_decode( $value ) ), self::JSON_FLAGS );
+	}
+
+	/**
+	 * Every string of a decoded document as plain text, keys and structure unchanged: token values and descriptions
+	 * never hold tags or line breaks.
+	 *
+	 * @param mixed $node Decoded JSON.
+	 * @return mixed
+	 */
+	private static function plain( $node ) {
+		if ( is_string( $node ) ) {
+			return sanitize_text_field( $node );
+		}
+		if ( is_array( $node ) ) {
+			return array_map( array( self::class, 'plain' ), $node );
+		}
+		if ( $node instanceof \stdClass ) {
+			foreach ( get_object_vars( $node ) as $key => $child ) {
+				$node->$key = self::plain( $child );
+			}
+		}
+		return $node;
 	}
 
 	/**

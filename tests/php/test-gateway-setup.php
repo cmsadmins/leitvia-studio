@@ -16,8 +16,8 @@ use LeitviaStudio\Tokens\Dtcg;
 use LeitviaStudio\Tokens\Token_Sets;
 
 /**
- * Abilities create-token-set, activate-token-set, set-variation, define-content-type, update-navigation and update-template-part
- * through the pipeline, as an agent in the profiles standard and full.
+ * Abilities create-token-set, activate-token-set, set-variation, define-content-type, update-site-values,
+ * update-navigation and update-template-part through the pipeline, as an agent in the profiles standard and full.
  */
 class Test_Gateway_Setup extends WP_UnitTestCase {
 
@@ -1326,5 +1326,115 @@ class Test_Gateway_Setup extends WP_UnitTestCase {
 			'values the content sets stay, byte for byte'
 		);
 		$this->assertSame( '<!-- wp:site-title /-->', LeitviaStudio\Gateway\Abilities\Setup::keep_navigation( '<!-- wp:site-title /-->', '<!-- wp:navigation {"submenuVisibility":"click"} /-->' ) );
+	}
+
+	/**
+	 * The events model with two more bindable settings, opening hours as text and a rating as number.
+	 */
+	private static function settings_model(): void {
+		$model                              = json_decode( (string) file_get_contents( __DIR__ . '/../fixtures/model/events.json' ), true ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Test fixture.
+		$model['settings']['opening_hours'] = array(
+			'type'     => 'text',
+			'label'    => 'Opening hours',
+			'bindable' => true,
+		);
+		$model['settings']['site_rating']   = array(
+			'type'     => 'number',
+			'label'    => 'Rating',
+			'min'      => 0,
+			'max'      => 5,
+			'bindable' => true,
+		);
+		update_option( Model::OPTION, $model );
+		Model::forget();
+		Registrar::register();
+	}
+
+	/**
+	 * The ability update-site-values: the base hash is settings_hash of get-content-model; unknown keys, settings
+	 * without bindable and values the field type refuses change nothing; an agent's values wait in one change package,
+	 * a person applies them, leitvia/setting shows the value on any page, and rollback restores the old ones.
+	 */
+	public function test_update_site_values(): void {
+		self::settings_model();
+		update_option( Registrar::SETTING_PREFIX . 'company_phone', '+49 30 123456' );
+		$this->sign_in( 'standard' );
+		$hash   = static fn(): string => (string) wp_get_ability( 'leitvia/get-content-model' )->execute()['settings_hash'];
+		$values = array(
+			'opening_hours' => 'Mon to Fri 8 to 18',
+			'site_rating'   => 4.5,
+		);
+
+		$data = $this->assert_rejected(
+			'leitvia_stale_hash',
+			self::call(
+				'leitvia/update-site-values',
+				array(
+					'values'    => $values,
+					'base_hash' => 'outdated',
+				)
+			)
+		);
+		$this->assertSame( $hash(), $data['current_hash'] );
+		$cases = array(
+			'unknown key'  => array( 'opening_days' => 'Mon' ),
+			'not bindable' => array( 'company_email' => 'office@example.org' ),
+			'number'       => array( 'site_rating' => 'very good' ),
+			'range'        => array( 'site_rating' => 9 ),
+			'one bad item' => array(
+				'opening_hours' => 'Mon to Fri',
+				'site_rating'   => 9,
+			),
+		);
+		foreach ( $cases as $case => $change ) {
+			$this->assert_rejected(
+				'leitvia_invalid_input',
+				self::call(
+					'leitvia/update-site-values',
+					array(
+						'values'    => $change,
+						'base_hash' => $hash(),
+					)
+				)
+			);
+			$this->assertFalse( get_option( Registrar::SETTING_PREFIX . 'opening_hours' ), $case );
+		}
+
+		$result = $this->assert_mode(
+			'package',
+			self::call(
+				'leitvia/update-site-values',
+				array(
+					'values'    => $values,
+					'base_hash' => $hash(),
+					'package'   => 'opening-hours',
+				)
+			)
+		);
+		$this->assertCount( 2, Packages::operations( $result['package'] ) );
+		$this->assertFalse( get_option( Registrar::SETTING_PREFIX . 'opening_hours' ) );
+
+		$this->sign_in( 'standard', 'administrator' );
+		$report = Packages::apply( $result['package'] );
+		$this->assertSame( 'applied', $report['state'], wp_json_encode( $report ) );
+		$this->assertSame( 'Mon to Fri 8 to 18', get_option( Registrar::SETTING_PREFIX . 'opening_hours' ) );
+		$this->assertEquals( 4.5, get_option( Registrar::SETTING_PREFIX . 'site_rating' ) );
+		$this->assertEquals(
+			array(
+				'company_phone' => '+49 30 123456',
+				'opening_hours' => 'Mon to Fri 8 to 18',
+				'site_rating'   => 4.5,
+			),
+			(array) wp_get_ability( 'leitvia/get-content-model' )->execute()['settings_values']
+		);
+		$html = do_blocks( '<!-- wp:paragraph {"metadata":{"bindings":{"content":{"source":"leitvia/setting","args":{"key":"opening_hours"}}}}} --><p></p><!-- /wp:paragraph -->' );
+		$this->assertStringContainsString( '>Mon to Fri 8 to 18</p>', $html );
+
+		$this->assertIsArray( Packages::rollback( $result['package'] ) );
+		$this->assertFalse( get_option( Registrar::SETTING_PREFIX . 'opening_hours' ) );
+		$this->assertSame( '+49 30 123456', get_option( Registrar::SETTING_PREFIX . 'company_phone' ) );
+		foreach ( array( 'company_phone', 'company_email', 'opening_hours', 'site_rating' ) as $key ) {
+			unregister_setting( Registrar::SETTINGS_GROUP, Registrar::SETTING_PREFIX . $key );
+		}
 	}
 }

@@ -416,6 +416,36 @@ class Test_Gateway_Read_Design extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The ability get-content-model names the binding sources with their arguments and the attributes WordPress binds
+	 * per block, from the running version (core/list-item since 7.1) plus core/list of Leitvia, and the values of the
+	 * bindable settings with their hash; a setting without bindable stays out.
+	 */
+	public function test_content_model_bindings_and_settings(): void {
+		update_option( Model::OPTION, json_decode( (string) file_get_contents( dirname( __DIR__ ) . '/fixtures/model/events.json' ), true ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Test fixture.
+		Model::forget();
+		LeitviaStudio\Model\Registrar::register();
+		update_option( 'leitvia_site_company_phone', '+49 30 123456' );
+		update_option( 'leitvia_site_company_email', 'office@example.org' );
+		$result  = $this->call( 'leitvia/get-content-model' );
+		$sources = array_column( $result['bindings']['sources'], null, 'name' );
+		foreach ( array( 'leitvia/meta', 'leitvia/relation', 'leitvia/setting', 'core/post-meta', 'core/pattern-overrides' ) as $name ) {
+			$this->assertArrayHasKey( $name, $sources, $name );
+		}
+		$this->assertSame( array( 'key', 'prefix', 'suffix' ), array_keys( (array) $sources['leitvia/meta']['args'] ) );
+		$attributes = (array) $result['bindings']['attributes'];
+		$this->assertSame( array( 'content' ), $attributes['core/list-item'] );
+		$this->assertSame( array( 'content' ), $attributes['core/list'] );
+		$this->assertSame( array( 'datetime' ), $attributes['core/post-date'] );
+		$this->assertContains( 'caption', $attributes['core/image'] );
+		$this->assertArrayNotHasKey( 'core/cover', $attributes );
+		$this->assertSame( array( 'company_phone' => '+49 30 123456' ), (array) $result['settings_values'] );
+		$this->assertSame( LeitviaStudio\Gateway\Abilities\Setup::settings_hash(), $result['settings_hash'] );
+		foreach ( array( 'company_phone', 'company_email' ) as $key ) {
+			unregister_setting( LeitviaStudio\Model\Registrar::SETTINGS_GROUP, LeitviaStudio\Model\Registrar::SETTING_PREFIX . $key );
+		}
+	}
+
+	/**
 	 * The whole catalog, or only the blocks the editor allows for a post type; post types outside the scope are refused.
 	 */
 	public function test_list_blocks(): void {

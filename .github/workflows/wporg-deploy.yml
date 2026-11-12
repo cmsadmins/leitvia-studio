@@ -1,0 +1,52 @@
+name: Deploy to WordPress.org
+
+# Runs in the mirror cmsadmins/leitvia-studio, not in the monorepo. The release zip is the gated build (the mirror
+# holds the sources without build/), so this workflow builds nothing: it deploys the zip of the published release.
+on:
+  release:
+    types:
+      - published
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy ${{ github.event.release.tag_name }}
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.release.tag_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check SVN repository
+        run: curl -sfI "https://plugins.svn.wordpress.org/leitvia-studio/" >/dev/null
+
+      - name: Download and unpack the release zip
+        run: |
+          mkdir -p "$RUNNER_TEMP/release"
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "leitvia-studio-$TAG.zip" --dir "$RUNNER_TEMP"
+          unzip -q "$RUNNER_TEMP/leitvia-studio-$TAG.zip" -d "$RUNNER_TEMP/release"
+          test -f "$RUNNER_TEMP/release/leitvia-studio/leitvia-studio.php"
+
+      - name: Verify version match (tag = header = stable tag)
+        working-directory: ${{ runner.temp }}/release/leitvia-studio
+        run: |
+          HEADER=$(grep -m1 -E "^[[:space:]]*\*?[[:space:]]*Version:" leitvia-studio.php | sed -E 's/.*Version:[[:space:]]*//' | tr -d '[:space:]')
+          STABLE=$(grep -m1 -E "^Stable tag:" readme.txt | sed -E 's/^Stable tag:[[:space:]]*//' | tr -d '[:space:]')
+          echo "Tag: $TAG, header: $HEADER, stable tag: $STABLE"
+          if [ "$TAG" != "$HEADER" ] || [ "$TAG" != "$STABLE" ]; then
+            echo "::error::Version mismatch."
+            exit 1
+          fi
+
+      - name: Deploy to WordPress.org SVN
+        uses: 10up/action-wordpress-plugin-deploy@stable
+        env:
+          SVN_USERNAME: ${{ secrets.SVN_USERNAME }}
+          SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
+          SLUG: leitvia-studio
+          VERSION: ${{ github.event.release.tag_name }}
+          BUILD_DIR: ${{ runner.temp }}/release/leitvia-studio
+          ASSETS_DIR: .wordpress-org

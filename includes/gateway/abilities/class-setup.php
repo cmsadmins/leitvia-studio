@@ -17,6 +17,7 @@ use LeitviaStudio\Gateway\Recipes;
 use LeitviaStudio\Gateway\Rejection;
 use LeitviaStudio\Gateway\Scope;
 use LeitviaStudio\Model\Model;
+use LeitviaStudio\Model\Registrar;
 use LeitviaStudio\Tokens\Compiler;
 use LeitviaStudio\Tokens\Token_Sets;
 
@@ -24,9 +25,9 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Abilities leitvia/create-token-set, leitvia/activate-token-set, leitvia/set-variation, leitvia/define-content-type,
- * leitvia/update-navigation, leitvia/update-template-part and leitvia/update-template. Each one describes an operation
- * for Pipeline::run() with the Studio building blocks: token sets with the contrast lock, the compiler, the content
- * model. Token sets and global styles belong to the area design, the rest to structure.
+ * leitvia/update-site-values, leitvia/update-navigation, leitvia/update-template-part and leitvia/update-template.
+ * Each one describes an operation for Pipeline::run() with the Studio building blocks: token sets with the contrast
+ * lock, the compiler, the content model. Token sets and global styles belong to the area design, the rest to structure.
  */
 final class Setup {
 
@@ -193,6 +194,29 @@ final class Setup {
 				'required'   => array( 'declaration' ),
 			) + $object,
 			array( self::class, 'describe_define_content_type' )
+		);
+		Abilities::write(
+			'leitvia/update-site-values',
+			__( 'Update site values', 'leitvia-studio' ),
+			__( 'Sets values of site settings of the content model declared with bindable true, the values blocks show on every page through the binding source leitvia/setting, such as opening hours or a phone number. values names them by key; the settings you leave out stay. Each value follows the field type of its setting, an empty string empties a text. leitvia/get-content-model returns the values as settings_values and their hash as settings_hash, the base_hash. Like every setting it waits in a change package for a person, and leitvia/rollback undoes it once applied. Declare a new setting with leitvia/define-content-type first.', 'leitvia-studio' ),
+			'setup',
+			array(
+				'destructive' => true,
+				'idempotent'  => false,
+			),
+			array(
+				'properties' => array(
+					'values' => array(
+						'type'                 => 'object',
+						'minProperties'        => 1,
+						'maxProperties'        => 50,
+						'description'          => __( 'New values by setting key, for example {"opening_hours": "Mon to Fri 8 to 18"}; only settings with bindable true.', 'leitvia-studio' ),
+						'additionalProperties' => array( 'type' => array( 'string', 'number', 'boolean' ) ),
+					),
+				),
+				'required'   => array( 'values' ),
+			) + $object,
+			array( self::class, 'describe_update_site_values' )
 		);
 		$item = array(
 			'type'                 => 'object',
@@ -539,6 +563,99 @@ final class Setup {
 				return array( 'value' => $merged );
 			},
 		);
+	}
+
+	/**
+	 * Stored values of the site settings of the content model with bindable true, by key; null for a value never set.
+	 * The binding source leitvia/setting shows them to every visitor, so reading them reveals nothing.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function site_settings(): array {
+		$values = array();
+		foreach ( (array) ( Model::current()['settings'] ?? array() ) as $key => $setting ) {
+			if ( ! empty( $setting['bindable'] ) ) {
+				$values[ (string) $key ] = get_option( Registrar::SETTING_PREFIX . $key, null );
+			}
+		}
+		return $values;
+	}
+
+	/**
+	 * Hash of the values of the bindable site settings, the base hash of update-site-values.
+	 *
+	 * @param array<string, mixed>|null $values Values from site_settings(), read again when null.
+	 */
+	public static function settings_hash( ?array $values = null ): string {
+		return Hashes::of( (string) wp_json_encode( (object) ( $values ?? self::site_settings() ) ) );
+	}
+
+	/**
+	 * Operations of update-site-values: one option operation per value, checked against the field type of its
+	 * setting before anything runs, so a call changes all its settings or none. The base hash covers all bindable
+	 * settings; each operation then carries the hash of its option, as the pipeline checks it.
+	 *
+	 * @param array<string, mixed> $input Input.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public static function describe_update_site_values( array $input ) {
+		$settings = (array) ( Model::current()['settings'] ?? array() );
+		$values   = (array) ( $input['values'] ?? array() );
+		if ( ! $values ) {
+			return Block_Edit::invalid( 'values', __( 'Name at least one setting in values.', 'leitvia-studio' ), array(), 'leitvia/get-content-model' );
+		}
+		$current = self::settings_hash();
+		if ( ! hash_equals( $current, (string) ( $input['base_hash'] ?? '' ) ) ) {
+			return Rejection::make(
+				'leitvia_stale_hash',
+				/* translators: %s: current hash of the site settings */
+				sprintf( __( 'The site settings changed since they were read. Read them with leitvia/get-content-model and repeat the change on the current values with base_hash %s.', 'leitvia-studio' ), $current ),
+				409,
+				'stale_hash',
+				array(),
+				'leitvia/get-content-model',
+				'once',
+				array( 'current_hash' => $current )
+			);
+		}
+		$batch = array();
+		foreach ( $values as $key => $value ) {
+			$key    = (string) $key;
+			$option = Registrar::SETTING_PREFIX . $key;
+			$target = array(
+				'option'  => $option,
+				'setting' => $key,
+			);
+			$field  = $settings[ $key ] ?? null;
+			if ( ! is_array( $field ) || empty( $field['bindable'] ) ) {
+				$bindable = array_map( 'strval', array_keys( self::site_settings() ) );
+				return Block_Edit::invalid(
+					'setting',
+					$bindable
+						/* translators: %s: list of setting keys */
+						? sprintf( __( 'The content model has no bindable site setting with this key. Use one of these: %s.', 'leitvia-studio' ), implode( ', ', $bindable ) )
+						: __( 'The content model has no bindable site setting. Declare one with bindable true through leitvia/define-content-type first.', 'leitvia-studio' ),
+					$target,
+					'leitvia/get-content-model'
+				);
+			}
+			$schema = Registrar::schema_for( $field )[1];
+			$valid  = rest_validate_value_from_schema( $value, $schema, $key );
+			if ( is_wp_error( $valid ) ) {
+				return Block_Edit::invalid( 'value', $valid->get_error_message(), $target, 'leitvia/get-content-model' );
+			}
+			$value = rest_sanitize_value_from_schema( $value, $schema, $key );
+			if ( 'image' === $field['type'] && $value && ( ! wp_attachment_is_image( (int) $value ) || ! Scope::readable( (int) $value ) ) ) {
+				return Block_Edit::invalid( 'value', __( 'The ID is no image of the media library.', 'leitvia-studio' ), $target, 'leitvia/list-media' );
+			}
+			$batch[] = array(
+				'area'      => 'structure',
+				'target'    => array( 'option' => $option ),
+				'base_hash' => Hashes::of( (string) wp_json_encode( get_option( $option ) ) ),
+				'change'    => static fn(): array => array( 'value' => $value ),
+			);
+		}
+		return array( 'batch' => $batch );
 	}
 
 	/**

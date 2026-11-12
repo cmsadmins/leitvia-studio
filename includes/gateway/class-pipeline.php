@@ -33,7 +33,7 @@ final class Pipeline {
 	 * example the template or lab metadata), terms (the theme and area of a template part in tax_input, terms of a
 	 * content type in terms), the date and the author. A failed create deletes the post, so nothing of them needs restoring.
 	 */
-	public const CREATE_FIELDS = array( 'post_mime_type', 'file', 'meta_input', 'tax_input', 'terms', 'post_date', 'post_author' );
+	public const CREATE_FIELDS = array( 'post_mime_type', 'file', 'meta_input', 'tax_input', 'terms', 'rows', 'post_date', 'post_author' );
 
 	/**
 	 * Meta keys per post type that belong to the state of an existing post, under meta_input: hashed, snapshotted,
@@ -668,8 +668,8 @@ final class Pipeline {
 			// Only the meta keys of META; an existing post takes no other meta through the pipeline.
 			$after['meta_input'] = array_intersect_key( (array) $after['meta_input'], $start['meta_input'] );
 		}
-		foreach ( array( 'product', 'term', 'terms', 'attribute', 'review' ) as $key ) {
-			// Only the props, term fields and taxonomies the state knows.
+		foreach ( array( 'product', 'term', 'terms', 'rows', 'attribute', 'review' ) as $key ) {
+			// Only the props, term fields, taxonomies and repeaters the state knows.
 			if ( isset( $start[ $key ] ) ) {
 				$after[ $key ] = array_intersect_key( (array) $after[ $key ], $start[ $key ] ) + $start[ $key ];
 			}
@@ -1036,6 +1036,8 @@ final class Pipeline {
 			'post'      => $op->post_id(),
 			'post_type' => (string) $after['post_type'],
 			'ability'   => $op->ability,
+			// The bindings check reads a content model that waits in this package, see Content_Checks::bindings().
+			'package'   => $op->package,
 		);
 		if ( isset( $after['meta_input']['_wp_page_template'] ) ) {
 			$context['template'] = (string) $after['meta_input']['_wp_page_template'];
@@ -1202,7 +1204,7 @@ final class Pipeline {
 			if ( self::MODEL_OPTION === $option ) {
 				$failed = is_wp_error( Model::save( (array) $after['value'] ) );
 			} elseif ( '' !== $option ) {
-				update_option( $option, $after['value'] );
+				self::write_option( $option, $after['value'] );
 				$failed = false;
 			} elseif ( $op->term() ) {
 				$failed = ! self::update_term( $id, (array) $after['term'] );
@@ -1222,7 +1224,7 @@ final class Pipeline {
 					default                    => wp_insert_post( wp_slash( Content::prepare( 0, $after ) ), true ),
 				};
 				$id     = is_wp_error( $written ) ? 0 : (int) $written;
-				$failed = ! $id || ( $op->creates() && ! Content::set_terms( $id, $after ) );
+				$failed = ! $id || ( $op->creates() && ! ( Content::set_terms( $id, $after ) && Content::set_rows( $id, $after ) ) );
 			}
 		} catch ( \Throwable $e ) {
 			$failed = true;
@@ -1350,7 +1352,7 @@ final class Pipeline {
 		}
 		$row     = array_diff_key( (array) get_post( $id, ARRAY_A ), array_flip( array( 'page_template', 'ancestors', 'post_category', 'tags_input' ) ) );
 		$written = wp_insert_post( wp_slash( array( 'ID' => $id ) + Content::prepare( $id, $fields ) + $row ), true );
-		return is_wp_error( $written ) || Content::set_terms( $id, $fields ) ? $written : self::failed( array( 'post' => $id ) );
+		return is_wp_error( $written ) || ( Content::set_terms( $id, $fields ) && Content::set_rows( $id, $fields ) ) ? $written : self::failed( array( 'post' => $id ) );
 	}
 
 	/**
@@ -1377,6 +1379,21 @@ final class Pipeline {
 	}
 
 	/**
+	 * Writes an option. A site setting of the content model without a value before (false, as a rollback puts it back)
+	 * is deleted: its sanitize callback would refuse false and keep the value of the write.
+	 *
+	 * @param string $option Option name.
+	 * @param mixed  $value  Value.
+	 */
+	private static function write_option( string $option, $value ): void {
+		if ( false === $value && self::model_setting( $option ) ) {
+			delete_option( $option );
+			return;
+		}
+		update_option( $option, $value );
+	}
+
+	/**
 	 * Restores the state before a failed write: the old post fields or option value, or deletes a half-created post.
 	 *
 	 * @param Operation            $op      Operation.
@@ -1388,7 +1405,7 @@ final class Pipeline {
 			if ( self::MODEL_OPTION === $op->option() ) {
 				Model::save( (array) $before['value'] );
 			} elseif ( '' !== $op->option() ) {
-				update_option( $op->option(), $before['value'] );
+				self::write_option( $op->option(), $before['value'] );
 			} elseif ( $op->term() ) {
 				self::update_term( $op->term(), (array) $before['term'] );
 			} elseif ( $op->attribute() ) {
