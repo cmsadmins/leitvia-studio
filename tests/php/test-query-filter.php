@@ -337,4 +337,67 @@ class Test_Query_Filter extends WP_UnitTestCase {
 	public function test_translations_in_the_plugin(): void {
 		$this->assertSame( '/languages', get_file_data( LEITVIA_STUDIO_FILE, array( 'path' => 'Domain Path' ) )['path'] );
 	}
+
+	/**
+	 * A language pack of WordPress.org lacks the strings of a new release until translate.wordpress.org has them: the
+	 * translations of the zip fill those, in PHP and in scripts, and a string of the pack keeps its translation.
+	 */
+	public function test_zip_translations_fill_what_the_pack_lacks(): void {
+		$dir     = dirname( LEITVIA_STUDIO_FILE ) . '/languages';
+		$created = ! is_dir( $dir );
+		wp_mkdir_p( $dir );
+		wp_mkdir_p( WP_LANG_DIR . '/plugins' );
+		$mo   = static function ( string $path, array $strings ): void {
+			$file = new MO();
+			foreach ( $strings as $original => $translation ) {
+				$file->add_entry(
+					new Translation_Entry(
+						array(
+							'singular'     => $original,
+							'translations' => array( $translation ),
+						)
+					)
+				);
+			}
+			$file->export_to_file( $path );
+		};
+		$pack = WP_LANG_DIR . '/plugins/leitvia-studio-de_DE.mo';
+		$zip  = $dir . '/leitvia-studio-de_DE.mo';
+		$json = $dir . '/leitvia-studio-de_DE-0123456789abcdef0123456789abcdef.json';
+		$mo( $pack, array( 'Zoom out' => 'Pack' ) );
+		$mo(
+			$zip,
+			array(
+				'Zoom out' => 'Zip',
+				'Zoom in'  => 'Vergrößern',
+			)
+		);
+		$messages = array(
+			'Close'   => array( 'Zip' ),
+			'Zoom in' => array( 'Vergrößern' ),
+		);
+		file_put_contents( $json, (string) wp_json_encode( array( 'locale_data' => array( 'messages' => $messages ) ) ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions -- Test fixture.
+
+		$locale = static fn(): string => 'de_DE';
+		add_filter( 'locale', $locale );
+		unload_textdomain( 'leitvia-studio' );
+		load_textdomain( 'leitvia-studio', $pack ); // As core loads a pack just in time.
+		\LeitviaStudio\Translations::load();
+		$zoom_out = __( 'Zoom out', 'leitvia-studio' ); // phpcs:ignore WordPress.WP.I18n.TextDomainMismatch -- The domain under test.
+		$zoom_in  = __( 'Zoom in', 'leitvia-studio' ); // phpcs:ignore WordPress.WP.I18n.TextDomainMismatch -- The domain under test.
+		$script   = json_decode( (string) \LeitviaStudio\Translations::script_translations( (string) wp_json_encode( array( 'locale_data' => array( 'messages' => array( 'Close' => array( 'Pack' ) ) ) ) ), WP_LANG_DIR . '/plugins/' . basename( $json ), 'handle', 'leitvia-studio' ), true );
+		unload_textdomain( 'leitvia-studio' );
+		remove_filter( 'locale', $locale );
+		wp_delete_file( $pack );
+		wp_delete_file( $zip );
+		wp_delete_file( $json );
+		if ( $created ) {
+			rmdir( $dir ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir -- Test fixture.
+		}
+
+		$this->assertSame( 'Pack', $zoom_out, 'the pack wins where it has the string' );
+		$this->assertSame( 'Vergrößern', $zoom_in, 'the zip fills a string the pack lacks' );
+		$this->assertSame( array( 'Pack' ), $script['locale_data']['messages']['Close'] );
+		$this->assertSame( array( 'Vergrößern' ), $script['locale_data']['messages']['Zoom in'] );
+	}
 }

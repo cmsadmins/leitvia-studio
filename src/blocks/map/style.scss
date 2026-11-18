@@ -75,3 +75,23 @@ $heights: (
 		}
 	}
 }
+
+// The controls of the map stand on Leaflet's white surface. A band with light text (is-style-inverse, ink, accent)
+// gives every link its text color, so the zoom buttons and the close button of a popup would turn light on white
+// (WCAG 1.4.11): they keep Leaflet's own colors here, whatever the band. The attribution stands below the map, on the
+// band, and takes the band color as its text does.
+.wp-block-leitvia-map .leaflet-container {
+	.leaflet-bar a {
+		color: #000;
+		text-decoration: none;
+	}
+
+	.leaflet-bar a.leaflet-disabled {
+		color: #bbb;
+	}
+
+	a.leaflet-popup-close-button {
+		color: #757575;
+		text-decoration: none;
+	}
+}

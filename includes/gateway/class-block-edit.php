@@ -1002,6 +1002,14 @@ final class Block_Edit {
 				return $block;
 			}
 		}
+		// Every other block with supports.align takes align with the values it supports, see align().
+		if ( array_key_exists( 'align', $attrs ) && self::aligns( $name ) ) {
+			$block = self::align( $block, $attrs['align'], $target, $rebuild );
+			$attrs = array_diff_key( $attrs, array( 'align' => true ) );
+			if ( is_wp_error( $block ) || ! $attrs ) {
+				return $block;
+			}
+		}
 		$core  = self::CORE_ATTRIBUTES[ $name ] ?? null;
 		$entry = $core ? array( 'attributes' => array( 'properties' => $core ) ) : array_column( \LeitviaStudio\Blocks\Catalog::get(), null, 'name' )[ $name ] ?? null;
 		if ( ! $entry ) {
@@ -1494,6 +1502,60 @@ final class Block_Edit {
 	}
 
 	/**
+	 * Alignments a block takes by supports.align: all five for true, the listed ones for a list, none without.
+	 *
+	 * @param string $name Block name.
+	 * @return list<string>
+	 */
+	public static function aligns( string $name ): array {
+		$align = \WP_Block_Type_Registry::get_instance()->get_registered( $name )->supports['align'] ?? false;
+		return true === $align ? array( 'left', 'center', 'right', 'wide', 'full' ) : array_values( array_filter( (array) $align, 'is_string' ) );
+	}
+
+	/**
+	 * Block with a new align of aligns() (null removes it) in its comment. Saved markup of a static block takes the
+	 * class align<value> on its outer element as the editor saves it; a block that renders on the server adds the class
+	 * itself (block supports).
+	 *
+	 * @param array<string, mixed> $block   Parsed block.
+	 * @param mixed                $align   New align or null.
+	 * @param array<string, mixed> $target  Target.
+	 * @param \WP_Error            $rebuild Rejection for static markup.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private static function align( array $block, $align, array $target, \WP_Error $rebuild ) {
+		$name   = (string) $block['blockName'];
+		$aligns = self::aligns( $name );
+		if ( null !== $align && ! in_array( $align, $aligns, true ) ) {
+			/* translators: %s: list of alignments, for example wide, full. */
+			return self::invalid( 'attributes', sprintf( __( 'This block takes align %s, or null to remove it.', 'leitvia-studio' ), implode( ', ', $aligns ) ), $target, 'leitvia/list-blocks' );
+		}
+		$type = \WP_Block_Type_Registry::get_instance()->get_registered( $name );
+		$own  = implode( '', array_filter( (array) $block['innerContent'], 'is_string' ) );
+		if ( $type && ! $type->is_dynamic() && '' !== trim( $own ) ) {
+			$tags = new \WP_HTML_Tag_Processor( (string) ( $block['innerContent'][0] ?? '' ) );
+			if ( ! $tags->next_tag() ) {
+				return $rebuild;
+			}
+			foreach ( array( 'left', 'center', 'right', 'wide', 'full' ) as $old ) {
+				$tags->remove_class( 'align' . $old );
+			}
+			if ( null !== $align ) {
+				$tags->add_class( 'align' . $align );
+			}
+			$block['innerContent'][0] = $tags->get_updated_html();
+		}
+		// In the order the editor saves the comment: after the attributes of the block, lock and metadata, before the
+		// other supports such as layout and style (the order core registers the attributes in).
+		$order          = array_flip( array_keys( (array) ( $type->attributes ?? array() ) ) );
+		$at             = $order['align'] ?? PHP_INT_MAX;
+		$rest           = array_diff_key( (array) $block['attrs'], array( 'align' => true ) );
+		$before         = array_filter( $rest, static fn( $key ): bool => isset( $order[ $key ] ) && $order[ $key ] < $at, ARRAY_FILTER_USE_KEY );
+		$block['attrs'] = $before + ( null === $align ? array() : array( 'align' => $align ) ) + array_diff_key( $rest, $before );
+		return $block;
+	}
+
+	/**
 	 * Block with a new effect on scroll: leitviaAnimation (none or null removes it) and leitviaMotion (null removes it)
 	 * in the block comment, in the order the editor saves them; the markup stays as it is.
 	 *
@@ -1589,10 +1651,11 @@ final class Block_Edit {
 	private static function image( array $block, string $html, array $image, array $target, \WP_Error $rebuild ) {
 		$id         = (int) ( $image['id'] ?? 0 );
 		$decorative = ! empty( $image['decorative'] );
-		$alt        = $decorative ? '' : trim( (string) ( $image['alt'] ?? '' ) );
 		if ( ! wp_attachment_is_image( $id ) || ! Scope::readable( $id ) ) {
 			return self::invalid( 'image', __( 'The image is not in the media library. Add it with leitvia/add-media first.', 'leitvia-studio' ), $target, 'leitvia/add-media' );
 		}
+		// Without alt the image keeps the alt text of the media library; an empty alt counts only as decorative.
+		$alt = $decorative ? '' : trim( (string) ( $image['alt'] ?? get_post_meta( $id, '_wp_attachment_image_alt', true ) ) );
 		if ( '' === $alt && ! $decorative ) {
 			return self::invalid( 'alt_text', __( 'Give the image an alt text that describes it, or mark it as decorative.', 'leitvia-studio' ), $target );
 		}

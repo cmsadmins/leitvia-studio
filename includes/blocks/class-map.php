@@ -49,6 +49,17 @@ final class Map {
 	}
 
 	/**
+	 * Link to the route planner of openstreetmap.org with a point as destination, the start left to the visitor.
+	 *
+	 * @param float $lat  Latitude.
+	 * @param float $lng  Longitude.
+	 * @param int   $zoom Zoom level.
+	 */
+	public static function directions( float $lat, float $lng, int $zoom ): string {
+		return sprintf( 'https://www.openstreetmap.org/directions?to=%1$s%%2C%2$s#map=%3$d/%1$s/%2$s', round( $lat, 6 ), round( $lng, 6 ), $zoom );
+	}
+
+	/**
 	 * Saved content of the block as save.js builds it: the heading (h2, '' for none) and the list of places, each with
 	 * its title, address and link to OpenStreetMap at the zoom of the map. Block_Edit builds a changed map with it.
 	 *
@@ -80,6 +91,13 @@ final class Map {
 	public static function render( string $content, array $block ): string {
 		// The default link text is saved in the markup, in English; a text of its own stays.
 		$content = str_replace( '>View on OpenStreetMap<', '>' . esc_html__( 'View on OpenStreetMap', 'leitvia-studio' ) . '<', $content );
+		// The saved link of a place (link()) opens the route planner with the place as destination; the saved markup
+		// stays as save.js builds it, so no block becomes invalid. The link of the placeholder below shows the map.
+		$content = (string) preg_replace_callback(
+			'#href="https://www\.openstreetmap\.org/\?mlat=(-?[0-9.]+)&(?:amp;|\#038;)?mlon=(-?[0-9.]+)\#map=([0-9]+)/[^"]*"#',
+			static fn( array $found ): string => 'href="' . esc_attr( self::directions( (float) $found[1], (float) $found[2], (int) $found[3] ) ) . '"',
+			$content
+		);
 		$attrs   = (array) ( $block['attrs'] ?? array() );
 		$lat     = (float) ( $attrs['lat'] ?? 52.52 );
 		$lng     = (float) ( $attrs['lng'] ?? 13.405 );

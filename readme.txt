@@ -4,7 +4,7 @@ Tags: ai agent, mcp, abilities api, design tokens, block theme
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.47
+Stable tag: 1.3.48
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -275,6 +275,14 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 
 == Changelog ==
 
+= 1.3.48 =
+* Fix: Removing the saved link of a bound button (url "") no longer fails as unsafe content.
+* Fix: New strings show in German even when the WordPress.org language pack lacks them; the bundled translations fill the gaps in PHP and scripts.
+* Fix: Map zoom and popup close buttons stay readable in dark bands (WCAG 1.4.11).
+* Change: The link of each place on a map opens the OpenStreetMap route planner with the place as destination.
+* Fix: update-block and insert set align on every block with supports.align, using the values it supports (for example leitvia/consent-embed).
+* Fix: update-block with image { id } keeps the alt text from the media library when alt is left out.
+
 = 1.3.47 =
 * New block Embed behind consent: any iframe of another provider, such as a configurator or a booking tool, waits behind the consent placeholder until the visitor loads it. Providers are listed under Leitvia Studio, Settings, Privacy with up to ten host names, a purpose and the address of their privacy policy; the placeholder names the provider, says where the data goes and shows a preview image from the media library. The iframe loads sandboxed and without a referrer. Addresses with a backslash or quotes are refused and international host names are stored as ASCII, in the editor the same way as on the server.
 * Organization data: Settings take the kind of business, founding date, area served, opening hours and profiles, and the front page describes the organization as Organization or local business in JSON-LD. Posts name the same organization as publisher. The ability leitvia/set-organization writes these values, leitvia/get-seo returns them.
@@ -308,13 +316,4 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * Every REST route of Studio describes its answer in a schema, and OPTIONS shows it; a test keeps it that way for new routes.
 * Child themes of Leitvia: a child theme contract with "extends": "leitvia" adds its patterns to the contract of the parent. Switching between Leitvia and its child theme copies global styles, the active token set and edited templates and template parts to the new theme, without overwriting anything there.
 
-= 1.3.43 =
-* The abilities pass the checks of the WordPress agent skills: every required input has a description, the output of every write says what mode, level, hash, package and snapshot mean, and the annotations match what the abilities do (apply-package, apply-recipe, define-content-type, repair-links and set-alt-text are destructive, plan-page with AI reaches an outside service).
-* The default server of the MCP Adapter lists the Leitvia abilities as well (discover-abilities, execute-ability), with the same checks, autonomy levels and change packages, and returns a rejection in full with code, message and data.
-* get-tokens, get-content-model and get-contract return the hashes the write abilities need; a stale hash is named in the message of the rejection. get-contract also returns the core preset aliases of the theme.
-* Content written with core preset names (base, contrast, primary, spacing 50 and the like) is saved with the roles of the theme. The token check rejects a preset the theme does not have (rule no-unknown-preset) and names the roles to use instead.
-* REST routes check their input against a schema before they run, and OPTIONS shows it. A rate limit answer carries the header Retry-After.
-* The token of the contact form expires after 7 days (filter leitvia_studio_contact_form_max_age). Deleting Studio with its data also removes the meta fields of AI generated posts and their sources.
-* Fixes: the consent settings block stays valid when the editor runs in another language than the one it was saved in; list-product-reviews with unrated false over GET no longer filters; icons whose SVG contains a dollar sign render whole; the rating block in the editor formats numbers in the language of the site.
-
-Older versions, 1.0.0 to 1.3.42: [changelog.txt](https://github.com/cmsadmins/leitvia-studio/blob/main/changelog.txt).
+Older versions, 1.0.0 to 1.3.43: [changelog.txt](https://github.com/cmsadmins/leitvia-studio/blob/main/changelog.txt).

@@ -49,7 +49,7 @@ class Test_Map extends WP_UnitTestCase {
 	public function test_list_and_links_stay_and_the_map_comes_first(): void {
 		$html = self::live( do_blocks( self::BLOCK ) );
 		$this->assertStringContainsString( '<strong>Office Berlin</strong><span>Main street 1</span>', $html );
-		$this->assertStringContainsString( '<a href="https://www.openstreetmap.org/?mlat=52.52&amp;mlon=13.405#map=12/52.52/13.405">View on OpenStreetMap</a>', $html );
+		$this->assertStringContainsString( '<a href="https://www.openstreetmap.org/directions?to=52.52%2C13.405#map=12/52.52/13.405">View on OpenStreetMap</a>', $html, 'the link of a place plans the route to it' );
 		$this->assertStringContainsString( 'href="https://www.openstreetmap.org/?mlat=52.5&#038;mlon=13.4#map=12/52.5/13.4">Open on OpenStreetMap</a>', $html );
 		$this->assertLessThan( strpos( $html, '<ul class="wp-block-leitvia-map__places"' ), strpos( $html, 'class="leitvia-consent"' ) );
 		$this->assertGreaterThan( strpos( $html, '<h2' ), strpos( $html, 'class="leitvia-consent"' ) );

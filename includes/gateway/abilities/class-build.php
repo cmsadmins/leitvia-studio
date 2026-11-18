@@ -386,8 +386,9 @@ final class Build {
 							'description' => __( 'Attachment ID of the image, from leitvia/list-media or leitvia/add-media.', 'leitvia-studio' ),
 						),
 						'alt'        => array(
-							'type'      => 'string',
-							'maxLength' => 500,
+							'type'        => 'string',
+							'maxLength'   => 500,
+							'description' => __( 'Alt text of the image here. Left out, the image keeps its alt text from the media library; an image without one needs alt or decorative true.', 'leitvia-studio' ),
 						),
 						'decorative' => array( 'type' => 'boolean' ),
 					),
@@ -413,7 +414,7 @@ final class Build {
 		}
 		$schema['properties']['attributes'] = array(
 			'type'        => 'object',
-			'description' => __( 'Attributes from leitvia/list-blocks; for a core/heading its level, 1 to 6; for a core/query query with perPage, pages, offset, postType, order, orderBy, sticky and inherit (perPage counts with inherit false); for a core/video tracks, each with id, kind, srclang and label; for a leitvia/timeline-item date (YYYY, YYYY-MM or YYYY-MM-DD, empty for a free label), dateLabel and heading; leitviaAnimation and leitviaMotion on every block that lists them, also next to other attributes (null removes either); className (is-style-<name>, null removes the style and keeps other classes) on every core block with registered block styles; on core media blocks align, on core/image also width, height, aspectRatio, scale, sizeSlug, linkDestination, href, lightbox (null removes one). null for an attribute the block does not have changes nothing.', 'leitvia-studio' ),
+			'description' => __( 'Attributes from leitvia/list-blocks; for a core/heading its level, 1 to 6; for a core/query query with perPage, pages, offset, postType, order, orderBy, sticky and inherit (perPage counts with inherit false); for a core/video tracks, each with id, kind, srclang and label; for a leitvia/timeline-item date (YYYY, YYYY-MM or YYYY-MM-DD, empty for a free label), dateLabel and heading; leitviaAnimation and leitviaMotion on every block that lists them, also next to other attributes (null removes either); className (is-style-<name>, null removes the style and keeps other classes) on every core block with registered block styles; align on every block whose supports.align in leitvia/list-blocks names the value (null removes it); on core/image also width, height, aspectRatio, scale, sizeSlug, linkDestination, href, lightbox (null removes one). null for an attribute the block does not have changes nothing.', 'leitvia-studio' ),
 		);
 		return $schema;
 	}

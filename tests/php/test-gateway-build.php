@@ -617,6 +617,30 @@ class Test_Gateway_Build extends WP_UnitTestCase {
 		$this->assertArrayNotHasKey( 'leitviaDecorative', $cover['attrs']['metadata'] );
 		$this->assertStringContainsString( 'class="wp-block-cover__image-background wp-image-' . $image . '" alt="A path through hills at dusk" src="' . wp_get_attachment_url( $image ) . '"', $cover['innerHTML'] );
 		$this->assertCount( 1, $cover['innerBlocks'] );
+
+		// Without alt the image takes the alt text of the media library; an empty alt is still refused.
+		update_post_meta( $image, '_wp_attachment_image_alt', 'Hills in the library' );
+		$swap   = static fn( array $image_input ): array => array(
+			'post'      => $page,
+			'block'     => 'p:0',
+			'image'     => $image_input,
+			'base_hash' => Hashes::document( $page ),
+		);
+		$this->assert_rejected(
+			'leitvia_invalid_input',
+			self::call(
+				'leitvia/update-block',
+				$swap(
+					array(
+						'id'  => $image,
+						'alt' => '',
+					)
+				)
+			)
+		);
+		$result = self::call( 'leitvia/update-block', $swap( array( 'id' => $image ) ) );
+		$this->assertIsArray( $result, is_wp_error( $result ) ? wp_json_encode( $result->get_error_data() ) : '' );
+		$this->assertSame( 'Hills in the library', parse_blocks( get_post( $page )->post_content )[0]['attrs']['alt'] );
 	}
 
 	/**

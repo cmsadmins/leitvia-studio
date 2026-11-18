@@ -3,7 +3,7 @@
  * Plugin Name:       Leitvia Studio: AI Agents, MCP and Design Tokens for Block Themes
  * Plugin URI:        https://leitvia.com/features/
  * Description:       AI agents such as Claude Code build and maintain block theme sites over MCP or REST. Every change is checked, reviewable and can be rolled back.
- * Version:           1.3.47
+ * Version:           1.3.48
  * Requires at least: 7.1
  * Requires PHP:      8.2
  * Author:            CMS ADMINS
@@ -18,7 +18,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-const LEITVIA_STUDIO_VERSION = '1.3.47';
+const LEITVIA_STUDIO_VERSION = '1.3.48';
 const LEITVIA_STUDIO_API     = 1;
 // Oldest Extension API version add-ons may still declare; raised two major Studio versions after a breaking change.
 const LEITVIA_STUDIO_API_MIN = 1;
@@ -43,31 +43,11 @@ spl_autoload_register(
 
 require __DIR__ . '/includes/functions.php';
 
-// Translations of the release zip in languages/, for sites without a language pack of WordPress.org. A pack in
-// WP_LANG_DIR wins. PHP strings need only the header Domain Path, which core registers on every request; scripts
-// are looked up in WP_LANG_DIR alone, so they go through this filter. The zip holds de_DE only: de_DE_formal, de_AT,
-// de_CH and the other German variants read that file instead of showing English.
-add_filter(
-	'load_script_translation_file',
-	static function ( $file, $handle, $domain ) {
-		$own = __DIR__ . '/languages/' . preg_replace( '/-de_\w+-/', '-de_DE-', basename( (string) $file ), 1 );
-		return 'leitvia-studio' === $domain && $file && ! is_readable( $file ) && is_readable( $own ) ? $own : $file;
-	},
-	10,
-	3
-);
-
-add_action(
-	'after_setup_theme',
-	static function (): void {
-		if ( preg_match( '/^de_(?!DE$)/', determine_locale() ) ) {
-			get_translations_for_domain( 'leitvia-studio' ); // Loads a language pack of the variant when there is one.
-			if ( ! is_textdomain_loaded( 'leitvia-studio' ) ) {
-				load_textdomain( 'leitvia-studio', __DIR__ . '/languages/leitvia-studio-de_DE.mo' );
-			}
-		}
-	}
-);
+// Translations of the release zip in languages/ fill what a language pack of WordPress.org lacks, see
+// LeitviaStudio\Translations.
+add_filter( 'load_script_translation_file', array( \LeitviaStudio\Translations::class, 'script_file' ), 10, 3 );
+add_filter( 'load_script_translations', array( \LeitviaStudio\Translations::class, 'script_translations' ), 10, 4 );
+add_action( 'after_setup_theme', array( \LeitviaStudio\Translations::class, 'load' ) );
 
 add_action( 'plugins_loaded', array( \LeitviaStudio\Plugin::class, 'boot' ) );
 // Gravatar stays off after a deactivation and the usage index counts as unbuilt (see LeitviaStudio\Avatars\Avatars::deactivate()).

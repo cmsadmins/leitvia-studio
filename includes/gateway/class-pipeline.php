@@ -1032,12 +1032,15 @@ final class Pipeline {
 	}
 
 	/**
-	 * Whether wp_kses_post() keeps the markup, apart from how entities and self-closing tags are spelled.
+	 * Whether wp_kses_post() keeps the markup, apart from how entities, self-closing tags and space before the end of
+	 * a tag are spelled.
 	 *
 	 * @param string $html Markup.
 	 */
 	private static function kses_safe( string $html ): bool {
-		$normal = static fn( string $markup ): string => (string) preg_replace( '#\s*/>#', '>', html_entity_decode( $markup, ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
+		// Space before the end of a tag counts as spelling too: KSES drops it, and the HTML API leaves it where it
+		// removed the last attribute (<a class="x" > after an href goes).
+		$normal = static fn( string $markup ): string => (string) preg_replace( '#\s*/?>#', '>', html_entity_decode( $markup, ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
 		add_filter( 'safecss_filter_attr_allow_css', array( self::class, 'allow_colors' ), 10, 2 );
 		$kept   = wp_kses_post( $html );
 		remove_filter( 'safecss_filter_attr_allow_css', array( self::class, 'allow_colors' ), 10 );

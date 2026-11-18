@@ -1,6 +1,15 @@
-== Changelog of Leitvia Studio, versions 1.0.0 to 1.3.42 ==
+== Changelog of Leitvia Studio, versions 1.0.0 to 1.3.43 ==
 
 Newer versions are listed in readme.txt.
+
+= 1.3.43 =
+* The abilities pass the checks of the WordPress agent skills: every required input has a description, the output of every write says what mode, level, hash, package and snapshot mean, and the annotations match what the abilities do (apply-package, apply-recipe, define-content-type, repair-links and set-alt-text are destructive, plan-page with AI reaches an outside service).
+* The default server of the MCP Adapter lists the Leitvia abilities as well (discover-abilities, execute-ability), with the same checks, autonomy levels and change packages, and returns a rejection in full with code, message and data.
+* get-tokens, get-content-model and get-contract return the hashes the write abilities need; a stale hash is named in the message of the rejection. get-contract also returns the core preset aliases of the theme.
+* Content written with core preset names (base, contrast, primary, spacing 50 and the like) is saved with the roles of the theme. The token check rejects a preset the theme does not have (rule no-unknown-preset) and names the roles to use instead.
+* REST routes check their input against a schema before they run, and OPTIONS shows it. A rate limit answer carries the header Retry-After.
+* The token of the contact form expires after 7 days (filter leitvia_studio_contact_form_max_age). Deleting Studio with its data also removes the meta fields of AI generated posts and their sources.
+* Fixes: the consent settings block stays valid when the editor runs in another language than the one it was saved in; list-product-reviews with unrated false over GET no longer filters; icons whose SVG contains a dollar sign render whole; the rating block in the editor formats numbers in the language of the site.
 
 = 1.3.42 =
 * Icons train front and bike (116 Lucide icons), for the stops of the route in Leitvia Pro.

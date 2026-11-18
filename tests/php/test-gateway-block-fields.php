@@ -793,4 +793,72 @@ class Test_Gateway_Block_Fields extends WP_UnitTestCase {
 		wp_set_current_user( $this->agent );
 		$this->assert_rejected( 'leitvia_invalid_input', self::call( 'leitvia/set-privacy-page', array( 'page' => $form + 1000 ) ) );
 	}
+
+	/**
+	 * An empty url removes the saved link of a button whose url a binding fills, through the whole pipeline: the HTML
+	 * API leaves a space where href was (<a class="..." >), which is no unsafe markup. The markup is that of a stored
+	 * button of a job posting pattern after an agent gave it a link.
+	 */
+	public function test_update_block_removes_the_saved_link_of_a_bound_button(): void {
+		register_block_bindings_source(
+			'example/job-posting',
+			array(
+				'label'              => 'Job posting',
+				'get_value_callback' => static fn(): string => '/apply/',
+			)
+		);
+		$page   = self::page( '<!-- wp:buttons -->' . "\n" . '<div class="wp-block-buttons"><!-- wp:button {"width":100,"metadata":{"leitviaId":"a1b2c3d4","bindings":{"url":{"source":"example/job-posting"}}}} -->' . "\n" . '<div class="wp-block-button has-custom-width wp-block-button__width-100"><a class="wp-block-button__link wp-element-button" href="' . home_url( '/contact/' ) . '">Apply now</a></div>' . "\n" . '<!-- /wp:button --></div>' . "\n" . '<!-- /wp:buttons -->' );
+		$result = self::call(
+			'leitvia/update-block',
+			array(
+				'post'      => $page,
+				'block'     => 'a1b2c3d4',
+				'url'       => '',
+				'base_hash' => Hashes::document( $page ),
+			)
+		);
+		unregister_block_bindings_source( 'example/job-posting' );
+		$this->assert_done( $result );
+		$content = get_post( $page )->post_content;
+		$this->assertStringNotContainsString( 'href=', $content );
+		$this->assertStringContainsString( '"bindings":{"url":{"source":"example/job-posting"}}', $content, 'the binding stays' );
+		$this->assertStringContainsString( '>Apply now</a>', $content );
+	}
+
+	/**
+	 * The attribute align goes on every block with supports.align, with the values it supports: in the comment of a block that
+	 * renders on the server, also as class on the outer element of a static block; null removes it. A value outside
+	 * supports is refused. An inserted block takes it as well.
+	 */
+	public function test_update_block_align_follows_supports(): void {
+		$embed = self::page( '<!-- wp:leitvia/consent-embed {"url":"https://planner.example.com/embed","title":"Planner"} /-->' );
+		$this->assertIsString( self::edit( $embed, array( 'attributes' => array( 'align' => 'wide' ) ) ) );
+		$this->assertSame( 'wide', parse_blocks( get_post( $embed )->post_content )[0]['attrs']['align'] );
+		$this->assert_rejected( 'leitvia_invalid_input', self::edit( $embed, array( 'attributes' => array( 'align' => 'left' ) ) ) );
+		$this->assertIsString( self::edit( $embed, array( 'attributes' => array( 'align' => null ) ) ) );
+		$this->assertArrayNotHasKey( 'align', parse_blocks( get_post( $embed )->post_content )[0]['attrs'] );
+
+		$group   = self::page( '<!-- wp:group {"layout":{"type":"constrained"}} --><div class="wp-block-group"><!-- wp:paragraph --><p>Text</p><!-- /wp:paragraph --></div><!-- /wp:group -->' );
+		$content = self::edit( $group, array( 'attributes' => array( 'align' => 'full' ) ) );
+		$this->assertIsString( $content, is_wp_error( $content ) ? $content->get_error_message() : '' );
+		// The pipeline gives the group its metadata.leitviaId first, so the comment is matched from align on.
+		$this->assertMatchesRegularExpression( '/<!-- wp:group \{("metadata":\{[^}]*\},)?"align":"full","layout":\{"type":"constrained"\}\} --><div class="wp-block-group alignfull">/', $content, 'align before layout, as the editor saves it' );
+		$content = self::edit( $group, array( 'attributes' => array( 'align' => 'wide' ) ) );
+		$this->assertStringContainsString( '<div class="wp-block-group alignwide">', $content );
+
+		$inserted = \LeitviaStudio\Gateway\Block_Edit::build(
+			array(
+				'block'      => 'leitvia/consent-embed',
+				'attributes' => array(
+					'url'   => 'https://planner.example.com/embed',
+					'title' => 'Planner',
+					'align' => 'wide',
+				),
+			),
+			array(),
+			'core/group'
+		);
+		$this->assertIsArray( $inserted, is_wp_error( $inserted ) ? $inserted->get_error_message() : '' );
+		$this->assertSame( 'wide', $inserted['attrs']['align'] );
+	}
 }
