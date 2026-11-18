@@ -45,11 +45,13 @@ class Test_Gateway_Block_Fields extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Removes the abilities and the category.
+	 * Removes the abilities and the category, and the styles the rendered block styles queued: their handle
+	 * block-style-variation-styles depends on global-styles, which a later test printing wp_head has not registered.
 	 */
 	public function tear_down(): void {
 		self::unregister();
 		wp_clean_theme_json_cache();
+		$GLOBALS['wp_styles'] = null; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- A fresh request.
 		parent::tear_down();
 		leitvia_studio()->reset_for_tests();
 	}
@@ -203,6 +205,60 @@ class Test_Gateway_Block_Fields extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Add-media takes a local video, MP4 with H.264 and WebM, without alt text, with a poster from the library as its
+	 * featured image and a caption; core reads its length. Other codecs, a wrong extension, a poster that is no image,
+	 * a poster for an image and a video above the limit of the filter are refused.
+	 */
+	public function test_add_media_takes_video(): void {
+		$dir    = dirname( __DIR__ ) . '/fixtures/';
+		$mp4    = (string) file_get_contents( $dir . 'clip.mp4' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Test fixture.
+		$webm   = (string) file_get_contents( $dir . 'clip.webm' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Test fixture.
+		$poster = self::factory()->attachment->create_upload_object( $dir . 'avatar.png', 0 );
+
+		$result = self::call(
+			'leitvia/add-media',
+			self::file( $mp4, 'process.mp4' ) + array(
+				'poster'  => $poster,
+				'caption' => 'The process in five steps, without sound.',
+			)
+		);
+		$this->assert_done( $result );
+		$id = (int) $result['target']['post'];
+		$this->assertSame( 'video/mp4', get_post_mime_type( $id ) );
+		$this->assertTrue( wp_attachment_is( 'video', $id ) );
+		$this->assertSame( $mp4, file_get_contents( get_attached_file( $id ) ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Test.
+		$this->assertSame( $poster, (int) get_post_thumbnail_id( $id ) );
+		$this->assertSame( 'The process in five steps, without sound.', get_post_field( 'post_excerpt', $id ) );
+		$this->assertSame( '', (string) get_post_meta( $id, '_wp_attachment_image_alt', true ) );
+		$this->assertArrayHasKey( 'length', (array) wp_get_attachment_metadata( $id ), 'core reads the length as on upload' );
+
+		$webm_result = self::call( 'leitvia/add-media', self::file( $webm, 'process.webm' ) );
+		$this->assert_done( $webm_result );
+		$this->assertSame( 'video/webm', get_post_mime_type( $webm_result['target']['post'] ) );
+
+		$refused = array(
+			'HEVC instead of H.264' => self::file( str_replace( array( 'avc1', 'avc3' ), 'hvc1', $mp4 ), 'hevc.mp4' ),
+			'WebM named .mp4'       => self::file( $webm, 'clip.mp4' ),
+			'MP4 named .webm'       => self::file( $mp4, 'clip.webm' ),
+			'poster is no image'    => self::file( $mp4, 'clip.mp4' ) + array( 'poster' => $id ),
+			'poster for an image'   => self::file( (string) file_get_contents( $dir . 'avatar.png' ), 'portrait.png' ) + array( // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Test fixture.
+				'alt'    => 'Portrait',
+				'poster' => $poster,
+			),
+		);
+		foreach ( $refused as $case => $input ) {
+			$rejected = self::call( 'leitvia/add-media', $input );
+			$this->assertWPError( $rejected, $case );
+			$this->assertSame( 'leitvia_invalid_input', $rejected->get_error_code(), $case );
+		}
+
+		$limit = static fn(): int => 1000;
+		add_filter( 'leitvia_studio_max_video_bytes', $limit );
+		$this->assert_rejected( 'leitvia_invalid_input', self::call( 'leitvia/add-media', self::file( $mp4, 'large.mp4' ) ) );
+		remove_filter( 'leitvia_studio_max_video_bytes', $limit );
+	}
+
+	/**
 	 * Tracks reach attribute and markup, survive the write and render; only WebVTT files of the library count; an empty
 	 * list removes them. Caption and tracks work together on one video.
 	 */
@@ -270,6 +326,33 @@ class Test_Gateway_Block_Fields extends WP_UnitTestCase {
 		$this->assertStringNotContainsString( '<track', $content );
 		$this->assertStringNotContainsString( 'figcaption', $content );
 		$this->assertArrayNotHasKey( 'tracks', parse_blocks( $content )[0]['attrs'] );
+
+		// Wider than the text: align on a video, also with its tracks in the same call, and on audio and embeds.
+		$content = self::edit(
+			$page,
+			array(
+				'attributes' => array(
+					'align'  => 'wide',
+					'tracks' => array(),
+				),
+			)
+		);
+		$this->assertIsString( $content, is_wp_error( $content ) ? $content->get_error_message() : '' );
+		$this->assertSame( 'wide', parse_blocks( $content )[0]['attrs']['align'] );
+		$this->assertStringContainsString( '<figure class="wp-block-video alignwide">', $content );
+		$content = self::edit( $page, array( 'attributes' => array( 'align' => null ) ) );
+		$this->assertStringContainsString( '<figure class="wp-block-video">', $content );
+		$this->assertArrayNotHasKey( 'align', parse_blocks( $content )[0]['attrs'] );
+		$this->assert_rejected( 'leitvia_invalid_input', self::edit( $page, array( 'attributes' => array( 'align' => 'huge' ) ) ) );
+		$cases = array(
+			'<!-- wp:audio --><figure class="wp-block-audio"><audio controls src="/a.mp3"></audio></figure><!-- /wp:audio -->' => 'wp-block-audio',
+			'<!-- wp:embed {"url":"https://example.com/v","type":"video","providerNameSlug":"example"} --><figure class="wp-block-embed is-type-video is-provider-example wp-block-embed-example"><div class="wp-block-embed__wrapper">https://example.com/v</div></figure><!-- /wp:embed -->' => 'wp-block-embed',
+		);
+		foreach ( $cases as $markup => $class ) {
+			$content = self::edit( self::page( $markup ), array( 'attributes' => array( 'align' => 'full' ) ) );
+			$this->assertIsString( $content, is_wp_error( $content ) ? $content->get_error_message() : '' );
+			$this->assertMatchesRegularExpression( '/<figure class="' . $class . '[^"]* alignfull">/', $content );
+		}
 	}
 
 	/**
@@ -472,6 +555,54 @@ class Test_Gateway_Block_Fields extends WP_UnitTestCase {
 		$this->assertSame( 'is-style-test-frame', $block['attrs']['className'] );
 		$this->assertStringContainsString( 'wp-block-gallery has-nested-images columns-default is-cropped is-style-test-frame', $block['innerHTML'] );
 		$this->assert_rejected( 'leitvia_invalid_input', self::edit( $gallery, array( 'attributes' => array( 'width' => '10px' ) ) ) );
+	}
+
+	/**
+	 * A registered block style goes onto any core block that has styles, not only media blocks: the class swaps in the
+	 * comment and on the element, other classes stay, null removes it. Unknown styles and other classes are refused.
+	 */
+	public function test_update_block_style_of_a_core_block(): void {
+		$registered = WP_Block_Styles_Registry::get_instance()->is_registered( 'core/group', 'inverse' );
+		if ( ! $registered ) {
+			register_block_style(
+				'core/group',
+				array(
+					'name'  => 'inverse',
+					'label' => 'Inverse',
+				)
+			);
+		}
+		$page = self::page( '<!-- wp:group {"className":"band is-style-tile","layout":{"type":"constrained"}} --><div class="wp-block-group band is-style-tile"><!-- wp:paragraph --><p>Hello</p><!-- /wp:paragraph --></div><!-- /wp:group -->' );
+
+		$content = self::edit( $page, array( 'attributes' => array( 'className' => 'is-style-inverse' ) ) );
+		$this->assertIsString( $content, is_wp_error( $content ) ? $content->get_error_message() : '' );
+		$block = parse_blocks( $content )[0];
+		$this->assertSame( 'band is-style-inverse', $block['attrs']['className'] );
+		$this->assertSame( array( 'type' => 'constrained' ), $block['attrs']['layout'] );
+		$this->assertStringContainsString( '<div class="wp-block-group band is-style-inverse">', $block['innerContent'][0] );
+		$this->assertStringNotContainsString( 'is-style-tile', $content );
+		$this->assertStringContainsString( '<p>Hello</p>', $content );
+
+		$this->assert_rejected( 'leitvia_invalid_input', self::edit( $page, array( 'attributes' => array( 'className' => 'is-style-unbekannt' ) ) ) );
+		$this->assert_rejected( 'leitvia_invalid_input', self::edit( $page, array( 'attributes' => array( 'className' => 'beliebig' ) ) ) );
+
+		// A new className goes before layout, where the editor saves it.
+		$plain = self::page( '<!-- wp:group {"layout":{"type":"constrained"}} --><div class="wp-block-group"><!-- wp:paragraph --><p>Hello</p><!-- /wp:paragraph --></div><!-- /wp:group -->' );
+		$saved = self::edit( $plain, array( 'attributes' => array( 'className' => 'is-style-inverse' ) ) );
+		$this->assertIsString( $saved, is_wp_error( $saved ) ? $saved->get_error_message() : '' );
+		$keys = array_keys( parse_blocks( $saved )[0]['attrs'] );
+		$this->assertLessThan( array_search( 'layout', $keys, true ), array_search( 'className', $keys, true ) );
+		$this->assertStringContainsString( '<div class="wp-block-group is-style-inverse">', $saved );
+
+		$content = self::edit( $page, array( 'attributes' => array( 'className' => null ) ) );
+		if ( ! $registered ) {
+			unregister_block_style( 'core/group', 'inverse' );
+		}
+		$this->assertIsString( $content, is_wp_error( $content ) ? $content->get_error_message() : '' );
+		$block = parse_blocks( $content )[0];
+		$this->assertSame( 'band', $block['attrs']['className'] );
+		$this->assertStringContainsString( '<div class="wp-block-group band">', $block['innerContent'][0] );
+		$this->assertStringNotContainsString( 'is-style-', $content );
 	}
 
 	/**

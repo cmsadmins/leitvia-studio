@@ -332,7 +332,7 @@ final class Read_Design {
 			'leitvia/list-blocks',
 			__( 'List blocks', 'leitvia-studio' ),
 			/* translators: %s: product name */
-			sprintf( __( 'Returns the block catalog of %s and its add-ons with attribute schema and usage rules. With post_type only the blocks the editor allows for that post type.', 'leitvia-studio' ), leitvia_studio_brand()['name'] ),
+			sprintf( __( 'Returns the block catalog of %s and its add-ons with attribute schema and usage rules, and the registered block styles of every block, core blocks included, by block name; a style is set as the class is-style-<name>. With post_type only the blocks the editor allows for that post type.', 'leitvia-studio' ), leitvia_studio_brand()['name'] ),
 			array(
 				'type'                 => 'object',
 				'properties'           => array(
@@ -352,6 +352,20 @@ final class Read_Design {
 					'blocks' => array(
 						'type'  => 'array',
 						'items' => \LeitviaStudio\Blocks\Catalog::schema()['items'] ?? array( 'type' => 'object' ),
+					),
+					'styles' => array(
+						'type'                 => 'object',
+						'description'          => __( 'Block styles by block name, from block.json and register_block_style(), each with name and label.', 'leitvia-studio' ),
+						'additionalProperties' => array(
+							'type'  => 'array',
+							'items' => array(
+								'type'       => 'object',
+								'properties' => array(
+									'name'  => array( 'type' => 'string' ),
+									'label' => array( 'type' => 'string' ),
+								),
+							),
+						),
 					),
 				),
 			),
@@ -768,12 +782,15 @@ final class Read_Design {
 	 * The block catalog, limited to the blocks the editor allows for a post type when one is given.
 	 *
 	 * @param string $post_type Post type, '' for all blocks.
-	 * @return array{blocks: list<array<string, mixed>>}|\WP_Error
+	 * @return array{blocks: list<array<string, mixed>>, styles: array<string, list<array{name: string, label: string}>>}|\WP_Error
 	 */
 	public static function blocks( string $post_type ) {
 		$blocks = \LeitviaStudio\Blocks\Catalog::get();
 		if ( '' === $post_type ) {
-			return array( 'blocks' => $blocks );
+			return array(
+				'blocks' => $blocks,
+				'styles' => self::block_styles( null ),
+			);
 		}
 		if ( ! in_array( $post_type, Gateway\Scope::post_types(), true ) ) {
 			return Gateway\Block_Edit::invalid( 'post_type', __( 'This post type is not open to agents. Leave post_type empty or use an allowed post type.', 'leitvia-studio' ), array( 'post_type' => $post_type ) );
@@ -796,9 +813,47 @@ final class Read_Design {
 			)
 		);
 		if ( true === $allowed ) {
-			return array( 'blocks' => $blocks );
+			return array(
+				'blocks' => $blocks,
+				'styles' => self::block_styles( null ),
+			);
 		}
-		$allowed = is_array( $allowed ) ? $allowed : array();
-		return array( 'blocks' => array_values( array_filter( $blocks, static fn( array $block ): bool => in_array( $block['name'], $allowed, true ) ) ) );
+		$allowed = is_array( $allowed ) ? array_values( $allowed ) : array();
+		return array(
+			'blocks' => array_values( array_filter( $blocks, static fn( array $block ): bool => in_array( $block['name'], $allowed, true ) ) ),
+			'styles' => self::block_styles( $allowed ),
+		);
+	}
+
+	/**
+	 * Registered block styles by block name: those of block.json and those of register_block_style(), the latter winning
+	 * on the same name. Blocks without styles are left out.
+	 *
+	 * @param list<string>|null $names Block names to include, null for every registered block.
+	 * @return array<string, list<array{name: string, label: string}>>
+	 */
+	private static function block_styles( ?array $names ): array {
+		$registry = \WP_Block_Styles_Registry::get_instance();
+		$styles   = array();
+		foreach ( \WP_Block_Type_Registry::get_instance()->get_all_registered() as $name => $type ) {
+			if ( null !== $names && ! in_array( $name, $names, true ) ) {
+				continue;
+			}
+			$list = array();
+			foreach ( array_merge( (array) $type->styles, array_values( $registry->get_registered_styles_for_block( $name ) ) ) as $style ) {
+				$slug = is_array( $style ) ? (string) ( $style['name'] ?? '' ) : '';
+				if ( '' !== $slug ) {
+					$list[ $slug ] = array(
+						'name'  => $slug,
+						'label' => (string) ( $style['label'] ?? $slug ),
+					);
+				}
+			}
+			if ( $list ) {
+				$styles[ $name ] = array_values( $list );
+			}
+		}
+		ksort( $styles );
+		return $styles;
 	}
 }

@@ -77,7 +77,8 @@ final class Normalize {
 		foreach ( self::top_level( $content ) as [ $piece, $is_block ] ) {
 			$block   = $is_block ? parse_blocks( $piece )[0] ?? null : null;
 			$anchors = $target ? self::anchors( $target, $part ) : null;
-			if ( is_array( $block ) && self::block( $block, $hulls, $known, $anchors, $aliases ) ) {
+			// A broken block comment stays as sent, so the pipeline rejects it instead of a repair dropping its attributes.
+			if ( is_array( $block ) && ! Pipeline::broken_markup( array( $block ) ) && self::block( $block, $hulls, $known, $anchors, $aliases ) ) {
 				$piece   = serialize_block( $block );
 				$changed = true;
 			}

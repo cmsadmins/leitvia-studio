@@ -102,8 +102,73 @@ class Test_Settings extends WP_UnitTestCase {
 					'default' => '',
 				),
 			),
-			$schema['properties']
+			array_slice( $schema['properties'], 0, 18 )
 		);
+	}
+
+	/**
+	 * The settings of round 14: consent providers, kind of business, founding date and the lists of the organization.
+	 */
+	public function test_schema_of_lists_and_organization(): void {
+		$properties = get_registered_settings()['leitvia_studio_settings']['show_in_rest']['schema']['properties'];
+		$this->assertSame(
+			array( 'consent_providers', 'organization_type', 'organization_founding_date', 'organization_area_served', 'organization_opening_hours', 'organization_same_as' ),
+			array_keys( array_slice( $properties, 18 ) )
+		);
+		$this->assertSame( 'array', $properties['consent_providers']['type'] );
+		$this->assertSame( array( 'key', 'label', 'hosts', 'purpose', 'privacy' ), array_keys( $properties['consent_providers']['items']['properties'] ) );
+		$this->assertFalse( $properties['consent_providers']['items']['additionalProperties'] );
+		$this->assertSame( \LeitviaStudio\Organization\Organization::TYPES, $properties['organization_type']['enum'] );
+		$this->assertSame( 'Organization', $properties['organization_type']['default'] );
+		$this->assertSame( \LeitviaStudio\Organization\Organization::DATE, $properties['organization_founding_date']['pattern'] );
+		$this->assertSame( array( 'type' => 'string' ), $properties['organization_area_served']['items'] );
+		$this->assertSame( \LeitviaStudio\Organization\Organization::DAYS, $properties['organization_opening_hours']['items']['properties']['days']['items']['enum'] );
+		$this->assertSame( \LeitviaStudio\Organization\Organization::TIME, $properties['organization_opening_hours']['items']['properties']['opens']['pattern'] );
+		$this->assertSame( array( 'type' => 'string' ), $properties['organization_same_as']['items'] );
+	}
+
+	/**
+	 * Lists keep valid entries only; a wrong kind of business or founding date falls back.
+	 */
+	public function test_sanitize_lists_and_organization(): void {
+		$clean = \LeitviaStudio\Admin\Settings::sanitize(
+			array(
+				'organization_type'          => 'Castle',
+				'organization_founding_date' => '62',
+				'organization_area_served'   => array( ' Kassel ', '', 'Kassel', 'Baunatal', array( 'x' ) ),
+				'organization_same_as'       => array( 'https://example.org/brackenfold', 'http://example.org/old', 'javascript:alert(1)', 'https://example.org/brackenfold' ),
+				'organization_opening_hours' => 'none',
+			)
+		);
+		$this->assertSame( 'Organization', $clean['organization_type'] );
+		$this->assertSame( '', $clean['organization_founding_date'] );
+		$this->assertSame( array( 'Kassel', 'Baunatal' ), $clean['organization_area_served'] );
+		$this->assertSame( array( 'https://example.org/brackenfold' ), $clean['organization_same_as'] );
+		$this->assertSame( array(), $clean['organization_opening_hours'] );
+
+		$clean = \LeitviaStudio\Admin\Settings::sanitize(
+			array(
+				'organization_type'          => 'GeneralContractor',
+				'organization_founding_date' => '1962-04-01',
+			)
+		);
+		$this->assertSame( 'GeneralContractor', $clean['organization_type'] );
+		$this->assertSame( '1962-04-01', $clean['organization_founding_date'] );
+
+		// A day has to be on the calendar, a month between 1 and 12.
+		$dates = array(
+			'1962'       => '1962',
+			'1962-12'    => '1962-12',
+			'1962-13'    => '',
+			'1962-00'    => '',
+			'2024-02-29' => '2024-02-29',
+			'2025-02-29' => '',
+			'1962-04-31' => '',
+			'1962-4-1'   => '',
+		);
+		foreach ( $dates as $date => $expected ) {
+			$this->assertSame( $expected, \LeitviaStudio\Admin\Settings::sanitize( array( 'organization_founding_date' => (string) $date ) )['organization_founding_date'], (string) $date );
+		}
 	}
 
 	/**
@@ -170,6 +235,12 @@ class Test_Settings extends WP_UnitTestCase {
 				'organization_country'       => '',
 				'organization_phone'         => '',
 				'organization_email'         => '',
+				'consent_providers'          => array(),
+				'organization_type'          => 'Organization',
+				'organization_founding_date' => '',
+				'organization_area_served'   => array(),
+				'organization_opening_hours' => array(),
+				'organization_same_as'       => array(),
 			),
 			get_option( 'leitvia_studio_settings' )
 		);
@@ -263,6 +334,12 @@ class Test_Settings extends WP_UnitTestCase {
 				'organization_country'       => '',
 				'organization_phone'         => '',
 				'organization_email'         => '',
+				'consent_providers'          => array(),
+				'organization_type'          => 'Organization',
+				'organization_founding_date' => '',
+				'organization_area_served'   => array(),
+				'organization_opening_hours' => array(),
+				'organization_same_as'       => array(),
 			),
 			$response->get_data()['leitvia_studio_settings']
 		);
@@ -290,6 +367,12 @@ class Test_Settings extends WP_UnitTestCase {
 				'organization_country'       => '',
 				'organization_phone'         => '',
 				'organization_email'         => '',
+				'consent_providers'          => array(),
+				'organization_type'          => 'Organization',
+				'organization_founding_date' => '',
+				'organization_area_served'   => array(),
+				'organization_opening_hours' => array(),
+				'organization_same_as'       => array(),
 			),
 			rest_do_request( $request )->get_data()['leitvia_studio_settings']
 		);

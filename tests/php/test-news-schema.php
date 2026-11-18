@@ -45,7 +45,12 @@ class Test_News_Schema extends WP_UnitTestCase {
 	 */
 	public function set_up(): void {
 		parent::set_up();
+		// A fresh request: styles an earlier test queued (block style variations need global-styles) would print in wp_head.
+		$GLOBALS['wp_styles'] = null; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- A fresh request.
 		$this->set_permalink_structure( '/%postname%/' );
+		// Taxonomies add their permastruct only when registered on pretty permalinks; without it the category links
+		// depend on whether the install of the tests site turned them on.
+		create_initial_taxonomies();
 		update_option( 'timezone_string', 'Europe/Berlin' );
 		update_option( 'blogname', 'Leitvia News' );
 		$this->author = self::factory()->user->create(
@@ -146,7 +151,7 @@ class Test_News_Schema extends WP_UnitTestCase {
 	 * Address, phone and email from the settings join the publisher; empty fields stay out.
 	 */
 	public function test_organization_details(): void {
-		$this->assertArrayNotHasKey( 'address', Schema::website()['publisher'] );
+		$this->assertArrayNotHasKey( 'address', Schema::article( get_post( $this->post ) )['publisher'] );
 		update_option(
 			Settings::OPTION,
 			array(
@@ -157,7 +162,7 @@ class Test_News_Schema extends WP_UnitTestCase {
 				'organization_postal_code' => '',
 			) + Settings::DEFAULTS
 		);
-		$publisher = Schema::website()['publisher'];
+		$publisher = Schema::article( get_post( $this->post ) )['publisher'];
 		$this->assertSame(
 			array(
 				'@type'           => 'PostalAddress',
@@ -441,7 +446,8 @@ class Test_News_Schema extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The front page carries a WebSite with name, tagline and the site as publisher, for the site name in results.
+	 * The front page carries a WebSite with name and tagline that names the organization by @id, and the organization as
+	 * a node of its own with its logo, for the site name in results.
 	 */
 	public function test_front_page_website(): void {
 		update_option( 'blogdescription', 'Pages &amp; posts' );
@@ -451,8 +457,10 @@ class Test_News_Schema extends WP_UnitTestCase {
 		$this->assertSame( 'Leitvia News', $data['name'] );
 		$this->assertSame( home_url( '/' ), $data['url'] );
 		$this->assertSame( 'Pages & posts', $data['description'] );
-		$this->assertSame( 'Organization', $data['publisher']['@type'] );
-		$this->assertSame( 200, $data['publisher']['logo']['width'] );
+		$this->assertSame( array( '@id' => home_url( '/#organization' ) ), $data['publisher'] );
+		$organization = $this->node( 'Organization' );
+		$this->assertSame( home_url( '/#organization' ), $organization['@id'] );
+		$this->assertSame( 200, $organization['logo']['width'] );
 		$this->assertSame( 1, substr_count( get_echo( 'wp_head' ), 'application/ld+json' ) );
 
 		update_option( 'blogdescription', '' );

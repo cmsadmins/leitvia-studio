@@ -149,4 +149,49 @@ class Test_Map extends WP_UnitTestCase {
 		$this->assertStringNotContainsString( 'leitvia-consent', $html );
 		$this->assertStringContainsString( '<div class="wp-block-leitvia-map__canvas" role="region" aria-label="Interactive map"', $html );
 	}
+
+	/**
+	 * An agent sets coordinates, zoom, markers, height, heading and link text when it inserts the map: the list of
+	 * places is built from them, nothing of the catalog example stays, and still no tile host loads before consent.
+	 * The labels of the map controls are translatable.
+	 */
+	public function test_agents_set_the_map_on_insert(): void {
+		$block = \LeitviaStudio\Gateway\Block_Edit::build(
+			array(
+				'block'      => 'leitvia/map',
+				'attributes' => array(
+					'heading'  => 'Workshop',
+					'lat'      => 48.1,
+					'lng'      => 11.5,
+					'zoom'     => 14,
+					'height'   => 'small',
+					'linkText' => 'Directions',
+					'markers'  => array(
+						array(
+							'title'   => 'Workshop',
+							'address' => 'Main street 1',
+							'lat'     => 48.1,
+							'lng'     => 11.5,
+						),
+					),
+				),
+			),
+			array( 'post' => 1 ),
+			''
+		);
+		$this->assertIsArray( $block, is_wp_error( $block ) ? $block->get_error_message() : '' );
+		$saved = serialize_block( $block );
+		$this->assertStringContainsString( '"zoom":14', $saved );
+		$this->assertStringContainsString( '<div class="wp-block-leitvia-map is-height-small"><h2 class="wp-block-leitvia-map__heading">Workshop</h2><ul class="wp-block-leitvia-map__places"><li><strong>Workshop</strong><span>Main street 1</span><a href="https://www.openstreetmap.org/?mlat=48.1&amp;mlon=11.5#map=14/48.1/11.5">Directions</a></li></ul></div>', $saved );
+		$this->assertStringNotContainsString( 'Alexanderplatz', $saved );
+		$this->assertStringNotContainsString( 'Our office', $saved );
+
+		$german = static fn( string $translation, string $text ): string => 'Zoom in' === $text ? 'Hineinzoomen' : $translation;
+		add_filter( 'gettext', $german, 10, 2 );
+		$html   = do_blocks( $saved );
+		remove_filter( 'gettext', $german, 10 );
+		$this->assertStringNotContainsString( 'tile.openstreetmap.org', self::live( $html ) );
+		$this->assertStringContainsString( 'data-view="[48.1,11.5,14]"', $html );
+		$this->assertStringContainsString( 'data-labels="[&quot;Hineinzoomen&quot;,&quot;Zoom out&quot;,&quot;Close popup&quot;]"', $html );
+	}
 }

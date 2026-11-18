@@ -77,11 +77,11 @@ final class Catalog {
 			),
 		),
 		'core/video' => array(
-			'extension' => 'leitvia/add-media takes the WebVTT file; the attribute tracks of leitvia/update-block sets it with kind, srclang and label, and its field caption sets the figcaption.',
+			'extension' => 'leitvia/add-media takes the video (MP4 with H.264 or WebM, with poster) and the WebVTT file; the attribute tracks of leitvia/update-block sets it with kind, srclang and label, and its field caption sets the figcaption.',
 			'usage'     => array(
 				'useWhen'   => 'A video file hosted on the site itself, which sends no data to a third party.',
 				'avoidWhen' => 'Videos of a third party; use the embed block with its consent placeholder.',
-				'a11y'      => 'Spoken content needs captions (WCAG 1.2.2): a track with kind captions. Do not autoplay with sound.',
+				'a11y'      => 'Spoken content needs captions (WCAG 1.2.2): a track with kind captions. A video without speech needs a text that says what it shows. Set a poster, controls and preload none; never autoplay.',
 			),
 		),
 	);

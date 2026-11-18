@@ -31,6 +31,11 @@ final class Build {
 	public const MAX_MEDIA_BYTES = 5 * MB_IN_BYTES;
 
 	/**
+	 * Largest video file in bytes by default, see max_video_bytes().
+	 */
+	public const MAX_VIDEO_BYTES = 50 * MB_IN_BYTES;
+
+	/**
 	 * Page kinds compose-page may set in _leitvia_page_kind.
 	 */
 	public const PAGE_KINDS = array( 'imprint', 'privacy', 'terms', 'withdrawal', 'accessibility', 'editorial', 'contact', 'authors' );
@@ -39,6 +44,11 @@ final class Build {
 	 * Post types whose changes belong to the area structure.
 	 */
 	private const STRUCTURE_TYPES = array( 'wp_block', 'wp_template', 'wp_template_part', 'wp_navigation' );
+
+	/**
+	 * Keys of a block edit that Block_Edit::apply() takes.
+	 */
+	private const CHANGES = array( 'attributes', 'text', 'link_text', 'url', 'add_link', 'caption', 'anchor', 'columns', 'image' );
 
 	/**
 	 * Registers the abilities. Runs on leitvia_studio_init.
@@ -51,7 +61,7 @@ final class Build {
 		Abilities::write(
 			'leitvia/compose-page',
 			__( 'Compose page', 'leitvia-studio' ),
-			__( 'Creates a page from patterns in the order of a page frame of the contract. Plan it with leitvia/plan-page first; base_hash is empty for the new page. Per section texts (also quote citations and details summaries), links and images at block IDs of the pattern outline can change, and remove and repeat take blocks from a parent or add copies, for fewer or more entries than the pattern; a text that would drop a link is refused. Edits apply in order. Each section keeps metadata.patternName (core/block/<ID> for a Lab pattern). Unknown patterns are rejected with a pointer to leitvia/list-patterns, deprecated ones with their replacement, Lab patterns that are not approved (also through a part) with leitvia_pattern_not_approved. Later changes go through leitvia/update-content and leitvia/update-block.', 'leitvia-studio' ),
+			__( 'Creates a page from patterns in the order of a page frame of the contract. Plan it with leitvia/plan-page first; base_hash is empty for the new page. Per section texts (also quote citations and details summaries), links, images, captions, catalog attributes, an HTML anchor and the columns of a grid at block IDs of the pattern outline can change, remove and repeat take blocks from a parent or add copies, for fewer or more entries than the pattern, and insert adds a block of leitvia/list-blocks after a block, given as name with attributes, anchor and inner blocks, never as markup; a text that would drop a link is refused. Edits apply in order. Each section keeps metadata.patternName (core/block/<ID> for a Lab pattern). Unknown patterns are rejected with a pointer to leitvia/list-patterns, deprecated ones with their replacement, Lab patterns that are not approved (also through a part) with leitvia_pattern_not_approved. Later changes go through leitvia/update-content and leitvia/update-block.', 'leitvia-studio' ),
 			'build',
 			$create,
 			array(
@@ -101,7 +111,7 @@ final class Build {
 		Abilities::write(
 			'leitvia/update-block',
 			__( 'Update block', 'leitvia-studio' ),
-			__( 'Changes one block found by its ID or path ID: attributes from the block catalog and the level of a heading, the text of a paragraph, heading, list item or button, the citation of a quote, the summary of a details block, the link of a button or of the one link in a text (link_text names the linked part), or the image of an image or cover block with alt text. add_link sets a new link on a passage of a text, caption the caption of an image, video, audio, gallery, table or embed. Attributes that a static block keeps in its markup, such as prefix, value, suffix and label of a counter, change like any other. query of a core/query merges into its settings. tracks of a core/video replaces its text tracks: each names a WebVTT file from leitvia/add-media by id, with kind, srclang and label. A spotlight point moves with attributes x and y in percent. The effect on scroll (leitviaAnimation, leitviaMotion) changes on every block that has it, core blocks and saved markup included, since only the block comment changes. Static markup is rebuilt with the HTML API; changes it cannot rebuild safely are rejected with leitvia_static_markup. Read the post with leitvia/get-page-outline first and send its hash as base_hash; get-block shows the current attributes. For several text changes in one post use leitvia/update-content.', 'leitvia-studio' ),
+			__( 'Changes one block found by its ID or path ID: attributes from the block catalog and the level of a heading, the text of a paragraph, heading, list item or button, the citation of a quote, the summary of a details block, the link of a button or of the one link in a text (link_text names the linked part), or the image of an image or cover block with alt text. add_link sets a new link on a passage of a text, caption the caption of an image, video, audio, gallery, table or embed, anchor the HTML anchor of a block with the support anchor (unique on the page), columns the column count of a grid (group or post template with the layout grid). A timeline entry takes date, dateLabel and heading as attributes. Attributes that a static block keeps in its markup, such as prefix, value, suffix and label of a counter, change like any other. query of a core/query merges into its settings. tracks of a core/video replaces its text tracks: each names a WebVTT file from leitvia/add-media by id, with kind, srclang and label. A spotlight point moves with attributes x and y in percent. The effect on scroll (leitviaAnimation, leitviaMotion) changes on every block that has it, core blocks and saved markup included, since only the block comment changes. Static markup is rebuilt with the HTML API; changes it cannot rebuild safely are rejected with leitvia_static_markup. Read the post with leitvia/get-page-outline first and send its hash as base_hash; get-block shows the current attributes. For several text changes in one post use leitvia/update-content.', 'leitvia-studio' ),
 			'build',
 			array(
 				'destructive' => true,
@@ -170,7 +180,7 @@ final class Build {
 		Abilities::write(
 			'leitvia/add-media',
 			__( 'Add media', 'leitvia-studio' ),
-			__( 'Adds an image to the media library from a URL of this site or as Base64 data up to 5 MB, with alt text or marked as decorative. It also takes a WebVTT file with captions for a video (.vtt, UTF-8, starts with WEBVTT, no alt text). It needs the right to upload files. URLs of other hosts are rejected; nothing is fetched from them. base_hash is empty. Images already in the library are used by their ID in compose-page and update-block, a WebVTT file by its ID in tracks of update-block.', 'leitvia-studio' ),
+			__( 'Adds an image to the media library from a URL of this site or as Base64 data up to 5 MB, with alt text or marked as decorative. It also takes a WebVTT file with captions for a video (.vtt, UTF-8, starts with WEBVTT, no alt text) and a video hosted on this site, MP4 (H.264) or WebM up to 50 MB, with poster and caption instead of alt text. It needs the right to upload files. URLs of other hosts are rejected; nothing is fetched from them. base_hash is empty. Images already in the library are used by their ID in compose-page and update-block, a WebVTT file by its ID in tracks of update-block, a video by its ID and URL in a core/video.', 'leitvia-studio' ),
 			'build',
 			$create,
 			array(
@@ -181,7 +191,7 @@ final class Build {
 					),
 					'data'       => array(
 						'type'      => 'string',
-						'maxLength' => (int) ceil( self::MAX_MEDIA_BYTES / 3 ) * 4 + 4,
+						'maxLength' => (int) ceil( max( self::MAX_MEDIA_BYTES, self::max_video_bytes() ) / 3 ) * 4 + 4,
 					),
 					'filename'   => array(
 						'type'      => 'string',
@@ -196,6 +206,16 @@ final class Build {
 						'maxLength' => 500,
 					),
 					'decorative' => array( 'type' => 'boolean' ),
+					'poster'     => array(
+						'type'        => 'integer',
+						'minimum'     => 1,
+						'description' => __( 'Video only: attachment ID of an image of the media library that shows before the video plays, a still of it. Also set it as poster of the core/video.', 'leitvia-studio' ),
+					),
+					'caption'    => array(
+						'type'        => 'string',
+						'maxLength'   => 2000,
+						'description' => __( 'Video only: what the video shows, in plain text, as caption of the file in the media library. A video without speech needs this text on the page as well.', 'leitvia-studio' ),
+					),
 				),
 				'additionalProperties' => false,
 			),
@@ -210,7 +230,7 @@ final class Build {
 		Abilities::write(
 			'leitvia/crop-media',
 			__( 'Crop media', 'leitvia-studio' ),
-			__( 'Crops an image of the media library into a new image. The rectangle is in percent of the image size; the original stays. The new image takes the alt text of the original and its title with an addition. Use it for images with text burned in: keep the part without the text band. Only JPEG, PNG, GIF, WebP and AVIF, no SVG; it needs the right to upload files. base_hash is empty. A live crop gets a change package, so leitvia/rollback deletes the new image with its files.', 'leitvia-studio' ),
+			__( 'Crops an image of the media library into a new image. The rectangle is in percent of the image size; the original stays. The new image takes the alt text of the original and its title with an addition. Use it for images with text burned in: keep the part without the text band. Only JPEG, PNG, GIF, WebP and AVIF, no SVG; it needs the right to upload files. base_hash is empty. A live crop gets a change package, so leitvia/rollback deletes the new image with its files. In a package the new image has no ID before a person applies it (target.post 0); applied.post of leitvia/get-package gives it, so a further step on it goes into the next package.', 'leitvia-studio' ),
 			'build',
 			$create,
 			array(
@@ -268,12 +288,61 @@ final class Build {
 	}
 
 	/**
-	 * Schema of one block edit.
+	 * Schema of a block built from its name, for the edit insert and for its inner blocks.
 	 *
-	 * @param bool $attributes Whether catalog attributes may change too (update-block only).
+	 * @param int $depth Levels of inner blocks below this one.
 	 * @return array<string, mixed>
 	 */
-	private static function edit_schema( bool $attributes ): array {
+	private static function block_schema( int $depth ): array {
+		$schema = array(
+			'type'                 => 'object',
+			'properties'           => array(
+				'block'      => array(
+					'type'        => 'string',
+					'pattern'     => '^[a-z0-9-]+/[a-z0-9-]+$',
+					'description' => __( 'Name of a block from leitvia/list-blocks, such as leitvia/consent-embed. Inner blocks may also be other blocks that render on the server, such as gravityforms/form.', 'leitvia-studio' ),
+				),
+				'attributes' => array(
+					'type'        => 'object',
+					'description' => __( 'Attributes from leitvia/list-blocks, checked as in leitvia/update-block.', 'leitvia-studio' ),
+				),
+				'anchor'     => self::anchor_schema(),
+			),
+			'required'             => array( 'block' ),
+			'additionalProperties' => false,
+		);
+		if ( $depth > 0 ) {
+			$schema['properties']['inner'] = array(
+				'type'        => 'array',
+				'minItems'    => 1,
+				'maxItems'    => 30,
+				'description' => __( 'Inner blocks in order, in place of those of the catalog example.', 'leitvia-studio' ),
+				'items'       => self::block_schema( $depth - 1 ),
+			);
+		}
+		return $schema;
+	}
+
+	/**
+	 * Schema of an HTML anchor, shared by the block edits and the blocks of insert.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private static function anchor_schema(): array {
+		return array(
+			'type'        => array( 'string', 'null' ),
+			'maxLength'   => 100,
+			'description' => __( 'HTML anchor (id) of a block with the support anchor, unique on the page, such as contact-form for links to #contact-form; empty or null removes it.', 'leitvia-studio' ),
+		);
+	}
+
+	/**
+	 * Schema of one block edit.
+	 *
+	 * @param bool $single Whether the edit is the input of update-block, without remove and repeat.
+	 * @return array<string, mixed>
+	 */
+	private static function edit_schema( bool $single ): array {
 		$schema = array(
 			'type'                 => 'object',
 			'properties'           => array(
@@ -297,10 +366,17 @@ final class Build {
 				'url'       => array(
 					'type'        => 'string',
 					'maxLength'   => 2000,
-					'description' => __( 'Link of a button, or of the one link in a paragraph, heading or list item (mailto: and tel: work too).', 'leitvia-studio' ),
+					'description' => __( 'Link of a button, or of the one link in a paragraph, heading or list item (mailto: and tel: work too). "" removes the saved link of a button whose link a binding fills; the binding stays.', 'leitvia-studio' ),
 				),
 				'add_link'  => self::add_link_schema(),
 				'caption'   => self::caption_schema(),
+				'anchor'    => self::anchor_schema(),
+				'columns'   => array(
+					'type'        => 'integer',
+					'minimum'     => 1,
+					'maximum'     => 6,
+					'description' => __( 'Column count of a grid: a group or post template with the layout grid, such as the cards of a teaser pattern. Four cards take 2: with 4 a narrower window still wraps to 3 + 1.', 'leitvia-studio' ),
+				),
 				'image'     => array(
 					'type'                 => 'object',
 					'properties'           => array(
@@ -322,7 +398,7 @@ final class Build {
 			'required'             => array( 'block' ),
 			'additionalProperties' => false,
 		);
-		if ( ! $attributes ) {
+		if ( ! $single ) {
 			$schema['properties']['remove'] = array(
 				'type'        => 'boolean',
 				'description' => __( 'Removes the block from its parent, for a section with fewer entries than the pattern. Later edits of the list count from the result, so work from the last block to the first.', 'leitvia-studio' ),
@@ -333,13 +409,12 @@ final class Build {
 				'maximum'     => 20,
 				'description' => __( 'Number of copies to add right after the block, for a section with more entries than the pattern. Later edits reach the copies by the IDs they get.', 'leitvia-studio' ),
 			);
+			$schema['properties']['insert'] = array( 'description' => __( 'A new block right after the block, in the same parent, such as leitvia/form-errors with gravityforms/form inside or leitvia/consent-embed; a static block starts from the example of the catalog. Later edits reach it and its inner blocks by the IDs they get.', 'leitvia-studio' ) ) + self::block_schema( 2 );
 		}
-		if ( $attributes ) {
-			$schema['properties']['attributes'] = array(
-				'type'        => 'object',
-				'description' => __( 'Attributes from leitvia/list-blocks; for a core/heading its level, 1 to 6; for a core/query query with perPage, pages, offset, postType, order, orderBy, sticky and inherit (perPage counts with inherit false); for a core/video tracks, each with id, kind, srclang and label; leitviaAnimation and leitviaMotion on every block that lists them (null removes leitviaMotion); on core media blocks align and className (is-style-<name>), on core/image also width, height, aspectRatio, scale, sizeSlug, linkDestination, href, lightbox (null removes one).', 'leitvia-studio' ),
-			);
-		}
+		$schema['properties']['attributes'] = array(
+			'type'        => 'object',
+			'description' => __( 'Attributes from leitvia/list-blocks; for a core/heading its level, 1 to 6; for a core/query query with perPage, pages, offset, postType, order, orderBy, sticky and inherit (perPage counts with inherit false); for a core/video tracks, each with id, kind, srclang and label; for a leitvia/timeline-item date (YYYY, YYYY-MM or YYYY-MM-DD, empty for a free label), dateLabel and heading; leitviaAnimation and leitviaMotion on every block that lists them, also next to other attributes (null removes either); className (is-style-<name>, null removes the style and keeps other classes) on every core block with registered block styles; on core media blocks align, on core/image also width, height, aspectRatio, scale, sizeSlug, linkDestination, href, lightbox (null removes one). null for an attribute the block does not have changes nothing.', 'leitvia-studio' ),
+		);
 		return $schema;
 	}
 
@@ -474,15 +549,20 @@ final class Build {
 	 * @return string|\WP_Error
 	 */
 	public static function compose( array $sections ) {
-		$parts = array();
+		$parts   = array();
+		$anchors = array();
 		foreach ( $sections as $section ) {
 			$content = self::edit( (string) $section['content'], (array) $section['edits'], array( 'pattern' => $section['ref'] ) );
 			if ( is_wp_error( $content ) ) {
 				return $content;
 			}
 			$parts[] = self::name_sections( $content, (string) $section['name'] );
+			foreach ( (array) $section['edits'] as $edit ) {
+				$anchors = array_merge( $anchors, Block_Edit::anchors( (array) $edit ), Block_Edit::anchors( (array) ( $edit['insert'] ?? array() ) ) );
+			}
 		}
-		return implode( "\n\n", $parts );
+		// Each section checks its own anchors; only the whole page shows one that another section has too.
+		return Block_Edit::unique_anchors( implode( "\n\n", $parts ), $anchors );
 	}
 
 	/**
@@ -494,9 +574,9 @@ final class Build {
 	public static function describe_update( array $input ) {
 		$post   = (int) ( $input['post'] ?? 0 );
 		$block  = (string) ( $input['block'] ?? '' );
-		$change = array_intersect_key( $input, array_flip( array( 'attributes', 'text', 'link_text', 'url', 'add_link', 'caption', 'image' ) ) );
+		$change = array_intersect_key( $input, array_flip( self::CHANGES ) );
 		if ( ! array_diff_key( $change, array( 'link_text' => true ) ) ) {
-			return Block_Edit::invalid( 'change', __( 'Name what to change: attributes, text, url, add_link, caption or image.', 'leitvia-studio' ), array( 'post' => $post ) );
+			return Block_Edit::invalid( 'change', __( 'Name what to change: attributes, text, url, add_link, caption, anchor, columns or image.', 'leitvia-studio' ), array( 'post' => $post ) );
 		}
 		return array(
 			'area'   => in_array( get_post_type( $post ), self::STRUCTURE_TYPES, true ) ? 'structure' : 'content',
@@ -607,23 +687,52 @@ final class Build {
 		if ( false === $file || '' === $name ) {
 			return Block_Edit::invalid( 'source', __( 'The data is not valid Base64, or the file name is missing.', 'leitvia-studio' ) );
 		}
-		if ( strlen( $file ) > self::MAX_MEDIA_BYTES ) {
+		$size = strlen( $file );
+		$most = self::max_video_bytes();
+		if ( $size > max( self::MAX_MEDIA_BYTES, $most ) ) {
+			/* translators: %d: largest video in MB */
+			return Block_Edit::invalid( 'size', sprintf( __( 'The file is too large: images and captions up to 5 MB, videos up to %d MB.', 'leitvia-studio' ), (int) floor( $most / MB_IN_BYTES ) ) );
+		}
+		$video = Packages::video_type( $file, $name );
+		if ( ! $video && $size > self::MAX_MEDIA_BYTES ) {
 			return Block_Edit::invalid( 'size', __( 'The file is larger than 5 MB.', 'leitvia-studio' ) );
 		}
+		if ( $video && $size > $most ) {
+			/* translators: %d: largest video in MB */
+			return Block_Edit::invalid( 'size', sprintf( __( 'The video is larger than %d MB.', 'leitvia-studio' ), (int) floor( $most / MB_IN_BYTES ) ) );
+		}
 		$track = null;
-		$type  = Packages::image_type( $file, $name );
+		$type  = $video ?? Packages::image_type( $file, $name );
 		if ( ! $type ) {
 			$track = Packages::track_type( $file, $name );
 			$type  = $track;
 		}
 		if ( ! $type ) {
-			return Block_Edit::invalid( 'type', __( 'Only images of a type this site allows can be added, JPEG, PNG, GIF, WebP or AVIF, and WebVTT files that start with WEBVTT in UTF-8.', 'leitvia-studio' ) );
+			return Block_Edit::invalid( 'type', __( 'Only images of a type this site allows can be added, JPEG, PNG, GIF, WebP or AVIF, WebVTT files that start with WEBVTT in UTF-8, and videos as MP4 with H.264 or WebM.', 'leitvia-studio' ) );
+		}
+		$extra = array();
+		if ( isset( $input['poster'] ) || isset( $input['caption'] ) ) {
+			if ( ! $video ) {
+				return Block_Edit::invalid( 'poster', __( 'Only a video takes a poster and a caption.', 'leitvia-studio' ) );
+			}
+			$poster = (int) ( $input['poster'] ?? 0 );
+			if ( isset( $input['poster'] ) && ( ! wp_attachment_is_image( $poster ) || ! Scope::readable( $poster ) ) ) {
+				return Block_Edit::invalid( 'poster', __( 'The poster must be an image of the media library. Add it with leitvia/add-media first.', 'leitvia-studio' ), array( 'post' => $poster ), 'leitvia/add-media' );
+			}
+			// Core shows the featured image of a video attachment as its thumbnail; the caption is its excerpt, as in the media library.
+			$extra = array_filter(
+				array(
+					'post_excerpt' => sanitize_textarea_field( (string) ( $input['caption'] ?? '' ) ),
+					'meta_input'   => array_filter( array( '_thumbnail_id' => $poster ) ),
+				)
+			);
 		}
 		$name     = $type['name'];
-		$findings = $track ? array() : Content_Checks::alt_text( self::image_markup( $name, $decorative ? '' : $alt, $decorative ), array( 'post_type' => 'page' ) );
+		$findings = $track || $video ? array() : Content_Checks::alt_text( self::image_markup( $name, $decorative ? '' : $alt, $decorative ), array( 'post_type' => 'page' ) );
 		if ( $findings ) {
 			return Rejection::make( 'leitvia_check_failed', __( 'The image needs alt text that describes it, or mark it as decorative.', 'leitvia-studio' ), 422, 'checks', array(), '', 'once', array( 'findings' => $findings ) );
 		}
+		$alt   = $video ? '' : $alt;
 		$title = (string) ( $input['title'] ?? '' );
 		return array(
 			'area'   => 'content',
@@ -631,8 +740,21 @@ final class Build {
 				'post'      => 0,
 				'post_type' => 'attachment',
 			),
-			'change' => static fn( array $state ) => self::new_media( $state, $name, $file, $type['type'], $alt, $title ),
+			'change' => static fn( array $state ) => self::new_media( $state, $name, $file, $type['type'], $alt, $title, $extra ),
 		);
+	}
+
+	/**
+	 * Largest video add-media takes, in bytes: 50 MB unless the filter leitvia_studio_max_video_bytes changes it.
+	 * Images and captions keep 5 MB. The server limits of uploads and request size apply as well.
+	 */
+	public static function max_video_bytes(): int {
+		/**
+		 * Filters the largest video file in bytes that leitvia/add-media takes.
+		 *
+		 * @param int $bytes Bytes, 50 MB by default.
+		 */
+		return max( 1, (int) apply_filters( 'leitvia_studio_max_video_bytes', self::MAX_VIDEO_BYTES ) );
 	}
 
 	/**
@@ -710,20 +832,22 @@ final class Build {
 	 * @param string               $type  MIME type.
 	 * @param string               $alt   Alt text.
 	 * @param string               $title Title, '' for the file name.
+	 * @param array<string, mixed> $extra post_excerpt and meta_input of a video.
 	 * @return array<string, mixed>|\WP_Error
 	 */
-	private static function new_media( array $state, string $name, string $bytes, string $type, string $alt, string $title ) {
+	private static function new_media( array $state, string $name, string $bytes, string $type, string $alt, string $title, array $extra = array() ) {
 		$path = Packages::stash_file( $name, $bytes );
 		if ( '' === $path ) {
 			return Rejection::make( 'leitvia_execution_failed', __( 'The file could not be saved; nothing was changed. Try again later.', 'leitvia-studio' ), 500, 'execution', array(), '', 'never' );
 		}
-		$size = 'text/vtt' === $type ? false : wp_getimagesize( $path );
-		// ponytail: no sub-sizes; a person can generate them with a thumbnail tool when the theme needs them.
-		// The pipeline sets the file path of the metadata when it moves the file into the uploads folder.
-		$meta = 'text/vtt' === $type ? array() : array(
+		$image = str_starts_with( $type, 'image/' );
+		$size  = $image ? wp_getimagesize( $path ) : false;
+		// The pipeline sets the file path of the metadata when it moves the file into the uploads folder, and core's
+		// metadata (sizes of an image, length of a video) after the write.
+		$meta = $image ? array(
 			'width'  => (int) ( $size[0] ?? 0 ),
 			'height' => (int) ( $size[1] ?? 0 ),
-		);
+		) : array();
 		return array(
 			'post_title'     => '' !== $title ? $title : (string) pathinfo( $name, PATHINFO_FILENAME ),
 			'post_status'    => 'inherit',
@@ -733,9 +857,9 @@ final class Build {
 				array(
 					'_wp_attachment_image_alt' => $alt,
 					'_wp_attachment_metadata'  => $meta,
-				)
+				) + (array) ( $extra['meta_input'] ?? array() )
 			),
-		) + $state;
+		) + array_diff_key( $extra, array( 'meta_input' => true ) ) + $state;
 	}
 
 	/**
@@ -778,10 +902,10 @@ final class Build {
 	public static function edit( string $content, array $edits, array $target ) {
 		foreach ( $edits as $edit ) {
 			$block     = (string) ( $edit['block'] ?? '' );
-			$change    = array_intersect_key( (array) $edit, array_flip( array( 'text', 'link_text', 'url', 'add_link', 'caption', 'image' ) ) );
-			$structure = array_filter( array_intersect_key( (array) $edit, array_flip( array( 'remove', 'repeat' ) ) ) );
-			if ( $structure && ( $change || 2 === count( $structure ) ) ) {
-				return Block_Edit::invalid( 'structure', __( 'An edit with remove or repeat changes nothing else. Send remove, repeat and text changes as edits of their own.', 'leitvia-studio' ), $target + array( 'block' => $block ) );
+			$change    = array_intersect_key( (array) $edit, array_flip( self::CHANGES ) );
+			$structure = array_filter( array_intersect_key( (array) $edit, array_flip( array( 'remove', 'repeat', 'insert' ) ) ) );
+			if ( $structure && ( $change || count( $structure ) > 1 ) ) {
+				return Block_Edit::invalid( 'structure', __( 'An edit with remove, repeat or insert changes nothing else. Send them and text changes as edits of their own.', 'leitvia-studio' ), $target + array( 'block' => $block ) );
 			}
 			$content = $structure ? Block_Edit::structure( $content, $block, $structure, $target ) : Block_Edit::apply( $content, $block, $change, $target );
 			if ( is_wp_error( $content ) ) {

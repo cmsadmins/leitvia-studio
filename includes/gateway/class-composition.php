@@ -17,6 +17,8 @@ defined( 'ABSPATH' ) || exit;
  * with role frame are skipped, slugs the contract does not list count as unknownPattern, except the blocks of
  * INTRO_BLOCKS before the first pattern on a template that shows the title itself. Approved Lab patterns
  * (block:<ID>) join the contract as labPatterns, see lab(); one without composition is known but outside the rhythm.
+ * A saved page also hands in the tones of its sections, see tones(): a section made dark on the block itself (style
+ * Inverse, ink or accent ground) counts with that tone instead of the one of its pattern.
  *
  * Check leitvia/composition (scope page) warns when an agent write leaves a page below the minimum score of the
  * gateway settings and below the score it had before; a warning turns "autonomous" into a change package.
@@ -59,9 +61,10 @@ final class Composition {
 	 * @param string[]             $slugs    Pattern slugs in page order.
 	 * @param array<string, mixed> $contract Contract data.
 	 * @param string               $template Template slug, '' to skip the hero template rule.
+	 * @param array<int, string>   $tones    Tone per index in slugs from the blocks, see tones().
 	 * @return list<array{rule: string, index: int, message: string}>
 	 */
-	public static function check( array $slugs, array $contract, string $template = '' ): array {
+	public static function check( array $slugs, array $contract, string $template = '', array $tones = array() ): array {
 		$rules   = (array) ( $contract['compositionRules'] ?? array() );
 		$by_slug = array();
 		foreach ( array_merge( (array) ( $contract['patterns'] ?? array() ), (array) ( $contract['studioPatterns'] ?? array() ), (array) ( $contract['addonPatterns'] ?? array() ), (array) ( $contract['labPatterns'] ?? array() ) ) as $pattern ) {
@@ -96,6 +99,9 @@ final class Composition {
 				/* translators: 1: section number, 2: pattern slug. */
 				$add( 'unknownPattern', $index, sprintf( __( 'Section %1$d uses unknown pattern %2$s.', 'leitvia-studio' ), $index + 1, $slug ) );
 			} elseif ( isset( $pattern['composition'] ) && 'frame' !== $pattern['composition']['role'] ) {
+				if ( isset( $tones[ $index ] ) && 'image' !== ( $pattern['composition']['tone'] ?? '' ) ) {
+					$pattern['composition']['tone'] = $tones[ $index ];
+				}
 				$sections[] = $pattern + array(
 					'index' => $index,
 					'n'     => $index + 1,
@@ -186,10 +192,11 @@ final class Composition {
 	 * @param string[]             $slugs    Pattern slugs in page order.
 	 * @param array<string, mixed> $contract Contract data.
 	 * @param string               $template Template slug or ''.
+	 * @param array<int, string>   $tones    Tone per index in slugs, see tones().
 	 * @return array{issues: list<array{rule: string, index: int, message: string}>, score: int}
 	 */
-	public static function score( array $slugs, array $contract, string $template = '' ): array {
-		$issues  = self::check( $slugs, $contract, $template );
+	public static function score( array $slugs, array $contract, string $template = '', array $tones = array() ): array {
+		$issues  = self::check( $slugs, $contract, $template, $tones );
 		$scoring = (array) ( $contract['compositionRules']['scoring'] ?? array() );
 		$score   = 100;
 		foreach ( $issues as $issue ) {
@@ -208,11 +215,12 @@ final class Composition {
 	 * @param string[]             $slugs    Pattern slugs in page order.
 	 * @param array<string, mixed> $contract Contract data.
 	 * @param string               $template Template slug or ''.
+	 * @param array<int, string>   $tones    Tone per index in slugs, see tones(); a replaced section loses its own.
 	 * @return array{issues: list<array<string, mixed>>, score: int, suggestions: list<array<string, mixed>>}
 	 */
-	public static function report( array $slugs, array $contract, string $template = '' ): array {
+	public static function report( array $slugs, array $contract, string $template = '', array $tones = array() ): array {
 		$slugs                 = array_values( $slugs );
-		$result                = self::score( $slugs, $contract, $template );
+		$result                = self::score( $slugs, $contract, $template, $tones );
 		$patterns              = array_merge( (array) ( $contract['patterns'] ?? array() ), (array) ( $contract['studioPatterns'] ?? array() ), (array) ( $contract['addonPatterns'] ?? array() ) );
 		$roles                 = array_combine( array_column( $patterns, 'slug' ), array_column( array_column( $patterns, 'composition' ), 'role' ) );
 		$replaced              = array_filter( array_combine( array_column( $patterns, 'slug' ), array_map( static fn( array $pattern ): bool => ! empty( $pattern['docs']['replacedBy'] ), $patterns ) ) );
@@ -227,7 +235,7 @@ final class Composition {
 				}
 				$try                    = $slugs;
 				$try[ $issue['index'] ] = $slug;
-				$new                    = self::score( $try, $contract, $template );
+				$new                    = self::score( $try, $contract, $template, array_diff_key( $tones, array( $issue['index'] => true ) ) );
 				$same                   = array_filter( $new['issues'], static fn( array $found ): bool => $found['rule'] === $issue['rule'] && $found['index'] === $issue['index'] );
 				if ( ! $same && $new['score'] > $result['score'] ) {
 					$candidates[ $slug ] = $new['score'];
@@ -304,17 +312,45 @@ final class Composition {
 	public static function sections( string $content ): array {
 		$slugs   = array();
 		$pattern = false;
-		foreach ( Block_Ids::blocks( parse_blocks( $content ) ) as $block ) {
-			$name = (string) ( $block['blockName'] ?? '' );
-			if ( 'core/template-part' === $name ) {
-				continue;
-			}
+		foreach ( self::roots( $content ) as $block ) {
+			$name    = (string) ( $block['blockName'] ?? '' );
 			$from    = (string) ( $block['attrs']['metadata']['patternName'] ?? '' );
 			$pattern = $pattern || '' !== $from;
 			$ref     = Status::of_name( $from );
 			$slugs[] = '' !== $from ? ( str_starts_with( $ref, 'block:' ) ? $ref : $from ) : ( '' !== $name ? $name : 'core/freeform' );
 		}
 		return $pattern ? $slugs : array();
+	}
+
+	/**
+	 * Tones the root blocks of block markup set themselves, by index as in sections(): ink for the style Inverse or an
+	 * ink ground, accent for an accent ground. A stage pattern switched to Inverse is a dark band, not the light tone
+	 * of its pattern.
+	 *
+	 * @param string $content Block markup.
+	 * @return array<int, string>
+	 */
+	public static function tones( string $content ): array {
+		$tones = array();
+		foreach ( self::roots( $content ) as $index => $block ) {
+			$bg = $block['attrs']['backgroundColor'] ?? null;
+			if ( 'ink' === $bg || in_array( 'is-style-inverse', explode( ' ', (string) ( $block['attrs']['className'] ?? '' ) ), true ) ) {
+				$tones[ $index ] = 'ink';
+			} elseif ( 'accent' === $bg ) {
+				$tones[ $index ] = 'accent';
+			}
+		}
+		return $tones;
+	}
+
+	/**
+	 * Root blocks of block markup without template parts: the sections of sections() and tones().
+	 *
+	 * @param string $content Block markup.
+	 * @return list<array<string, mixed>>
+	 */
+	private static function roots( string $content ): array {
+		return array_values( array_filter( Block_Ids::blocks( parse_blocks( $content ) ), static fn( array $block ): bool => 'core/template-part' !== ( $block['blockName'] ?? '' ) ) );
 	}
 
 	/**
@@ -337,9 +373,9 @@ final class Composition {
 		$compare = $post && 'leitvia/audit-site' !== ( $context['ability'] ?? '' );
 		$saved   = $compare ? self::sections( (string) get_post_field( 'post_content', $post, 'raw' ) ) : array();
 		$data    = self::lab( array_merge( $slugs, $saved ), $contract->data() );
-		$report  = self::report( $slugs, $data, $template );
+		$report  = self::report( $slugs, $data, $template, self::tones( $content ) );
 		$min     = (int) Gateway::settings()['min_composition_score'];
-		$before  = $compare ? self::score( $saved, $data, $template )['score'] : 101;
+		$before  = $compare ? self::score( $saved, $data, $template, self::tones( (string) get_post_field( 'post_content', $post, 'raw' ) ) )['score'] : 101;
 		if ( $report['score'] >= $min || $report['score'] >= $before ) {
 			return array();
 		}

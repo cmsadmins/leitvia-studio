@@ -1,0 +1,22 @@
+{
+	"name": "dark-bands",
+	"template": "page-landing",
+	"sections": [
+		"leitvia/hero-split-image",
+		"leitvia/content-feature-grid",
+		"leitvia/content-faq",
+		"leitvia/teaser-services",
+		"leitvia/content-steps",
+		"leitvia/cta-contact"
+	],
+	"tones": {
+		"2": "ink"
+	},
+	"issues": [
+		[
+			"maxDensityRun",
+			5
+		]
+	],
+	"score": 95
+}

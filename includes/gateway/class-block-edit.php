@@ -22,15 +22,17 @@ defined( 'ABSPATH' ) || exit;
 final class Block_Edit {
 
 	/**
-	 * Blocks whose text can change, with the query for the element that holds the text.
+	 * Blocks whose text can change, with the query for the element that holds the text. The icon of an icon list item
+	 * renders on the server, so its text is the span of the saved markup.
 	 */
 	public const TEXT_BLOCKS = array(
-		'core/paragraph' => array(),
-		'core/heading'   => array(),
-		'core/list-item' => array(),
-		'core/button'    => array( 'class_name' => 'wp-block-button__link' ),
-		'core/quote'     => array( 'tag_name' => 'cite' ),
-		'core/details'   => array( 'tag_name' => 'summary' ),
+		'core/paragraph'         => array(),
+		'core/heading'           => array(),
+		'core/list-item'         => array(),
+		'core/button'            => array( 'class_name' => 'wp-block-button__link' ),
+		'core/quote'             => array( 'tag_name' => 'cite' ),
+		'core/details'           => array( 'tag_name' => 'summary' ),
+		'leitvia/icon-list-item' => array( 'class_name' => 'wp-block-leitvia-icon-list-item__text' ),
 	);
 
 	/**
@@ -130,9 +132,15 @@ final class Block_Edit {
 
 	/**
 	 * Core media blocks whose layout attributes may change, see media(): align and a block style (className) on all of
-	 * them, size, crop, link and lightbox on an image as well.
+	 * them, size, crop, link and lightbox on an image as well. Video, audio and embed change their other attributes
+	 * as before (tracks of a video, the catalog entry of an embed), see PLAYER_BLOCKS.
 	 */
-	public const MEDIA_BLOCKS = array( 'core/image', 'core/gallery', 'core/cover', 'core/media-text' );
+	public const MEDIA_BLOCKS = array( 'core/image', 'core/gallery', 'core/cover', 'core/media-text', 'core/video', 'core/audio', 'core/embed' );
+
+	/**
+	 * Media blocks of MEDIA_BLOCKS that take only align and className through media(); their other attributes go on.
+	 */
+	private const PLAYER_BLOCKS = array( 'core/video', 'core/audio', 'core/embed' );
 
 	/**
 	 * Attributes of Studio blocks that save as a custom property in percent in the style of their element, rebuilt from
@@ -144,6 +152,16 @@ final class Block_Edit {
 			'y' => '--y',
 		),
 	);
+
+	/**
+	 * A valid HTML anchor: a letter, then letters, digits, - and _, so it works in a URL fragment and a CSS selector.
+	 */
+	public const ANCHOR = '/^[A-Za-z][A-Za-z0-9_-]{0,99}$/D';
+
+	/**
+	 * A valid date of a timeline entry, as save.js of leitvia/timeline-item checks it: year, year and month, or a date.
+	 */
+	private const TIMELINE_DATE = '/^\d{4}(-\d{2}(-\d{2})?)?$/D';
 
 	/**
 	 * Content with one block changed.
@@ -175,17 +193,153 @@ final class Block_Edit {
 		if ( ! $found ) {
 			return Rejection::make( 'leitvia_not_found', __( 'There is no block with this ID. Read the outline for the current IDs.', 'leitvia-studio' ), 404, 'block', $target + array( 'block' => $id ), 'leitvia/get-page-outline' );
 		}
-		return $error ?? serialize_blocks( $blocks );
+		if ( $error ) {
+			return $error;
+		}
+		$content = serialize_blocks( $blocks );
+		$anchors = self::anchors( $change );
+		return $anchors ? self::unique_anchors( $content, $anchors, $target + array( 'block' => $id ) ) : $content;
 	}
 
 	/**
-	 * Content with one block removed from its parent or repeated right after itself, for sections with fewer or more
-	 * entries than the pattern. IDs of the blocks after it shift, so edits in one list build on each other: work from
-	 * the last block to the first. Copies lose their leitviaId; core gives them a new one on save.
+	 * The content when each anchor names exactly one element in it, else the rejection for the first one that does not.
+	 *
+	 * @param string               $content Block markup.
+	 * @param array<int, string>   $anchors HTML anchors set by edits.
+	 * @param array<string, mixed> $target  Target for rejections.
+	 * @return string|\WP_Error
+	 */
+	public static function unique_anchors( string $content, array $anchors, array $target = array() ) {
+		$count = array_count_values( self::ids( parse_blocks( $content ) ) );
+		foreach ( $anchors as $anchor ) {
+			if ( 1 !== ( $count[ $anchor ] ?? 0 ) ) {
+				/* translators: %s: HTML anchor. */
+				return self::invalid( 'anchor', sprintf( __( 'The anchor %s is on the page already. Choose an anchor the page has once.', 'leitvia-studio' ), $anchor ), $target, 'leitvia/get-page-outline' );
+			}
+		}
+		return $content;
+	}
+
+	/**
+	 * HTML IDs of the blocks, repeats included: the id attributes of their saved markup and the attribute anchor of
+	 * blocks without markup, which their render adds.
+	 *
+	 * @param array<mixed> $blocks Parsed blocks.
+	 * @return list<string>
+	 */
+	private static function ids( array $blocks ): array {
+		$ids = array();
+		foreach ( $blocks as $block ) {
+			$own  = implode( '', array_filter( (array) $block['innerContent'], 'is_string' ) );
+			$tags = new \WP_HTML_Tag_Processor( $own );
+			while ( $tags->next_tag() ) {
+				$id = $tags->get_attribute( 'id' );
+				if ( is_string( $id ) && '' !== $id ) {
+					$ids[] = $id;
+				}
+			}
+			if ( '' === trim( $own ) && is_string( $block['attrs']['anchor'] ?? null ) ) {
+				$ids[] = $block['attrs']['anchor'];
+			}
+			$ids = array_merge( $ids, self::ids( (array) $block['innerBlocks'] ) );
+		}
+		return $ids;
+	}
+
+	/**
+	 * A block built from a structured description, never from markup: a block of the catalog from its example (the
+	 * saved markup of a static block) or empty when it renders on the server, with new inner blocks in place of those
+	 * of the example, an anchor and attributes, checked as in apply(). Inner blocks may also be other registered blocks
+	 * that render on the server, such as the form block of a form plugin. Parent and allowed blocks count as in the
+	 * editor. A static block without example is refused: it needs a pattern.
+	 *
+	 * @param array<string, mixed> $spec        block (name), attributes, anchor and inner (list of such descriptions).
+	 * @param array<string, mixed> $target      Target for rejections.
+	 * @param string               $parent_name Name of the parent block.
+	 * @param bool                 $listed      Whether the block must be in the catalog, false for inner blocks.
+	 * @return array<string, mixed>|\WP_Error Parsed block.
+	 */
+	public static function build( array $spec, array $target, string $parent_name, bool $listed = true ) {
+		$name     = (string) ( $spec['block'] ?? '' );
+		$target  += array( 'block' => $name );
+		$registry = \WP_Block_Type_Registry::get_instance();
+		$type     = $registry->get_registered( $name );
+		$entry    = array_column( \LeitviaStudio\Blocks\Catalog::get(), null, 'name' )[ $name ] ?? null;
+		if ( ! $type || ( $listed && ! $entry ) ) {
+			return self::invalid( 'block', __( 'This block is not in the block catalog. Use a block of leitvia/list-blocks, or a pattern.', 'leitvia-studio' ), $target, 'leitvia/list-blocks' );
+		}
+		$allowed = $registry->get_registered( $parent_name )->allowed_blocks ?? null;
+		if ( ( $type->parent && ! in_array( $parent_name, (array) $type->parent, true ) ) || ( is_array( $allowed ) && ! in_array( $name, $allowed, true ) ) ) {
+			return self::invalid( 'block', __( 'This block cannot stand here: its parent or the allowed inner blocks of the block around it rule it out (parent and innerBlocks in leitvia/list-blocks).', 'leitvia-studio' ), $target, 'leitvia/list-blocks' );
+		}
+		$example = array_values( array_filter( parse_blocks( (string) ( $entry['example'] ?? '' ) ), static fn( array $block ): bool => $name === $block['blockName'] ) );
+		if ( $example ) {
+			$block = $example[0];
+		} elseif ( $type->is_dynamic() ) {
+			$block = array(
+				'blockName'    => $name,
+				'attrs'        => array(),
+				'innerBlocks'  => array(),
+				'innerHTML'    => '',
+				'innerContent' => array(),
+			);
+		} else {
+			return self::invalid( 'block', __( 'This block keeps its content in its markup and has no example to build it from. Use a pattern that holds it.', 'leitvia-studio' ), $target, 'leitvia/list-patterns' );
+		}
+		if ( isset( $spec['inner'] ) ) {
+			$children = array();
+			foreach ( (array) $spec['inner'] as $child ) {
+				$child = self::build( (array) $child, $target, $name, false );
+				if ( is_wp_error( $child ) ) {
+					return $child;
+				}
+				$children[] = $child;
+			}
+			$content = (array) $block['innerContent'];
+			$slots   = array_keys( $content, null, true );
+			if ( ! $slots && '' !== trim( implode( '', $content ) ) ) {
+				return self::invalid( 'inner', __( 'This block takes no inner blocks.', 'leitvia-studio' ), $target, 'leitvia/list-blocks' );
+			}
+			// The markup before the first and after the last inner block of the example stays, the inner blocks change.
+			$block['innerContent'] = array_merge(
+				$slots ? array_slice( $content, 0, $slots[0] ) : array(),
+				array_fill( 0, count( $children ), null ),
+				$slots ? array_slice( $content, (int) end( $slots ) + 1 ) : array()
+			);
+			$block['innerBlocks']  = $children;
+		}
+		$change = array_intersect_key( $spec, array( 'anchor' => true ) );
+		$attrs  = (array) ( $spec['attributes'] ?? array() );
+		if ( ! $entry && $attrs ) {
+			// A block outside the catalog renders on the server: its attributes live in the comment only.
+			foreach ( $attrs as $key => $value ) {
+				$schema = $type->attributes[ $key ] ?? null;
+				if ( ! is_array( $schema ) || isset( $schema['source'] ) ) {
+					/* translators: %s: attribute name. */
+					return self::invalid( 'attributes', sprintf( __( 'The block has no attribute %s.', 'leitvia-studio' ), $key ), $target );
+				}
+				$valid = rest_validate_value_from_schema( $value, array_diff_key( $schema, array( 'default' => true ) ), (string) $key );
+				if ( is_wp_error( $valid ) ) {
+					return self::invalid( 'attributes', $valid->get_error_message(), $target );
+				}
+			}
+			$block['attrs'] = $attrs + (array) $block['attrs'];
+		} elseif ( $attrs ) {
+			$change['attributes'] = $attrs;
+		}
+		$block['innerHTML'] = implode( '', array_filter( (array) $block['innerContent'], 'is_string' ) );
+		return $change ? self::change( $block, $change, $target ) : $block;
+	}
+
+	/**
+	 * Content with one block removed from its parent, repeated right after itself or followed by a new block from
+	 * build() (insert), for sections with fewer or more entries than the pattern or a block the pattern lacks. IDs of
+	 * the blocks after it shift, so edits in one list build on each other: work from the last block to the first.
+	 * Copies lose their leitviaId; core gives them a new one on save.
 	 *
 	 * @param string               $content Block markup.
 	 * @param string               $id      leitviaId or path ID.
-	 * @param array<string, mixed> $change  remove (true) or repeat (number of copies).
+	 * @param array<string, mixed> $change  remove (true), repeat (number of copies) or insert (a block for build()).
 	 * @param array<string, mixed> $target  Target for rejections.
 	 * @return string|\WP_Error
 	 */
@@ -217,7 +371,27 @@ final class Block_Edit {
 			},
 			$found
 		);
-		return $error ?? serialize_blocks( $blocks );
+		if ( $error ) {
+			return $error;
+		}
+		$content = serialize_blocks( $blocks );
+		$anchors = self::anchors( (array) ( $change['insert'] ?? array() ) );
+		return $anchors ? self::unique_anchors( $content, $anchors, $target ) : $content;
+	}
+
+	/**
+	 * The anchors a block edit or a block for build() sets, its inner blocks included; empty ones remove an anchor.
+	 *
+	 * @param array<string, mixed> $spec Edit or block with anchor (or attributes.anchor) and inner.
+	 * @return array<int, string>
+	 */
+	public static function anchors( array $spec ): array {
+		$anchor = $spec['anchor'] ?? $spec['attributes']['anchor'] ?? null;
+		$found  = is_string( $anchor ) && '' !== $anchor ? array( $anchor ) : array();
+		foreach ( (array) ( $spec['inner'] ?? array() ) as $child ) {
+			$found = array_merge( $found, self::anchors( (array) $child ) );
+		}
+		return $found;
 	}
 
 	/**
@@ -268,7 +442,15 @@ final class Block_Edit {
 		$next    = $content[ $at + 1 ] ?? null;
 		// White space between two inner blocks, not the opening or closing markup of the parent.
 		$gap = static fn( $chunk, int $key ): bool => is_string( $chunk ) && '' === trim( $chunk ) && $key > 0 && $key < count( $content ) - 1;
-		if ( empty( $change['remove'] ) ) {
+		if ( isset( $change['insert'] ) ) {
+			$new = self::build( (array) $change['insert'], $target, (string) $parent_block['blockName'] );
+			if ( is_wp_error( $new ) ) {
+				return $new;
+			}
+			$space = $gap( $next, $at + 1 ) ? $next : ( $gap( $prev, $at - 1 ) ? $prev : '' );
+			array_splice( $content, $at + 1, 0, '' !== $space ? array( $space, null ) : array( null ) );
+			array_splice( $parent_block['innerBlocks'], $index + 1, 0, array( $new ) );
+		} elseif ( empty( $change['remove'] ) ) {
 			$type = \WP_Block_Type_Registry::get_instance()->get_registered( (string) $child['blockName'] );
 			if ( false === ( $type->supports['multiple'] ?? true ) ) {
 				return self::invalid( 'structure', __( 'This block may appear only once.', 'leitvia-studio' ), $target );
@@ -378,7 +560,46 @@ final class Block_Edit {
 			return $bound;
 		}
 		$rebuild = Rejection::make( 'leitvia_static_markup', __( 'This change needs markup that cannot be rebuilt safely. Insert the pattern again with leitvia/compose-page, or change a block that supports it.', 'leitvia-studio' ), 422, 'static_markup', $target, 'leitvia/compose-page' );
-		if ( isset( $change['attributes'] ) ) {
+		// The anchor is a support of the block, no catalog attribute; it changes the same way from either key.
+		if ( is_array( $change['attributes'] ?? null ) && array_key_exists( 'anchor', $change['attributes'] ) ) {
+			$change['anchor'] = $change['attributes']['anchor'];
+			unset( $change['attributes']['anchor'] );
+			if ( ! $change['attributes'] ) {
+				unset( $change['attributes'] );
+			}
+		}
+		if ( array_key_exists( 'anchor', $change ) ) {
+			$block = self::anchor( $block, $change['anchor'], $target, $rebuild );
+			if ( is_wp_error( $block ) ) {
+				return $block;
+			}
+		}
+		if ( isset( $change['columns'] ) ) {
+			$layout = (array) ( $block['attrs']['layout'] ?? array() );
+			if ( 'grid' !== ( $layout['type'] ?? '' ) ) {
+				return self::invalid( 'columns', __( 'Only a grid takes a number of columns: a group or post template with the layout grid. A columns block has one column block per column; take one out with remove or add one with repeat.', 'leitvia-studio' ), $target );
+			}
+			$columns = (int) $change['columns'];
+			if ( $columns < 1 || $columns > 6 ) {
+				return self::invalid( 'columns', __( 'A grid has 1 to 6 columns.', 'leitvia-studio' ), $target );
+			}
+			// Core renders the grid from the layout in the comment; the saved markup holds none of it.
+			$block['attrs']['layout'] = array(
+				'type'        => 'grid',
+				'columnCount' => $columns,
+			) + $layout;
+		}
+		// The text of a map is its heading.
+		if ( 'leitvia/map' === $name && isset( $change['text'] ) ) {
+			$change['attributes'] = array( 'heading' => (string) $change['text'] ) + (array) ( $change['attributes'] ?? array() );
+			unset( $change['text'] );
+		}
+		// The saved link of a button whose url a binding fills goes with url "" or attributes url null; the binding stays.
+		if ( 'core/button' === $name && '' !== self::binding( $block, 'url' ) && is_array( $change['attributes'] ?? null ) && array_key_exists( 'url', $change['attributes'] ) && in_array( $change['attributes']['url'], array( null, '' ), true ) ) {
+			$change['url'] = '';
+			unset( $change['attributes']['url'] );
+		}
+		if ( ! empty( $change['attributes'] ) ) {
 			$block = self::attributes( $block, (array) $change['attributes'], $target, $rebuild );
 			if ( is_wp_error( $block ) ) {
 				return $block;
@@ -411,10 +632,13 @@ final class Block_Edit {
 			if ( ! $tags->next_tag( self::TEXT_BLOCKS[ $name ] ) || 'A' !== $tags->get_tag() ) {
 				return $rebuild;
 			}
-			if ( '' === $url ) {
+			if ( '' === trim( (string) $change['url'] ) && '' !== self::binding( $block, 'url' ) ) {
+				$tags->remove_attribute( 'href' );
+			} elseif ( '' === $url ) {
 				return self::invalid( 'url', __( 'The link is not a valid URL.', 'leitvia-studio' ), $target );
+			} else {
+				$tags->set_attribute( 'href', $url );
 			}
-			$tags->set_attribute( 'href', $url );
 			$html = $tags->get_updated_html();
 		}
 		if ( isset( $change['image'] ) ) {
@@ -447,12 +671,17 @@ final class Block_Edit {
 		if ( ! is_array( $bindings ) ) {
 			return null;
 		}
+		// Removing the saved value of a bound attribute hides nothing: visitors see the bound value either way.
+		$change['attributes'] = array_filter( (array) ( $change['attributes'] ?? array() ), static fn( $value ): bool => null !== $value && '' !== $value );
+		if ( '' === ( $change['url'] ?? null ) ) {
+			unset( $change['url'] );
+		}
 		$text     = array(
 			'core/button'  => 'text',
 			'core/quote'   => 'citation',
 			'core/details' => 'summary',
 		)[ (string) $block['blockName'] ] ?? 'content';
-		$touched  = array_keys( (array) ( $change['attributes'] ?? array() ) );
+		$touched  = array_keys( $change['attributes'] );
 		$touched += isset( $change['text'] ) ? array( 'text' => $text ) : array();
 		$touched += isset( $change['url'] ) && 'core/button' === $block['blockName'] ? array( 'url' => 'url' ) : array();
 		$touched += isset( $change['caption'] ) ? array( 'caption' => 'caption' ) : array();
@@ -467,13 +696,28 @@ final class Block_Edit {
 			$key  = (string) ( $args['key'] ?? $args['relation'] ?? '' );
 			return self::invalid(
 				'bound',
-				/* translators: 1: attribute, for example content; 2: binding source, for example leitvia/meta; 3: field key */
-				sprintf( __( 'The attribute %1$s of this block shows "%3$s" from %2$s, so visitors would not see the change. Change the value there.', 'leitvia-studio' ), $attribute, $source, $key ),
+				'' === $key
+					/* translators: 1: attribute, for example url; 2: binding source, for example leitvia/relation */
+					? sprintf( __( 'The attribute %1$s of this block takes its value from %2$s, so visitors would not see the change. Change the value there; an empty value removes only what the block saved.', 'leitvia-studio' ), $attribute, $source )
+					/* translators: 1: attribute, for example content; 2: binding source, for example leitvia/meta; 3: field key */
+					: sprintf( __( 'The attribute %1$s of this block shows "%3$s" from %2$s, so visitors would not see the change. Change the value there.', 'leitvia-studio' ), $attribute, $source, $key ),
 				$target,
 				'leitvia/setting' === $source ? 'leitvia/update-site-values' : ( str_starts_with( $source, 'leitvia/' ) || 'core/post-meta' === $source ? 'leitvia/update-content' : '' )
 			);
 		}
 		return null;
+	}
+
+	/**
+	 * Source of the binding that fills an attribute of the block, '' for none. Pattern overrides count as none: a copy
+	 * shows its own value.
+	 *
+	 * @param array<string, mixed> $block     Parsed block.
+	 * @param string               $attribute Attribute, for example url.
+	 */
+	public static function binding( array $block, string $attribute ): string {
+		$source = $block['attrs']['metadata']['bindings'][ $attribute ]['source'] ?? '';
+		return is_string( $source ) && 'core/pattern-overrides' !== $source ? $source : '';
 	}
 
 	/**
@@ -594,6 +838,71 @@ final class Block_Edit {
 	}
 
 	/**
+	 * Block with a new HTML anchor, '' or null removes it: the id of the first element of its saved markup, as the
+	 * editor saves it, or the attribute anchor of a block without markup, which its render adds. Only blocks with the
+	 * support anchor take one; ids the template gives every page are refused. Whether the page has it once is checked
+	 * on the whole content (unique_anchors()).
+	 *
+	 * @param array<string, mixed> $block   Parsed block.
+	 * @param mixed                $anchor  New anchor.
+	 * @param array<string, mixed> $target  Target.
+	 * @param \WP_Error            $rebuild Rejection for static markup.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private static function anchor( array $block, $anchor, array $target, \WP_Error $rebuild ) {
+		$type = \WP_Block_Type_Registry::get_instance()->get_registered( (string) $block['blockName'] );
+		if ( ! $type || empty( $type->supports['anchor'] ) ) {
+			return self::invalid( 'anchor', __( 'This block takes no HTML anchor. Set it on a block around it, such as the group of the section.', 'leitvia-studio' ), $target, 'leitvia/list-blocks' );
+		}
+		$anchor = is_string( $anchor ) ? $anchor : '';
+		if ( '' !== $anchor && ( ! preg_match( self::ANCHOR, $anchor ) || in_array( $anchor, Content_Checks::PAGE_IDS, true ) ) ) {
+			return self::invalid( 'anchor', __( 'An anchor starts with a letter and holds only letters, digits, - and _, such as contact-form; top, main, content, comments and respond belong to the template.', 'leitvia-studio' ), $target );
+		}
+		unset( $block['attrs']['anchor'] );
+		if ( '' === trim( implode( '', array_filter( (array) $block['innerContent'], 'is_string' ) ) ) ) {
+			$block['attrs'] += '' !== $anchor ? array( 'anchor' => $anchor ) : array();
+			return $block;
+		}
+		$tags = new \WP_HTML_Tag_Processor( (string) ( $block['innerContent'][0] ?? '' ) );
+		if ( ! $tags->next_tag() ) {
+			return $rebuild;
+		}
+		if ( '' === $anchor ) {
+			$tags->remove_attribute( 'id' );
+		} else {
+			$tags->set_attribute( 'id', $anchor );
+		}
+		// remove_attribute() leaves the space before it (<div class="a" >), which KSES would close up.
+		$block['innerContent'][0] = (string) preg_replace( '#^(\s*<[^>]*?)\s+(/?>)#', '$1$2', $tags->get_updated_html(), 1 );
+		return $block;
+	}
+
+	/**
+	 * Timeline entry with a new date, as its save function builds it: a time element with datetime for a valid date,
+	 * a span for a free label (an empty date). The label inside stays.
+	 *
+	 * @param array<string, mixed> $block   Parsed block.
+	 * @param string               $date    YYYY, YYYY-MM, YYYY-MM-DD or ''.
+	 * @param \WP_Error            $rebuild Rejection for static markup.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private static function timeline_date( array $block, string $date, \WP_Error $rebuild ) {
+		$class = 'wp-block-leitvia-timeline-item__date';
+		$html  = (string) ( $block['innerContent'][0] ?? '' );
+		$tags  = self::processor( $html );
+		$range = $tags->next_tag( array( 'class_name' => $class ) ) ? $tags->inner_range() : null;
+		$end   = $range ? strpos( $html, '>', $range[0] + $range[1] ) : false;
+		if ( false === $end ) {
+			return $rebuild;
+		}
+		$tag  = preg_match( self::TIMELINE_DATE, $date ) ? 'time' : 'span';
+		$open = '<' . $tag . ' class="' . $class . '"' . ( 'time' === $tag ? ' datetime="' . esc_attr( $date ) . '"' : '' ) . '>';
+
+		$block['innerContent'][0] = substr_replace( $html, $open . substr( $html, $range[0], $range[1] ) . '</' . $tag . '>', $range[2], $end + 1 - $range[2] );
+		return $block;
+	}
+
+	/**
 	 * New content of a text element: the escaped text, with its one link around the linked part; the opening tag of the
 	 * link stays as it was, only href changes with url. Plain text may replace a sample link to "#".
 	 *
@@ -651,7 +960,8 @@ final class Block_Edit {
 	 * Block with new attributes. Allowed are attributes of the block catalog that live in the block comment, on blocks
 	 * that render on the server or save no markup of their own, the CORE_ATTRIBUTES whose markup is rebuilt here, text
 	 * attributes whose element the block has (sourced()), and leitviaAnimation and leitviaMotion on every block that has them, static markup included: the server adds their
-	 * classes on render, the saved markup stays (animation()). Anything else would leave the saved markup behind.
+	 * classes on render, the saved markup stays (animation()). className takes a registered block style on every core
+	 * block that has one (style()). Anything else would leave the saved markup behind.
 	 *
 	 * @param array<string, mixed> $block  Parsed block.
 	 * @param array<string, mixed> $attrs  New attribute values.
@@ -661,11 +971,36 @@ final class Block_Edit {
 	 */
 	private static function attributes( array $block, array $attrs, array $target, \WP_Error $rebuild ) {
 		$name = (string) $block['blockName'];
-		if ( $attrs && ! array_diff_key( $attrs, array_flip( array( 'leitviaAnimation', 'leitviaMotion' ) ) ) ) {
-			return self::animation( $block, $attrs, $target );
+		// null removes an attribute. One the block neither has nor registers is gone already, so its null changes
+		// nothing instead of failing the call; any other value of an unknown attribute is still refused below.
+		$known = (array) ( \WP_Block_Type_Registry::get_instance()->get_registered( $name )->attributes ?? array() );
+		$attrs = array_filter( $attrs, static fn( $value, $key ): bool => null !== $value || array_key_exists( $key, (array) $block['attrs'] ) || isset( $known[ $key ] ), ARRAY_FILTER_USE_BOTH );
+		if ( ! $attrs ) {
+			return $block;
+		}
+		if ( array_key_exists( 'className', $attrs ) && str_starts_with( $name, 'core/' ) && ! in_array( $name, self::MEDIA_BLOCKS, true ) && self::styles( $name ) ) {
+			$block = self::style( $block, $attrs['className'], $target, $rebuild );
+			$attrs = array_diff_key( $attrs, array( 'className' => true ) );
+			if ( is_wp_error( $block ) || ! $attrs ) {
+				return $block;
+			}
+		}
+		// The effect on scroll lives in the block comment only, so it goes with any other change of the same call.
+		$motion = array_intersect_key( $attrs, array_flip( array( 'leitviaAnimation', 'leitviaMotion' ) ) );
+		if ( $motion ) {
+			$block = self::animation( $block, $motion, $target );
+			$attrs = array_diff_key( $attrs, $motion );
+			if ( is_wp_error( $block ) || ! $attrs ) {
+				return $block;
+			}
 		}
 		if ( in_array( $name, self::MEDIA_BLOCKS, true ) ) {
-			return self::media( $block, $attrs, $target, $rebuild );
+			$layout = in_array( $name, self::PLAYER_BLOCKS, true ) ? array_intersect_key( $attrs, self::media_schema( $name ) ) : $attrs;
+			$block  = $layout ? self::media( $block, $layout, $target, $rebuild ) : $block;
+			$attrs  = array_diff_key( $attrs, $layout );
+			if ( is_wp_error( $block ) || ! $attrs ) {
+				return $block;
+			}
 		}
 		$core  = self::CORE_ATTRIBUTES[ $name ] ?? null;
 		$entry = $core ? array( 'attributes' => array( 'properties' => $core ) ) : array_column( \LeitviaStudio\Blocks\Catalog::get(), null, 'name' )[ $name ] ?? null;
@@ -680,8 +1015,12 @@ final class Block_Edit {
 				return self::invalid( 'attributes', sprintf( __( 'The block has no attribute %s in the catalog.', 'leitvia-studio' ), $key ), $target, 'leitvia/list-blocks' );
 			}
 			if ( isset( $schema['source'] ) ) {
-				if ( ! in_array( $schema['source'], array( 'text', 'rich-text', 'html' ), true ) || ! is_string( $value ) ) {
+				$date = 'leitvia/timeline-item' === $name && 'date' === $key;
+				if ( ( ! $date && ! in_array( $schema['source'], array( 'text', 'rich-text', 'html' ), true ) ) || ! is_string( $value ) ) {
 					return $rebuild;
+				}
+				if ( $date && '' !== $value && ! preg_match( self::TIMELINE_DATE, $value ) ) {
+					return self::invalid( 'attributes', __( 'The date of a timeline entry is YYYY, YYYY-MM or YYYY-MM-DD, or empty for an entry with a free label.', 'leitvia-studio' ), $target );
 				}
 				$texts[ $key ] = $value;
 				continue;
@@ -698,6 +1037,9 @@ final class Block_Edit {
 				'core/query' === $name    => self::query( $block, $attrs ),
 				default                   => $block,
 			};
+		}
+		if ( 'leitvia/map' === $name ) {
+			return self::map_block( $block, $attrs, $target, $rebuild );
 		}
 		if ( $texts ) {
 			$block = self::sourced( $block, $texts, $rebuild );
@@ -717,6 +1059,143 @@ final class Block_Edit {
 		}
 		$block['attrs'] = $attrs + (array) $block['attrs'];
 		return $block;
+	}
+
+	/**
+	 * Map with new attributes: the comment takes them, and the saved list of places is built again as save.js builds
+	 * it (\LeitviaStudio\Blocks\Map::places()); the wrapper keeps its attributes, only its height class follows.
+	 * Every marker needs a title and lat and lng on the earth; heading "" removes the heading.
+	 *
+	 * @param array<string, mixed> $block   Parsed block.
+	 * @param array<string, mixed> $attrs   New attributes, checked against the catalog.
+	 * @param array<string, mixed> $target  Target.
+	 * @param \WP_Error            $rebuild Rejection for static markup.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private static function map_block( array $block, array $attrs, array $target, \WP_Error $rebuild ) {
+		foreach ( (array) ( $attrs['markers'] ?? array() ) as $marker ) {
+			$marker = (array) $marker;
+			if ( '' === trim( (string) ( $marker['title'] ?? '' ) ) || ! is_numeric( $marker['lat'] ?? null ) || ! is_numeric( $marker['lng'] ?? null ) || abs( (float) $marker['lat'] ) > 90 || abs( (float) $marker['lng'] ) > 180 ) {
+				return self::invalid( 'attributes', __( 'Each marker of a map needs a title, lat from -90 to 90 and lng from -180 to 180; address is the line below the title.', 'leitvia-studio' ), $target );
+			}
+		}
+		if ( ( isset( $attrs['zoom'] ) && ( $attrs['zoom'] < 1 || $attrs['zoom'] > 19 ) ) || ( isset( $attrs['lat'] ) && abs( (float) $attrs['lat'] ) > 90 ) || ( isset( $attrs['lng'] ) && abs( (float) $attrs['lng'] ) > 180 ) ) {
+			return self::invalid( 'attributes', __( 'A map takes zoom from 1 to 19, lat from -90 to 90 and lng from -180 to 180.', 'leitvia-studio' ), $target );
+		}
+		$html = (string) ( $block['innerContent'][0] ?? '' );
+		$tags = self::processor( $html );
+		if ( 1 !== count( (array) $block['innerContent'] ) || ! $tags->next_tag( array( 'class_name' => 'wp-block-leitvia-map' ) ) ) {
+			return $rebuild;
+		}
+		$range = $tags->inner_range();
+		if ( ! $range ) {
+			return $rebuild;
+		}
+		$heading = self::element( $block, array( 'class_name' => 'wp-block-leitvia-map__heading' ) );
+		$heading = array_key_exists( 'heading', $attrs ) ? esc_html( (string) $attrs['heading'] ) : ( $heading ? substr( $html, $heading[1], $heading[2] ) : '' );
+		$saved   = array_diff_key( $attrs, array( 'heading' => true ) ) + (array) $block['attrs'];
+		$inner   = \LeitviaStudio\Blocks\Map::places( $heading, $saved );
+		$html    = substr_replace( $html, $inner, $range[0], $range[1] );
+		$tags    = new \WP_HTML_Tag_Processor( $html );
+		$tags->next_tag();
+		foreach ( array( 'small', 'medium', 'large' ) as $height ) {
+			$tags->remove_class( 'is-height-' . $height );
+		}
+		$tags->add_class( 'is-height-' . ( $saved['height'] ?? 'medium' ) );
+
+		$block['attrs']        = $saved;
+		$block['innerContent'] = array( $tags->get_updated_html() );
+		return $block;
+	}
+
+	/**
+	 * Names of the block styles of a block: registered with register_block_style() or as a style variation of the
+	 * theme, and those of its block.json.
+	 *
+	 * @param string $name Block name.
+	 * @return list<string>
+	 */
+	private static function styles( string $name ): array {
+		$type  = \WP_Block_Type_Registry::get_instance()->get_registered( $name );
+		$names = array_keys( \WP_Block_Styles_Registry::get_instance()->get_registered_styles_for_block( $name ) );
+		foreach ( $type ? (array) $type->styles : array() as $style ) {
+			$names[] = is_array( $style ) ? ( $style['name'] ?? '' ) : '';
+		}
+		return array_values( array_filter( array_map( 'strval', $names ) ) );
+	}
+
+	/**
+	 * Core block outside MEDIA_BLOCKS with a new block style: is-style-<name> from styles(), or null or an empty
+	 * string, which removes it. Only the is-style-* class changes, in className and on the first element of the saved
+	 * markup; other classes stay. A block that saves no markup of its own keeps the class in its comment only.
+	 *
+	 * @param array<string, mixed> $block   Parsed block.
+	 * @param mixed                $value   New className.
+	 * @param array<string, mixed> $target  Target.
+	 * @param \WP_Error            $rebuild Rejection for static markup.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private static function style( array $block, $value, array $target, \WP_Error $rebuild ) {
+		$name  = (string) $block['blockName'];
+		$valid = rest_validate_value_from_schema( $value, self::media_schema( $name )['className'], 'className' );
+		if ( is_wp_error( $valid ) ) {
+			return self::invalid( 'attributes', $valid->get_error_message(), $target, 'leitvia/list-blocks' );
+		}
+		$style = (string) $value;
+		if ( '' !== $style && ! in_array( substr( $style, 9 ), self::styles( $name ), true ) ) {
+			/* translators: %s: class of a block style. */
+			return self::invalid( 'attributes', sprintf( __( 'The block has no block style %s.', 'leitvia-studio' ), $style ), $target, 'leitvia/list-blocks' );
+		}
+		$tags = null;
+		if ( '' !== trim( implode( '', array_filter( (array) $block['innerContent'], 'is_string' ) ) ) ) {
+			$tags = new \WP_HTML_Tag_Processor( (string) ( $block['innerContent'][0] ?? '' ) );
+			if ( ! $tags->next_tag() ) {
+				return $rebuild;
+			}
+		}
+		$class = self::restyle( $block, $style, $tags );
+		if ( $tags ) {
+			$block['innerContent'][0] = $tags->get_updated_html();
+		}
+		$attrs = (array) $block['attrs'];
+		if ( '' === $class ) {
+			unset( $attrs['className'] );
+		} elseif ( isset( $attrs['className'] ) ) {
+			$attrs['className'] = $class;
+		} else {
+			// The editor saves className after align and before style, the colors, fontSize, fontFamily, layout and anchor.
+			$after = array( 'style', 'backgroundColor', 'textColor', 'gradient', 'borderColor', 'fontSize', 'fontFamily', 'layout', 'anchor' );
+			$at    = array_search( true, array_map( static fn( $key ): bool => in_array( $key, $after, true ), array_keys( $attrs ) ), true );
+			$at    = false === $at ? count( $attrs ) : (int) $at;
+			$attrs = array_slice( $attrs, 0, $at, true ) + array( 'className' => $class ) + array_slice( $attrs, $at, null, true );
+		}
+		$block['attrs'] = $attrs;
+		return $block;
+	}
+
+	/**
+	 * The className of a block with its is-style-* class swapped for a new one ('' for none), the same swap made on the
+	 * element of the tag processor when there is one.
+	 *
+	 * @param array<string, mixed>        $block Parsed block.
+	 * @param string                      $style is-style-<name>, or ''.
+	 * @param \WP_HTML_Tag_Processor|null $tags  Processor at the element of the block.
+	 */
+	private static function restyle( array $block, string $style, ?\WP_HTML_Tag_Processor $tags ): string {
+		$classes = (array) preg_split( '/\s+/', trim( (string) ( $block['attrs']['className'] ?? '' ) ), -1, PREG_SPLIT_NO_EMPTY );
+		if ( $tags ) {
+			foreach ( array_merge( $classes, iterator_to_array( $tags->class_list(), false ) ) as $class ) {
+				if ( str_starts_with( (string) $class, 'is-style-' ) ) {
+					$tags->remove_class( (string) $class );
+				}
+			}
+		}
+		$kept = array_values( array_filter( $classes, static fn( $name ): bool => ! str_starts_with( (string) $name, 'is-style-' ) ) );
+		if ( '' !== $style ) {
+			$tags?->add_class( $style );
+			$kept[] = $style;
+		}
+		return implode( ' ', $kept );
 	}
 
 	/**
@@ -797,7 +1276,7 @@ final class Block_Edit {
 			}
 		}
 		$style = (string) ( $attrs['className'] ?? '' );
-		if ( '' !== $style && ! \WP_Block_Styles_Registry::get_instance()->is_registered( $name, substr( $style, 9 ) ) ) {
+		if ( '' !== $style && ! in_array( substr( $style, 9 ), self::styles( $name ), true ) ) {
 			/* translators: %s: class of a block style. */
 			return self::invalid( 'attributes', sprintf( __( 'The block has no block style %s.', 'leitvia-studio' ), $style ), $target, 'leitvia/list-blocks' );
 		}
@@ -815,18 +1294,7 @@ final class Block_Edit {
 			}
 		}
 		if ( array_key_exists( 'className', $attrs ) ) {
-			$classes = (array) preg_split( '/\s+/', trim( (string) ( $block['attrs']['className'] ?? '' ) ), -1, PREG_SPLIT_NO_EMPTY );
-			foreach ( array_merge( $classes, iterator_to_array( $tags->class_list(), false ) ) as $class ) {
-				if ( str_starts_with( (string) $class, 'is-style-' ) ) {
-					$tags->remove_class( (string) $class );
-				}
-			}
-			$kept = array_values( array_filter( $classes, static fn( $name ): bool => ! str_starts_with( (string) $name, 'is-style-' ) ) );
-			if ( '' !== $style ) {
-				$tags->add_class( $style );
-				$kept[] = $style;
-			}
-			$new['className'] = implode( ' ', $kept );
+			$new['className'] = self::restyle( $block, $style, $tags );
 		}
 		if ( isset( $attrs['sizeSlug'] ) ) {
 			foreach ( iterator_to_array( $tags->class_list(), false ) as $class ) {
@@ -973,6 +1441,13 @@ final class Block_Edit {
 				return $block;
 			}
 		}
+		if ( 'leitvia/timeline-item' === $block['blockName'] && isset( $texts['date'] ) ) {
+			$block = self::timeline_date( $block, $texts['date'], $rebuild );
+			unset( $texts['date'] );
+			if ( is_wp_error( $block ) ) {
+				return $block;
+			}
+		}
 		$types = \WP_Block_Type_Registry::get_instance()->get_registered( (string) $block['blockName'] )->attributes ?? array();
 		foreach ( $texts as $key => $text ) {
 			$selector = (string) ( $types[ $key ]['selector'] ?? '' );
@@ -1019,8 +1494,8 @@ final class Block_Edit {
 	}
 
 	/**
-	 * Block with a new effect on scroll: leitviaAnimation (none removes it) and leitviaMotion (null removes it) in the
-	 * block comment, in the order the editor saves them; the markup stays as it is.
+	 * Block with a new effect on scroll: leitviaAnimation (none or null removes it) and leitviaMotion (null removes it)
+	 * in the block comment, in the order the editor saves them; the markup stays as it is.
 	 *
 	 * @param array<string, mixed> $block  Parsed block.
 	 * @param array<string, mixed> $attrs  leitviaAnimation and/or leitviaMotion.
@@ -1034,7 +1509,7 @@ final class Block_Edit {
 			return self::invalid( 'attributes', __( 'This block takes no effect on scroll.', 'leitvia-studio' ), $target, 'leitvia/list-blocks' );
 		}
 		foreach ( $attrs as $key => $value ) {
-			if ( 'leitviaMotion' === $key && null === $value ) {
+			if ( null === $value ) {
 				continue;
 			}
 			$valid = rest_validate_value_from_schema( $value, array_diff_key( (array) $schema[ $key ], array( 'default' => true ) ), (string) $key );
@@ -1186,7 +1661,7 @@ final class Block_Edit {
 	 * @param string $html Markup.
 	 * @return mixed A WP_HTML_Tag_Processor with inner_range(); an anonymous class has no name to declare.
 	 */
-	private static function processor( string $html ) {
+	public static function processor( string $html ) {
 		return new class( $html ) extends \WP_HTML_Tag_Processor {
 
 			/**

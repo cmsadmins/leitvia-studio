@@ -1,0 +1,52 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "leitvia/consent-embed",
+	"version": "0.1.0",
+	"title": "Embed behind consent",
+	"category": "leitvia",
+	"icon": "shield",
+	"description": "Content of another provider in an iframe, such as a configurator or a booking tool, that loads only after the visitor agrees.",
+	"keywords": [ "iframe", "embed", "consent", "privacy", "gdpr" ],
+	"textdomain": "leitvia-studio",
+	"attributes": {
+		"url": {
+			"type": "string",
+			"default": ""
+		},
+		"title": {
+			"type": "string",
+			"default": ""
+		},
+		"aspectRatio": {
+			"type": "string",
+			"enum": [ "16/9", "4/3", "1/1", "9/16", "fixed" ],
+			"default": "16/9"
+		},
+		"height": {
+			"type": "integer",
+			"default": 600
+		},
+		"previewId": {
+			"type": "integer",
+			"default": 0
+		}
+	},
+	"supports": {
+		"html": false,
+		"align": [ "wide", "full" ],
+		"interactivity": true,
+		"spacing": {
+			"margin": true
+		}
+	},
+	"example": {
+		"attributes": {
+			"url": "https://planner.example.com/embed",
+			"title": "Kitchen planner"
+		}
+	},
+	"editorScript": "file:./index.js",
+	"style": "file:./style-index.css",
+	"viewScriptModule": "@leitvia/consent"
+}

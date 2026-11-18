@@ -7,6 +7,7 @@
 
 namespace LeitviaStudio\Gateway\Abilities;
 
+use LeitviaStudio\Blocks\Animation;
 use LeitviaStudio\Gateway;
 use LeitviaStudio\Lab\Status;
 
@@ -15,7 +16,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Ability leitvia/audit-site: the content checks over published content, page by page, plus classic content,
  * deprecated patterns, token drift, internal links without a target, links of the rendered page that lead nowhere,
- * pages that look like legal texts without a page kind and placeholders left on legal pages. The first page adds findings about the whole site under site: a site
+ * pages that look like legal texts without a page kind, placeholders left on legal pages and uneven motion (motion()). The first page adds findings about the whole site under site: a site
  * closed to search engines, a missing imprint, contact or editorial page, and recent news without a large image or
  * whose author has no biography.
  */
@@ -79,6 +80,16 @@ final class Read_Audit {
 	public const NEWS_CHECKED = 20;
 
 	/**
+	 * Most blocks with a striking effect (zoom, slide, wipe, blur, mask) on one page, see motion().
+	 */
+	public const MOTION_STRIKING = 3;
+
+	/**
+	 * Most animated blocks on one page, as the skill allows on a home page, see motion().
+	 */
+	public const MOTION_MAX = 6;
+
+	/**
 	 * Preset types in markup and the global settings that list their slugs.
 	 */
 	private const PRESETS = array(
@@ -94,7 +105,7 @@ final class Read_Audit {
 		Gateway\Abilities::read(
 			'leitvia/audit-site',
 			__( 'Audit site', 'leitvia-studio' ),
-			__( 'Runs the content checks (headings, alt text, link text, #anchor links, block validity, unregistered blocks, tokens, contrast, one h1 and landmarks) over published content, at most 20 posts per call in ID order. Also reports classic content without blocks, deprecated patterns, preset slugs missing from the active tokens, internal links that lead to no page or to the old address of a renamed post, links that lead nowhere (empty href, # without target) on the rendered page outside content and template parts, with their class, pages that look like legal texts without a page kind, and placeholders left on legal pages: square brackets such as [Organization name] and sentences that say they are a placeholder. The first page (after 0) also returns site: an error when the site is closed to search engines outside a local or staging site, an error per header or footer part with such links, warnings for a missing imprint, contact or editorial page while there are posts, and for the latest 20 news posts without a featured image of at least 1200 px width or whose author has no biography. Pass next as after for the following page; next is null at the end.', 'leitvia-studio' ),
+			__( 'Runs the content checks (headings, alt text, link text, #anchor links, block validity, unregistered blocks, tokens, contrast, one h1 and landmarks) over published content, at most 20 posts per call in ID order. Also reports classic content without blocks, deprecated patterns, preset slugs missing from the active tokens, internal links that lead to no page or to the old address of a renamed post, links that lead nowhere (empty href, # without target) on the rendered page outside content and template parts, with their class, pages that look like legal texts without a page kind, placeholders left on legal pages (square brackets such as [Organization name] and sentences that say they are a placeholder), and uneven motion (leitvia/motion): leitviaMotion other than the site setting, fade and rise on one page, more than one kind of striking effect, more than 3 striking or 6 animated blocks. The first page (after 0) also returns site: an error when the site is closed to search engines outside a local or staging site, a warning when Gravity Forms loads a captcha from another host (a captcha add-on or a reCAPTCHA field), an error per header or footer part with such links, warnings for a missing imprint, contact or editorial page while there are posts, and for the latest 20 news posts without a featured image of at least 1200 px width or whose author has no biography. Pass next as after for the following page; next is null at the end.', 'leitvia-studio' ),
 			array(
 				'type'                 => 'object',
 				'properties'           => array(
@@ -219,7 +230,14 @@ final class Read_Audit {
 			/* translators: %s: preset type and slug. */
 			$findings[] = self::finding( 'leitvia/token-drift', sprintf( __( 'The preset %s is missing from the active tokens.', 'leitvia-studio' ), $preset ), __( 'Use a preset from leitvia/get-tokens.', 'leitvia-studio' ) );
 		}
-		foreach ( self::broken_links( $post->post_content ) as $href => $to ) {
+		foreach ( self::motion( $post->post_content ) as $message ) {
+			$findings[] = self::finding( 'leitvia/motion', $message, __( 'Keep one motion on every page: one entry effect, fade, for sections, stagger for cards and grids, parallax for covers. Remove the other effects and every leitviaMotion with leitvia/update-block ("leitviaAnimation": "none", "leitviaMotion": null). For more or less motion ask for leitvia/set-motion.', 'leitvia-studio' ) );
+		}
+		$context = array(
+			'postId'   => $post->ID,
+			'postType' => $post->post_type,
+		);
+		foreach ( self::broken_links( self::bound_links( parse_blocks( $post->post_content ), $context ) ) as $href => $to ) {
 			$findings[] = '' === $to
 				/* translators: %s: link. */
 				? self::finding( 'leitvia/broken-link', sprintf( __( 'The link %s leads to no page of this site.', 'leitvia-studio' ), $href ), __( 'Repair it with leitvia/repair-links and the page the link text names, or ask the person where it should go.', 'leitvia-studio' ) )
@@ -268,9 +286,10 @@ final class Read_Audit {
 	/**
 	 * Findings about the whole site. Error: closed to search engines (blog_public 0) on a production site; local,
 	 * development and staging sites and the Playground are left alone. Error: a header or footer template part with
-	 * links that lead nowhere (Content_Checks::empty_links()), such as the placeholder links of a footer pattern. Warning: no published imprint, contact or
-	 * editorial page (by page kind or slug) while there are published posts; one of the latest news posts without a
-	 * featured image of at least 1200 px width; an author of those without a biography.
+	 * links that lead nowhere (Content_Checks::empty_links()), such as the placeholder links of a footer pattern.
+	 * Warning: Gravity Forms with a captcha of another host (Consent\Gravity_Forms::captchas()). Warning: no published
+	 * imprint, contact or editorial page (by page kind or slug) while there are published posts; one of the latest news
+	 * posts without a featured image of at least 1200 px width; an author of those without a biography.
 	 *
 	 * @return list<array<string, mixed>>
 	 */
@@ -283,6 +302,11 @@ final class Read_Audit {
 		 */
 		if ( ! get_option( 'blog_public' ) && ! apply_filters( 'leitvia_studio_preview_site', 'production' !== wp_get_environment_type() ) ) {
 			$findings[] = self::finding( 'leitvia/search-blocked', __( 'The site asks search engines not to index it, so no page appears in search results or Google News.', 'leitvia-studio' ), __( 'A person turns off "Discourage search engines from indexing this site" under Settings, Reading.', 'leitvia-studio' ), 'error' );
+		}
+		$captchas = \LeitviaStudio\Consent\Gravity_Forms::captchas();
+		if ( $captchas ) {
+			/* translators: %s: captcha add-ons and forms with a reCAPTCHA field. */
+			$findings[] = self::finding( 'leitvia/form-captcha', sprintf( __( 'Gravity Forms loads a captcha from another host: %s. The captcha sends the IP address and details of the device of every visitor of a form page to the provider, before anyone agrees.', 'leitvia-studio' ), implode( ', ', $captchas ) ), __( 'A person deactivates the captcha add-on or removes the reCAPTCHA field and keeps the honeypot of Gravity Forms on against spam.', 'leitvia-studio' ) );
 		}
 		foreach ( self::part_links() as $part => $texts ) {
 			/* translators: 1: slug of the template part, 2: texts of the links. */
@@ -413,6 +437,35 @@ final class Read_Audit {
 	}
 
 	/**
+	 * Own markup of the blocks, with each block whose url a binding fills (Block_Edit::binding()) rendered in the
+	 * context of the blocks around it, so its link is the bound one visitors follow, not the saved one.
+	 *
+	 * @param array<int|string, array<string, mixed>> $blocks  Parsed blocks.
+	 * @param array<string, mixed>                    $context Context the blocks around them provide.
+	 */
+	private static function bound_links( array $blocks, array $context ): string {
+		$registry = \WP_Block_Type_Registry::get_instance();
+		$html     = '';
+		foreach ( $blocks as $block ) {
+			if ( '' !== Gateway\Block_Edit::binding( $block, 'url' ) ) {
+				// verify-ignore: readonly -- renders the one bound block in memory for its link, no HTTP request.
+				$html .= ( new \WP_Block( $block, $context ) )->render();
+				continue;
+			}
+			$type  = $registry->get_registered( (string) $block['blockName'] );
+			$inner = $context;
+			foreach ( (array) ( $type->provides_context ?? array() ) as $key => $attribute ) {
+				$inner[ $key ] = $block['attrs'][ $attribute ] ?? $type->attributes[ $attribute ]['default'] ?? null;
+			}
+			$index = 0;
+			foreach ( (array) $block['innerContent'] as $chunk ) {
+				$html .= is_string( $chunk ) ? $chunk : self::bound_links( array( $block['innerBlocks'][ $index++ ] ), $inner );
+			}
+		}
+		return $html;
+	}
+
+	/**
 	 * Links of a post that lead nowhere (Content_Checks::empty_links()) on its rendered page, each with in: content when
 	 * the content holds it, page when the template or a plugin prints it. A post visitors cannot see, or one without a
 	 * template, has the links of its content only.
@@ -458,6 +511,62 @@ final class Read_Audit {
 			$found[ mb_substr( trim( $sentence ), 0, 120 ) ] = true;
 		}
 		return array_keys( $found );
+	}
+
+	/**
+	 * What makes the motion of a page uneven, one message each: blocks with a strength (leitviaMotion) other than the
+	 * site setting motion, so their durations differ; fade and rise side by side; more than one kind of striking effect
+	 * (zoom, slide, wipe, blur, mask); more than MOTION_STRIKING striking or MOTION_MAX animated blocks. Stagger and
+	 * parallax are part of the motion of any site. Nothing while the site setting is off, since nothing moves then.
+	 *
+	 * @param string $content Block markup.
+	 * @return list<string>
+	 */
+	public static function motion( string $content ): array {
+		$site = Animation::site();
+		if ( 'off' === $site ) {
+			return array();
+		}
+		$effects = array();
+		$other   = 0;
+		$blocks  = parse_blocks( $content );
+		while ( $blocks ) {
+			$block  = array_shift( $blocks );
+			$blocks = array_merge( (array) ( $block['innerBlocks'] ?? array() ), $blocks );
+			$attrs  = (array) ( $block['attrs'] ?? array() );
+			$name   = (string) ( $block['blockName'] ?? '' );
+			// As Animation::render(): the reveal block by its own effect, excluded blocks never.
+			$effect = 'leitvia/reveal' === $name ? (string) ( $attrs['effect'] ?? 'rise' ) : ( in_array( $name, Animation::EXCLUDED, true ) ? '' : ( $attrs['leitviaAnimation'] ?? '' ) );
+			if ( ! in_array( $effect, Animation::EFFECTS, true ) ) {
+				continue;
+			}
+			$effects[] = $effect;
+			$strength  = $attrs['leitviaMotion'] ?? $site;
+			$other    += (int) ( in_array( $strength, Animation::STRENGTHS, true ) && $strength !== $site );
+		}
+		$striking = array_values( array_diff( $effects, array( 'fade', 'rise', 'stagger', 'parallax' ) ) );
+		$kinds    = array_unique( $striking );
+		$messages = array();
+		if ( $other ) {
+			/* translators: 1: number of blocks, 2: site setting motion. */
+			$messages[] = sprintf( _n( '%1$d animated block has a strength of its own (leitviaMotion) instead of the site setting %2$s, so its duration differs.', '%1$d animated blocks have a strength of their own (leitviaMotion) instead of the site setting %2$s, so their durations differ.', $other, 'leitvia-studio' ), $other, $site );
+		}
+		if ( ! array_diff( array( 'fade', 'rise' ), $effects ) ) {
+			$messages[] = __( 'Sections fade in and rise on the same page.', 'leitvia-studio' );
+		}
+		if ( count( $kinds ) > 1 ) {
+			/* translators: %s: list of effects. */
+			$messages[] = sprintf( __( 'The page mixes striking effects: %s.', 'leitvia-studio' ), implode( ', ', $kinds ) );
+		}
+		if ( count( $striking ) > self::MOTION_STRIKING ) {
+			/* translators: 1: number of blocks, 2: maximum. */
+			$messages[] = sprintf( __( '%1$d blocks have a striking effect, more than %2$d.', 'leitvia-studio' ), count( $striking ), self::MOTION_STRIKING );
+		}
+		if ( count( $effects ) > self::MOTION_MAX ) {
+			/* translators: 1: number of blocks, 2: maximum. */
+			$messages[] = sprintf( __( '%1$d blocks are animated, more than %2$d.', 'leitvia-studio' ), count( $effects ), self::MOTION_MAX );
+		}
+		return $messages;
 	}
 
 	/**

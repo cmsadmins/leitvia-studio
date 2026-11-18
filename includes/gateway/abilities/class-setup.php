@@ -12,12 +12,14 @@ use LeitviaStudio\Gateway\Block_Edit;
 use LeitviaStudio\Gateway\Content_Checks;
 use LeitviaStudio\Gateway\Hashes;
 use LeitviaStudio\Admin\Settings;
+use LeitviaStudio\Consent\Consent;
 use LeitviaStudio\Gateway\Pipeline;
 use LeitviaStudio\Gateway\Recipes;
 use LeitviaStudio\Gateway\Rejection;
 use LeitviaStudio\Gateway\Scope;
 use LeitviaStudio\Model\Model;
 use LeitviaStudio\Model\Registrar;
+use LeitviaStudio\Organization\Organization;
 use LeitviaStudio\Tokens\Compiler;
 use LeitviaStudio\Tokens\Token_Sets;
 
@@ -25,7 +27,8 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Abilities leitvia/create-token-set, leitvia/activate-token-set, leitvia/set-variation, leitvia/define-content-type,
- * leitvia/update-site-values, leitvia/update-navigation, leitvia/update-template-part and leitvia/update-template.
+ * leitvia/update-site-values, leitvia/update-navigation, leitvia/update-template-part, leitvia/update-template,
+ * leitvia/set-site-identity, leitvia/set-motion, leitvia/set-front-page, leitvia/get-consent-providers and leitvia/set-consent-providers.
  * Each one describes an operation for Pipeline::run() with the Studio building blocks: token sets with the contrast
  * lock, the compiler, the content model. Token sets and global styles belong to the area design, the rest to structure.
  */
@@ -160,28 +163,231 @@ final class Setup {
 		Abilities::write(
 			'leitvia/set-organization',
 			__( 'Set organization details', 'leitvia-studio' ),
-			__( 'Sets address, phone and email of the organization. Leitvia Studio adds them to its structured data while no SEO plugin is active; the name and the logo stay those of the site. Only the fields you send change, an empty string clears one. leitvia/get-seo returns the current values. base_hash is empty. Use only facts the person gave or the site shows. Like every setting it waits in a change package for a person.', 'leitvia-studio' ),
+			__( 'Sets the details of the organization behind the site: kind of business (type, Organization or a type of LocalBusiness; type falls back to Organization), address, phone, email, founding date (founding_date, YYYY, YYYY-MM or YYYY-MM-DD), area served (area_served, places), opening hours (opening_hours, rows of days with opens and closes as HH:MM, only printed for a local business) and profiles on other sites (same_as, https addresses). Leitvia Studio prints them as structured data on the front page and as publisher of posts while no SEO plugin is active; the name and the logo stay those of the site. Only the fields you send change, an empty string or an empty list clears one. leitvia/get-seo returns the current values. base_hash is empty. Use only facts the person gave or the site shows; never guess opening hours. Like every setting it waits in a change package for a person.', 'leitvia-studio' ),
 			'setup',
 			$replace,
 			array(
 				'properties' => array(
-					'street'      => array( 'type' => 'string' ),
-					'postal_code' => array( 'type' => 'string' ),
-					'city'        => array( 'type' => 'string' ),
-					'country'     => array(
+					'type'          => array(
+						'type' => 'string',
+						'enum' => Organization::TYPES,
+					),
+					'street'        => array( 'type' => 'string' ),
+					'postal_code'   => array( 'type' => 'string' ),
+					'city'          => array( 'type' => 'string' ),
+					'country'       => array(
 						'type'    => 'string',
 						'pattern' => '^([A-Z]{2})?$',
 					),
-					'phone'       => array( 'type' => 'string' ),
-					'email'       => array( 'type' => 'string' ),
+					'phone'         => array( 'type' => 'string' ),
+					'email'         => array( 'type' => 'string' ),
+					'founding_date' => array(
+						'type'    => 'string',
+						'pattern' => Organization::DATE,
+					),
+					'area_served'   => array(
+						'type'     => 'array',
+						'maxItems' => 50,
+						'items'    => array( 'type' => 'string' ),
+					),
+					'opening_hours' => array(
+						'type'     => 'array',
+						'maxItems' => 14,
+						'items'    => array(
+							'type'                 => 'object',
+							'properties'           => array(
+								'days'   => array(
+									'type'        => 'array',
+									'description' => __( 'Days of the week the times apply to, in English: Monday to Sunday.', 'leitvia-studio' ),
+									'minItems'    => 1,
+									'items'       => array(
+										'type' => 'string',
+										'enum' => Organization::DAYS,
+									),
+								),
+								'opens'  => array(
+									'type'        => 'string',
+									'description' => __( 'Opening time as HH:MM, 24-hour clock.', 'leitvia-studio' ),
+									'pattern'     => Organization::TIME,
+								),
+								'closes' => array(
+									'type'        => 'string',
+									'description' => __( 'Closing time as HH:MM, 24-hour clock.', 'leitvia-studio' ),
+									'pattern'     => Organization::TIME,
+								),
+							),
+							'required'             => array( 'days', 'opens', 'closes' ),
+							'additionalProperties' => false,
+						),
+					),
+					'same_as'       => array(
+						'type'     => 'array',
+						'maxItems' => 50,
+						'items'    => array(
+							'type'    => 'string',
+							'pattern' => '^https://',
+						),
+					),
 				),
 			) + $object,
 			array( self::class, 'describe_set_organization' )
 		);
 		Abilities::write(
+			'leitvia/set-motion',
+			__( 'Set motion', 'leitvia-studio' ),
+			__( 'Sets the motion of the whole site: off (no effect on scroll and no hover motion of the theme), subtle (800 ms, the default) or bold (twice the way, 1200 ms). It is the strength and duration of every effect of leitviaAnimation without leitviaMotion, so one setting keeps the motion of all pages the same. When a person wants more or less motion, change this setting instead of giving single blocks effects or leitviaMotion. base_hash is empty. Like every setting it waits in a change package for a person.', 'leitvia-studio' ),
+			'setup',
+			$replace,
+			array(
+				'properties' => array(
+					'motion' => array(
+						'type'        => 'string',
+						'enum'        => \LeitviaStudio\Blocks\Animation::SITE,
+						'description' => __( 'off, subtle or bold.', 'leitvia-studio' ),
+					),
+				),
+				'required'   => array( 'motion' ),
+			) + $object,
+			array( self::class, 'describe_set_motion' )
+		);
+		$image = array(
+			'type'    => 'integer',
+			'minimum' => 0,
+		);
+		Abilities::write(
+			'leitvia/set-site-identity',
+			__( 'Set site identity', 'leitvia-studio' ),
+			__( 'Sets the site title, the tagline, the logo and the site icon. logo and icon are image IDs from leitvia/list-media or leitvia/add-media, 0 removes them. The logo is the one core/site-logo shows in the header and WordPress hands out as custom logo, the title is the text of core/site-title and the start of every page title in the browser, the tagline that of core/site-tagline; so the header needs no image block for the logo. The icon is the small image of browser tabs and bookmarks, square and at least 512 pixels wide; notice says so otherwise. Only the fields you send change, an empty string clears the tagline. base_hash is empty. Like every setting it waits in a change package for a person.', 'leitvia-studio' ),
+			'setup',
+			$replace,
+			array(
+				'properties' => array(
+					'title'   => array(
+						'type'      => 'string',
+						'minLength' => 1,
+						'maxLength' => 200,
+					),
+					'tagline' => array(
+						'type'      => 'string',
+						'maxLength' => 300,
+					),
+					'logo'    => $image,
+					'icon'    => $image,
+				),
+			) + $object,
+			array( self::class, 'describe_set_site_identity' )
+		);
+		Abilities::write(
+			'leitvia/set-front-page',
+			__( 'Set front page', 'leitvia-studio' ),
+			__( 'Makes an existing page the static front page; 0 shows the latest posts there again. The front page is the page the address of the site shows. base_hash is empty. The page must exist, so create it first and wait until a package with it is applied; the posts page cannot be the front page as well. Like every setting it waits in a change package for a person. notice says so while the page is not published. Set the posts page with leitvia/set-posts-page.', 'leitvia-studio' ),
+			'setup',
+			$replace,
+			array(
+				'properties' => array(
+					'page' => array(
+						'type'        => 'integer',
+						'minimum'     => 0,
+						'description' => __( 'ID of a page from leitvia/list-content, 0 for the latest posts.', 'leitvia-studio' ),
+					),
+				),
+				'required'   => array( 'page' ),
+			) + $object,
+			array( self::class, 'describe_set_front_page' )
+		);
+		$provider = array(
+			'type'                 => 'object',
+			'properties'           => array(
+				'key'     => array(
+					'type'        => 'string',
+					'description' => __( 'Key from leitvia/get-consent-providers; send it to keep a provider, so "Always allow" of visitors stays with it. A new provider gets one from its label.', 'leitvia-studio' ),
+				),
+				'label'   => array(
+					'type'        => 'string',
+					'minLength'   => 1,
+					'description' => __( 'Name of the provider, as the consent placeholder shows it.', 'leitvia-studio' ),
+				),
+				'hosts'   => array(
+					'type'        => 'array',
+					'minItems'    => 1,
+					'maxItems'    => Consent::MAX_HOSTS,
+					'description' => __( 'Host names of the embedded content, such as maps.example.com; subdomains count as well, the own site never.', 'leitvia-studio' ),
+					'items'       => array(
+						'type'      => 'string',
+						'minLength' => 1,
+						'maxLength' => 253,
+					),
+				),
+				'purpose' => array(
+					'type'        => 'string',
+					'description' => __( 'One sentence on what the content does, shown in the placeholder.', 'leitvia-studio' ),
+				),
+				'privacy' => array(
+					'type'        => 'string',
+					'pattern'     => '^(https://.*)?$',
+					'description' => __( 'https address of the privacy policy of the provider.', 'leitvia-studio' ),
+				),
+			),
+			'required'             => array( 'label', 'hosts' ),
+			'additionalProperties' => false,
+		);
+		Abilities::read(
+			'leitvia/get-consent-providers',
+			__( 'Get consent providers', 'leitvia-studio' ),
+			__( 'Returns the providers of embedded content from the privacy settings. providers holds key, label, hosts, purpose and privacy of each, services the services the consent placeholder knows without an entry (key and label, such as YouTube), hash the base_hash of leitvia/set-consent-providers. Content from a host of a provider or service waits behind a consent placeholder named after it.', 'leitvia-studio' ),
+			$object + array( 'properties' => array() ),
+			array(
+				'type'       => 'object',
+				'required'   => array( 'providers', 'services', 'hash' ),
+				'properties' => array(
+					'providers' => array(
+						'type'        => 'array',
+						'description' => __( 'Providers saved under Settings, Privacy.', 'leitvia-studio' ),
+						'items'       => $provider,
+					),
+					'services'  => array(
+						'type'        => 'array',
+						'description' => __( 'Services the consent placeholder knows without an entry.', 'leitvia-studio' ),
+						'items'       => array(
+							'type'       => 'object',
+							'properties' => array(
+								'key'   => array( 'type' => 'string' ),
+								'label' => array( 'type' => 'string' ),
+							),
+						),
+					),
+					'hash'      => array(
+						'type'        => 'string',
+						'description' => __( 'Hash of the providers, the base_hash of leitvia/set-consent-providers.', 'leitvia-studio' ),
+					),
+				),
+			),
+			static fn(): array => self::consent_providers()
+		);
+		Abilities::write(
+			'leitvia/set-consent-providers',
+			__( 'Set consent providers', 'leitvia-studio' ),
+			/* translators: %d: most providers */
+			sprintf( __( 'Replaces the providers of embedded content in the privacy settings. Send the whole list, at most %d; a provider you leave out is removed. Read them with leitvia/get-consent-providers first, send its hash as base_hash and the key of every provider that stays. A built-in service such as YouTube needs no entry. Hosts lose scheme, port and path; a provider without a valid host of another site is rejected. Use only providers the site embeds and privacy policies the provider publishes. Like every setting it waits in a change package for a person.', 'leitvia-studio' ), Consent::MAX_PROVIDERS ),
+			'setup',
+			$replace,
+			array(
+				'properties' => array(
+					'providers' => array(
+						'type'        => 'array',
+						'maxItems'    => Consent::MAX_PROVIDERS,
+						'description' => __( 'The whole new list of providers; an empty list removes all.', 'leitvia-studio' ),
+						'items'       => $provider,
+					),
+				),
+				'required'   => array( 'providers' ),
+			) + $object,
+			array( self::class, 'describe_set_consent_providers' )
+		);
+		Abilities::write(
 			'leitvia/define-content-type',
 			__( 'Define content type', 'leitvia-studio' ),
-			__( 'Adds entries to the content model (postTypes, taxonomies, relations, settings) and keeps the others. An entry that exists is merged: the input sets its own keys and fields, fields, repeaters and supports it does not name stay, and the postTypes of a taxonomy are joined; relations and settings are replaced whole. Nothing is removed through this ability: an entry, field, repeater or supports value can only be removed by a person on the Model screen. Read the declaration with leitvia/get-content-model first. The base hash is the hash of the content model. leitvia/get-content-model returns it as hash. showInAbilities stays a decision of a person: agents may not set it.', 'leitvia-studio' ),
+			__( 'Adds entries to the content model (postTypes, taxonomies, relations, settings) and keeps the others. An entry that exists is merged: the input sets its own keys and fields, fields, repeaters and supports it does not name stay, and the postTypes of a taxonomy are joined; relations and settings are replaced whole. Nothing is removed through this ability: an entry, field, repeater or supports value can only be removed by a person on the Model screen. Read the declaration with leitvia/get-content-model first. The base hash is the hash of the content model. leitvia/get-content-model returns it as hash. showInAbilities stays a decision of a person: agents may not set it. A new address (slug, or the key) that a published page or another public type already has is refused: the subpages of such a page would lead to a 404.', 'leitvia-studio' ),
 			'setup',
 			$replace,
 			array(
@@ -489,27 +695,199 @@ final class Setup {
 	}
 
 	/**
-	 * Operation of set-organization: the fields of the input over the saved Studio settings, which sanitize them.
+	 * Operation of set-organization: the fields of the input over the saved Studio settings, which sanitize them
+	 * (Settings::sanitize()).
 	 *
 	 * @param array<string, mixed> $input Input.
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	public static function describe_set_organization( array $input ) {
 		$fields = array();
-		foreach ( array( 'street', 'postal_code', 'city', 'country', 'phone', 'email' ) as $field ) {
+		foreach ( Organization::FIELDS as $field ) {
 			if ( isset( $input[ $field ] ) ) {
-				$fields[ 'organization_' . $field ] = (string) $input[ $field ];
+				$fields[ 'organization_' . $field ] = $input[ $field ];
 			}
 		}
 		$target = array( 'option' => Settings::OPTION );
 		if ( ! $fields ) {
-			return Block_Edit::invalid( 'change', __( 'Name what to change: street, postal_code, city, country, phone or email.', 'leitvia-studio' ), $target );
+			/* translators: %s: list of field names. */
+			return Block_Edit::invalid( 'change', sprintf( __( 'Name what to change: %s.', 'leitvia-studio' ), implode( ', ', Organization::FIELDS ) ), $target );
 		}
 		return array(
 			'area'      => 'structure',
 			'target'    => $target,
 			'base_hash' => Hashes::of( (string) wp_json_encode( get_option( Settings::OPTION ) ) ),
 			'change'    => static fn( array $state ): array => array( 'value' => $fields + (array) $state['value'] ),
+		);
+	}
+
+	/**
+	 * Operation of set-motion: the site setting motion over the saved Studio settings.
+	 *
+	 * @param array<string, mixed> $input Input.
+	 * @return array<string, mixed>
+	 */
+	public static function describe_set_motion( array $input ): array {
+		$motion = (string) $input['motion'];
+		return array(
+			'area'      => 'structure',
+			'target'    => array( 'option' => Settings::OPTION ),
+			'base_hash' => Hashes::of( (string) wp_json_encode( get_option( Settings::OPTION ) ) ),
+			'change'    => static fn( array $state ): array => array( 'value' => array( 'motion' => $motion ) + (array) $state['value'] ),
+		);
+	}
+
+	/**
+	 * One operation on an option of Pipeline::OPTIONS that sets it to a value, with the hash of its current value.
+	 *
+	 * @param string $option Option name.
+	 * @param mixed  $value  New value.
+	 * @param string $notice Notice for the result, '' for none.
+	 * @return array<string, mixed>
+	 */
+	private static function option_op( string $option, $value, string $notice = '' ): array {
+		return array(
+			'area'      => 'structure',
+			'target'    => array( 'option' => $option ),
+			'base_hash' => Hashes::of( (string) wp_json_encode( get_option( $option ) ) ),
+			'notice'    => $notice,
+			'change'    => static fn(): array => array( 'value' => $value ),
+		);
+	}
+
+	/**
+	 * Operations of set-site-identity: blogname, blogdescription, site_logo and site_icon, one per field sent. Core
+	 * returns site_logo as theme mod custom_logo as well (_override_custom_logo_theme_mod()), so core/site-logo and
+	 * get_custom_logo() show the same image. Images are checked before anything runs, so a call changes all its fields
+	 * or none.
+	 *
+	 * @param array<string, mixed> $input Input.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public static function describe_set_site_identity( array $input ) {
+		$options = array(
+			'title'   => 'blogname',
+			'tagline' => 'blogdescription',
+			'logo'    => 'site_logo',
+			'icon'    => 'site_icon',
+		);
+		$batch   = array();
+		foreach ( array_intersect_key( $options, $input ) as $field => $option ) {
+			$target = array( 'option' => $option );
+			if ( 'title' === $field || 'tagline' === $field ) {
+				$value = sanitize_text_field( (string) $input[ $field ] );
+				if ( 'title' === $field && '' === $value ) {
+					return Block_Edit::invalid( 'title', __( 'The site title cannot be empty.', 'leitvia-studio' ), $target );
+				}
+				$batch[] = self::option_op( $option, $value );
+				continue;
+			}
+			$id = (int) $input[ $field ];
+			if ( $id && ( ! wp_attachment_is_image( $id ) || ! Scope::readable( $id ) ) ) {
+				return Block_Edit::invalid( $field, __( 'The ID is no image of the media library.', 'leitvia-studio' ), $target + array( 'image' => $id ), 'leitvia/list-media' );
+			}
+			$size    = $id ? wp_get_attachment_image_src( $id, 'full' ) : false;
+			$small   = 'icon' === $field && $size && ( (int) $size[1] !== (int) $size[2] || (int) $size[1] < 512 );
+			$batch[] = self::option_op( $option, $id, $small ? __( 'The site icon should be square and at least 512 pixels wide, or browsers show it blurred or cut.', 'leitvia-studio' ) : '' );
+		}
+		if ( ! $batch ) {
+			/* translators: %s: list of field names. */
+			return Block_Edit::invalid( 'change', sprintf( __( 'Name what to change: %s.', 'leitvia-studio' ), implode( ', ', array_keys( $options ) ) ), array( 'option' => 'blogname' ) );
+		}
+		return array( 'batch' => $batch );
+	}
+
+	/**
+	 * Operations of set-front-page: show_on_front page with page_on_front the page, or show_on_front posts with
+	 * page_on_front 0.
+	 *
+	 * @param array<string, mixed> $input Input.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public static function describe_set_front_page( array $input ) {
+		$page   = (int) ( $input['page'] ?? 0 );
+		$target = array( 'option' => 'page_on_front' );
+		if ( $page && ( 'page' !== get_post_type( $page ) || ! Scope::readable( $page ) ) ) {
+			return Block_Edit::invalid( 'page', __( 'There is no page with this ID that agents can read. Take the ID from leitvia/list-content.', 'leitvia-studio' ), $target + array( 'page' => $page ), 'leitvia/list-content' );
+		}
+		if ( $page && (int) get_option( 'page_for_posts' ) === $page ) {
+			return Block_Edit::invalid( 'page', __( 'The posts page cannot be the front page as well. Use another page, or move the posts page first with leitvia/set-posts-page.', 'leitvia-studio' ), $target + array( 'page' => $page ), 'leitvia/set-posts-page' );
+		}
+		return array(
+			'batch' => array(
+				self::option_op( 'show_on_front', $page ? 'page' : 'posts' ),
+				self::option_op( 'page_on_front', (string) $page, $page && 'publish' !== get_post_status( $page ) ? __( 'The page is not published yet, so the address of the site shows nothing to visitors.', 'leitvia-studio' ) : '' ),
+			),
+		);
+	}
+
+	/**
+	 * Output of get-consent-providers: the saved providers, the other services the placeholder knows and the hash.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function consent_providers(): array {
+		$providers = Consent::sanitize_providers( leitvia_studio_setting( 'consent_providers' ) );
+		$saved     = array_flip( array_column( $providers, 'key' ) );
+		$services  = array();
+		foreach ( array_diff_key( Consent::services(), $saved ) as $key => $service ) {
+			$services[] = array(
+				'key'   => (string) $key,
+				'label' => (string) ( $service['label'] ?? $key ),
+			);
+		}
+		return array(
+			'providers' => $providers,
+			'services'  => $services,
+			'hash'      => Hashes::of( (string) wp_json_encode( $providers ) ),
+		);
+	}
+
+	/**
+	 * Operation of set-consent-providers: the list sanitized as the settings page does (Consent::sanitize_providers())
+	 * in place of the saved one. A provider the sanitizing would drop is rejected, so nothing vanishes unnoticed.
+	 *
+	 * @param array<string, mixed> $input Input.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public static function describe_set_consent_providers( array $input ) {
+		$target  = array( 'option' => Settings::OPTION );
+		$current = (string) self::consent_providers()['hash'];
+		if ( ! hash_equals( $current, (string) ( $input['base_hash'] ?? '' ) ) ) {
+			return Rejection::make(
+				'leitvia_stale_hash',
+				/* translators: %s: current hash of the providers */
+				sprintf( __( 'The providers changed since they were read. Read them with leitvia/get-consent-providers and repeat the change on the current list with base_hash %s.', 'leitvia-studio' ), $current ),
+				409,
+				'stale_hash',
+				$target,
+				'leitvia/get-consent-providers',
+				'once',
+				array( 'current_hash' => $current )
+			);
+		}
+		$given   = array_values( (array) ( $input['providers'] ?? array() ) );
+		$dropped = array();
+		foreach ( $given as $i => $provider ) {
+			if ( ! Consent::sanitize_providers( array( $provider ) ) ) {
+				$dropped[] = (string) ( $i + 1 );
+			}
+		}
+		if ( $dropped ) {
+			return Block_Edit::invalid(
+				'providers',
+				/* translators: %s: positions of the providers in the list, such as 1, 3 */
+				sprintf( __( 'These providers of the list have no name or no valid host of another site, such as maps.example.com: %s.', 'leitvia-studio' ), implode( ', ', $dropped ) ),
+				$target,
+				'leitvia/get-consent-providers'
+			);
+		}
+		$clean = Consent::sanitize_providers( $given );
+		return array(
+			'area'      => 'structure',
+			'target'    => $target,
+			'base_hash' => Hashes::of( (string) wp_json_encode( get_option( Settings::OPTION ) ) ),
+			'change'    => static fn( array $state ): array => array( 'value' => array( 'consent_providers' => $clean ) + (array) $state['value'] ),
 		);
 	}
 
@@ -560,9 +938,102 @@ final class Setup {
 					}
 					return self::check_failed( array( 'option' => Pipeline::MODEL_OPTION ), $findings, 'leitvia/get-content-model' );
 				}
+				$clashes = self::address_clashes( $decl, $merged );
+				if ( $clashes ) {
+					return self::check_failed( array( 'option' => Pipeline::MODEL_OPTION ), $clashes, 'leitvia/list-content' );
+				}
 				return array( 'value' => $merged );
 			},
 		);
+	}
+
+	/**
+	 * Findings for entries of the input that take an address another one has: the base of a published page (its
+	 * subpages would lead to a 404, since the rules of the type come first) or of another public post type or
+	 * taxonomy. Only an address the entry does not have yet counts, so a known clash does not block other changes.
+	 *
+	 * @param array<string, mixed> $decl   Declaration of the input.
+	 * @param array<string, mixed> $merged Declaration after the change.
+	 * @return list<array<string, string>>
+	 */
+	private static function address_clashes( array $decl, array $merged ): array {
+		$taken = array();
+		foreach ( array_merge( get_post_types( array( 'public' => true ), 'objects' ), get_taxonomies( array( 'public' => true ), 'objects' ) ) as $object ) {
+			// A type the content model registered but the model after the change no longer holds leaves its address.
+			$section = $object instanceof \WP_Post_Type ? 'postTypes' : 'taxonomies';
+			$owned   = 'postTypes' === $section ? Registrar::owns_post_type( $object->name ) : Registrar::owns_taxonomy( $object->name );
+			if ( $owned && ! isset( $merged[ $section ][ $object->name ] ) ) {
+				continue;
+			}
+			$rewrite = $object->rewrite;
+			if ( is_array( $rewrite ) && '' !== trim( (string) ( $rewrite['slug'] ?? '' ), '/' ) ) {
+				$taken[ self::address( (string) $rewrite['slug'], ! empty( $rewrite['with_front'] ) ) ][ $object->name ] = $object->name;
+			}
+		}
+		$planned = array();
+		foreach ( array( 'postTypes', 'taxonomies' ) as $section ) {
+			foreach ( (array) ( $merged[ $section ] ?? array() ) as $key => $entry ) {
+				$entry = (array) $entry;
+				$open  = ! empty( $entry['public'] ) && ( 'taxonomies' === $section || ( $entry['singlePages'] ?? true ) );
+				if ( $open ) {
+					$planned[ $section ][ (string) $key ] = self::address( (string) ( $entry['slug'] ?? $key ), ! empty( $entry['withFront'] ) );
+				}
+			}
+		}
+		$findings = array();
+		foreach ( array( 'postTypes', 'taxonomies' ) as $section ) {
+			foreach ( array_keys( (array) ( $decl[ $section ] ?? array() ) ) as $key ) {
+				$key  = (string) $key;
+				$base = $planned[ $section ][ $key ] ?? '';
+				if ( '' === $base || isset( $taken[ $base ][ $key ] ) ) {
+					continue;
+				}
+				$others = array_values( $taken[ $base ] ?? array() );
+				foreach ( $planned as $other_section => $entries ) {
+					foreach ( $entries as $other => $address ) {
+						if ( $address === $base && ( $other_section !== $section || $other !== $key ) ) {
+							$others[] = $other;
+						}
+					}
+				}
+				$page    = get_page_by_path( $base );
+				$message = match ( true ) {
+					$page instanceof \WP_Post && 'publish' === $page->post_status => sprintf(
+						/* translators: 1: address such as /services/, 2: page title, 3: page ID */
+						__( 'The address %1$s belongs to the published page %2$s (ID %3$d). Its subpages would lead to a 404 once the content type takes the address.', 'leitvia-studio' ),
+						'/' . $base . '/',
+						$page->post_title,
+						$page->ID
+					),
+					/* translators: 1: address such as /services/, 2: names of post types or taxonomies */
+					(bool) $others => sprintf( __( 'The address %1$s belongs to %2$s already.', 'leitvia-studio' ), '/' . $base . '/', implode( ', ', array_unique( $others ) ) ),
+					default => '',
+				};
+				if ( '' !== $message ) {
+					$findings[] = array(
+						'check'    => 'leitvia/content-model',
+						'severity' => 'error',
+						'block'    => '/' . $section . '/' . $key . '/slug',
+						'message'  => $message,
+						'fix'      => __( 'Choose another slug, or move or rename the page first.', 'leitvia-studio' ),
+					);
+				}
+			}
+		}
+		return $findings;
+	}
+
+	/**
+	 * Path of the archive address of a slug, without slashes around it: with the prefix of the post permalinks when
+	 * with_front is on.
+	 *
+	 * @param string $slug       Rewrite slug.
+	 * @param bool   $with_front Whether the prefix of the post permalinks comes first.
+	 */
+	private static function address( string $slug, bool $with_front ): string {
+		global $wp_rewrite;
+		$front = $with_front && $wp_rewrite instanceof \WP_Rewrite ? trim( (string) $wp_rewrite->front, '/' ) : '';
+		return trim( ( '' !== $front ? $front . '/' : '' ) . trim( $slug, '/' ), '/' );
 	}
 
 	/**
@@ -828,6 +1299,11 @@ final class Setup {
 		if ( ! $keep || ! str_contains( $content, 'wp:navigation' ) ) {
 			return $content;
 		}
+		$blocks = parse_blocks( $content );
+		// Serializing would drop attributes that are no valid JSON; the pipeline rejects such markup as sent.
+		if ( Pipeline::broken_markup( $blocks ) ) {
+			return $content;
+		}
 		$changed = false;
 		$walk    = static function ( array $blocks ) use ( &$walk, $keep, &$changed ): array {
 			foreach ( $blocks as &$block ) {
@@ -839,7 +1315,7 @@ final class Setup {
 			}
 			return $blocks;
 		};
-		$blocks  = $walk( parse_blocks( $content ) );
+		$blocks  = $walk( $blocks );
 		return $changed ? serialize_blocks( $blocks ) : $content;
 	}
 

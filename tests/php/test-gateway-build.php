@@ -311,6 +311,81 @@ class Test_Gateway_Build extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Edits of compose-page set an anchor, the column count of a grid and insert a block built from the catalog (form
+	 * errors around a block that renders on the server); the empty hidden title of the error summary passes the heading
+	 * check. An anchor that a second section repeats is refused, as is an insert outside the catalog.
+	 */
+	public function test_compose_page_anchor_columns_insert(): void {
+		$section = static fn( string $anchor ): array => array(
+			'pattern' => 'leitvia/content-feature-grid',
+			'edits'   => array(
+				array(
+					'block'  => 'p:0',
+					'anchor' => $anchor,
+				),
+				array(
+					'block'  => 'p:0.1.5',
+					'remove' => true,
+				),
+				array(
+					'block'  => 'p:0.1.4',
+					'remove' => true,
+				),
+				array(
+					'block'   => 'p:0.1',
+					'columns' => 2,
+				),
+				array(
+					'block'  => 'p:0.0.1',
+					'insert' => array(
+						'block'  => 'leitvia/form-errors',
+						'anchor' => $anchor . '-form',
+						'inner'  => array(
+							array(
+								'block'      => 'core/search',
+								'attributes' => array(
+									'label'      => 'Search the features',
+									'buttonText' => 'Search',
+								),
+							),
+						),
+					),
+				),
+			),
+		);
+		$page    = static fn( array $sections ) => self::call(
+			'leitvia/compose-page',
+			array(
+				'title'    => 'Features',
+				'frame'    => 'contact',
+				'sections' => $sections,
+			)
+		);
+
+		$result = $page( array( $section( 'features' ) ) );
+		$this->assertIsArray( $result, is_wp_error( $result ) ? wp_json_encode( $result->get_error_data() ) : '' );
+		$root = array_values( array_filter( parse_blocks( (string) get_post_field( 'post_content', $result['target']['post'], 'raw' ) ), static fn( array $block ): bool => null !== $block['blockName'] ) )[0];
+		$this->assertSame( 'leitvia/content-feature-grid', $root['attrs']['metadata']['patternName'] );
+		$this->assertStringContainsString( 'id="features"', $root['innerContent'][0] );
+		$this->assertSame( 2, $root['innerBlocks'][1]['attrs']['layout']['columnCount'] );
+		$this->assertCount( 4, $root['innerBlocks'][1]['innerBlocks'] );
+		$form = $root['innerBlocks'][0]['innerBlocks'][2];
+		$this->assertSame( 'leitvia/form-errors', $form['blockName'] );
+		$this->assertStringContainsString( 'id="features-form"', $form['innerContent'][0] );
+		$this->assertSame( 'core/search', $form['innerBlocks'][0]['blockName'] );
+		$this->assertSame( 'Search the features', $form['innerBlocks'][0]['attrs']['label'] );
+
+		$data = $this->assert_rejected( 'leitvia_invalid_input', $page( array( $section( 'features' ), $section( 'features' ) ) ) );
+		$this->assertSame( 'anchor', $data['reason'] );
+		$outside                                 = $section( 'other' );
+		$outside['edits'][4]['insert']['block']  = 'core/search';
+		$outside['edits'][4]['insert']['anchor'] = null;
+		unset( $outside['edits'][4]['insert']['inner'] );
+		$data = $this->assert_rejected( 'leitvia_invalid_input', $page( array( $outside ) ) );
+		$this->assertSame( 'leitvia/list-blocks', $data['next_ability'] );
+	}
+
+	/**
 	 * Unknown patterns point to list-patterns, deprecated ones name the replacement, unknown frames are refused.
 	 */
 	public function test_compose_page_rejections(): void {

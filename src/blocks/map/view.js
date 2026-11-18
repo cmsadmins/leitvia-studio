@@ -12,12 +12,23 @@ async function draw( canvas ) {
 		/* webpackChunkName: "blocks/map/leaflet" */ './leaflet'
 	);
 	const [ lat, lng, zoom ] = JSON.parse( canvas.dataset.view );
+	// Translated labels of the zoom buttons and the close button of a popup (Map::render()), English without them.
+	const [ zoomIn, zoomOut, close ] = JSON.parse(
+		canvas.dataset.labels || '[]'
+	);
 	// The attribution stands below the map, as a line of text, not as a control in its corner: there markers that
 	// the view or the pan of a popup moves into the corner would cover its small links (WCAG 2.5.8).
 	const map = L.map( canvas, {
 		scrollWheelZoom: false,
 		attributionControl: false,
+		zoomControl: false,
 	} ).setView( [ lat, lng ], zoom );
+	L.control
+		.zoom( {
+			zoomInTitle: zoomIn || 'Zoom in',
+			zoomOutTitle: zoomOut || 'Zoom out',
+		} )
+		.addTo( map );
 	L.tileLayer( canvas.dataset.tiles, { maxZoom: 19 } ).addTo( map );
 	// The attribution is the fixed markup of Map::render(), as Leaflet would insert it.
 	canvas.insertAdjacentHTML(
@@ -76,6 +87,12 @@ async function draw( canvas ) {
 			const content = event.popup
 				.getElement()
 				.querySelector( '.leaflet-popup-content' );
+			if ( close ) {
+				event.popup
+					.getElement()
+					.querySelector( '.leaflet-popup-close-button' )
+					?.setAttribute( 'aria-label', close );
+			}
 			const link = content.querySelector( 'a[href]' );
 			if ( ! link ) {
 				content.tabIndex = -1;

@@ -461,4 +461,33 @@ class Test_Gateway_Read_Design extends WP_UnitTestCase {
 		$this->assertCount( count( $all['blocks'] ), $post['blocks'] );
 		$this->assertSame( 'leitvia_invalid_input', wp_get_ability( 'leitvia/list-blocks' )->execute( array( 'post_type' => 'user_request' ) )->get_error_code() );
 	}
+
+	/**
+	 * The block styles come with name and label for every block, core blocks outside the catalog included: those of
+	 * block.json and those of register_block_style(); with post_type only those of the allowed blocks.
+	 */
+	public function test_list_blocks_names_block_styles(): void {
+		register_block_style(
+			'core/group',
+			array(
+				'name'  => 'test-band',
+				'label' => 'Test band',
+			)
+		);
+		$all = $this->call( 'leitvia/list-blocks' );
+		$this->assertContains(
+			array(
+				'name'  => 'test-band',
+				'label' => 'Test band',
+			),
+			$all['styles']['core/group']
+		);
+		$this->assertContains( 'rounded', wp_list_pluck( $all['styles']['core/image'], 'name' ) );
+		$filter = static fn( $allowed, WP_Block_Editor_Context $context ) => 'page' === $context->post->post_type ? array( 'core/group' ) : $allowed;
+		add_filter( 'allowed_block_types_all', $filter, 10, 2 );
+		$page   = $this->call( 'leitvia/list-blocks', array( 'post_type' => 'page' ) );
+		remove_filter( 'allowed_block_types_all', $filter );
+		unregister_block_style( 'core/group', 'test-band' );
+		$this->assertSame( array( 'core/group' ), array_keys( $page['styles'] ) );
+	}
 }

@@ -49,15 +49,39 @@ function leitvia_studio_seo_plugin_active(): bool {
 }
 
 /**
+ * The organization behind the site from the Studio settings, for add-ons that print it, such as the hiring
+ * organization of a job posting: kind of business (Organization or a type of LocalBusiness), name and address of the
+ * site, postal address, phone, email, founding date, area served, opening hours and profiles. Empty strings and lists
+ * where nothing is set.
+ *
+ * @return array{type: string, name: string, url: string, street: string, postal_code: string, city: string, country: string, phone: string, email: string, founding_date: string, area_served: list<string>, opening_hours: list<array{days: list<string>, opens: string, closes: string}>, same_as: list<string>}
+ */
+function leitvia_studio_organization_details(): array {
+	return \LeitviaStudio\Organization\Organization::details();
+}
+
+/**
+ * The organization as schema.org node with @id (the address of the site with #organization), as Studio prints it on
+ * the front page and as publisher of posts. An add-on may use it whole or refer to it by its @id. It does not check
+ * whether an SEO plugin is active; see leitvia_studio_seo_plugin_active().
+ *
+ * @return array<string, mixed>
+ */
+function leitvia_studio_organization_schema(): array {
+	return \LeitviaStudio\Organization\Organization::node();
+}
+
+/**
  * Consent placeholder for third-party content: names the provider, links to its privacy policy and to the content,
  * and keeps `$html` in a <template> that the script module @leitvia/consent inserts once the visitor agrees.
  *
  * @param string $service      Service key from the filter leitvia_studio_consent_services, or a host name.
  * @param string $html         Original HTML of the third-party content.
  * @param string $fallback_url Link to the content on the provider's site, used without JavaScript.
+ * @param string $preview      HTML of an image of the own site behind the texts, '' for none.
  */
-function leitvia_studio_consent_placeholder( string $service, string $html, string $fallback_url ): string {
-	return \LeitviaStudio\Consent\Consent::placeholder( $service, $html, $fallback_url );
+function leitvia_studio_consent_placeholder( string $service, string $html, string $fallback_url, string $preview = '' ): string {
+	return \LeitviaStudio\Consent\Consent::placeholder( $service, $html, $fallback_url, $preview );
 }
 
 /**

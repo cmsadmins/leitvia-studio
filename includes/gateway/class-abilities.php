@@ -181,7 +181,7 @@ final class Abilities {
 	 * (Recipes::collecting()): what may go live goes live and lands in one applied package that leitvia/rollback undoes
 	 * as a whole, what may not waits in one open package. An operation on a target an earlier one of the batch wrote
 	 * builds on the hash that one left, so items on the same post send the hash read before the call. Items fail one by
-	 * one; when every item fails, the first rejection is the answer.
+	 * one; when every item fails, the first rejection is the answer. The notices of the items join to one notice.
 	 *
 	 * @param string                               $name  Ability name.
 	 * @param list<array<string, mixed>|\WP_Error> $batch Descriptions per item, see write().
@@ -251,7 +251,8 @@ final class Abilities {
 		if ( ! $done && $failed instanceof \WP_Error ) {
 			return $failed;
 		}
-		return array(
+		$notices = array_filter( array_map( static fn( $parts ): string => is_array( $parts ) ? (string) ( $parts['notice'] ?? '' ) : '', $batch ) );
+		return ( $notices ? array( 'notice' => implode( ' ', $notices ) ) : array() ) + array(
 			'mode'     => match ( true ) {
 				$queue > 0 => 'package',
 				in_array( 'live', $modes, true ) => 'live',

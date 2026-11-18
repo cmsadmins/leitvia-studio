@@ -908,6 +908,20 @@ final class Dtcg {
 	}
 
 	/**
+	 * Family names a token set can use with font faces on this site (bundled_fonts()), spelled as their faces name them.
+	 *
+	 * @return list<string>
+	 */
+	public static function bundled_families(): array {
+		$names = array();
+		foreach ( self::bundled_fonts() as $key => $faces ) {
+			$face    = (array) ( $faces[0] ?? array() );
+			$names[] = self::split( (string) ( $face['fontFamily'] ?? '' ) )[0] ?? (string) $key;
+		}
+		return $names;
+	}
+
+	/**
 	 * Font faces bundled with the theme, its style variations or Leitvia Studio, or uploaded to the Font Library of
 	 * this site, by lowercased first family name.
 	 *

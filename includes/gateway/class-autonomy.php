@@ -94,15 +94,16 @@ final class Autonomy {
 	/**
 	 * Whether only a person may let a change of this target reach the site: every option (site and reading settings,
 	 * the content model declaration and its site details), the user global styles and the activation of a token set
-	 * into them, since each one changes the whole site. Agents may propose these changes, never make them; no ability
-	 * touches plugins, themes, users, roles or files outside the uploads at all.
+	 * into them, since each one changes the whole site. So does removing content (target remove of trash-content and
+	 * delete-media), since visitors lose it. Agents may propose these changes, never make them; no ability touches
+	 * plugins, themes, users, roles or files outside the uploads at all.
 	 *
 	 * @param array<string, mixed> $target Target of the operation, see Operation.
 	 */
 	public static function person_decides( array $target ): bool {
 		$post = (int) ( $target['post'] ?? 0 );
 		$type = $post ? (string) get_post_type( $post ) : (string) ( $target['post_type'] ?? '' );
-		return isset( $target['option'] ) || isset( $target['token_set'] ) || 'wp_global_styles' === $type;
+		return isset( $target['option'] ) || isset( $target['token_set'] ) || isset( $target['remove'] ) || 'wp_global_styles' === $type;
 	}
 
 	/**
@@ -133,7 +134,9 @@ final class Autonomy {
 			if ( in_array( get_post_meta( $id, '_leitvia_page_kind', true ), self::LEGAL_PAGES, true ) || (int) get_option( 'wp_page_for_privacy_policy' ) === $id ) {
 				$kinds[] = 'legal';
 			}
-			if ( (string) ( $before['post_name'] ?? '' ) !== (string) ( $after['post_name'] ?? '' ) ) {
+			// A new parent changes the address of a page as a new slug does.
+			$parent = is_post_type_hierarchical( (string) ( $after['post_type'] ?? '' ) ) && (int) ( $before['post_parent'] ?? 0 ) !== (int) ( $after['post_parent'] ?? 0 );
+			if ( $parent || (string) ( $before['post_name'] ?? '' ) !== (string) ( $after['post_name'] ?? '' ) ) {
 				$kinds[] = 'slugs';
 			}
 		}

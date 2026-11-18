@@ -124,6 +124,8 @@ final class Content_Checks {
 
 	/**
 	 * Check leitvia/headings: no h1 when the template shows the title as h1, no skipped levels, no empty headings.
+	 * Headings in an element with the attribute hidden do not count, such as the title of the error summary of
+	 * leitvia/form-errors, which its render fills and its script shows.
 	 *
 	 * @param string               $content Block markup.
 	 * @param array<string, mixed> $context Context.
@@ -136,10 +138,28 @@ final class Content_Checks {
 		$title_h1 = self::title_is_h1( self::template( $context ) );
 		$previous = 1;
 		$findings = array();
+		/**
+		 * Filters the blocks that render a heading on the server, by block name the attribute that holds its level (1
+		 * to 6, the default of the block type when the attribute is missing). Their saved markup has no heading, so the
+		 * check counts the level from the attribute, before the headings of the block's inner blocks.
+		 *
+		 * @param array<string, string> $blocks Attribute by block name.
+		 */
+		$dynamic = (array) apply_filters( 'leitvia_studio_heading_blocks', array() );
 		foreach ( self::walk( $content ) as [ $block, $id ] ) {
-			preg_match_all( '#<h([1-6])\b[^>]*>(.*?)</h\1>#is', self::html( $block ), $matches, PREG_SET_ORDER );
+			preg_match_all( '#<h([1-6])\b[^>]*>(.*?)</h\1>#is', self::without_hidden( self::html( $block ) ), $matches, PREG_SET_ORDER );
+			$attribute = (string) ( $dynamic[ (string) $block['blockName'] ] ?? '' );
+			if ( '' !== $attribute ) {
+				$type  = \WP_Block_Type_Registry::get_instance()->get_registered( (string) $block['blockName'] );
+				$level = (int) ( $block['attrs'][ $attribute ] ?? $type->attributes[ $attribute ]['default'] ?? 0 );
+				// The server renders the text, so it counts as given.
+				array_unshift( $matches, array( '', (string) $level, 'x' ) );
+			}
 			foreach ( $matches as [ , $level, $inner ] ) {
 				$level = (int) $level;
+				if ( $level < 1 || $level > 6 ) {
+					continue;
+				}
 				if ( ! self::has_text( $inner ) ) {
 					$findings[] = self::finding( 'leitvia/headings', 'error', $id, __( 'The heading is empty.', 'leitvia-studio' ), __( 'Give the heading text or remove it.', 'leitvia-studio' ) );
 				}
@@ -215,7 +235,8 @@ final class Content_Checks {
 				$tag->next_tag();
 				$label = trim( (string) $tag->get_attribute( 'aria-label' ) ) . trim( (string) $tag->get_attribute( 'aria-labelledby' ) );
 				$text  = strtolower( trim( (string) preg_replace( array( '/\s+/u', '/[\s.:…»›>]+$/u' ), array( ' ', '' ), html_entity_decode( wp_strip_all_tags( $inner ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) ) ) );
-				$href  = $tag->get_attribute( 'href' );
+				// A link a binding fills shows the bound value, not the saved one; audit-site checks it on the page.
+				$href = '' === Block_Edit::binding( $block, 'url' ) ? $tag->get_attribute( 'href' ) : false;
 				if ( '#' === trim( (string) $href ) ) {
 					$findings[] = self::finding( 'leitvia/link-text', 'error', $id, __( 'The link points to "#" and goes nowhere.', 'leitvia-studio' ), __( 'Link to the real target, or use a button block for an action.', 'leitvia-studio' ) );
 				} elseif ( true === $href || ( is_string( $href ) && '' === trim( $href ) ) ) {
@@ -471,7 +492,7 @@ final class Content_Checks {
 	/**
 	 * Ids a link may point to that the template gives the page, not the content.
 	 */
-	private const PAGE_IDS = array( 'top', 'main', 'content', 'wp--skip-link--target', 'comments', 'respond' );
+	public const PAGE_IDS = array( 'top', 'main', 'content', 'wp--skip-link--target', 'comments', 'respond' );
 
 	/**
 	 * Check leitvia/anchors: a link to #anchor has to find its anchor in the part of the post it stands in. In a post
@@ -875,8 +896,11 @@ final class Content_Checks {
 	}
 
 	/**
-	 * Check leitvia/content-contrast: a block with textColor and backgroundColor uses a pair of the contract, or the two
-	 * roles reach 4.5:1 in the active palette.
+	 * Check leitvia/content-contrast: a block with textColor uses a pair of the contract with its ground, or the two
+	 * roles reach 4.5:1 in the active palette. The ground is its own backgroundColor, else that of the nearest block
+	 * around it; a block with the style Inverse (is-style-inverse) stands on the inverse background of the active styles.
+	 * On ink, accent and inverse bands the theme draws accent and ink-muted text in the band text color, so these two
+	 * count there only on a ground of their own.
 	 *
 	 * @param string               $content Block markup.
 	 * @param array<string, mixed> $context Context.
@@ -892,10 +916,10 @@ final class Content_Checks {
 			$pairs[ $pair['fg'] . '|' . $pair['bg'] ] = true;
 		}
 		$palette = null;
-		foreach ( self::walk( $content ) as [ $block, $id ] ) {
-			$fg = $block['attrs']['textColor'] ?? null;
-			$bg = $block['attrs']['backgroundColor'] ?? null;
-			if ( ! is_string( $fg ) || ! is_string( $bg ) || isset( $pairs[ $fg . '|' . $bg ] ) ) {
+		foreach ( self::grounds( parse_blocks( $content ), 'p:', null, false ) as [ $block, $id, $bg, $band ] ) {
+			$fg  = $block['attrs']['textColor'] ?? null;
+			$own = isset( $block['attrs']['backgroundColor'] );
+			if ( ! is_string( $fg ) || ! is_string( $bg ) || isset( $pairs[ $fg . '|' . $bg ] ) || ( $band && ! $own && in_array( $fg, array( 'accent', 'ink-muted' ), true ) ) ) {
 				continue;
 			}
 			$palette ??= (array) wp_get_global_settings( array( 'color', 'palette', 'theme' ) );
@@ -909,6 +933,38 @@ final class Content_Checks {
 			}
 		}
 		return $findings;
+	}
+
+	/**
+	 * Blocks with their ground for contrast(): the background role of the block or of the nearest block around it,
+	 * the inverse background for the style Inverse, and whether a dark band (ink, accent, inverse) lies around it.
+	 *
+	 * @param array<int|string, array<string, mixed>> $blocks Parsed blocks.
+	 * @param string                                  $path   Path prefix.
+	 * @param string|null                             $ground Background role around the blocks.
+	 * @param bool                                    $band   A dark band lies around the blocks.
+	 * @return \Generator<array{0: array<string, mixed>, 1: string, 2: string|null, 3: bool}>
+	 */
+	private static function grounds( array $blocks, string $path, ?string $ground, bool $band ): \Generator {
+		foreach ( Block_Ids::blocks( $blocks ) as $index => $block ) {
+			$id      = Block_Ids::id( $block );
+			$bg      = $block['attrs']['backgroundColor'] ?? null;
+			$inverse = in_array( 'is-style-inverse', explode( ' ', (string) ( $block['attrs']['className'] ?? '' ) ), true );
+			// The theme drops a surface ground under Inverse on render (inverse_over_surface()), so the style wins there.
+			$own = $inverse && ( ! is_string( $bg ) || 'surface' === $bg ) ? self::inverse_ground() : ( is_string( $bg ) ? $bg : $ground );
+			yield array( $block, '' !== $id ? $id : $path . $index, $own, $band );
+			yield from self::grounds( (array) $block['innerBlocks'], $path . $index . '.', $own, $band || $inverse || in_array( $bg, array( 'ink', 'accent' ), true ) );
+		}
+	}
+
+	/**
+	 * Background role of the style Inverse in the active global styles: ink in light palettes, surface-alt in dark ones.
+	 */
+	private static function inverse_ground(): string {
+		$value = wp_get_global_styles( array( 'blocks', 'core/group', 'variations', 'inverse', 'color', 'background' ) );
+		$value = is_string( $value ) && '' !== $value ? $value : wp_get_global_styles( array( 'variations', 'inverse', 'color', 'background' ) );
+		// var(--wp--preset--color--ink) or var:preset|color|ink; the slug follows the color part, not the first "--".
+		return is_string( $value ) && preg_match( '/(?:--color--|\|color\|)([a-z0-9-]+)\)?$/', $value, $match ) ? $match[1] : 'ink';
 	}
 
 	/**
@@ -1296,6 +1352,30 @@ final class Content_Checks {
 	 */
 	private static function html( array $block ): string {
 		return implode( '', array_filter( (array) $block['innerContent'], 'is_string' ) );
+	}
+
+	/**
+	 * Markup without the elements that have the attribute hidden, and their content.
+	 *
+	 * @param string $html Markup.
+	 */
+	private static function without_hidden( string $html ): string {
+		if ( ! str_contains( $html, 'hidden' ) ) {
+			return $html;
+		}
+		$tags = Block_Edit::processor( $html );
+		$cuts = array();
+		while ( $tags->next_tag() ) {
+			$range = null !== $tags->get_attribute( 'hidden' ) ? $tags->inner_range() : null;
+			$end   = $range ? strpos( $html, '>', $range[0] + $range[1] ) : false;
+			if ( false !== $end ) {
+				$cuts[] = array( $range[2], $end + 1 - $range[2] );
+			}
+		}
+		foreach ( array_reverse( $cuts ) as [ $start, $length ] ) {
+			$html = substr_replace( $html, '', $start, $length );
+		}
+		return $html;
 	}
 
 	/**

@@ -285,6 +285,8 @@ Add-ons dock onto the gateway through hooks, for example to run one workflow on 
 | `leitvia_studio_gateway_areas` | filter | `array $levels` (level by area), `array $settings` | When the autonomy level of an area is read. Add the area of an add-on or cap levels with a policy shared by several sites. `admin` and areas without a valid level (`locked`, `suggest`, `draft`, `autonomous`) stay locked. |
 | `leitvia_studio_rate_limit` | filter | `int $limit`, `bool $read`, `int $user_id` | Calls per minute of one user, reads and changes apart, from the settings `read_rate_per_minute` (300) and `rate_per_minute` (60). |
 | `leitvia_studio_gateway_options` | filter | `array $options` (check of a new value by option name) | Options of an add-on that its own abilities write through `Pipeline::run()` with the target `array( 'option' => <name> )`. The check gets the new value and returns `true` or a `WP_Error`, whose message the rejection `leitvia_invalid_input` carries; it runs on every write but a rollback, also when a package is applied, and a check that throws refuses the write. Agents propose such a write, a person applies it. The options of `Pipeline::OPTIONS` and of the content model are left out, and core options that matter for security never open (`Pipeline::protected_option()`: addresses, plugins, theme, users and roles, admin email, keys and salts, cron, uploads, transients, names ending in `_key` or `_salt`). Create the option before the first write (`add_option( 'my_addon_icons', array(), '', false )`) so it keeps its autoload. |
+| `leitvia_studio_max_video_bytes` | filter | `int $bytes` | Largest video file `leitvia/add-media` takes, 50 MB by default. Images and captions keep 5 MB; the upload and request limits of the server apply as well. |
+| `leitvia_studio_heading_blocks` | filter | `array $blocks` (attribute by block name) | Blocks that render a heading on the server, with the attribute that holds its level (1 to 6, the default of the block type when it is missing). The check `leitvia/headings` counts that level before the headings of the inner blocks, for example `'my-addon/job' => 'level'`. |
 | `leitvia_studio_gateway_post_types` | filter | `list<string> $post_types` | Post types open to agents; blocked types are dropped whatever the filter returns. |
 | `leitvia_studio_ai_note` | filter | `string $note`, `int $post_id` | Text of the note shown before content that `leitvia/create-content` marked with `ai_generated` (meta `leitvia_ai_generated`); an empty string hides it. Deleting the meta in the custom fields of a post removes the note for that post. |
 | `leitvia_studio_public_author_name` | filter | `string $name`, `int $user_id` | Name visitors see for an author whose display name is still the login, and for agent users: first and last name, else the name of the site. |
@@ -339,7 +341,9 @@ add_filter( 'leitvia_studio_consent_services', function ( array $services ): arr
 } );
 ```
 
-`leitvia_studio_consent_placeholder( $service, $html, $fallback_url )` wraps any other third-party HTML the same way and loads the script module `@leitvia/consent`.
+`leitvia_studio_consent_placeholder( $service, $html, $fallback_url, $preview = '' )` wraps any other third-party HTML the same way and loads the script module `@leitvia/consent`. `$preview` is the HTML of an image of the own site, such as `wp_get_attachment_image()`, shown behind the texts until the content loads.
+
+Providers a person saves under Settings, Privacy (setting `consent_providers`: `key`, `label`, `hosts`, `purpose`, `privacy`) are part of `leitvia_studio_consent_services` already; they never replace a built-in service, and their keys never change once saved. The block `leitvia/consent-embed` takes the address of an iframe and names its provider by these hosts.
 
 A consent management platform docks on through two DOM events:
 
@@ -381,6 +385,12 @@ Limits:
 - An inline script of type `module` runs on its own time after activation; the scripts after it do not wait for it.
 
 While the filter has entries, every page loads the script module `@leitvia/consent`. The category counts as a key in the same list as the services: once it is allowed, the module replaces every waiting script of the allowed categories with a working copy, one after the other in the order of the page. A revoke applies from the next page load: scripts that already ran stay in the page until then. The block `leitvia/consent-settings` offers each category of the entries with an Allow button and lists an allowed one with Revoke; `leitvia:consent-granted` with the category as `detail.service` activates the scripts of the page without storing anything.
+
+## Organization
+
+`leitvia_studio_organization_details()` returns the organization behind the site from the Studio settings: `type` (`Organization` or a type of `LocalBusiness` from `LeitviaStudio\Organization\Organization::TYPES`), `name` and `url` of the site, `street`, `postal_code`, `city`, `country`, `phone`, `email`, `founding_date` (YYYY, YYYY-MM or YYYY-MM-DD), `area_served` (list of places), `opening_hours` (list of `days`, `opens`, `closes` as HH:MM) and `same_as` (list of https addresses). Empty strings and lists where nothing is set.
+
+`leitvia_studio_organization_schema()` returns the schema.org node with `@id` (`home_url( '/#organization' )`) that Studio prints on the front page and as publisher of posts. An add-on refers to it by `array( '@id' => … )` or uses the node whole, for example as `hiringOrganization` of a job posting. Neither function checks for an SEO plugin; call `leitvia_studio_seo_plugin_active()` before printing JSON-LD.
 
 ## Contact form
 

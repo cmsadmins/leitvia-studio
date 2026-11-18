@@ -326,6 +326,22 @@ class Test_Compiler extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The warning font_not_bundled names the bundled family closest to a misspelled or shortened name as data.suggestion, and
+	 * none for a name far from every bundled family.
+	 */
+	public function test_font_not_bundled_suggests_a_bundled_family(): void {
+		$doc        = json_decode( get_post_meta( self::set_with_accent( '#123456' ), Token_Sets::META, true ), true );
+		$suggestion = static function ( string $name ) use ( $doc ) {
+			$doc['fontFamily']['mono']['$value'] = array( $name, 'monospace' );
+			$found                               = array_values( wp_list_filter( Compiler::check( $doc ), array( 'code' => 'font_not_bundled' ) ) );
+			return $found[0]['data']['suggestion'] ?? null;
+		};
+		$this->assertSame( 'Libre Franklin', $suggestion( 'Libre Frankin' ) );
+		$this->assertSame( 'Libre Franklin', $suggestion( 'Libre' ) );
+		$this->assertNull( $suggestion( 'Comic Neue' ) );
+	}
+
+	/**
 	 * A check with an error blocks activation; warnings do not.
 	 */
 	public function test_checks_block_activation(): void {

@@ -92,12 +92,14 @@ final class Read_Composition {
 		$post     = (int) ( $input['post'] ?? 0 );
 		$template = sanitize_key( (string) ( $input['template'] ?? '' ) );
 		$unknown  = array();
+		$tones    = array();
 		if ( $post ) {
 			if ( ! Gateway\Scope::readable( $post ) ) {
 				return Gateway\Rejection::make( 'leitvia_out_of_scope', __( 'Agents may not read this object. Only published or draft content of the allowed post types is open to them.', 'leitvia-studio' ), 403, 'scope', array( 'post' => $post ), '', 'never' );
 			}
 			$content  = (string) get_post_field( 'post_content', $post, 'raw' );
 			$slugs    = Gateway\Composition::sections( $content );
+			$tones    = Gateway\Composition::tones( $content );
 			$template = '' !== $template ? $template : (string) get_page_template_slug( $post );
 			$unknown  = Gateway\Content_Checks::unregistered_types( $content );
 		} else {
@@ -106,6 +108,6 @@ final class Read_Composition {
 		if ( ! $slugs ) {
 			return Gateway\Rejection::make( 'leitvia_invalid_input', __( 'Pass pattern slugs, or a post whose sections come from patterns.', 'leitvia-studio' ), 400, 'input', $post ? array( 'post' => $post ) : array(), 'leitvia/list-patterns', 'once', $unknown ? array( 'unregistered' => $unknown ) : array() );
 		}
-		return ( $unknown ? array( 'unregistered' => $unknown ) : array() ) + array( 'sections' => $slugs ) + Gateway\Composition::report( $slugs, Gateway\Composition::lab( $slugs, leitvia_studio_contract()->data() ), $template ) + array( 'min_score' => (int) Gateway\Gateway::settings()['min_composition_score'] );
+		return ( $unknown ? array( 'unregistered' => $unknown ) : array() ) + array( 'sections' => $slugs ) + Gateway\Composition::report( $slugs, Gateway\Composition::lab( $slugs, leitvia_studio_contract()->data() ), $template, $tones ) + array( 'min_score' => (int) Gateway\Gateway::settings()['min_composition_score'] );
 	}
 }

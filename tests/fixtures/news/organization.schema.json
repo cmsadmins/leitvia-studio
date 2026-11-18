@@ -1,15 +1,33 @@
 {
 	"$schema": "http://json-schema.org/draft-07/schema#",
 	"$id": "https://leitvia.com/schemas/news/organization.schema.json",
-	"title": "Publisher of an article",
-	"description": "An Organization node as search engines read it for article publishers: a name, the address of its editorial principles when there are some, and if a logo is given it must be an image of at least 112 by 112 pixels.",
+	"title": "Organization behind the site",
+	"description": "The organization node of Leitvia Studio as search engines read it, on the front page and as publisher of articles: one of the types of Organization::TYPES, a name, the address of its editorial principles when there are some, the details of the settings, and if a logo is given it must be an image of at least 112 by 112 pixels.",
 	"type": "object",
 	"required": [ "@type", "name" ],
 	"properties": {
-		"@type": { "const": "Organization" },
+		"@type": { "enum": [ "Organization", "LocalBusiness", "HomeAndConstructionBusiness", "GeneralContractor", "Electrician", "Plumber", "HVACBusiness", "RoofingContractor", "HousePainter", "AutoRepair", "Restaurant", "Store", "HealthAndBeautyBusiness", "LodgingBusiness" ] },
+		"@id": { "$ref": "#/definitions/url" },
 		"name": { "type": "string", "minLength": 1 },
 		"url": { "$ref": "#/definitions/url" },
 		"publishingPrinciples": { "$ref": "#/definitions/url" },
+		"foundingDate": { "type": "string", "pattern": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01]))?)?$" },
+		"areaServed": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+		"sameAs": { "type": "array", "items": { "$ref": "#/definitions/url" } },
+		"image": { "$ref": "#/definitions/url" },
+		"openingHoursSpecification": {
+			"type": "array",
+			"items": {
+				"type": "object",
+				"required": [ "@type", "dayOfWeek", "opens", "closes" ],
+				"properties": {
+					"@type": { "const": "OpeningHoursSpecification" },
+					"dayOfWeek": { "type": "array", "minItems": 1, "items": { "enum": [ "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday" ] } },
+					"opens": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" },
+					"closes": { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" }
+				}
+			}
+		},
 		"logo": {
 			"type": "object",
 			"required": [ "@type", "url", "width", "height" ],

@@ -674,6 +674,27 @@ final class Packages {
 	}
 
 	/**
+	 * Type and name of a video file: MP4 with H.264 (a sample entry avc1 or avc3) or WebM, by core's check of name and
+	 * content, under the extension .mp4 or .webm and with the signature of the format; null otherwise. Browsers play
+	 * both without a plugin.
+	 * ponytail: looks for the codec tag anywhere in the file, no box parser; a file that names avc1 in its metadata
+	 * only passes, and the browser then shows its own error.
+	 *
+	 * @param string $bytes File content.
+	 * @param string $name  File name.
+	 * @return array{type: string, name: non-empty-string}|null
+	 */
+	public static function video_type( string $bytes, string $name ): ?array {
+		$type = self::allowed_type( $bytes, $name );
+		$safe = match ( $type['type'] ?? '' ) {
+			'video/mp4'  => 'ftyp' === substr( $bytes, 4, 4 ) && ( str_contains( $bytes, 'avc1' ) || str_contains( $bytes, 'avc3' ) ),
+			'video/webm' => str_starts_with( $bytes, "\x1A\x45\xDF\xA3" ) && str_contains( substr( $bytes, 0, 64 ), 'webm' ),
+			default      => false,
+		};
+		return $safe && in_array( strtolower( pathinfo( $type['name'], PATHINFO_EXTENSION ) ), array( 'mp4', 'webm' ), true ) ? $type : null;
+	}
+
+	/**
 	 * Runs a check or upload of a captions file with .vtt allowed for a user who may upload files. Core allows it on a
 	 * single site, but a network allows only its list of file types. Only for this call: nothing else on the site can
 	 * upload such a file through it.
@@ -719,7 +740,7 @@ final class Packages {
 	}
 
 	/**
-	 * Writes an image or captions file of an operation to the private area: a folder with a random name below uploads/leitvia-studio/private,
+	 * Writes an image, video or captions file of an operation to the private area: a folder with a random name below uploads/leitvia-studio/private,
 	 * which denies web access where the server reads .htaccess. The pipeline moves it into the uploads folder when it
 	 * writes the attachment; rejecting the package deletes it.
 	 *
@@ -728,9 +749,9 @@ final class Packages {
 	 * @return string Path, '' on failure.
 	 */
 	public static function stash_file( string $name, string $bytes ): string {
-		// Only images and captions of a type the site allows, under the name core's check gives them; never a script or
-		// other file.
-		$type = self::image_type( $bytes, $name ) ?? self::track_type( $bytes, $name );
+		// Only images, videos and captions of a type the site allows, under the name core's check gives them; never a
+		// script or other file.
+		$type = self::image_type( $bytes, $name ) ?? self::video_type( $bytes, $name ) ?? self::track_type( $bytes, $name );
 		if ( ! $type ) {
 			return '';
 		}
@@ -905,6 +926,10 @@ final class Packages {
 		};
 		if ( ! $before && isset( $target['post'] ) ) {
 			$target['delete'] = true;
+		}
+		// A post trash-content put in the trash comes back out of it, see Pipeline::before().
+		if ( isset( $target['post'], $entry['target']['remove'] ) ) {
+			$target['remove'] = (string) $entry['target']['remove'];
 		}
 		return new Operation( 'leitvia/rollback', (string) $entry['area'], $target, (string) $entry['applied']['hash'], static fn(): array => $before, (array) $entry['kinds'] );
 	}

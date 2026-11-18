@@ -293,7 +293,9 @@ final class Pipeline {
 		if ( $unsafe ) {
 			return Rejection::make(
 				'leitvia_unsafe_content',
-				__( 'The content holds markup agents may not write: scripts, event attributes, Custom HTML blocks, classic blocks or Base64 data. Use registered blocks and media from the library.', 'leitvia-studio' ) . self::where( $unsafe ),
+				( 'block_comment' === $unsafe['reason']
+					? __( 'A block comment is broken: its attributes are no valid JSON, or the comment does not close. Send each block comment as serialize_block() writes it.', 'leitvia-studio' )
+					: __( 'The content holds markup agents may not write: scripts, event attributes, Custom HTML blocks, classic blocks or Base64 data. Use registered blocks and media from the library.', 'leitvia-studio' ) ) . self::where( $unsafe ),
 				422,
 				$unsafe['reason'],
 				array( 'block' => $unsafe['block'] ) + $target,
@@ -400,7 +402,7 @@ final class Pipeline {
 			return $denied;
 		}
 		// 8. Snapshot, write; on any failure the previous state comes back.
-		return self::execute( $op, $before, $after, $result, $rollback && ! empty( $op->target['delete'] ), $rollback || self::stored_unsafe( $op, $after ) );
+		return self::execute( $op, $before, $after, $result, $rollback && ! empty( $op->target['delete'] ), $rollback || self::stored_unsafe( $op, $after ), $rollback );
 	}
 
 	/**
@@ -527,7 +529,9 @@ final class Pipeline {
 			}
 			return current_user_can( $object->cap->create_posts ) ? array() : $forbidden;
 		}
-		if ( ! Scope::readable( $op->post_id() ) ) {
+		// A post in the trash is open to the rollback of the trash-content that put it there, nothing else.
+		$trashed = 'trash' === ( $op->target['remove'] ?? '' ) && 'trash' === get_post_status( $op->post_id() ) && in_array( (string) get_post_type( $op->post_id() ), Scope::post_types(), true );
+		if ( ! $trashed && ! Scope::readable( $op->post_id() ) ) {
 			return $out;
 		}
 		if ( ! current_user_can( 'edit_post', $op->post_id() ) ) {
@@ -536,6 +540,11 @@ final class Pipeline {
 			if ( ! $proposal ) {
 				return $forbidden;
 			}
+		}
+		// Trashing and deleting need delete_post. An agent holds no delete capability and only proposes (the change
+		// waits for a person, Autonomy::person_decides()); whoever applies or rolls it back needs it.
+		if ( isset( $op->target['remove'] ) && ! current_user_can( 'delete_post', $op->post_id() ) && ( $package || ! Gateway::is_agent() ) ) {
+			return $forbidden;
 		}
 		return self::state( $op->post_id() );
 	}
@@ -678,7 +687,8 @@ final class Pipeline {
 			return $after;
 		}
 		$after['post_type'] = $start['post_type'];
-		$statuses           = Scope::statuses( (string) $after['post_type'] );
+		// trash marks the state of trash-content and delete-media; execute() trashes or deletes the post.
+		$statuses = array_merge( Scope::statuses( (string) $after['post_type'] ), isset( $op->target['remove'] ) ? array( 'trash' ) : array() );
 		if ( ! in_array( $after['post_status'], $statuses, true ) ) {
 			return Rejection::make( 'leitvia_out_of_scope', __( 'Agents may not set this status. Use draft, pending or publish.', 'leitvia-studio' ), 403, 'status', self::target( $op ), '', 'once' );
 		}
@@ -781,6 +791,7 @@ final class Pipeline {
 			$id     = '' !== $id ? $id : $path . $index;
 			$reason = match ( true ) {
 				isset( $known[ self::own_part( $block ) ] ) => '',
+				self::broken_comment( $block ) => 'block_comment',
 				'core/html' === $name => 'html_block',
 				( '' === $name || 'core/freeform' === $name ) && ! $classic && '' !== trim( $html ) => 'classic_block',
 				(bool) preg_match( '/data:[^,"\'\s]*;base64/i', $html . wp_json_encode( $block['attrs'] ) ) => 'base64',
@@ -803,6 +814,33 @@ final class Pipeline {
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * Whether a parsed block comes from a broken block comment: attributes that are no valid JSON (core's parser gives
+	 * null for them, and the save would drop them without a word) or a delimiter the parser could not read, which stays
+	 * in the markup as text and shows on the page.
+	 *
+	 * @param array<string, mixed> $block Parsed block.
+	 */
+	public static function broken_comment( array $block ): bool {
+		return ( null !== $block['blockName'] && ! is_array( $block['attrs'] ) )
+			|| (bool) preg_match( '#<!--\s*/?wp:#', implode( '', array_filter( (array) $block['innerContent'], 'is_string' ) ) );
+	}
+
+	/**
+	 * Whether any of the blocks or their inner blocks comes from a broken block comment, see broken_comment(). Code that
+	 * parses and serializes markup before the pipeline checks it leaves such markup as it is, so the check sees it.
+	 *
+	 * @param array<int|string, array<string, mixed>> $blocks Parsed blocks.
+	 */
+	public static function broken_markup( array $blocks ): bool {
+		foreach ( $blocks as $block ) {
+			if ( self::broken_comment( $block ) || self::broken_markup( (array) $block['innerBlocks'] ) ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -1147,10 +1185,11 @@ final class Pipeline {
 	 * @param array<string, mixed> $after    State after.
 	 * @param array<string, mixed> $result   Result so far.
 	 * @param bool                 $delete   Whether to delete the target post, the rollback of a post a package created.
-	 * @param bool                 $snapshot Whether the write restores a snapshot (rollback).
+	 * @param bool                 $snapshot Whether the write passes by KSES (a rollback, or stored blocks KSES would change).
+	 * @param bool                 $rollback Whether the write restores a snapshot.
 	 * @return array<string, mixed>|\WP_Error
 	 */
-	private static function execute( Operation $op, array $before, array $after, array $result, bool $delete = false, bool $snapshot = false ) {
+	private static function execute( Operation $op, array $before, array $after, array $result, bool $delete = false, bool $snapshot = false, bool $rollback = false ) {
 		$option = $op->option();
 		$type   = match ( true ) {
 			'' !== $option  => 'option',
@@ -1166,7 +1205,9 @@ final class Pipeline {
 				return self::failed( $result['target'] );
 			}
 		}
-		if ( $delete ) {
+		// The target remove of trash-content and delete-media, '' for a rollback, which writes the snapshot back.
+		$remove = $rollback ? '' : (string) ( $op->target['remove'] ?? '' );
+		if ( $delete || 'delete' === $remove ) {
 			// Forced: an attachment takes its files along, and agents cannot see the trash.
 			return wp_delete_post( $id, true ) ? $result : self::failed( $result['target'] );
 		}
@@ -1219,6 +1260,10 @@ final class Pipeline {
 				$failed    = ! $id;
 			} else {
 				$written = match ( true ) {
+					// Core's trash keeps the status for the trash screen, frees the slug and empties the trash after
+					// EMPTY_TRASH_DAYS; its untrash brings the comments back before the snapshot is written.
+					'trash' === $remove        => wp_trash_post( $id ) ? $id : 0,
+					$rollback && isset( $op->target['remove'] ) && 'trash' === get_post_status( $id ) => wp_untrash_post( $id ) ? self::update( $id, $after ) : 0,
 					! $op->creates()           => self::update( $id, $after ),
 					isset( $after['product'] ) => Commerce::create( $after ),
 					default                    => wp_insert_post( wp_slash( Content::prepare( 0, $after ) ), true ),
@@ -1245,9 +1290,11 @@ final class Pipeline {
 			}
 		} elseif ( '' !== $private ) {
 			Packages::discard_file( array( 'file' => $private ) );
-			// The smaller sizes core makes on upload, so the image gets a srcset and phones load a small file.
-			if ( $id && wp_attachment_is_image( $id ) ) {
+			// The smaller sizes core makes on upload, so the image gets a srcset and phones load a small file; for a
+			// video its length and size, as on upload.
+			if ( $id && ( wp_attachment_is_image( $id ) || wp_attachment_is( 'video', $id ) ) ) {
 				require_once ABSPATH . 'wp-admin/includes/image.php';
+				require_once ABSPATH . 'wp-admin/includes/media.php';
 				wp_update_attachment_metadata( $id, wp_generate_attachment_metadata( $id, (string) $after['file'] ) );
 			}
 		}

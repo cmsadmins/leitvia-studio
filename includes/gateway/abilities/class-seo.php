@@ -12,6 +12,7 @@ use LeitviaStudio\Gateway\Block_Edit;
 use LeitviaStudio\Gateway\Hashes;
 use LeitviaStudio\Gateway\Rejection;
 use LeitviaStudio\Gateway\Scope;
+use LeitviaStudio\Organization\Organization;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -140,7 +141,7 @@ final class Seo {
 		Abilities::read(
 			'leitvia/get-seo',
 			__( 'Get SEO data', 'leitvia-studio' ),
-			__( 'Returns the SEO data of posts, pages and entries from the active SEO plugin. Supported are Yoast SEO, Rank Math, SEOPress and The SEO Framework. Per item: title, meta description, canonical, noindex, nofollow, Open Graph title, description and image, focus keyword and schema type. schema_type is the article type Leitvia Studio prints for a post (NewsArticle or BlogPosting), null where it prints none. indexable says whether the site is open to search engines, news_sitemap is the address of the news sitemap of Leitvia Studio or null, organization holds the address, phone and email of leitvia/set-organization. An empty value means the plugin falls back to its template. defaults holds what WordPress itself would print and a description suggested from the excerpt; without an SEO plugin plugin names Leitvia Studio, with an unsupported one seo is null, and notice says why. hash is the base_hash of leitvia/update-seo. IDs that are no readable content come back under skipped.', 'leitvia-studio' ),
+			__( 'Returns the SEO data of posts, pages and entries from the active SEO plugin. Supported are Yoast SEO, Rank Math, SEOPress and The SEO Framework. Per item: title, meta description, canonical, noindex, nofollow, Open Graph title, description and image, focus keyword and schema type. schema_type is the article type Leitvia Studio prints for a post (NewsArticle or BlogPosting), null where it prints none. indexable says whether the site is open to search engines, news_sitemap is the address of the news sitemap of Leitvia Studio or null, organization holds the details of leitvia/set-organization: type, name, url, address, phone, email, founding date, area served, opening hours and profiles. An empty value means the plugin falls back to its template. defaults holds what WordPress itself would print and a description suggested from the excerpt; without an SEO plugin plugin names Leitvia Studio, with an unsupported one seo is null, and notice says why. hash is the base_hash of leitvia/update-seo. IDs that are no readable content come back under skipped.', 'leitvia-studio' ),
 			array(
 				'type'                 => 'object',
 				'properties'           => array(
@@ -196,6 +197,49 @@ final class Seo {
 					),
 					'indexable'    => $bool,
 					'news_sitemap' => array( 'type' => array( 'string', 'null' ) ),
+					'organization' => array(
+						'type'       => 'object',
+						'properties' => array(
+							'type'          => array(
+								'type' => 'string',
+								'enum' => Organization::TYPES,
+							),
+							'name'          => $string,
+							'url'           => $string,
+							'street'        => $string,
+							'postal_code'   => $string,
+							'city'          => $string,
+							'country'       => $string,
+							'phone'         => $string,
+							'email'         => $string,
+							'founding_date' => $string,
+							'area_served'   => array(
+								'type'  => 'array',
+								'items' => $string,
+							),
+							'opening_hours' => array(
+								'type'  => 'array',
+								'items' => array(
+									'type'       => 'object',
+									'properties' => array(
+										'days'   => array(
+											'type'  => 'array',
+											'items' => array(
+												'type' => 'string',
+												'enum' => Organization::DAYS,
+											),
+										),
+										'opens'  => $string,
+										'closes' => $string,
+									),
+								),
+							),
+							'same_as'       => array(
+								'type'  => 'array',
+								'items' => $string,
+							),
+						),
+					),
 				),
 			),
 			array( self::class, 'get' )
@@ -331,7 +375,7 @@ final class Seo {
 			'skipped'      => $skipped,
 			'indexable'    => (bool) get_option( 'blog_public' ),
 			'news_sitemap' => \LeitviaStudio\News\Sitemap::enabled() ? \LeitviaStudio\News\Sitemap::url() : null,
-			'organization' => \LeitviaStudio\News\Schema::organization_details(),
+			'organization' => Organization::details(),
 		);
 	}
 

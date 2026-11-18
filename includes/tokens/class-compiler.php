@@ -78,13 +78,16 @@ final class Compiler {
 		$findings = array();
 		foreach ( $settings['typography']['fontFamilies']['theme'] ?? array() as $family ) {
 			if ( ! isset( $family['fontFace'] ) ) {
+				// A family name close to a bundled one is most likely that one misspelled or shortened (Fraunces for
+				// Fraunces Soft); data.suggestion names it.
+				$similar    = self::similar_family( self::first_family( (string) ( $family['fontFamily'] ?? '' ) ) );
 				$findings[] = array(
 					'code'     => 'font_not_bundled',
 					'severity' => 'warning',
 					/* translators: %s: font family slug. */
 					'message'  => sprintf( __( 'Font family %s is not bundled, falls back to the system font.', 'leitvia-studio' ), $family['slug'] ),
 					'fix'      => __( 'Have the font files uploaded to the Font Library before the token set is activated, or name a bundled family.', 'leitvia-studio' ),
-					'data'     => array( 'slug' => $family['slug'] ),
+					'data'     => array( 'slug' => $family['slug'] ) + ( '' === $similar ? array() : array( 'suggestion' => $similar ) ),
 				);
 				continue;
 			}
@@ -107,6 +110,30 @@ final class Compiler {
 			}
 		}
 		return $findings;
+	}
+
+	/**
+	 * The bundled family closest to a family name: one that starts with it or that it starts with, else the one with the
+	 * fewest typing differences, at most a quarter of the name (two for short names); '' when none is that close.
+	 *
+	 * @param string $name Family name.
+	 */
+	private static function similar_family( string $name ): string {
+		$name = strtolower( $name );
+		if ( strlen( $name ) < 3 ) {
+			return '';
+		}
+		$best     = '';
+		$distance = PHP_INT_MAX;
+		foreach ( Dtcg::bundled_families() as $family ) {
+			$lower = strtolower( $family );
+			$diff  = str_starts_with( $lower, $name ) || str_starts_with( $name, $lower ) ? 0 : levenshtein( $name, $lower );
+			if ( $diff < $distance ) {
+				$best     = $family;
+				$distance = $diff;
+			}
+		}
+		return $distance <= max( 2, intdiv( strlen( $name ), 4 ) ) ? $best : '';
 	}
 
 	/**

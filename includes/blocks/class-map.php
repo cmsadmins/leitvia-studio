@@ -49,6 +49,28 @@ final class Map {
 	}
 
 	/**
+	 * Saved content of the block as save.js builds it: the heading (h2, '' for none) and the list of places, each with
+	 * its title, address and link to OpenStreetMap at the zoom of the map. Block_Edit builds a changed map with it.
+	 *
+	 * @param string               $heading Content of the heading, HTML.
+	 * @param array<string, mixed> $attrs   Attributes of the block comment.
+	 */
+	public static function places( string $heading, array $attrs ): string {
+		$html  = '' !== trim( wp_strip_all_tags( $heading ) ) ? '<h2 class="wp-block-leitvia-map__heading">' . $heading . '</h2>' : '';
+		$zoom  = (int) ( $attrs['zoom'] ?? 13 );
+		$text  = (string) ( $attrs['linkText'] ?? 'View on OpenStreetMap' );
+		$items = '';
+		foreach ( (array) ( $attrs['markers'] ?? array() ) as $marker ) {
+			$marker  = (array) $marker;
+			$address = (string) ( $marker['address'] ?? '' );
+			$items  .= '<li><strong>' . esc_html( (string) ( $marker['title'] ?? '' ) ) . '</strong>'
+				. ( '' !== $address ? '<span>' . esc_html( $address ) . '</span>' : '' )
+				. '<a href="' . esc_attr( self::link( (float) $marker['lat'], (float) $marker['lng'], $zoom ) ) . '">' . esc_html( $text ) . '</a></li>';
+		}
+		return $html . ( '' !== $items ? '<ul class="wp-block-leitvia-map__places">' . $items . '</ul>' : '' );
+	}
+
+	/**
 	 * Inserts the map canvas, behind the consent placeholder, before the list of places. Runs on
 	 * render_block_leitvia/map.
 	 *
@@ -89,14 +111,16 @@ final class Map {
 		// (TILE_URL_PATTERN) and a valid URL once the placeholders are filled; anything else gives the default server.
 		$tiles  = \LeitviaStudio\Admin\Settings::tile_url( leitvia_studio_setting( 'map_tile_url' ) );
 		$canvas = sprintf(
-			'<div class="wp-block-leitvia-map__canvas" role="region" aria-label="%1$s" data-tiles="%2$s" data-attribution="%3$s" data-view="%4$s" data-markers="%5$s"%6$s></div>',
+			'<div class="wp-block-leitvia-map__canvas" role="region" aria-label="%1$s" data-tiles="%2$s" data-attribution="%3$s" data-view="%4$s" data-markers="%5$s" data-labels="%7$s"%6$s></div>',
 			esc_attr__( 'Interactive map', 'leitvia-studio' ),
 			esc_attr( $tiles ),
 			// Shown below the map by view.js, see there.
 			esc_attr( '<a href="https://leafletjs.com">Leaflet</a>, &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' ),
 			esc_attr( (string) wp_json_encode( array( $lat, $lng, $zoom ) ) ),
 			esc_attr( (string) wp_json_encode( $markers ) ),
-			$fit ? ' data-fit="' . $fit . '"' : ''
+			$fit ? ' data-fit="' . $fit . '"' : '',
+			// Leaflet's own control labels are English; view.js gives them these.
+			esc_attr( (string) wp_json_encode( array( __( 'Zoom in', 'leitvia-studio' ), __( 'Zoom out', 'leitvia-studio' ), __( 'Close popup', 'leitvia-studio' ) ) ) )
 		);
 		$service = Consent::service_for( $tiles );
 		$map     = '' === $service ? $canvas : Consent::placeholder( $service, $canvas, self::link( $lat, $lng, $zoom ) );

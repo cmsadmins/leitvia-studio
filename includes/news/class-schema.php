@@ -10,6 +10,7 @@ namespace LeitviaStudio\News;
 use WP_Post;
 use WP_Term;
 use WP_User;
+use LeitviaStudio\Organization\Organization;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -17,9 +18,10 @@ defined( 'ABSPATH' ) || exit;
  * Prints one JSON-LD block in the head, always an @graph: on single posts the article (NewsArticle for news posts, see
  * is_news(), else BlogPosting) with author and publisher plus a BreadcrumbList; on the posts page and on category and
  * tag archives a CollectionPage listing the posts of the page, on the archives with a BreadcrumbList; a ProfilePage on
- * author archives; a WebSite with the site as publisher on the front page (site name and logo in search results). Off
- * with the setting news_schema and whenever an SEO plugin is active, so a page never carries two article nodes. No
- * Open Graph tags: that stays the job of SEO plugins. The news sitemap is Sitemap.
+ * author archives; on the front page a WebSite that names the organization by @id and the organization as a node of
+ * its own, an Organization or a LocalBusiness with address, opening hours and profiles from the settings
+ * (Organization). Off with the setting news_schema and whenever an SEO plugin is active, so a page never carries two
+ * article nodes. No Open Graph tags: that stays the job of SEO plugins. The news sitemap is Sitemap.
  */
 final class Schema {
 
@@ -56,7 +58,7 @@ final class Schema {
 		$object = get_queried_object();
 		$nodes  = array();
 		if ( is_front_page() ) {
-			$nodes = array( self::website() );
+			$nodes = array( self::website(), self::organization() );
 		} elseif ( is_singular( 'post' ) && $object instanceof WP_Post ) {
 			$nodes = array( self::article( $object ), self::breadcrumbs( $object ) );
 		} elseif ( is_author() && $object instanceof WP_User ) {
@@ -280,7 +282,7 @@ final class Schema {
 	}
 
 	/**
-	 * WebSite of the front page: name, address, tagline when there is one, the site as publisher.
+	 * WebSite of the front page: name, address, tagline when there is one, the organization by its @id.
 	 *
 	 * @return array<string, mixed>
 	 */
@@ -289,7 +291,7 @@ final class Schema {
 			'@type'     => 'WebSite',
 			'name'      => self::text( get_bloginfo( 'name' ) ),
 			'url'       => home_url( '/' ),
-			'publisher' => self::organization(),
+			'publisher' => array( '@id' => Organization::id() ),
 		);
 		$description = self::text( get_bloginfo( 'description' ) );
 		if ( '' !== $description ) {
@@ -318,72 +320,18 @@ final class Schema {
 	}
 
 	/**
-	 * The site as publisher with its editorial principles (editorial_url()) when there are some and its address, phone
-	 * and email from the settings when they are filled in. Logo: the custom logo when that is a raster image of at least LOGO_MIN pixels in both
-	 * directions, else the site icon in its 512 px size under the same rule, else none. An SVG has no pixel size and
-	 * never qualifies.
+	 * The organization node (Organization::node()) with the editorial principles (editorial_url()) when there are some:
+	 * the publisher of articles and the node of its own on the front page.
 	 *
 	 * @return array<string, mixed>
 	 */
 	private static function organization(): array {
-		$organization = array(
-			'@type' => 'Organization',
-			'name'  => self::text( get_bloginfo( 'name' ) ),
-			'url'   => home_url( '/' ),
-		);
+		$organization = Organization::node();
 		$principles   = self::editorial_url();
 		if ( '' !== $principles ) {
 			$organization['publishingPrinciples'] = $principles;
 		}
-		$details = self::organization_details();
-		$address = array_filter(
-			array(
-				'streetAddress'   => $details['street'],
-				'postalCode'      => $details['postal_code'],
-				'addressLocality' => $details['city'],
-				'addressCountry'  => $details['country'],
-			)
-		);
-		if ( $address ) {
-			$organization['address'] = array( '@type' => 'PostalAddress' ) + $address;
-		}
-		$organization += array_filter(
-			array(
-				'telephone' => $details['phone'],
-				'email'     => $details['email'],
-			)
-		);
-
-		$icon_url = get_site_icon_url( 512 );
-		$icon     = $icon_url ? wp_get_attachment_image_src( (int) get_option( 'site_icon' ), array( 512, 512 ) ) : false;
-		if ( $icon ) {
-			$icon[0] = $icon_url;
-		}
-		foreach ( array( wp_get_attachment_image_src( (int) get_theme_mod( 'custom_logo' ), 'full' ), $icon ) as $logo ) {
-			if ( $logo && $logo[1] >= self::LOGO_MIN && $logo[2] >= self::LOGO_MIN ) {
-				$organization['logo'] = array(
-					'@type'  => 'ImageObject',
-					'url'    => $logo[0],
-					'width'  => $logo[1],
-					'height' => $logo[2],
-				);
-				break;
-			}
-		}
 		return $organization;
-	}
-
-	/**
-	 * Address, phone and email of the organization from the settings, empty strings where none is set.
-	 *
-	 * @return array<string, string>
-	 */
-	public static function organization_details(): array {
-		$details = array();
-		foreach ( array( 'street', 'postal_code', 'city', 'country', 'phone', 'email' ) as $field ) {
-			$details[ $field ] = (string) leitvia_studio_setting( 'organization_' . $field );
-		}
-		return $details;
 	}
 
 	/**

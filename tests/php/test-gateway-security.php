@@ -363,7 +363,7 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 		$paragraph = '<!-- wp:paragraph {"metadata":{"leitviaId":"aaaa1111"}} --><p>One</p><!-- /wp:paragraph -->';
 		$document  = static fn(): array => LeitviaStudio\Tokens\Dtcg::from_settings( wp_get_global_settings(), leitvia_studio_contract() );
 		return array(
-			'leitvia/compose-page'         => static fn(): array => array(
+			'leitvia/compose-page'          => static fn(): array => array(
 				'title'    => 'Security page',
 				'frame'    => 'home',
 				'sections' => array(
@@ -380,33 +380,33 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 					array( 'pattern' => 'leitvia/content-quote' ),
 				),
 			),
-			'leitvia/update-block'         => fn(): array => array(
+			'leitvia/update-block'          => fn(): array => array(
 				'post'  => $this->page( $paragraph ),
 				'block' => 'aaaa1111',
 				'text'  => 'Changed',
 			),
-			'leitvia/create-pattern'       => static fn(): array => array(
+			'leitvia/create-pattern'        => static fn(): array => array(
 				'title'   => 'Note',
 				'content' => '<!-- wp:paragraph --><p>A note</p><!-- /wp:paragraph -->',
 			),
-			'leitvia/vary-pattern'         => static fn(): array => array( 'original' => 'leitvia/content-quote' ),
-			'leitvia/add-media'            => static fn(): array => array(
+			'leitvia/vary-pattern'          => static fn(): array => array( 'original' => 'leitvia/content-quote' ),
+			'leitvia/add-media'             => static fn(): array => array(
 				'data'     => base64_encode( (string) file_get_contents( dirname( __DIR__ ) . '/fixtures/avatar.png' ) ), // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents, WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Test fixture.
 				'filename' => 'portrait.png',
 				'alt'      => 'Portrait of the author',
 			),
-			'leitvia/crop-media'           => static fn(): array => array(
+			'leitvia/crop-media'            => static fn(): array => array(
 				'id'     => self::factory()->attachment->create_upload_object( dirname( __DIR__ ) . '/fixtures/avatar.png', 0 ),
 				'x'      => 0,
 				'y'      => 0,
 				'width'  => 50,
 				'height' => 50,
 			),
-			'leitvia/create-token-set'     => static fn(): array => array(
+			'leitvia/create-token-set'      => static fn(): array => array(
 				'title'    => 'Brand',
 				'document' => $document(),
 			),
-			'leitvia/activate-token-set'   => static fn(): array => array(
+			'leitvia/activate-token-set'    => static fn(): array => array(
 				'set' => (int) self::call(
 					'leitvia/create-token-set',
 					array(
@@ -415,11 +415,23 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 					)
 				)['target']['post'],
 			),
-			'leitvia/set-variation'        => static fn(): array => array( 'variation' => 'corporate-light' ),
-			'leitvia/set-posts-page'       => static fn(): array => array( 'page' => self::factory()->post->create( array( 'post_type' => 'page' ) ) ),
-			'leitvia/set-privacy-page'     => static fn(): array => array( 'page' => self::factory()->post->create( array( 'post_type' => 'page' ) ) ),
-			'leitvia/set-organization'     => static fn(): array => array( 'city' => 'Berlin' ),
-			'leitvia/define-content-type'  => static fn(): array => array(
+			'leitvia/set-variation'         => static fn(): array => array( 'variation' => 'corporate-light' ),
+			'leitvia/set-posts-page'        => static fn(): array => array( 'page' => self::factory()->post->create( array( 'post_type' => 'page' ) ) ),
+			'leitvia/set-privacy-page'      => static fn(): array => array( 'page' => self::factory()->post->create( array( 'post_type' => 'page' ) ) ),
+			'leitvia/set-organization'      => static fn(): array => array( 'city' => 'Berlin' ),
+			'leitvia/set-site-identity'     => static fn(): array => array( 'tagline' => 'Made to measure' ),
+			'leitvia/set-motion'            => static fn(): array => array( 'motion' => 'bold' ),
+			'leitvia/set-front-page'        => static fn(): array => array( 'page' => self::factory()->post->create( array( 'post_type' => 'page' ) ) ),
+			'leitvia/set-consent-providers' => static fn(): array => array(
+				'providers' => array(
+					array(
+						'label' => 'Planner',
+						'hosts' => array( 'planner.example.com' ),
+					),
+				),
+				'base_hash' => (string) LeitviaStudio\Gateway\Abilities\Setup::consent_providers()['hash'],
+			),
+			'leitvia/define-content-type'   => static fn(): array => array(
 				'declaration' => array(
 					'version'   => 1,
 					'postTypes' => array(
@@ -430,7 +442,7 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 					),
 				),
 			),
-			'leitvia/update-site-values'   => static function (): array {
+			'leitvia/update-site-values'    => static function (): array {
 				$model                              = get_option( Model::OPTION );
 				$model                              = is_array( $model ) && $model ? $model : array( 'version' => 1 );
 				$model['settings']['opening_hours'] = array(
@@ -446,7 +458,7 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 					'base_hash' => LeitviaStudio\Gateway\Abilities\Setup::settings_hash(),
 				);
 			},
-			'leitvia/update-navigation'    => static fn(): array => array(
+			'leitvia/update-navigation'     => static fn(): array => array(
 				'items' => array(
 					array(
 						'label' => 'About us',
@@ -454,16 +466,16 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 					),
 				),
 			),
-			'leitvia/update-template-part' => static fn(): array => array(
+			'leitvia/update-template-part'  => static fn(): array => array(
 				'part'    => 'header',
 				'pattern' => 'leitvia/header-search',
 			),
-			'leitvia/update-template'      => static fn(): array => array(
+			'leitvia/update-template'       => static fn(): array => array(
 				'template' => 'page',
 				'content'  => '<!-- wp:post-content /-->',
 			),
-			'leitvia/apply-recipe'         => static fn(): array => array( 'recipe' => 'leitvia/blog' ),
-			'leitvia/add-building-block'   => static function (): array {
+			'leitvia/apply-recipe'          => static fn(): array => array( 'recipe' => 'leitvia/blog' ),
+			'leitvia/add-building-block'    => static function (): array {
 				add_action(
 					'leitvia_studio_init',
 					static fn( $studio ): bool => $studio->registry( 'building_blocks' )->register(
@@ -487,25 +499,25 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 				leitvia_studio()->reset_for_tests();
 				return array( 'name' => 'leitvia/security-notes' );
 			},
-			'leitvia/apply-package'        => fn(): array => array( 'id' => $this->queue( $this->page(), array( 'post_title' => 'Queued' ) ) ),
-			'leitvia/rollback'             => fn(): array => array( 'id' => $this->applied( $this->page(), array( 'post_title' => 'Applied' ) ) ),
-			'leitvia/create-content'       => static fn(): array => array(
+			'leitvia/apply-package'         => fn(): array => array( 'id' => $this->queue( $this->page(), array( 'post_title' => 'Queued' ) ) ),
+			'leitvia/rollback'              => fn(): array => array( 'id' => $this->applied( $this->page(), array( 'post_title' => 'Applied' ) ) ),
+			'leitvia/create-content'        => static fn(): array => array(
 				'post_type' => 'post',
 				'title'     => 'Security post',
 				'content'   => '<!-- wp:paragraph --><p>News</p><!-- /wp:paragraph -->',
 			),
-			'leitvia/update-seo'           => function (): array {
+			'leitvia/update-seo'            => function (): array {
 				add_filter( 'leitvia_studio_seo_adapter', static fn(): string => 'yoast' );
 				return array(
 					'post'  => $this->page(),
 					'title' => 'About our team',
 				);
 			},
-			'leitvia/update-content'       => fn(): array => array(
+			'leitvia/update-content'        => fn(): array => array(
 				'post'  => $this->page(),
 				'title' => 'New title',
 			),
-			'leitvia/repair-links'         => fn(): array => array(
+			'leitvia/repair-links'          => fn(): array => array(
 				'post'  => $this->page( '<!-- wp:paragraph --><p><a href="/about/">About us</a></p><!-- /wp:paragraph -->' ),
 				'links' => array(
 					array(
@@ -514,11 +526,11 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 					),
 				),
 			),
-			'leitvia/set-alt-text'         => fn(): array => array(
+			'leitvia/set-alt-text'          => fn(): array => array(
 				'image' => self::factory()->attachment->create_upload_object( dirname( __DIR__ ) . '/fixtures/avatar.png', 0 ),
 				'alt'   => 'Portrait of the author',
 			),
-			'leitvia/replace-pattern'      => function (): array {
+			'leitvia/replace-pattern'       => function (): array {
 				$banner = LeitviaStudio\Gateway\Abilities\Build::pattern( 'leitvia/cta-banner' );
 				$banner = LeitviaStudio\Gateway\Abilities\Build::edit(
 					$banner['content'],
@@ -538,6 +550,8 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 				self::deprecate( 'leitvia/cta-banner', 'leitvia/cta-split' );
 				return array( 'post' => $this->page( LeitviaStudio\Gateway\Abilities\Build::name_sections( (string) $banner, 'leitvia/cta-banner' ) ) );
 			},
+			'leitvia/trash-content'         => fn(): array => array( 'post' => $this->page() ),
+			'leitvia/delete-media'          => static fn(): array => array( 'id' => self::factory()->attachment->create_upload_object( dirname( __DIR__ ) . '/fixtures/avatar.png', 0 ) ),
 		);
 	}
 

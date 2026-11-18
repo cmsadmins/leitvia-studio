@@ -167,6 +167,32 @@ $leitvia-studio-accent-20: color.adjust($leitvia-studio-accent, $lightness: -10%
 	margin-top: 16px;
 }
 
+// Rows of the settings that hold a list: consent providers and opening hours. Square corners like the other boxes.
+.leitvia-studio-settings__rows {
+	margin: 0;
+	padding: 0;
+	border: 0;
+
+	> legend {
+		padding: 0;
+		font-weight: 600;
+	}
+
+	fieldset {
+		display: grid;
+		gap: 12px;
+		margin: 0 0 12px;
+		padding: 12px;
+		border: 1px solid #ddd;
+	}
+}
+
+.leitvia-studio-settings__days {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 16px;
+}
+
 // Data tables of the Inbox, Agents and Recipes screens wrap long hashes and texts instead of widening the page.
 .leitvia-studio-inbox,
 .leitvia-studio-agents,

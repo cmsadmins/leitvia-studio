@@ -7,6 +7,9 @@
 
 namespace LeitviaStudio\Admin;
 
+use LeitviaStudio\Consent\Consent;
+use LeitviaStudio\Organization\Organization;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -38,12 +41,66 @@ final class Settings {
 		'organization_country'       => '',
 		'organization_phone'         => '',
 		'organization_email'         => '',
+		'consent_providers'          => array(),
+		'organization_type'          => 'Organization',
+		'organization_founding_date' => '',
+		'organization_area_served'   => array(),
+		'organization_opening_hours' => array(),
+		'organization_same_as'       => array(),
 	);
 
 	/**
 	 * A tile URL: https, with the placeholders {z}, {x} and {y}, no spaces, quotes or angle brackets.
 	 */
 	private const TILE_URL_PATTERN = '^https://(?=[^\s]*\{z\})(?=[^\s]*\{x\})(?=[^\s]*\{y\})[^\s"\'<>]+$';
+
+	/**
+	 * Settings that hold a list, with the schema of one item. news_categories, a list of term IDs, is not one of them.
+	 */
+	private const LISTS = array(
+		'consent_providers'          => array(
+			'type'                 => 'object',
+			'properties'           => array(
+				'key'     => array( 'type' => 'string' ),
+				'label'   => array( 'type' => 'string' ),
+				'hosts'   => array(
+					'type'  => 'array',
+					'items' => array( 'type' => 'string' ),
+				),
+				'purpose' => array( 'type' => 'string' ),
+				'privacy' => array( 'type' => 'string' ),
+			),
+			'additionalProperties' => false,
+		),
+		'organization_area_served'   => array( 'type' => 'string' ),
+		'organization_opening_hours' => array(
+			'type'                 => 'object',
+			'properties'           => array(
+				'days'   => array(
+					'type'  => 'array',
+					'items' => array(
+						'type' => 'string',
+						'enum' => Organization::DAYS,
+					),
+				),
+				'opens'  => array(
+					'type'    => 'string',
+					'pattern' => Organization::TIME,
+				),
+				'closes' => array(
+					'type'    => 'string',
+					'pattern' => Organization::TIME,
+				),
+			),
+			'additionalProperties' => false,
+		),
+		'organization_same_as'       => array( 'type' => 'string' ),
+	);
+
+	/**
+	 * Most entries of a list of texts or addresses.
+	 */
+	private const MAX_ENTRIES = 50;
 
 	/**
 	 * Registers the option for the settings API and REST. Runs on init.
@@ -73,6 +130,21 @@ final class Settings {
 										'type'    => 'integer',
 										'default' => $fallback,
 										'minimum' => 0,
+									),
+									isset( self::LISTS[ $key ] ) => array(
+										'type'    => 'array',
+										'default' => $fallback,
+										'items'   => self::LISTS[ $key ],
+									),
+									'organization_type' === $key => array(
+										'type'    => 'string',
+										'default' => $fallback,
+										'enum'    => Organization::TYPES,
+									),
+									'organization_founding_date' === $key => array(
+										'type'    => 'string',
+										'default' => $fallback,
+										'pattern' => Organization::DATE,
 									),
 									is_array( $fallback ) => array(
 										'type'    => 'array',
@@ -110,9 +182,11 @@ final class Settings {
 
 	/**
 	 * Keeps the known keys as booleans, page IDs and lists of term IDs, the tile URL as a valid tile URL, motion as off,
-	 * subtle or bold (else the saved value or its default), the organization details as plain text, and drops the rest. Missing keys and an invalid
-	 * tile URL keep their saved value, so a partial update through /wp/v2/settings changes only the keys it sends;
-	 * without a saved value they get their default.
+	 * subtle or bold (else the saved value or its default), the organization details as plain text, the lists of consent
+	 * providers, area served, opening hours and profiles as their valid entries (Consent::sanitize_providers(),
+	 * Organization::hours()), the kind of business as one of Organization::TYPES and the founding date as YYYY, YYYY-MM
+	 * or a valid YYYY-MM-DD, and drops the rest. Missing keys and an invalid tile URL keep their saved value, so a partial
+	 * update through /wp/v2/settings changes only the keys it sends; without a saved value they get their default.
 	 *
 	 * @param mixed $value Submitted value.
 	 * @return array<string, mixed>
@@ -125,6 +199,12 @@ final class Settings {
 			$clean[ $key ] = match ( true ) {
 				is_bool( $fallback )  => array_key_exists( $key, $value ) ? filter_var( $given, FILTER_VALIDATE_BOOLEAN ) : (bool) $given,
 				is_int( $fallback )   => absint( $given ),
+				'consent_providers' === $key => Consent::sanitize_providers( $given ),
+				'organization_opening_hours' === $key => Organization::hours( $given ),
+				'organization_area_served' === $key => self::texts( $given ),
+				'organization_same_as' === $key => self::https_urls( $given ),
+				'organization_type' === $key => is_string( $given ) && in_array( $given, Organization::TYPES, true ) ? $given : self::DEFAULTS['organization_type'],
+				'organization_founding_date' === $key => self::founding_date( $given ),
 				is_array( $fallback ) => array_values( array_unique( array_filter( array_map( 'absint', (array) $given ) ) ) ),
 				'motion' === $key     => in_array( $given, \LeitviaStudio\Blocks\Animation::SITE, true ) ? $given : self::motion(),
 				'organization_email' === $key => sanitize_email( (string) $given ),
@@ -136,11 +216,46 @@ final class Settings {
 	}
 
 	/**
+	 * A founding date as YYYY, YYYY-MM or a day of the calendar as YYYY-MM-DD, else ''.
+	 *
+	 * @param mixed $date Submitted date.
+	 */
+	private static function founding_date( $date ): string {
+		if ( ! is_string( $date ) || ! preg_match( '#' . Organization::DATE . '#', $date ) ) {
+			return '';
+		}
+		// The pattern keeps the month between 1 and 12 and the day up to 31; checkdate() drops 2025-02-30.
+		return 10 !== strlen( $date ) || checkdate( (int) substr( $date, 5, 2 ), (int) substr( $date, 8, 2 ), (int) substr( $date, 0, 4 ) ) ? $date : '';
+	}
+
+	/**
 	 * The saved motion setting when it is valid, else its default.
 	 */
 	private static function motion(): string {
 		$saved = self::get( 'motion' );
 		return in_array( $saved, \LeitviaStudio\Blocks\Animation::SITE, true ) ? $saved : self::DEFAULTS['motion'];
+	}
+
+	/**
+	 * Plain texts of a list without empty entries and repeats, at most MAX_ENTRIES.
+	 *
+	 * @param mixed $value Submitted list.
+	 * @return list<string>
+	 */
+	private static function texts( $value ): array {
+		$texts = array_map( static fn( $text ): string => is_scalar( $text ) ? sanitize_text_field( (string) $text ) : '', is_array( $value ) ? $value : array() );
+		return array_slice( array_values( array_unique( array_filter( $texts, static fn( string $text ): bool => '' !== $text ) ) ), 0, self::MAX_ENTRIES );
+	}
+
+	/**
+	 * Addresses of a list that start with https://, without repeats, at most MAX_ENTRIES; anything else is dropped.
+	 *
+	 * @param mixed $value Submitted list.
+	 * @return list<string>
+	 */
+	private static function https_urls( $value ): array {
+		$urls = array_map( static fn( $url ): string => is_string( $url ) && str_starts_with( $url, 'https://' ) ? esc_url_raw( $url, array( 'https' ) ) : '', is_array( $value ) ? $value : array() );
+		return array_slice( array_values( array_unique( array_filter( $urls, static fn( string $url ): bool => '' !== $url ) ) ), 0, self::MAX_ENTRIES );
 	}
 
 	/**

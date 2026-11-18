@@ -1,0 +1,7 @@
+{
+	"usage": {
+		"useWhen": "Content of another provider that is no video and no map, given as the address of an iframe: a configurator, a booking tool, a form of a service. Add the provider under Settings, Privacy first, so the placeholder names it and links to its privacy policy.",
+		"avoidWhen": "Videos and posts of YouTube, Vimeo, X and similar sites; the embed block gets the same placeholder. Maps; use leitvia/map. Pages of the own site.",
+		"a11y": "Set the title: it names the iframe for screen readers. After the visitor loads the content, the focus moves to the iframe and a status message announces it. Without JavaScript the placeholder links to the content."
+	}
+}

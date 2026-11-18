@@ -23,8 +23,8 @@ ob_start();
 		<!-- /wp:column -->
 		<!-- wp:column {"width":"58%"} -->
 		<div class="wp-block-column" style="flex-basis:58%">
-			<!-- wp:leitvia/reveal -->
-			<div class="wp-block-leitvia-reveal is-effect-rise">
+			<!-- wp:leitvia/reveal {"effect":"fade"} -->
+			<div class="wp-block-leitvia-reveal is-effect-fade">
 				<!-- wp:paragraph {"fontSize":"lead"} -->
 				<p class="has-lead-font-size"><?php echo esc_html__( 'The first screen has one job: to tell people they are in the right place. Everything else can wait a scroll.', 'leitvia-studio' ); ?></p>
 				<!-- /wp:paragraph -->

@@ -106,7 +106,7 @@ class Test_Gateway_Content_Checks extends WP_UnitTestCase {
 			'link-text'      => array( 'leitvia/link-text', 'link-text', array( 'error par00001', 'error p:1', 'error p:1', 'error p:2.0', 'error p:3' ) ),
 			'block-validity' => array( 'leitvia/block-validity', 'block-validity', array( 'error htm00001', 'error p:2', 'error p:3' ) ),
 			'tokens'         => array( 'leitvia/content-tokens', 'content-tokens', array( 'error grp00001', 'error grp00001', 'error p:0.0', 'error p:0.0' ) ),
-			'contrast'       => array( 'leitvia/content-contrast', 'content-contrast', array( 'error grp00001' ) ),
+			'contrast'       => array( 'leitvia/content-contrast', 'content-contrast', array( 'error grp00001', 'error p:1.0' ) ),
 			'page-structure' => array( 'leitvia/page-structure', 'page-structure', array( 'error ' ), 'page' ),
 		);
 	}
@@ -214,6 +214,35 @@ class Test_Gateway_Content_Checks extends WP_UnitTestCase {
 		$found = self::run_check( 'leitvia/page-structure', self::fixture( 'page-structure-good' ), array( 'post_type' => 'page' ) );
 		remove_filter( 'get_block_template', $strip );
 		$this->assertSame( array( 'warning ', 'warning ', 'warning ' ), $found );
+	}
+
+	/**
+	 * A block that renders its heading on the server reports its level through leitvia_studio_heading_blocks: the
+	 * check counts it before the headings of its inner blocks, from the attribute or the default of the block type.
+	 */
+	public function test_headings_of_dynamic_blocks(): void {
+		register_block_type(
+			'leitvia-test/job',
+			array(
+				'attributes'      => array(
+					'level' => array(
+						'type'    => 'integer',
+						'default' => 3,
+					),
+				),
+				'render_callback' => static fn( array $attributes, string $content ): string => '<h' . (int) $attributes['level'] . '>Joiner</h' . (int) $attributes['level'] . '>' . $content,
+			)
+		);
+		$job     = static fn( string $attrs ): string => '<!-- wp:heading --><h2 class="wp-block-heading">Jobs</h2><!-- /wp:heading --><!-- wp:leitvia-test/job' . $attrs . ' --><!-- wp:heading {"level":4} --><h4 class="wp-block-heading">Tasks</h4><!-- /wp:heading --><!-- /wp:leitvia-test/job -->';
+		$headers = static fn(): array => array( 'leitvia-test/job' => 'level' );
+
+		$this->assertSame( array( 'error p:1.0' ), self::run_check( 'leitvia/headings', $job( '' ) ), 'without the filter h4 follows h2' );
+		add_filter( 'leitvia_studio_heading_blocks', $headers );
+		$this->assertSame( array(), self::run_check( 'leitvia/headings', $job( '' ) ), 'the default h3 of the block type' );
+		$this->assertSame( array(), self::run_check( 'leitvia/headings', $job( ' {"level":3}' ) ) );
+		$this->assertSame( array( 'error p:1' ), self::run_check( 'leitvia/headings', $job( ' {"level":5}' ) ), 'h5 after h2 skips a level' );
+		remove_filter( 'leitvia_studio_heading_blocks', $headers );
+		unregister_block_type( 'leitvia-test/job' );
 	}
 
 	/**

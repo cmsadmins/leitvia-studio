@@ -201,6 +201,7 @@ final class Plugin {
 		add_filter( 'register_block_type_args', array( Blocks\Mega_Menu::class, 'block_args' ), 10, 2 );
 		add_filter( 'register_block_type_args', array( Blocks\Blocks::class, 'render_callbacks' ), 10, 2 );
 		add_action( 'enqueue_block_editor_assets', array( Blocks\Icon::class, 'editor_data' ) );
+		add_action( 'enqueue_block_editor_assets', array( Blocks\Consent_Embed::class, 'editor_data' ) );
 		add_action( 'switch_blog', array( Blocks\Icon::class, 'flush' ) );
 		add_filter( 'render_block_core/navigation', array( Blocks\Mega_Menu::class, 'collapsible_overlay' ), 10, 2 );
 		add_filter( 'query_loop_block_query_vars', array( Blocks\Query_Filter::class, 'query_vars' ), 10, 2 );

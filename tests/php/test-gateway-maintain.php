@@ -11,8 +11,8 @@ use LeitviaStudio\Gateway\Hashes;
 use LeitviaStudio\Gateway\Packages;
 
 /**
- * Abilities update-content, repair-links, set-alt-text and replace-pattern through the pipeline, each live write
- * undone with leitvia/rollback.
+ * Abilities update-content, repair-links, set-alt-text, replace-pattern, trash-content and delete-media through the
+ * pipeline, each live write undone with leitvia/rollback.
  */
 class Test_Gateway_Maintain extends WP_UnitTestCase {
 
@@ -656,6 +656,72 @@ class Test_Gateway_Maintain extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A link a binding fills counts with its bound value, in the context of the block around it: the saved "#" of the
+	 * button is no finding, the bound address that leads nowhere is.
+	 */
+	public function test_audit_checks_bound_links_with_the_bound_value(): void {
+		$this->set_permalink_structure( '/%postname%/' );
+		register_block_type(
+			'test/posting',
+			array(
+				'attributes'       => array( 'applyUrl' => array( 'type' => 'string' ) ),
+				'provides_context' => array( 'test/applyUrl' => 'applyUrl' ),
+				'render_callback'  => static fn( array $attrs, string $content ): string => $content,
+			)
+		);
+		register_block_bindings_source(
+			'test/apply',
+			array(
+				'label'              => 'Apply',
+				'uses_context'       => array( 'test/applyUrl' ),
+				'get_value_callback' => static fn( array $args, WP_Block $block ): ?string => $block->context['test/applyUrl'] ?? null,
+			)
+		);
+		$page  = $this->page( '<!-- wp:test/posting {"applyUrl":"/gone-bound/"} --><!-- wp:buttons --><div class="wp-block-buttons"><!-- wp:button {"metadata":{"bindings":{"url":{"source":"test/apply"}}}} --><div class="wp-block-button"><a class="wp-block-button__link wp-element-button" href="#">Apply for the position</a></div><!-- /wp:button --></div><!-- /wp:buttons --><!-- /wp:test/posting -->' );
+		$items = array_column( \LeitviaStudio\Gateway\Abilities\Read_Audit::audit( 0, 20 )['items'], null, 'post' );
+		unregister_block_bindings_source( 'test/apply' );
+		unregister_block_type( 'test/posting' );
+		$messages = array_column( $items[ $page ]['findings'], 'message' );
+		$this->assertContains( 'The link /gone-bound/ leads to no page of this site.', $messages );
+		$this->assertNotContains( 'The link points to "#" and goes nowhere.', $messages );
+	}
+
+	/**
+	 * The audit reports uneven motion: a strength other than the site setting, fade beside rise, mixed striking
+	 * effects, too many striking or animated blocks. One motion with stagger and parallax passes, and nothing counts
+	 * while the site setting is off.
+	 */
+	public function test_audit_reports_uneven_motion(): void {
+		$block = static fn( string $attrs ): string => '<!-- wp:paragraph ' . $attrs . ' --><p>A</p><!-- /wp:paragraph -->';
+		$calm  = $block( '{"leitviaAnimation":"fade"}' ) . $block( '{"leitviaAnimation":"stagger"}' ) . '<!-- wp:cover {"leitviaAnimation":"parallax"} --><div class="wp-block-cover"></div><!-- /wp:cover -->' . $block( '{"leitviaAnimation":"mask"}' );
+		$this->assertSame( array(), \LeitviaStudio\Gateway\Abilities\Read_Audit::motion( $calm ) );
+
+		$mixed = \LeitviaStudio\Gateway\Abilities\Read_Audit::motion( $block( '{"leitviaAnimation":"fade"}' ) . $block( '{"leitviaAnimation":"rise","leitviaMotion":"bold"}' ) . $block( '{"leitviaAnimation":"zoom"}' ) . $block( '{"leitviaAnimation":"blur"}' ) );
+		$this->assertSame(
+			array(
+				'1 animated block has a strength of its own (leitviaMotion) instead of the site setting subtle, so its duration differs.',
+				'Sections fade in and rise on the same page.',
+				'The page mixes striking effects: zoom, blur.',
+			),
+			$mixed
+		);
+		$this->assertSame( array(), \LeitviaStudio\Gateway\Abilities\Read_Audit::motion( $block( '{"leitviaAnimation":"fade","leitviaMotion":"subtle"}' ) ), 'the strength of the site setting is no strength of its own' );
+		$this->assertSame( array( 'Sections fade in and rise on the same page.' ), \LeitviaStudio\Gateway\Abilities\Read_Audit::motion( '<!-- wp:leitvia/reveal {"effect":"fade"} --><div class="wp-block-leitvia-reveal"></div><!-- /wp:leitvia/reveal -->' . $block( '{"leitviaAnimation":"rise"}' ) ), 'the reveal block counts by its effect' );
+
+		$many = \LeitviaStudio\Gateway\Abilities\Read_Audit::motion( str_repeat( $block( '{"leitviaAnimation":"mask"}' ), 4 ) . str_repeat( $block( '{"leitviaAnimation":"fade"}' ), 3 ) );
+		$this->assertSame( array( '4 blocks have a striking effect, more than 3.', '7 blocks are animated, more than 6.' ), $many );
+
+		$page  = $this->page( str_repeat( $block( '{"leitviaAnimation":"mask"}' ), 7 ) );
+		$items = array_column( \LeitviaStudio\Gateway\Abilities\Read_Audit::audit( 0, 20 )['items'], null, 'post' );
+		$found = wp_list_filter( $items[ $page ]['findings'], array( 'check' => 'leitvia/motion' ) );
+		$this->assertCount( 2, $found );
+		$this->assertSame( array( 'warning' ), array_values( array_unique( array_column( $found, 'severity' ) ) ) );
+
+		update_option( \LeitviaStudio\Admin\Settings::OPTION, array( 'motion' => 'off' ) + \LeitviaStudio\Admin\Settings::DEFAULTS );
+		$this->assertSame( array(), \LeitviaStudio\Gateway\Abilities\Read_Audit::motion( str_repeat( $block( '{"leitviaAnimation":"mask"}' ), 7 ) ) );
+	}
+
+	/**
 	 * Alt text on the attachment (hash, snapshot and rollback include it, the MIME type stays) and on the image block
 	 * that shows it; file names fail the alt text check, another image's block is refused.
 	 */
@@ -1046,5 +1112,276 @@ class Test_Gateway_Maintain extends WP_UnitTestCase {
 		$this->assertSame( 'attributes', $data['reason'] );
 		$this->assertSame( array( 'align' ), $data['lost'][0]['attributes'] );
 		$this->assertSame( $before, get_post_field( 'post_content', $page ) );
+	}
+	/**
+	 * The field parent moves a page below another page: a URL change, so at most a suggestion until slugs are unlocked, then
+	 * live and undone by a rollback. Itself, a subpage, another type and a post type without hierarchy are refused.
+	 */
+	public function test_update_content_parent(): void {
+		update_option( Gateway::OPTION, array( 'profile' => 'full' ) + Gateway::DEFAULTS );
+		$top    = $this->page( self::paragraph( 'Top' ) );
+		$child  = $this->page( self::paragraph( 'Child' ) );
+		$queued = $this->assert_ok(
+			self::call(
+				'leitvia/update-content',
+				$child,
+				array(
+					'post'   => $child,
+					'parent' => $top,
+				)
+			)
+		);
+		$this->assertSame( 'package', $queued['mode'] );
+		$this->assertContains( 'slugs', $queued['kinds'] );
+		$this->assertSame( 0, wp_get_post_parent_id( $child ) );
+
+		update_option(
+			Gateway::OPTION,
+			array(
+				'profile'   => 'full',
+				'overrides' => array(
+					'areas' => array(),
+					'kinds' => Gateway::KINDS,
+				),
+			) + Gateway::DEFAULTS
+		);
+		$result = $this->assert_ok(
+			self::call(
+				'leitvia/update-content',
+				$child,
+				array(
+					'post'   => $child,
+					'parent' => $top,
+				)
+			)
+		);
+		$this->assertSame( $top, wp_get_post_parent_id( $child ) );
+		foreach ( array( $top, $child ) as $below ) {
+			$data = $this->assert_rejected(
+				'leitvia_invalid_input',
+				self::call(
+					'leitvia/update-content',
+					$top,
+					array(
+						'post'   => $top,
+						'parent' => $below,
+					)
+				)
+			);
+			$this->assertSame( 'parent', $data['reason'] );
+		}
+		$post = self::factory()->post->create();
+		$this->assert_rejected(
+			'leitvia_invalid_input',
+			self::call(
+				'leitvia/update-content',
+				$top,
+				array(
+					'post'   => $top,
+					'parent' => $post,
+				)
+			)
+		);
+		$this->assert_rejected(
+			'leitvia_invalid_input',
+			self::call(
+				'leitvia/update-content',
+				$post,
+				array(
+					'post'   => $post,
+					'parent' => 0,
+				)
+			)
+		);
+		$this->roll_back( $result );
+		$this->assertSame( 0, wp_get_post_parent_id( $child ) );
+	}
+
+	/**
+	 * With pattern any top-level section gets another pattern: texts of the old section move over, edits apply after
+	 * them, carry false keeps the texts of the pattern. Edits without pattern, a pattern without block and an unknown
+	 * pattern are refused.
+	 */
+	public function test_replace_section_with_another_pattern(): void {
+		update_option( Gateway::OPTION, array( 'profile' => 'full' ) + Gateway::DEFAULTS );
+		$banner = Build::pattern( 'leitvia/cta-banner' );
+		$banner = Build::edit(
+			$banner['content'],
+			array(
+				array(
+					'block' => 'p:0.0.0.1',
+					'text'  => 'Our heading',
+				),
+			),
+			array()
+		);
+		$this->assertIsString( $banner );
+		$markup = self::paragraph( 'Intro text' ) . "\n\n" . Build::name_sections( $banner, 'leitvia/cta-banner' );
+		$page   = $this->page( $markup );
+		$swap   = static fn( array $input ): array => $input + array(
+			'post'  => $page,
+			'block' => 'p:1',
+		);
+
+		$this->assert_rejected( 'leitvia_invalid_input', self::call( 'leitvia/replace-pattern', $page, $swap( array( 'carry' => false ) ) ) );
+		$this->assert_rejected(
+			'leitvia_invalid_input',
+			self::call(
+				'leitvia/replace-pattern',
+				$page,
+				array(
+					'post'    => $page,
+					'pattern' => 'leitvia/cta-split',
+				)
+			)
+		);
+		$this->assert_rejected( 'leitvia_unknown_pattern', self::call( 'leitvia/replace-pattern', $page, $swap( array( 'pattern' => 'leitvia/does-not-exist' ) ) ) );
+
+		$result = $this->assert_ok(
+			self::call(
+				'leitvia/replace-pattern',
+				$page,
+				$swap(
+					array(
+						'pattern' => 'leitvia/cta-split',
+						'edits'   => array(
+							array(
+								'block'  => 'p:0',
+								'anchor' => 'contact',
+							),
+							// The pattern links its button to "#", which the link check refuses.
+							array(
+								'block' => 'p:0.0.1.0.3.0',
+								'url'   => '/contact/',
+							),
+						),
+					)
+				)
+			)
+		);
+		$this->assertSame( 'live', $result['mode'] );
+		$blocks = array_values( array_filter( parse_blocks( get_post_field( 'post_content', $page ) ), static fn( array $block ): bool => null !== $block['blockName'] ) );
+		$this->assertCount( 2, $blocks );
+		$this->assertSame( 'Intro text', trim( wp_strip_all_tags( $blocks[0]['innerHTML'] ) ) );
+		$this->assertSame( 'leitvia/cta-split', $blocks[1]['attrs']['metadata']['patternName'] );
+		$this->assertStringContainsString( 'Our heading</h2>', serialize_block( $blocks[1] ) );
+		$this->assertStringContainsString( 'id="contact"', serialize_block( $blocks[1] ) );
+		$this->roll_back( $result );
+
+		$plain = $this->page( $markup );
+		$this->assert_ok(
+			self::call(
+				'leitvia/replace-pattern',
+				$plain,
+				array(
+					'post'    => $plain,
+					'block'   => 'p:1',
+					'pattern' => 'leitvia/cta-split',
+					'carry'   => false,
+					'edits'   => array(
+						array(
+							'block' => 'p:0.0.1.0.3.0',
+							'url'   => '/contact/',
+						),
+					),
+				)
+			)
+		);
+		$this->assertStringNotContainsString( 'Our heading', get_post_field( 'post_content', $plain ) );
+		$this->assertStringContainsString( '"patternName":"leitvia/cta-split"', get_post_field( 'post_content', $plain ) );
+	}
+
+	/**
+	 * Trash-content waits for a person even in the profile full; the agent cannot apply it. Applied by an
+	 * administrator the page is in the trash of core, and a rollback brings it back with its address. Links to it
+	 * are named. The front page, a page with subpages and a file are refused.
+	 */
+	public function test_trash_content(): void {
+		update_option( Gateway::OPTION, array( 'profile' => 'full' ) + Gateway::DEFAULTS );
+		$admin = self::factory()->user->create( array( 'role' => 'administrator' ) );
+		$page  = $this->page( self::paragraph( 'About' ) );
+		$slug  = (string) get_post_field( 'post_name', $page );
+		$other = $this->page( self::paragraph( '<a href="' . esc_url( (string) get_permalink( $page ) ) . '">About us</a>' ) );
+
+		$result = $this->assert_ok( self::call( 'leitvia/trash-content', $page, array( 'post' => $page ) ) );
+		$this->assertSame( 'package', $result['mode'] );
+		$this->assertSame( 'publish', get_post_status( $page ) );
+		$this->assertStringContainsString( $other . ' (Page, Published)', (string) $result['notice'], 'type and status by their labels, which a language pack translates' );
+		$this->assertSame( $other, $result['report']['links'][0]['post'] );
+		$this->assertNotEmpty( Packages::apply( $result['package'] )['errors'], 'the agent cannot apply it' );
+		$this->assertSame( 'publish', get_post_status( $page ) );
+
+		wp_set_current_user( $admin );
+		$this->assertSame( 'applied', Packages::apply( $result['package'] )['state'] );
+		$this->assertSame( 'trash', get_post_status( $page ) );
+		$this->assertSame( 'publish', get_post_meta( $page, '_wp_trash_meta_status', true ) );
+		$rolled = Packages::rollback( $result['package'] );
+		$this->assertIsArray( $rolled, is_wp_error( $rolled ) ? $rolled->get_error_code() . ' ' . $rolled->get_error_message() : '' );
+		$this->assertSame( 'publish', get_post_status( $page ) );
+		$this->assertSame( $slug, get_post_field( 'post_name', $page ) );
+		wp_set_current_user( $this->agent );
+
+		update_option( 'page_on_front', $other );
+		$data = $this->assert_rejected( 'leitvia_invalid_input', self::call( 'leitvia/trash-content', $other, array( 'post' => $other ) ) );
+		$this->assertSame( 'setting', $data['reason'] );
+		delete_option( 'page_on_front' );
+		$child = self::factory()->post->create(
+			array(
+				'post_type'   => 'page',
+				'post_parent' => $page,
+			)
+		);
+		$data  = $this->assert_rejected( 'leitvia_invalid_input', self::call( 'leitvia/trash-content', $page, array( 'post' => $page ) ) );
+		$this->assertSame( 'children', $data['reason'] );
+		$this->assertSame( array( $child ), $data['target']['children'] );
+		$image = self::factory()->attachment->create_upload_object( dirname( __DIR__ ) . '/fixtures/avatar.png', 0 );
+		$this->assert_rejected( 'leitvia_not_found', self::call( 'leitvia/trash-content', $image, array( 'post' => $image ) ) );
+	}
+
+	/**
+	 * Delete-media refuses a file that published content shows and names the place; one only a draft uses waits in a
+	 * package with a notice, and an administrator deletes it with its file. force deletes a file in use as well.
+	 */
+	public function test_delete_media(): void {
+		$admin = self::factory()->user->create( array( 'role' => 'administrator' ) );
+		$image = self::factory()->attachment->create_upload_object( dirname( __DIR__ ) . '/fixtures/avatar.png', 0 );
+		$file  = (string) get_attached_file( $image );
+		$page  = $this->page( '<!-- wp:image {"id":' . $image . '} --><figure class="wp-block-image"><img src="' . esc_url( (string) wp_get_attachment_url( $image ) ) . '" alt="Portrait" class="wp-image-' . $image . '"/></figure><!-- /wp:image -->' );
+
+		$data = $this->assert_rejected( 'leitvia_media_in_use', self::call( 'leitvia/delete-media', $image, array( 'id' => $image ) ) );
+		$this->assertSame( $page, $data['usage'][0]['post'] );
+		$this->assertTrue( $data['usage'][0]['public'] );
+		$this->assertSame( 'content', $data['usage'][0]['where'] );
+
+		$forced = $this->assert_ok(
+			self::call(
+				'leitvia/delete-media',
+				$image,
+				array(
+					'id'    => $image,
+					'force' => true,
+				)
+			)
+		);
+		$this->assertSame( 'package', $forced['mode'] );
+
+		wp_update_post(
+			array(
+				'ID'          => $page,
+				'post_status' => 'draft',
+			)
+		);
+		$result = $this->assert_ok( self::call( 'leitvia/delete-media', $image, array( 'id' => $image ) ) );
+		$this->assertSame( 'package', $result['mode'] );
+		$this->assertStringContainsString( (string) $page, (string) $result['notice'] );
+		$this->assertFileExists( $file );
+		$this->assertNotEmpty( Packages::apply( $result['package'] )['errors'], 'the agent cannot apply it' );
+
+		wp_set_current_user( $admin );
+		$this->assertSame( 'applied', Packages::apply( $result['package'] )['state'] );
+		$this->assertNull( get_post( $image ) );
+		$this->assertFileDoesNotExist( $file );
+		wp_set_current_user( $this->agent );
+		$this->assert_rejected( 'leitvia_not_found', self::call( 'leitvia/delete-media', $image, array( 'id' => $image ) ) );
 	}
 }

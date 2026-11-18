@@ -1,6 +1,6 @@
 <?php
 /**
- * Maintenance abilities: content, internal links, alt text and deprecated patterns.
+ * Maintenance abilities: content, internal links, alt text, patterns of sections, trash and media deletion.
  *
  * @package LeitviaStudio
  */
@@ -13,14 +13,17 @@ use LeitviaStudio\Gateway\Block_Ids;
 use LeitviaStudio\Gateway\Content_Checks;
 use LeitviaStudio\Gateway\Outline;
 use LeitviaStudio\Gateway\Rejection;
+use LeitviaStudio\Gateway\Scope;
 use LeitviaStudio\Lab\Status;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Abilities leitvia/update-content, leitvia/repair-links, leitvia/set-alt-text and leitvia/replace-pattern. Each one
- * changes one post through Pipeline::run(). Link repairs and alt texts are corrections (autonomous by default); a live
- * write of any of them gets a change package, so leitvia/rollback can undo it.
+ * Abilities leitvia/update-content, leitvia/repair-links, leitvia/set-alt-text, leitvia/replace-pattern,
+ * leitvia/trash-content and leitvia/delete-media. Each one changes one post through Pipeline::run(). Link repairs and
+ * alt texts are corrections (autonomous by default); a live write of any of them but delete-media gets a change
+ * package, so leitvia/rollback can undo it. Trashing and deleting always wait for a person (target remove, see
+ * Autonomy::person_decides()).
  */
 final class Maintain {
 
@@ -28,6 +31,21 @@ final class Maintain {
 	 * Most items of one call of set-alt-text.
 	 */
 	public const MAX_ALT_TEXTS = 100;
+
+	/**
+	 * Most posts one usage search of trash-content and delete-media reads.
+	 */
+	private const MAX_USAGE = 100;
+
+	/**
+	 * Statuses of posts that count as places of use.
+	 */
+	private const USE_STATUSES = array( 'publish', 'future', 'draft', 'pending' );
+
+	/**
+	 * Statuses visitors see.
+	 */
+	private const PUBLIC_STATUSES = array( 'publish', 'future' );
 
 	/**
 	 * Registers the abilities. Runs on leitvia_studio_init.
@@ -45,7 +63,7 @@ final class Maintain {
 		Abilities::write(
 			'leitvia/update-content',
 			__( 'Update content', 'leitvia-studio' ),
-			__( 'Updates title, excerpt, slug, date, status, author, terms, fields, rows of repeaters, featured image, comment status and the texts and button links of several blocks of one post in one operation, blocks found by their ID from the outline. Per block, url changes the one link of a text too, link_text names the part that stays linked, add_link sets a new link on a passage and caption the caption of a figure, as in leitvia/update-block. status publishes a draft, schedules it (future, with a date) or takes a post back to draft or pending; like every change it follows the autonomy level, so at a lower level it waits in a change package, and publishing needs the right to publish when it is applied. Terms, fields, rows, featured image and template follow the rules of leitvia/create-content; terms replace those of their taxonomy, and template switches the post to another template of the contract (page-landing for a page). Instead of blocks, content replaces the whole content with block markup, for example to turn classic content into blocks; the new content may hold no classic block. Read the post with leitvia/get-page-outline first and send its hash as base_hash. A slug change is a URL change and lands at most as a suggestion; after one, leitvia/repair-links with auto points the links of other posts to the new address. For attributes or images of a block use leitvia/update-block.', 'leitvia-studio' ),
+			__( 'Updates title, excerpt, slug, date, status, author, terms, fields, rows of repeaters, featured image, comment status and the texts and button links of several blocks of one post in one operation, blocks found by their ID from the outline. Per block, url changes the one link of a text too, link_text names the part that stays linked, add_link sets a new link on a passage and caption the caption of a figure, as in leitvia/update-block. status publishes a draft, schedules it (future, with a date) or takes a post back to draft or pending; like every change it follows the autonomy level, so at a lower level it waits in a change package, and publishing needs the right to publish when it is applied. Terms, fields, rows, featured image and template follow the rules of leitvia/create-content; terms replace those of their taxonomy, and template switches the post to another template of the contract (page-landing for a page). Instead of blocks, content replaces the whole content with block markup, for example to turn classic content into blocks; the new content may hold no classic block. parent moves a page below another page of the same type, 0 to the top level; a page cannot go below itself or one of its subpages. Read the post with leitvia/get-page-outline first and send its hash as base_hash. A slug or parent change is a URL change and lands at most as a suggestion; after a slug change leitvia/repair-links with auto points the links of other posts to the new address, after a parent change leitvia/repair-links with from and to. For attributes or images of a block use leitvia/update-block.', 'leitvia-studio' ),
 			'maintain',
 			$overwrite,
 			array(
@@ -120,6 +138,11 @@ final class Maintain {
 						'type'        => 'string',
 						'pattern'     => '^[a-z0-9-]*$',
 						'description' => __( 'Template of the contract: a page template for pages, a single template for the other types. Empty or default: the standard template.', 'leitvia-studio' ),
+					),
+					'parent'         => array(
+						'type'        => 'integer',
+						'minimum'     => 0,
+						'description' => __( 'ID of the new parent page from leitvia/list-content, 0 for the top level; only for pages and other hierarchical types.', 'leitvia-studio' ),
 					),
 				),
 				'required'             => array( 'post' ),
@@ -222,24 +245,76 @@ final class Maintain {
 		);
 		Abilities::write(
 			'leitvia/replace-pattern',
-			__( 'Replace deprecated pattern', 'leitvia-studio' ),
-			__( 'Replaces the sections of one post that use a deprecated pattern (metadata.patternName) with the replacement the contract names, all of them or the one section given by block. leitvia/audit-site reports the posts that use deprecated patterns; the base hash is the hash of the post from leitvia/get-page-outline. Texts and button links move over in order per block type. A section without replacement is rejected with leitvia_no_replacement.', 'leitvia-studio' ),
+			__( 'Replace pattern', 'leitvia-studio' ),
+			__( 'Replaces top-level sections of one post with another pattern. Without pattern the sections that use a deprecated pattern (metadata.patternName) get the replacement the contract names, all of them or the one given by block; leitvia/audit-site reports such posts, and a section without replacement is rejected with leitvia_no_replacement. With pattern the one section given by block gets that pattern, any approved one of leitvia/list-patterns, with edits at block IDs of its outline as in leitvia/compose-page (text, link, image, caption, catalog attributes such as the level of a heading, anchor, columns of a grid, remove, repeat and insert): so a section of an existing page changes its pattern. Texts and button links of the old section move over in order per block type (carry false keeps the texts of the pattern), then the edits apply and win; the HTML anchor of the old section does not move over, set it again with an anchor edit. The base hash is the hash of the post from leitvia/get-page-outline.', 'leitvia-studio' ),
 			'maintain',
 			$overwrite,
 			array(
 				'properties'           => array(
-					'post'  => $post,
-					'block' => array(
+					'post'    => $post,
+					'block'   => array(
 						'type'        => 'string',
 						'minLength'   => 1,
 						'maxLength'   => 200,
 						'description' => __( 'Block ID or path ID of a top-level section from the outline.', 'leitvia-studio' ),
+					),
+					'pattern' => array(
+						'type'        => 'string',
+						'minLength'   => 1,
+						'description' => __( 'Pattern slug such as leitvia/cta-split, or block:<ID> for a Lab pattern, that replaces the section given by block.', 'leitvia-studio' ),
+					),
+					'edits'   => Build::sections_schema()['items']['properties']['edits'],
+					'carry'   => array(
+						'type'        => 'boolean',
+						'description' => __( 'With pattern: whether texts and button links of the old section move over before the edits; true by default.', 'leitvia-studio' ),
 					),
 				),
 				'required'             => array( 'post' ),
 				'additionalProperties' => false,
 			),
 			array( self::class, 'describe_replace_pattern' )
+		);
+		$remove = array(
+			'destructive' => true,
+			'idempotent'  => false,
+		);
+		Abilities::write(
+			'leitvia/trash-content',
+			__( 'Trash content', 'leitvia-studio' ),
+			__( 'Moves a post, page or entry to the trash. It stays restorable with its address: leitvia/rollback of the applied package or Restore in the trash of the admin bring it back, until WordPress empties the trash (after 30 days unless the site changed that). Removing content is the decision of a person: the change always waits in a change package, and applying it needs the right to delete the post. Read the post with leitvia/get-page-outline first and send its hash as base_hash. Refused for the front page, the posts page and the privacy policy page (point the setting to another page first) and for a page with subpages (move them with parent of leitvia/update-content, or trash them first). notice and report.links name the posts whose links lead nowhere afterwards. Files go with leitvia/delete-media.', 'leitvia-studio' ),
+			'maintain',
+			$remove,
+			array(
+				'properties'           => array(
+					'post' => $post,
+				),
+				'required'             => array( 'post' ),
+				'additionalProperties' => false,
+			),
+			array( self::class, 'describe_trash_content' )
+		);
+		Abilities::write(
+			'leitvia/delete-media',
+			__( 'Delete media', 'leitvia-studio' ),
+			__( 'Deletes a file of the media library for good, with all its sizes; there is no way back. First it looks where the file is used: in blocks and links of content, templates, patterns and navigation, as featured image, as site logo or site icon. While published content or the site uses it, the call is refused with leitvia_media_in_use and the places in data.usage: replace the image there with leitvia/update-block, or send force to delete it anyway, and those places show no image. Places in drafts come as notice and report.usage. Removing content is the decision of a person: the change always waits in a change package, and applying it needs the right to delete the file. base_hash is the hash of the attachment from leitvia/get-page-outline with its ID as post.', 'leitvia-studio' ),
+			'maintain',
+			$remove,
+			array(
+				'properties'           => array(
+					'id'    => array(
+						'type'        => 'integer',
+						'minimum'     => 1,
+						'description' => __( 'ID of the file in the media library, from leitvia/list-media.', 'leitvia-studio' ),
+					),
+					'force' => array(
+						'type'        => 'boolean',
+						'description' => __( 'Delete the file although published content or the site still uses it.', 'leitvia-studio' ),
+					),
+				),
+				'required'             => array( 'id' ),
+				'additionalProperties' => false,
+			),
+			array( self::class, 'describe_delete_media' )
 		);
 	}
 
@@ -266,11 +341,19 @@ final class Maintain {
 		$extra    = array_intersect_key( $input, array_flip( array( 'date', 'author', 'terms', 'fields', 'rows', 'featured_image' ) ) );
 		$status   = isset( $input['status'] ) ? (string) $input['status'] : null;
 		$template = isset( $input['template'] ) ? (string) $input['template'] : null;
+		$parent   = isset( $input['parent'] ) ? (int) $input['parent'] : null;
 		if ( null !== $replace && $edits ) {
 			return Block_Edit::invalid( 'change', __( 'Send either content or blocks, not both.', 'leitvia-studio' ), array( 'post' => $post ) );
 		}
-		if ( ! $fields && ! $edits && null === $replace && ! $extra && null === $status && null === $template ) {
-			return Block_Edit::invalid( 'change', __( 'Name what to change: title, excerpt, slug, date, status, author, terms, fields, rows, featured image, comment status, template, blocks or content.', 'leitvia-studio' ), array( 'post' => $post ) );
+		if ( ! $fields && ! $edits && null === $replace && ! $extra && null === $status && null === $template && null === $parent ) {
+			return Block_Edit::invalid( 'change', __( 'Name what to change: title, excerpt, slug, date, status, author, terms, fields, rows, featured image, comment status, template, parent, blocks or content.', 'leitvia-studio' ), array( 'post' => $post ) );
+		}
+		if ( null !== $parent ) {
+			$invalid = self::invalid_parent( $post, $parent );
+			if ( $invalid ) {
+				return $invalid;
+			}
+			$fields['post_parent'] = $parent;
 		}
 		return array(
 			'area'   => 'content',
@@ -457,34 +540,61 @@ final class Maintain {
 	}
 
 	/**
-	 * Operation of replace-pattern.
+	 * Operation of replace-pattern: with pattern the one section gets that pattern with its edits (the checks of
+	 * compose-page, Build::sections()), without it deprecated patterns get their replacement.
 	 *
 	 * @param array<string, mixed> $input Input.
-	 * @return array<string, mixed>
+	 * @return array<string, mixed>|\WP_Error
 	 */
-	public static function describe_replace_pattern( array $input ): array {
-		$post  = (int) ( $input['post'] ?? 0 );
-		$block = (string) ( $input['block'] ?? '' );
+	public static function describe_replace_pattern( array $input ) {
+		$post    = (int) ( $input['post'] ?? 0 );
+		$block   = (string) ( $input['block'] ?? '' );
+		$target  = array( 'post' => $post ) + ( '' !== $block ? array( 'block' => $block ) : array() );
+		$ref     = (string) ( $input['pattern'] ?? '' );
+		$section = null;
+		if ( '' === $ref && ( isset( $input['edits'] ) || isset( $input['carry'] ) ) ) {
+			return Block_Edit::invalid( 'pattern', __( 'edits and carry belong to a new pattern; send pattern as well.', 'leitvia-studio' ), $target, 'leitvia/list-patterns' );
+		}
+		if ( '' !== $ref ) {
+			if ( '' === $block ) {
+				return Block_Edit::invalid( 'block', __( 'Name the section the pattern replaces with block, a top-level block ID or path ID from the outline.', 'leitvia-studio' ), $target, 'leitvia/get-page-outline' );
+			}
+			$found = Build::sections(
+				array(
+					array(
+						'pattern' => $ref,
+						'edits'   => (array) ( $input['edits'] ?? array() ),
+					),
+				)
+			);
+			if ( is_wp_error( $found ) ) {
+				return $found;
+			}
+			$section = $found[0] + array( 'carry' => ! isset( $input['carry'] ) || ! empty( $input['carry'] ) );
+		}
 		return array(
 			'area'   => 'structure',
-			'target' => array( 'post' => $post ) + ( '' !== $block ? array( 'block' => $block ) : array() ),
+			'target' => $target,
 			'record' => true,
-			'change' => static function ( array $state ) use ( $post, $block ) {
-				$content = self::replace( (string) $state['post_content'], $block, array( 'post' => $post ) );
+			'change' => static function ( array $state ) use ( $post, $block, $section ) {
+				$content = self::replace( (string) $state['post_content'], $block, array( 'post' => $post ), $section );
 				return is_wp_error( $content ) ? $content : array( 'post_content' => $content ) + $state;
 			},
 		);
 	}
 
 	/**
-	 * Markup with the top-level sections of deprecated patterns replaced, all or the one with the ID.
+	 * Markup with top-level sections replaced: the sections of deprecated patterns, all or the one with the ID; or
+	 * with a section from Build::sections() the one with the ID.
 	 *
-	 * @param string               $content Block markup.
-	 * @param string               $only    leitviaId or path ID of one section, '' for all.
-	 * @param array<string, mixed> $target  Target for rejections.
+	 * @param string                    $content Block markup.
+	 * @param string                    $only    leitviaId or path ID of one section, '' for all.
+	 * @param array<string, mixed>      $target  Target for rejections.
+	 * @param array<string, mixed>|null $section Pattern with edits and carry that replaces the section, null for the
+	 *                                           replacement of a deprecated pattern.
 	 * @return string|\WP_Error
 	 */
-	private static function replace( string $content, string $only, array $target ) {
+	private static function replace( string $content, string $only, array $target, ?array $section = null ) {
 		// ponytail: top-level sections only, as compose-page writes them; nested ones would need placeholder bookkeeping.
 		$blocks   = array();
 		$index    = 0;
@@ -502,6 +612,17 @@ final class Maintain {
 			$name   = (string) ( $block['attrs']['metadata']['patternName'] ?? '' );
 			if ( ! $chosen || ( '' === $only && ( '' === $name || 'deprecated' !== Status::own( 'pattern:' . $name ) ) ) ) {
 				$blocks[] = $block;
+				continue;
+			}
+			if ( $section ) {
+				$here   = $target + array( 'block' => $id );
+				$markup = $section['carry'] ? self::carry( $block, (string) $section['content'], $here ) : (string) $section['content'];
+				$markup = is_wp_error( $markup ) ? $markup : Build::edit( $markup, (array) $section['edits'], $here );
+				if ( is_wp_error( $markup ) ) {
+					return $markup;
+				}
+				$blocks = array_merge( $blocks, parse_blocks( Build::name_sections( $markup, (string) $section['name'] ) ) );
+				++$replaced;
 				continue;
 			}
 			$ref     = '' !== $name ? (string) preg_replace( '/^pattern:/', '', (string) ( leitvia_studio_contract()->pattern( $name )['docs']['replacedBy'] ?? '' ) ) : '';
@@ -522,7 +643,15 @@ final class Maintain {
 		if ( '' !== $only && ! $found ) {
 			return Rejection::make( 'leitvia_not_found', __( 'There is no top-level section with this ID. Read the outline for the current IDs.', 'leitvia-studio' ), 404, 'block', $target + array( 'block' => $only ), 'leitvia/get-page-outline' );
 		}
-		return $replaced ? serialize_blocks( $blocks ) : self::no_replacement( $target, '' );
+		if ( ! $replaced ) {
+			return self::no_replacement( $target, '' );
+		}
+		$anchors = array();
+		foreach ( (array) ( $section['edits'] ?? array() ) as $edit ) {
+			$anchors = array_merge( $anchors, Block_Edit::anchors( (array) $edit ), Block_Edit::anchors( (array) ( $edit['insert'] ?? array() ) ) );
+		}
+		// An anchor of the new section must be unique on the whole page, as in compose-page.
+		return Block_Edit::unique_anchors( serialize_blocks( $blocks ), $anchors, $target );
 	}
 
 	/**
@@ -593,6 +722,251 @@ final class Maintain {
 			$found = array_merge( $found, self::texts( (array) $block['innerBlocks'], $here . '.' ) );
 		}
 		return $found;
+	}
+
+	/**
+	 * Rejection when a post cannot get this parent: its type has no hierarchy, the parent is no post of the same type
+	 * agents can read, or it is the post itself or one of its descendants; null when it can. 0 is always fine.
+	 *
+	 * @param int $post  Post ID.
+	 * @param int $above ID of the new parent, 0 for the top level.
+	 */
+	private static function invalid_parent( int $post, int $above ): ?\WP_Error {
+		$type   = (string) get_post_type( $post );
+		$target = array( 'post' => $post );
+		if ( '' !== $type && ! is_post_type_hierarchical( $type ) ) {
+			return Block_Edit::invalid( 'parent', __( 'Only pages and other hierarchical types have a parent.', 'leitvia-studio' ), $target );
+		}
+		if ( ! $above ) {
+			return null;
+		}
+		if ( get_post_type( $above ) !== $type || ! Scope::readable( $above ) ) {
+			return Block_Edit::invalid( 'parent', __( 'The parent must be a post of the same type that agents can read. Take its ID from leitvia/list-content.', 'leitvia-studio' ), $target + array( 'parent' => $above ), 'leitvia/list-content' );
+		}
+		if ( $above === $post || in_array( $post, array_map( 'intval', get_post_ancestors( $above ) ), true ) ) {
+			return Block_Edit::invalid( 'parent', __( 'A page cannot go below itself or one of its subpages. Move the subpage first.', 'leitvia-studio' ), $target + array( 'parent' => $above ) );
+		}
+		return null;
+	}
+
+	/**
+	 * Operation of trash-content: the post with the status trash, which the pipeline writes through wp_trash_post()
+	 * and a rollback through wp_untrash_post() (target remove). Refused while a setting points to the page, while it
+	 * has subpages whose addresses would break, and on a site without trash, where core would delete the post at once.
+	 *
+	 * @param array<string, mixed> $input Input.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public static function describe_trash_content( array $input ) {
+		$post   = (int) ( $input['post'] ?? 0 );
+		$target = array( 'post' => $post );
+		$type   = (string) get_post_type( $post );
+		if ( ! $post || 'attachment' === $type || ! is_post_type_viewable( $type ) || ! Scope::readable( $post ) ) {
+			return Rejection::make( 'leitvia_not_found', __( 'There is no post, page or entry with this ID that agents can read. Take the ID from leitvia/list-content; files go with leitvia/delete-media.', 'leitvia-studio' ), 404, 'post', $target, 'leitvia/list-content' );
+		}
+		if ( ! EMPTY_TRASH_DAYS ) {
+			return Block_Edit::invalid( 'trash', __( 'This site keeps no trash, so WordPress would delete the post for good. A person can delete it in the admin.', 'leitvia-studio' ), $target );
+		}
+		$settings = array(
+			'page_on_front'              => 'leitvia/set-front-page',
+			'page_for_posts'             => 'leitvia/set-posts-page',
+			'wp_page_for_privacy_policy' => 'leitvia/set-privacy-page',
+		);
+		foreach ( $settings as $option => $next ) {
+			if ( (int) get_option( $option ) === $post ) {
+				/* translators: 1: option name, 2: ability name */
+				return Block_Edit::invalid( 'setting', sprintf( __( 'The site uses this page in its settings (%1$s). Point the setting to another page with %2$s first.', 'leitvia-studio' ), $option, $next ), $target + array( 'option' => $option ), $next );
+			}
+		}
+		$children = get_posts(
+			array(
+				'post_type'      => $type,
+				'post_parent'    => $post,
+				'post_status'    => self::USE_STATUSES,
+				'fields'         => 'ids',
+				'posts_per_page' => 20,
+				'no_found_rows'  => true,
+			)
+		);
+		if ( $children ) {
+			return Block_Edit::invalid(
+				'children',
+				/* translators: %s: list of post IDs */
+				sprintf( __( 'The page has subpages, whose addresses would break in the trash: %s. Move them with parent of leitvia/update-content, or trash them first.', 'leitvia-studio' ), implode( ', ', array_map( 'intval', $children ) ) ),
+				$target + array( 'children' => array_map( 'intval', $children ) ),
+				'leitvia/update-content'
+			);
+		}
+		$links = self::linked( $post );
+		return array(
+			'area'   => 'content',
+			'target' => $target + array( 'remove' => 'trash' ),
+			'record' => true,
+			/* translators: %s: list of places such as 12 (Page, Published) */
+			'notice' => $links ? sprintf( __( 'These posts link to it, and their links lead nowhere once it is in the trash: %s. Change them with leitvia/update-content.', 'leitvia-studio' ), self::places( $links ) ) : '',
+			'report' => static fn(): array => array( 'links' => $links ),
+			'change' => static fn( array $state ): array => array( 'post_status' => 'trash' ) + $state,
+		);
+	}
+
+	/**
+	 * Operation of delete-media: the attachment with the status trash as the mark, which the pipeline writes as a
+	 * forced deletion with its files (target remove). Refused while published content or the site uses the file,
+	 * unless force.
+	 *
+	 * @param array<string, mixed> $input Input.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public static function describe_delete_media( array $input ) {
+		$id     = (int) ( $input['id'] ?? 0 );
+		$target = array( 'post' => $id );
+		if ( ! $id || 'attachment' !== get_post_type( $id ) || ! Scope::readable( $id ) ) {
+			return Rejection::make( 'leitvia_not_found', __( 'There is no file with this ID in the media library. List the media for the current IDs.', 'leitvia-studio' ), 404, 'id', $target, 'leitvia/list-media' );
+		}
+		$usage = self::media_usage( $id );
+		$shown = array_filter( $usage, static fn( array $place ): bool => $place['public'] );
+		if ( $shown && empty( $input['force'] ) ) {
+			return Rejection::make(
+				'leitvia_media_in_use',
+				/* translators: %s: list of places such as 12 (Page, Published) or site_logo */
+				sprintf( __( 'Published content or the site still uses this file: %s. Replace it there with leitvia/update-block first, or send force to delete it anyway; those places then show no image.', 'leitvia-studio' ), self::places( $shown ) ),
+				409,
+				'in_use',
+				$target,
+				'leitvia/update-block',
+				'never',
+				array( 'usage' => $usage )
+			);
+		}
+		return array(
+			'area'   => 'content',
+			'target' => $target + array( 'remove' => 'delete' ),
+			/* translators: %s: list of places such as 12 (Page, Draft) */
+			'notice' => $usage ? sprintf( __( 'These places still use the file and show no image once it is deleted: %s.', 'leitvia-studio' ), self::places( $usage ) ) : '',
+			'report' => static fn(): array => array( 'usage' => $usage ),
+			'change' => static fn( array $state ): array => array( 'post_status' => 'trash' ) + $state,
+		);
+	}
+
+	/**
+	 * Posts whose content links to the post: links to its address and, in navigation menus, links by its ID.
+	 *
+	 * @param int $post Post ID.
+	 * @return list<array<string, mixed>>
+	 */
+	private static function linked( int $post ): array {
+		$url    = (string) get_permalink( $post );
+		$needle = untrailingslashit( wp_make_link_relative( $url ) );
+		$found  = array();
+		foreach ( self::containing( array_filter( array( $needle, '"id":' . $post ) ), $post ) as $other ) {
+			$links = 'wp_navigation' === $other->post_type && preg_match( '/"id":' . $post . '\b/', $other->post_content );
+			$tags  = new \WP_HTML_Tag_Processor( $other->post_content );
+			while ( ! $links && $tags->next_tag( array( 'tag_name' => 'a' ) ) ) {
+				$href  = $tags->get_attribute( 'href' );
+				$links = is_string( $href ) && self::internal( trim( $href ) ) && self::normal( trim( $href ) ) === self::normal( $url );
+			}
+			if ( $links ) {
+				$found[] = self::place( $other );
+			}
+		}
+		return $found;
+	}
+
+	/**
+	 * Places that use an attachment: content with a block of it (wp-image-<ID>, "id" or "mediaId") or a link to one of
+	 * its files, posts with it as featured image, and the site logo and icon. public says whether visitors see it.
+	 * ponytail: file names with the size suffix or -scaled only; edited copies (-e<time>) and WooCommerce galleries
+	 * are not searched.
+	 *
+	 * @param int $id Attachment ID.
+	 * @return list<array<string, mixed>>
+	 */
+	private static function media_usage( int $id ): array {
+		$file    = (string) get_post_meta( $id, '_wp_attached_file', true );
+		$stem    = '' !== $file ? (string) preg_replace( '/\.[^.\/]+$/', '', $file ) : '';
+		$pattern = '/wp-image-' . $id . '\b|"(?:id|mediaId)":' . $id . '\b' . ( '' !== $stem ? '|' . preg_quote( $stem, '/' ) . '(?:-\d+x\d+|-scaled)?\.' : '' ) . '/';
+		$usage   = array();
+		foreach ( self::containing( array_filter( array( 'wp-image-' . $id, '"id":' . $id, '"mediaId":' . $id, $stem ) ), $id ) as $post ) {
+			if ( preg_match( $pattern, $post->post_content ) ) {
+				$usage[] = self::place( $post ) + array( 'where' => 'content' );
+			}
+		}
+		$featured = get_posts(
+			array(
+				'post_type'      => array_values( array_diff( Scope::post_types(), array( 'attachment' ) ) ),
+				'post_status'    => self::USE_STATUSES,
+				'posts_per_page' => self::MAX_USAGE,
+				'no_found_rows'  => true,
+				'meta_key'       => '_thumbnail_id', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- One lookup before a deletion.
+				'meta_value'     => (string) $id, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- See above.
+			)
+		);
+		foreach ( $featured as $post ) {
+			$usage[] = self::place( $post ) + array( 'where' => 'featured_image' );
+		}
+		foreach ( array( 'site_logo', 'site_icon' ) as $option ) {
+			if ( (int) get_option( $option ) === $id ) {
+				$usage[] = array(
+					'option' => $option,
+					'where'  => 'setting',
+					'public' => true,
+				);
+			}
+		}
+		return $usage;
+	}
+
+	/**
+	 * Posts in scope but the given one, in a status of USE_STATUSES, whose content holds one of the strings; at most
+	 * MAX_USAGE. Callers check each hit, LIKE only narrows the search.
+	 *
+	 * @param string[] $needles Strings to search for.
+	 * @param int      $skip    Post ID to leave out.
+	 * @return list<\WP_Post>
+	 */
+	private static function containing( array $needles, int $skip ): array {
+		global $wpdb;
+		$types = array_values( array_diff( Scope::post_types(), array( 'attachment', 'leitvia_tokens', 'wp_global_styles' ) ) );
+		if ( ! $needles || ! $types ) {
+			return array();
+		}
+		$likes = array_map( static fn( string $needle ): string => '%' . $wpdb->esc_like( $needle ) . '%', array_values( $needles ) );
+		$ids   = $wpdb->get_col( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- One search before a removal, posts are read through get_post().
+			$wpdb->prepare(
+				"SELECT ID FROM {$wpdb->posts} WHERE ID <> %d AND post_status IN (" . implode( ',', array_fill( 0, count( self::USE_STATUSES ), '%s' ) ) . ') AND post_type IN (' . implode( ',', array_fill( 0, count( $types ), '%s' ) ) . ') AND (' . implode( ' OR ', array_fill( 0, count( $likes ), 'post_content LIKE %s' ) ) . ') ORDER BY ID ASC LIMIT %d', // phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Placeholders built per status, type and string.
+				array_merge( array( $skip ), self::USE_STATUSES, $types, $likes, array( self::MAX_USAGE ) )
+			)
+		);
+		return array_values( array_filter( array_map( static fn( $post ) => get_post( (int) $post ), $ids ), static fn( $post ): bool => $post instanceof \WP_Post && '' === $post->post_password ) );
+	}
+
+	/**
+	 * A post as place of use: ID, type, title, status and whether visitors see it.
+	 *
+	 * @param \WP_Post $post Post.
+	 * @return array<string, mixed>
+	 */
+	private static function place( \WP_Post $post ): array {
+		return array(
+			'post'      => $post->ID,
+			'post_type' => $post->post_type,
+			'title'     => $post->post_title,
+			'status'    => $post->post_status,
+			'public'    => in_array( $post->post_status, self::PUBLIC_STATUSES, true ),
+		);
+	}
+
+	/**
+	 * Places as text for a message, such as 12 (Page, Published), site_logo.
+	 *
+	 * @param array<array<string, mixed>> $places Places from place() or media_usage().
+	 */
+	private static function places( array $places ): string {
+		return implode(
+			', ',
+			// Names of type and status in the language of the site, as the admin shows them.
+			array_map( static fn( array $place ): string => isset( $place['option'] ) ? (string) $place['option'] : $place['post'] . ' (' . ( get_post_type_object( (string) $place['post_type'] )->labels->singular_name ?? $place['post_type'] ) . ', ' . ( get_post_status_object( (string) $place['status'] )->label ?? $place['status'] ) . ')', $places )
+		);
 	}
 
 	/**

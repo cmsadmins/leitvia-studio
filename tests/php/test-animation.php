@@ -155,6 +155,26 @@ class Test_Animation extends WP_UnitTestCase {
 		$this->assertSame( 'leitvia_invalid_input', $wrong->get_error_code() );
 		$html = "<!-- wp:html {\"metadata\":{\"leitviaId\":\"cccc3333\"}} -->\n<p>Raw</p>\n<!-- /wp:html -->";
 		$this->assertWPError( Block_Edit::apply( $html, 'cccc3333', array( 'attributes' => array( 'leitviaAnimation' => 'fade' ) ) ) );
+		// null of an attribute the block does not have is no change, not an error; another value still is.
+		$this->assertSame( $html, Block_Edit::apply( $html, 'cccc3333', array( 'attributes' => array( 'leitviaAnimation' => null ) ) ) );
+		$this->assertWPError( Block_Edit::apply( $html, 'cccc3333', array( 'attributes' => array( 'leitviaUnknown' => 'x' ) ) ) );
+
+		// The effect goes along with the attributes of a media block, and null removes it like none.
+		$image = "<!-- wp:image {\"metadata\":{\"leitviaId\":\"dddd4444\"},\"leitviaAnimation\":\"fade\"} -->\n<figure class=\"wp-block-image\"><img src=\"https://example.org/a.png\" alt=\"A drawing\"/></figure>\n<!-- /wp:image -->";
+		$drawn = Block_Edit::apply(
+			$image,
+			'dddd4444',
+			array(
+				'attributes' => array(
+					'scale'            => 'contain',
+					'leitviaAnimation' => null,
+				),
+			)
+		);
+		$this->assertIsString( $drawn, is_wp_error( $drawn ) ? $drawn->get_error_message() : '' );
+		$this->assertStringNotContainsString( 'leitviaAnimation', $drawn );
+		$this->assertStringContainsString( '"scale":"contain"', $drawn );
+		$this->assertStringContainsString( 'object-fit:contain', $drawn );
 	}
 
 	/**

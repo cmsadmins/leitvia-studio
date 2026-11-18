@@ -4,7 +4,7 @@ Tags: ai agent, mcp, abilities api, design tokens, block theme
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.46
+Stable tag: 1.3.47
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -12,7 +12,7 @@ AI agents such as Claude Code build and maintain block theme sites over MCP or R
 
 == Description ==
 
-Leitvia Studio lets AI agents such as Claude Code, Codex or Cursor build and maintain WordPress sites with block themes through 59 abilities, and every change passes checks for design, accessibility and content before it goes live. It is free and made for developers, agencies and site owners who want an AI agent to do the work without administrator rights.
+Leitvia Studio lets AI agents such as Claude Code, Codex or Cursor build and maintain WordPress sites with block themes through 66 abilities, and every change passes checks for design, accessibility and content before it goes live. It is free and made for developers, agencies and site owners who want an AI agent to do the work without administrator rights.
 
 The abilities belong to the WordPress [Abilities API](https://developer.wordpress.org/apis/abilities-api/) and run over MCP or the REST API. Everything Studio creates is stored in WordPress core structures (patterns, global styles, post types, block bindings), so the site keeps working when you deactivate the plugin. It works with any block theme and fits best with the free theme [Leitvia](https://github.com/cmsadmins/leitvia).
 
@@ -25,9 +25,9 @@ The abilities belong to the WordPress [Abilities API](https://developer.wordpres
 * **Pattern Lab.** All patterns with live previews in every style variation at 390, 782 and 1440 px, state variants, an axe accessibility check per preview, status, version and a usage index.
 * **Content model and block bindings.** Post types, taxonomies, fields, relations and site settings declared as JSON, registered through core APIs and shown in paragraphs, headings, buttons and images through block bindings.
 * **Site recipes.** One command or one agent call sets up a site from style variation, header, footer, pages from patterns, navigation and settings that send less data: Blog, Company, Publication, Documentation and, with WooCommerce, Shop. A second run adds nothing.
-* **Privacy by default.** Embeds from YouTube, Vimeo, X and other sites wait behind a consent placeholder, the Map block loads OpenStreetMap tiles only after consent, Gravatar and the emoji script of WordPress stay off, and fonts are served from your own site.
+* **Privacy by default.** Embeds from YouTube, Vimeo, X and other sites wait behind a consent placeholder, so does any iframe of another provider in the Embed behind consent block, the Map block loads OpenStreetMap tiles only after consent, Gravatar and the emoji script of WordPress stay off, and fonts are served from your own site.
 * **Accessibility blocks.** An accessibility bar, an easy language switch for pages in easy language (Leichte Sprache), a form error summary, a table of contents and tabs that stay readable without JavaScript.
-* **Structured data.** NewsArticle or BlogPosting, CollectionPage and ProfilePage as JSON-LD and a news sitemap, switched off while an SEO plugin such as Yoast SEO or Rank Math is active.
+* **Structured data.** NewsArticle or BlogPosting, CollectionPage and ProfilePage as JSON-LD, the organization behind the site as Organization or local business with opening hours on the front page, and a news sitemap, switched off while an SEO plugin such as Yoast SEO or Rank Math is active.
 * **WooCommerce.** A product comparison block, 10 abilities for products and categories and the recipe Shop, all registered only while WooCommerce is active.
 
 = Leitvia Pro =
@@ -51,6 +51,8 @@ Core preset slugs such as base, contrast or spacing 50 map to the roles of the d
 Leitvia Studio sends no visitor data anywhere and sets no cookies. Embeds from other sites (the Embed block and its variations such as YouTube, and iframes from other sites in classic content and in Custom HTML blocks) show a placeholder until the visitor clicks "Load content from" followed by the name of the provider (for example "Load content from YouTube"); only then does the visitor's browser contact the provider. When a visitor ticks "Always allow YouTube on this site" (with the name of the provider), the list of allowed providers is stored in the visitor's browser (localStorage, key `leitvia-consent`), never on the server; the Consent Settings block lists and revokes these entries. Without JavaScript the placeholder only links to the content on the provider's site. The setting "Ask visitors before loading embedded content from other sites" turns the placeholder off; deactivating Leitvia Studio also brings back the embeds as WordPress renders them. When you save a post, WordPress itself asks the provider for the embed code (oEmbed), as without the plugin; that request comes from your server and carries no visitor data.
 
 The list carries the path of the site in its key (`leitvia-consent:/` for a site at the root, `leitvia-consent:/club/` for a site below `/club/`), because sites of a subdirectory network or installations in folders of one domain share the local storage of the browser. Consent given on one of them never applies to another. A list stored by an older version under `leitvia-consent` carries over on a site at the root path only.
+
+The Embed behind consent block puts any iframe of another provider, such as a booking tool, behind the same placeholder. You list such providers under Leitvia Studio, Settings, Privacy with host names, purpose and privacy policy, which the placeholder names; its preview image comes from your media library, never from the provider.
 
 The Accessibility bar stores text size and high contrast in the visitor's browser (localStorage, key `leitvia-a11y`), only after the visitor changes one of them. Read aloud uses the speech synthesis of the browser with a voice installed on the device; the button only appears when such a voice exists for the language of the page, and voices from online services are never used.
 
@@ -115,7 +117,7 @@ The `src/` folder contains the source code of the files in `build/`, and `webpac
 
 = What is Leitvia Studio? =
 
-Leitvia Studio is a free WordPress plugin that lets AI agents build and maintain sites with block themes through 59 abilities of the WordPress Abilities API, with checks, an autonomy level per area, a review inbox and rollback. It also adds a Pattern Lab, design tokens in the DTCG format, a content model with block bindings, site recipes and blocks for privacy, accessibility and offers. It needs WordPress 7.1 and PHP 8.2 or later.
+Leitvia Studio is a free WordPress plugin that lets AI agents build and maintain sites with block themes through 66 abilities of the WordPress Abilities API, with checks, an autonomy level per area, a review inbox and rollback. It also adds a Pattern Lab, design tokens in the DTCG format, a content model with block bindings, site recipes and blocks for privacy, accessibility and offers. It needs WordPress 7.1 and PHP 8.2 or later.
 
 = Does Leitvia Studio work with Claude, ChatGPT or Cursor? =
 
@@ -136,6 +138,8 @@ Yes. Leitvia Studio is free under the GPL, version 2 or later, with no locked fe
 = Is Leitvia Studio GDPR compliant? =
 
 Leitvia Studio sends no visitor data to other hosts and sets no cookies, which makes a GDPR compliant site easier to run; compliance itself depends on your whole site and how you run it. Embeds and map tiles load only after the visitor agrees, Gravatar and the emoji images of WordPress stay off unless an administrator switches them on, and fonts come from your own site. Apart from the optional AI planning call described under External services, its only server side request goes to your own site. Every exception is listed under Privacy and External services.
+
+When Gravity Forms is active, the site audit of the agents (leitvia/audit-site) warns about a captcha add-on or a reCAPTCHA field, because such a captcha sends the visitor's IP address to its provider before any consent. Leitvia Studio reads only the list of active plugins and the forms for this, on your server.
 
 = Does Leitvia Studio make my site accessible under WCAG 2.2, the EAA or the BFSG? =
 
@@ -166,7 +170,7 @@ Your posts, pages, patterns, global styles and images stay, because Studio store
 
 = Does the plugin change my front end? =
 
-Only where you use its features. It loads scripts and styles for visitors only on pages with its blocks or an embed placeholder. It does change front end output in eight places: structured data in the head of posts, archives and author pages with the news sitemap and its line in robots.txt, while no SEO plugin is active the canonical link of archives and a stored SEO title, description and robots, profile pictures and the placeholder replace Gravatar images wherever WordPress shows avatars, embeds from other sites wait behind a consent placeholder, a scheduled token overlay changes the styles while it runs, the "Child entries" query lists the rows of a content model entry, code blocks get a "Copy code" button that shows once JavaScript runs, and the emoji script of WordPress is left out (see below). The Lab preview, which logged-in editors open from the admin, loads its own scripts, and axe-core only while an accessibility check runs.
+Only where you use its features. It loads scripts and styles for visitors only on pages with its blocks or an embed placeholder. It does change front end output in eight places: structured data in the head of the front page, posts, archives and author pages with the news sitemap and its line in robots.txt, while no SEO plugin is active the canonical link of archives and a stored SEO title, description and robots, profile pictures and the placeholder replace Gravatar images wherever WordPress shows avatars, embeds from other sites wait behind a consent placeholder, a scheduled token overlay changes the styles while it runs, the "Child entries" query lists the rows of a content model entry, code blocks get a "Copy code" button that shows once JavaScript runs, and the emoji script of WordPress is left out (see below). The Lab preview, which logged-in editors open from the admin, loads its own scripts, and axe-core only while an accessibility check runs.
 
 = What happens to blocks connected to content model fields when I deactivate the plugin? =
 
@@ -178,9 +182,9 @@ A building block is one content feature of an add-on, such as events or a team: 
 
 = How do I mark posts as news articles? =
 
-Every post is a news article until you choose categories under Studio, Settings, Design and search, "Posts that are news"; posts outside them get the type BlogPosting and stay out of the news sitemap. The filter `leitvia_studio_news_categories` receives that list and can return other slugs or IDs. The setting "Add structured data to posts and author pages" switches the structured data off, "Publish a news sitemap for Google News" the sitemap; the sitemap also stays off while the site discourages search engines or another plugin makes a news sitemap (filter `leitvia_studio_news_sitemap_enabled`). The filter `leitvia_studio_seo_plugin_active` tells Leitvia Studio about an SEO plugin it does not detect.
+Every post is a news article until you choose categories under Studio, Settings, Design and search, "Posts that are news"; posts outside them get the type BlogPosting and stay out of the news sitemap. The filter `leitvia_studio_news_categories` receives that list and can return other slugs or IDs. The setting "Add structured data to the front page, posts and author pages" switches the structured data off, "Publish a news sitemap for Google News" the sitemap; the sitemap also stays off while the site discourages search engines or another plugin makes a news sitemap (filter `leitvia_studio_news_sitemap_enabled`). The filter `leitvia_studio_seo_plugin_active` tells Leitvia Studio about an SEO plugin it does not detect.
 
-Posts, archives and author pages get structured data for search engines (JSON-LD): NewsArticle or BlogPosting, CollectionPage and ProfilePage, with three image sizes of 1200 px made on upload. The news sitemap for Google News lists the last 48 hours at /news.xml. While an SEO plugin such as Yoast SEO or Rank Math is active, Leitvia Studio prints none, so that plugin stays the only source.
+Posts, archives and author pages get structured data for search engines (JSON-LD): NewsArticle or BlogPosting, CollectionPage and ProfilePage, with three image sizes of 1200 px made on upload. The front page describes the organization behind the site with the kind of business, address, founding date, area served, opening hours and profiles from Studio, Settings; posts name the same organization as publisher. The news sitemap for Google News lists the last 48 hours at /news.xml. While an SEO plugin such as Yoast SEO or Rank Math is active, Leitvia Studio prints none, so that plugin stays the only source.
 
 = Which forms does the "Form error summary" block work with? =
 
@@ -271,6 +275,23 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 
 == Changelog ==
 
+= 1.3.47 =
+* New block Embed behind consent: any iframe of another provider, such as a configurator or a booking tool, waits behind the consent placeholder until the visitor loads it. Providers are listed under Leitvia Studio, Settings, Privacy with up to ten host names, a purpose and the address of their privacy policy; the placeholder names the provider, says where the data goes and shows a preview image from the media library. The iframe loads sandboxed and without a referrer. Addresses with a backslash or quotes are refused and international host names are stored as ASCII, in the editor the same way as on the server.
+* Organization data: Settings take the kind of business, founding date, area served, opening hours and profiles, and the front page describes the organization as Organization or local business in JSON-LD. Posts name the same organization as publisher. The ability leitvia/set-organization writes these values, leitvia/get-seo returns them.
+* The site audit leitvia/audit-site warns when Gravity Forms uses a captcha add-on, a reCAPTCHA field or Simple Cloudflare Turnstile, because the captcha sends the IP address of the visitor to its provider before any consent, and names other captcha plugins that may do the same.
+* leitvia/update-block sets block styles on every core block with registered styles, such as Media right on media and text.
+* update-block and insert set the Map block: coordinates, zoom, markers, height, heading and link text, and the list of places is built again. A button whose link a binding fills drops its saved link with url "", and leitvia/audit-site checks such links with the bound value. The zoom and close buttons of the map are translatable.
+* Settings show the cleaned lists after saving and name the providers they dropped.
+* New abilities leitvia/set-site-identity (site title, tagline, logo and site icon), leitvia/set-front-page (a page as the static front page, 0 for the latest posts) and leitvia/get-consent-providers and leitvia/set-consent-providers for the providers of the block Embed behind consent. Like every setting they wait in a change package.
+* New abilities leitvia/trash-content and leitvia/delete-media. A post goes to the trash and stays restorable; the front page, the posts page, the privacy policy page and pages with subpages are refused. A file is deleted only while no published content and no site setting uses it, or with force. A person always decides.
+* New ability leitvia/set-motion sets the motion of the whole site to off, subtle or bold. leitvia/audit-site reports uneven motion as leitvia/motion: a strength of its own on a block, fade next to rise, more than one kind of striking effect, more than 3 striking or 6 animated blocks on a page.
+* leitvia/add-media takes local videos, MP4 with H.264 or WebM up to 50 MB (filter leitvia_studio_max_video_bytes), with a poster from the media library and a caption. leitvia/update-block sets align on video, audio and embed blocks.
+* compose-page and update-block take the edits anchor (an HTML anchor, unique on the page), columns (the column count of a grid) and insert (a block of the catalog after another block, never as markup); compose-page also takes catalog attributes, and timeline entries take date, dateLabel and heading.
+* leitvia/replace-pattern swaps any top-level section for an approved pattern, with edits as in compose-page; texts and button links of the old section move over unless carry is false. leitvia/update-content moves a page below another page with parent. leitvia/define-content-type refuses an address that a published page or another public type already has.
+* leitvia/list-blocks names the registered block styles of every block, core blocks included. List abilities return the notices of their entries. update-block and update-content change the text of an icon list item like a list item, and null for an attribute the block lacks changes nothing.
+* Checks: content contrast measures a text on its own ground or the ground around it, Inverse included; the composition check takes the tone of a section from its outer block; hidden headings do not count in the heading check; font_not_bundled suggests the bundled family with the closest name; broken block comments are refused with leitvia_unsafe_content.
+* The filter leitvia_studio_heading_blocks tells the heading check the level of blocks that render on the server. The patterns of Studio fade in like all others.
+
 = 1.3.46 =
 * The readme spells out the labels of the consent placeholder ("Load content from YouTube") instead of a placeholder in angle brackets, which the readme parser of WordPress.org removed.
 * German: the AI connector is called Konnektor and its screen Einstellungen, Konnektoren, as in WordPress itself; the approvals of the AI plugin are Konnektor-Freigaben.
@@ -296,7 +317,4 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * The token of the contact form expires after 7 days (filter leitvia_studio_contact_form_max_age). Deleting Studio with its data also removes the meta fields of AI generated posts and their sources.
 * Fixes: the consent settings block stays valid when the editor runs in another language than the one it was saved in; list-product-reviews with unrated false over GET no longer filters; icons whose SVG contains a dollar sign render whole; the rating block in the editor formats numbers in the language of the site.
 
-= 1.3.42 =
-* Icons train front and bike (116 Lucide icons), for the stops of the route in Leitvia Pro.
-
-Older versions, 1.0.0 to 1.3.41: [changelog.txt](https://github.com/cmsadmins/leitvia-studio/blob/main/changelog.txt).
+Older versions, 1.0.0 to 1.3.42: [changelog.txt](https://github.com/cmsadmins/leitvia-studio/blob/main/changelog.txt).

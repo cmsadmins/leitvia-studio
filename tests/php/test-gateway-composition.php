@@ -100,7 +100,7 @@ class Test_Gateway_Composition extends WP_UnitTestCase {
 	 */
 	public function test_fixture_parity( array $fixture ): void {
 		$contract = array( 'labPatterns' => $fixture['labPatterns'] ?? array() ) + self::contract();
-		$result   = Composition::score( $fixture['sections'], $contract, (string) ( $fixture['template'] ?? '' ) );
+		$result   = Composition::score( $fixture['sections'], $contract, (string) ( $fixture['template'] ?? '' ), (array) ( $fixture['tones'] ?? array() ) );
 		$this->assertSame( $fixture['issues'], array_map( static fn( array $issue ): array => array( $issue['rule'], $issue['index'] ), $result['issues'] ) );
 		$this->assertSame( $fixture['score'], $result['score'] );
 	}
@@ -137,6 +137,38 @@ class Test_Gateway_Composition extends WP_UnitTestCase {
 			. "\n\n" . '<!-- wp:group {"metadata":{"patternName":"leitvia/cta-banner"}} --><div class="wp-block-group"></div><!-- /wp:group -->';
 		$this->assertSame( array( 'leitvia/hero-centered', 'core/paragraph', 'leitvia/cta-banner' ), Composition::sections( $markup ) );
 		$this->assertSame( array(), Composition::sections( '<!-- wp:paragraph --><p>Text</p><!-- /wp:paragraph -->' ) );
+	}
+
+	/**
+	 * A section made dark on its root block (Inverse, ink or accent ground) counts with that tone: a stage switched to
+	 * Inverse breaks a run of light sections, so a saved page scores like its tones and not like its patterns.
+	 */
+	public function test_tones_from_markup(): void {
+		$markup = '<!-- wp:template-part {"slug":"header"} /-->'
+			. '<!-- wp:group {"metadata":{"patternName":"leitvia/hero-split-image"},"className":"is-style-inverse","backgroundColor":"surface"} --><div class="wp-block-group is-style-inverse"></div><!-- /wp:group -->'
+			. '<!-- wp:group {"metadata":{"patternName":"leitvia/content-faq"},"backgroundColor":"surface-alt"} --><div class="wp-block-group"></div><!-- /wp:group -->'
+			. '<!-- wp:group {"metadata":{"patternName":"leitvia/cta-banner"},"backgroundColor":"accent"} --><div class="wp-block-group"></div><!-- /wp:group -->';
+		$this->assertSame(
+			array(
+				0 => 'ink',
+				2 => 'accent',
+			),
+			Composition::tones( $markup )
+		);
+
+		$slugs  = array( 'leitvia/hero-split-image', 'leitvia/content-feature-grid', 'leitvia/content-faq', 'leitvia/teaser-services', 'leitvia/content-steps', 'leitvia/cta-contact' );
+		$light  = self::page_markup( $slugs );
+		$dark   = str_replace( '{"metadata":{"patternName":"leitvia/content-faq"}}', '{"metadata":{"patternName":"leitvia/content-faq"},"className":"is-style-inverse"}', $light );
+		$create = fn( string $content ): int => self::factory()->post->create(
+			array(
+				'post_type'    => 'page',
+				'post_status'  => 'publish',
+				'post_content' => $content,
+				'meta_input'   => array( '_wp_page_template' => 'page-landing' ),
+			)
+		);
+		$this->assertSame( 85, Read_Composition::check( array( 'post' => $create( $light ) ) )['score'] );
+		$this->assertSame( 95, Read_Composition::check( array( 'post' => $create( $dark ) ) )['score'] );
 	}
 
 	/**

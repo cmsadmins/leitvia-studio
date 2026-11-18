@@ -2,6 +2,15 @@
 	"$comment": "Cases for Block_Edit::apply(): markup, block ID, change, and either the expected markup or the rejection code.",
 	"cases": [
 		{
+			"name": "text of an icon list item in its span, the icon stays in the comment",
+			"content": "<!-- wp:leitvia/icon-list -->\n<ul role=\"list\" class=\"wp-block-leitvia-icon-list\"><!-- wp:leitvia/icon-list-item {\"icon\":\"wallet\"} -->\n<li class=\"wp-block-leitvia-icon-list-item\"><span class=\"wp-block-leitvia-icon-list-item__text\">Pay</span></li>\n<!-- /wp:leitvia/icon-list-item --><!-- wp:leitvia/icon-list-item {\"icon\":\"wallet\"} -->\n<li class=\"wp-block-leitvia-icon-list-item\"><span class=\"wp-block-leitvia-icon-list-item__text\">Tools</span></li>\n<!-- /wp:leitvia/icon-list-item --></ul>\n<!-- /wp:leitvia/icon-list -->",
+			"block": "p:0.1",
+			"change": {
+				"text": "Paid overtime & a van"
+			},
+			"expect": "<!-- wp:leitvia/icon-list -->\n<ul role=\"list\" class=\"wp-block-leitvia-icon-list\"><!-- wp:leitvia/icon-list-item {\"icon\":\"wallet\"} -->\n<li class=\"wp-block-leitvia-icon-list-item\"><span class=\"wp-block-leitvia-icon-list-item__text\">Pay</span></li>\n<!-- /wp:leitvia/icon-list-item --><!-- wp:leitvia/icon-list-item {\"icon\":\"wallet\"} -->\n<li class=\"wp-block-leitvia-icon-list-item\"><span class=\"wp-block-leitvia-icon-list-item__text\">Paid overtime &amp; a van</span></li>\n<!-- /wp:leitvia/icon-list-item --></ul>\n<!-- /wp:leitvia/icon-list -->"
+		},
+		{
 			"name": "text of a paragraph inside a group keeps the group and its placeholders",
 			"content": "<!-- wp:group -->\n<div class=\"wp-block-group\"><!-- wp:paragraph -->\n<p>Old <strong>text</strong></p>\n<!-- /wp:paragraph -->\n\n<!-- wp:paragraph -->\n<p>Stays</p>\n<!-- /wp:paragraph --></div>\n<!-- /wp:group -->",
 			"block": "p:0.0",
@@ -222,6 +231,226 @@
 				"text": "New"
 			},
 			"expect": "<!-- wp:paragraph {\"metadata\":{\"bindings\":{\"content\":{\"source\":\"core/pattern-overrides\"}},\"name\":\"Intro\"}} -->\n<p>New</p>\n<!-- /wp:paragraph -->"
+		},
+		{
+			"name": "anchor of a heading is the id of its element",
+			"content": "<!-- wp:heading -->\n<h2 class=\"wp-block-heading\">Contact</h2>\n<!-- /wp:heading -->",
+			"block": "p:0",
+			"change": {
+				"anchor": "contact"
+			},
+			"expect": "<!-- wp:heading -->\n<h2 id=\"contact\" class=\"wp-block-heading\">Contact</h2>\n<!-- /wp:heading -->"
+		},
+		{
+			"name": "anchor from attributes of a group replaces its id",
+			"content": "<!-- wp:group {\"layout\":{\"type\":\"constrained\"}} -->\n<div id=\"old\" class=\"wp-block-group\"><!-- wp:paragraph -->\n<p>Text</p>\n<!-- /wp:paragraph --></div>\n<!-- /wp:group -->",
+			"block": "p:0",
+			"change": {
+				"attributes": {
+					"anchor": "opening-hours"
+				}
+			},
+			"expect": "<!-- wp:group {\"layout\":{\"type\":\"constrained\"}} -->\n<div id=\"opening-hours\" class=\"wp-block-group\"><!-- wp:paragraph -->\n<p>Text</p>\n<!-- /wp:paragraph --></div>\n<!-- /wp:group -->"
+		},
+		{
+			"name": "an empty anchor removes the id",
+			"content": "<!-- wp:heading -->\n<h2 class=\"wp-block-heading\" id=\"contact\">Contact</h2>\n<!-- /wp:heading -->",
+			"block": "p:0",
+			"change": {
+				"anchor": ""
+			},
+			"expect": "<!-- wp:heading -->\n<h2 class=\"wp-block-heading\">Contact</h2>\n<!-- /wp:heading -->"
+		},
+		{
+			"name": "anchor of a block without markup lives in its comment",
+			"content": "<!-- wp:leitvia/timeline-item /-->",
+			"block": "p:0",
+			"change": {
+				"anchor": "start"
+			},
+			"expect": "<!-- wp:leitvia/timeline-item {\"anchor\":\"start\"} /-->"
+		},
+		{
+			"name": "anchor on a block without the support is refused",
+			"content": "<!-- wp:leitvia/consent-embed {\"url\":\"https://planner.example.com/embed\"} /-->",
+			"block": "p:0",
+			"change": {
+				"anchor": "planner"
+			},
+			"error": "leitvia_invalid_input"
+		},
+		{
+			"name": "anchor with a space is refused",
+			"content": "<!-- wp:heading -->\n<h2 class=\"wp-block-heading\">Contact</h2>\n<!-- /wp:heading -->",
+			"block": "p:0",
+			"change": {
+				"anchor": "our contact"
+			},
+			"error": "leitvia_invalid_input"
+		},
+		{
+			"name": "anchor the template gives the page is refused",
+			"content": "<!-- wp:heading -->\n<h2 class=\"wp-block-heading\">Contact</h2>\n<!-- /wp:heading -->",
+			"block": "p:0",
+			"change": {
+				"anchor": "main"
+			},
+			"error": "leitvia_invalid_input"
+		},
+		{
+			"name": "anchor that another block has is refused",
+			"content": "<!-- wp:heading -->\n<h2 class=\"wp-block-heading\" id=\"contact\">Contact</h2>\n<!-- /wp:heading -->\n\n<!-- wp:paragraph -->\n<p>Write to us.</p>\n<!-- /wp:paragraph -->",
+			"block": "p:1",
+			"change": {
+				"anchor": "contact"
+			},
+			"error": "leitvia_invalid_input"
+		},
+		{
+			"name": "columns of a grid change its layout only",
+			"content": "<!-- wp:group {\"layout\":{\"type\":\"grid\",\"columnCount\":3,\"minimumColumnWidth\":\"17rem\"}} -->\n<div class=\"wp-block-group\"><!-- wp:paragraph -->\n<p>One</p>\n<!-- /wp:paragraph --></div>\n<!-- /wp:group -->",
+			"block": "p:0",
+			"change": {
+				"columns": 2
+			},
+			"expect": "<!-- wp:group {\"layout\":{\"type\":\"grid\",\"columnCount\":2,\"minimumColumnWidth\":\"17rem\"}} -->\n<div class=\"wp-block-group\"><!-- wp:paragraph -->\n<p>One</p>\n<!-- /wp:paragraph --></div>\n<!-- /wp:group -->"
+		},
+		{
+			"name": "columns of a group without grid are refused",
+			"content": "<!-- wp:group {\"layout\":{\"type\":\"constrained\"}} -->\n<div class=\"wp-block-group\"><!-- wp:paragraph -->\n<p>One</p>\n<!-- /wp:paragraph --></div>\n<!-- /wp:group -->",
+			"block": "p:0",
+			"change": {
+				"columns": 2
+			},
+			"error": "leitvia_invalid_input"
+		},
+		{
+			"name": "date, label and heading of a timeline entry",
+			"content": "<!-- wp:leitvia/timeline-item -->\n<li class=\"wp-block-leitvia-timeline-item\"><time class=\"wp-block-leitvia-timeline-item__date\" datetime=\"2019\">2019</time><h3 class=\"wp-block-leitvia-timeline-item__heading\">Founded</h3><div class=\"wp-block-leitvia-timeline-item__content\"><!-- wp:paragraph -->\n<p>Two designers start the studio.</p>\n<!-- /wp:paragraph --></div></li>\n<!-- /wp:leitvia/timeline-item -->",
+			"block": "p:0",
+			"change": {
+				"attributes": {
+					"date": "2021-05",
+					"dateLabel": "May 2021",
+					"heading": "New workshop"
+				}
+			},
+			"expect": "<!-- wp:leitvia/timeline-item -->\n<li class=\"wp-block-leitvia-timeline-item\"><time class=\"wp-block-leitvia-timeline-item__date\" datetime=\"2021-05\">May 2021</time><h3 class=\"wp-block-leitvia-timeline-item__heading\">New workshop</h3><div class=\"wp-block-leitvia-timeline-item__content\"><!-- wp:paragraph -->\n<p>Two designers start the studio.</p>\n<!-- /wp:paragraph --></div></li>\n<!-- /wp:leitvia/timeline-item -->"
+		},
+		{
+			"name": "an empty date of a timeline entry makes its label a span",
+			"content": "<!-- wp:leitvia/timeline-item -->\n<li class=\"wp-block-leitvia-timeline-item\"><time class=\"wp-block-leitvia-timeline-item__date\" datetime=\"2019\">2019</time><h3 class=\"wp-block-leitvia-timeline-item__heading\">Founded</h3><div class=\"wp-block-leitvia-timeline-item__content\"><!-- wp:paragraph -->\n<p>Two designers start the studio.</p>\n<!-- /wp:paragraph --></div></li>\n<!-- /wp:leitvia/timeline-item -->",
+			"block": "p:0",
+			"change": {
+				"attributes": {
+					"date": "",
+					"dateLabel": "First journey"
+				}
+			},
+			"expect": "<!-- wp:leitvia/timeline-item -->\n<li class=\"wp-block-leitvia-timeline-item\"><span class=\"wp-block-leitvia-timeline-item__date\">First journey</span><h3 class=\"wp-block-leitvia-timeline-item__heading\">Founded</h3><div class=\"wp-block-leitvia-timeline-item__content\"><!-- wp:paragraph -->\n<p>Two designers start the studio.</p>\n<!-- /wp:paragraph --></div></li>\n<!-- /wp:leitvia/timeline-item -->"
+		},
+		{
+			"name": "a date of a timeline entry that is no date is refused",
+			"content": "<!-- wp:leitvia/timeline-item -->\n<li class=\"wp-block-leitvia-timeline-item\"><time class=\"wp-block-leitvia-timeline-item__date\" datetime=\"2019\">2019</time><h3 class=\"wp-block-leitvia-timeline-item__heading\">Founded</h3><div class=\"wp-block-leitvia-timeline-item__content\"><!-- wp:paragraph -->\n<p>Two designers start the studio.</p>\n<!-- /wp:paragraph --></div></li>\n<!-- /wp:leitvia/timeline-item -->",
+			"block": "p:0",
+			"change": {
+				"attributes": {
+					"date": "May 2021"
+				}
+			},
+			"error": "leitvia_invalid_input"
+		},
+		{
+			"name": "a map rebuilds its list of places from markers, zoom, height and link text; the wrapper keeps its anchor",
+			"content": "<!-- wp:leitvia/map {\"markers\":[{\"title\":\"Office\",\"address\":\"Alexanderplatz 1, Berlin\",\"lat\":52.5219,\"lng\":13.4132}]} -->\n<div class=\"wp-block-leitvia-map is-height-medium\" id=\"find-us\"><h2 class=\"wp-block-leitvia-map__heading\">Our office</h2><ul class=\"wp-block-leitvia-map__places\"><li><strong>Office</strong><span>Alexanderplatz 1, Berlin</span><a href=\"https://www.openstreetmap.org/?mlat=52.5219&amp;mlon=13.4132#map=13/52.5219/13.4132\">View on OpenStreetMap</a></li></ul></div>\n<!-- /wp:leitvia/map -->",
+			"block": "p:0",
+			"change": {
+				"attributes": {
+					"zoom": 15,
+					"height": "large",
+					"linkText": "Directions",
+					"markers": [
+						{
+							"title": "Workshop",
+							"address": "Main street 1",
+							"lat": 48.1,
+							"lng": 11.5
+						},
+						{
+							"title": "Store",
+							"lat": 48.2,
+							"lng": 11.6
+						}
+					]
+				}
+			},
+			"expect": "<!-- wp:leitvia/map {\"zoom\":15,\"height\":\"large\",\"linkText\":\"Directions\",\"markers\":[{\"title\":\"Workshop\",\"address\":\"Main street 1\",\"lat\":48.1,\"lng\":11.5},{\"title\":\"Store\",\"lat\":48.2,\"lng\":11.6}]} -->\n<div class=\"wp-block-leitvia-map is-height-large\" id=\"find-us\"><h2 class=\"wp-block-leitvia-map__heading\">Our office</h2><ul class=\"wp-block-leitvia-map__places\"><li><strong>Workshop</strong><span>Main street 1</span><a href=\"https://www.openstreetmap.org/?mlat=48.1&amp;mlon=11.5#map=15/48.1/11.5\">Directions</a></li><li><strong>Store</strong><a href=\"https://www.openstreetmap.org/?mlat=48.2&amp;mlon=11.6#map=15/48.2/11.6\">Directions</a></li></ul></div>\n<!-- /wp:leitvia/map -->"
+		},
+		{
+			"name": "the text of a map is its heading",
+			"content": "<!-- wp:leitvia/map {\"markers\":[{\"title\":\"Office\",\"address\":\"Alexanderplatz 1, Berlin\",\"lat\":52.5219,\"lng\":13.4132}]} -->\n<div class=\"wp-block-leitvia-map is-height-medium\" id=\"find-us\"><h2 class=\"wp-block-leitvia-map__heading\">Our office</h2><ul class=\"wp-block-leitvia-map__places\"><li><strong>Office</strong><span>Alexanderplatz 1, Berlin</span><a href=\"https://www.openstreetmap.org/?mlat=52.5219&amp;mlon=13.4132#map=13/52.5219/13.4132\">View on OpenStreetMap</a></li></ul></div>\n<!-- /wp:leitvia/map -->",
+			"block": "p:0",
+			"change": {
+				"text": "Visit us & say hello"
+			},
+			"expect": "<!-- wp:leitvia/map {\"markers\":[{\"title\":\"Office\",\"address\":\"Alexanderplatz 1, Berlin\",\"lat\":52.5219,\"lng\":13.4132}]} -->\n<div class=\"wp-block-leitvia-map is-height-medium\" id=\"find-us\"><h2 class=\"wp-block-leitvia-map__heading\">Visit us &amp; say hello</h2><ul class=\"wp-block-leitvia-map__places\"><li><strong>Office</strong><span>Alexanderplatz 1, Berlin</span><a href=\"https://www.openstreetmap.org/?mlat=52.5219&amp;mlon=13.4132#map=13/52.5219/13.4132\">View on OpenStreetMap</a></li></ul></div>\n<!-- /wp:leitvia/map -->"
+		},
+		{
+			"name": "the center of a map lives in its comment, an empty heading goes",
+			"content": "<!-- wp:leitvia/map {\"markers\":[{\"title\":\"Office\",\"address\":\"Alexanderplatz 1, Berlin\",\"lat\":52.5219,\"lng\":13.4132}]} -->\n<div class=\"wp-block-leitvia-map is-height-medium\" id=\"find-us\"><h2 class=\"wp-block-leitvia-map__heading\">Our office</h2><ul class=\"wp-block-leitvia-map__places\"><li><strong>Office</strong><span>Alexanderplatz 1, Berlin</span><a href=\"https://www.openstreetmap.org/?mlat=52.5219&amp;mlon=13.4132#map=13/52.5219/13.4132\">View on OpenStreetMap</a></li></ul></div>\n<!-- /wp:leitvia/map -->",
+			"block": "p:0",
+			"change": {
+				"attributes": {
+					"lat": 48.1,
+					"lng": 11.5,
+					"heading": ""
+				}
+			},
+			"expect": "<!-- wp:leitvia/map {\"lat\":48.1,\"lng\":11.5,\"markers\":[{\"title\":\"Office\",\"address\":\"Alexanderplatz 1, Berlin\",\"lat\":52.5219,\"lng\":13.4132}]} -->\n<div class=\"wp-block-leitvia-map is-height-medium\" id=\"find-us\"><ul class=\"wp-block-leitvia-map__places\"><li><strong>Office</strong><span>Alexanderplatz 1, Berlin</span><a href=\"https://www.openstreetmap.org/?mlat=52.5219&amp;mlon=13.4132#map=13/52.5219/13.4132\">View on OpenStreetMap</a></li></ul></div>\n<!-- /wp:leitvia/map -->"
+		},
+		{
+			"name": "a marker of a map without coordinates is refused",
+			"content": "<!-- wp:leitvia/map {\"markers\":[{\"title\":\"Office\",\"address\":\"Alexanderplatz 1, Berlin\",\"lat\":52.5219,\"lng\":13.4132}]} -->\n<div class=\"wp-block-leitvia-map is-height-medium\" id=\"find-us\"><h2 class=\"wp-block-leitvia-map__heading\">Our office</h2><ul class=\"wp-block-leitvia-map__places\"><li><strong>Office</strong><span>Alexanderplatz 1, Berlin</span><a href=\"https://www.openstreetmap.org/?mlat=52.5219&amp;mlon=13.4132#map=13/52.5219/13.4132\">View on OpenStreetMap</a></li></ul></div>\n<!-- /wp:leitvia/map -->",
+			"block": "p:0",
+			"change": {
+				"attributes": {
+					"markers": [
+						{
+							"title": "Workshop"
+						}
+					]
+				}
+			},
+			"error": "leitvia_invalid_input"
+		},
+		{
+			"name": "an empty url removes the saved link of a button whose url a binding fills",
+			"content": "<!-- wp:buttons -->\n<div class=\"wp-block-buttons\"><!-- wp:button {\"metadata\":{\"bindings\":{\"url\":{\"source\":\"example/apply\"}}}} -->\n<div class=\"wp-block-button\"><a class=\"wp-block-button__link wp-element-button\" href=\"/old-sample/\">Apply now</a></div>\n<!-- /wp:button --></div>\n<!-- /wp:buttons -->",
+			"block": "p:0.0",
+			"change": {
+				"url": ""
+			},
+			"expect": "<!-- wp:buttons -->\n<div class=\"wp-block-buttons\"><!-- wp:button {\"metadata\":{\"bindings\":{\"url\":{\"source\":\"example/apply\"}}}} -->\n<div class=\"wp-block-button\"><a class=\"wp-block-button__link wp-element-button\" >Apply now</a></div>\n<!-- /wp:button --></div>\n<!-- /wp:buttons -->"
+		},
+		{
+			"name": "the url attribute null removes the saved link of a bound button as well",
+			"content": "<!-- wp:buttons -->\n<div class=\"wp-block-buttons\"><!-- wp:button {\"metadata\":{\"bindings\":{\"url\":{\"source\":\"example/apply\"}}}} -->\n<div class=\"wp-block-button\"><a class=\"wp-block-button__link wp-element-button\" href=\"/old-sample/\">Apply now</a></div>\n<!-- /wp:button --></div>\n<!-- /wp:buttons -->",
+			"block": "p:0.0",
+			"change": {
+				"attributes": {
+					"url": null
+				}
+			},
+			"expect": "<!-- wp:buttons -->\n<div class=\"wp-block-buttons\"><!-- wp:button {\"metadata\":{\"bindings\":{\"url\":{\"source\":\"example/apply\"}}}} -->\n<div class=\"wp-block-button\"><a class=\"wp-block-button__link wp-element-button\" >Apply now</a></div>\n<!-- /wp:button --></div>\n<!-- /wp:buttons -->"
+		},
+		{
+			"name": "a new url of a bound button is still refused",
+			"content": "<!-- wp:buttons -->\n<div class=\"wp-block-buttons\"><!-- wp:button {\"metadata\":{\"bindings\":{\"url\":{\"source\":\"example/apply\"}}}} -->\n<div class=\"wp-block-button\"><a class=\"wp-block-button__link wp-element-button\" href=\"/old-sample/\">Apply now</a></div>\n<!-- /wp:button --></div>\n<!-- /wp:buttons -->",
+			"block": "p:0.0",
+			"change": {
+				"url": "/apply/"
+			},
+			"error": "leitvia_invalid_input"
 		}
 	]
 }

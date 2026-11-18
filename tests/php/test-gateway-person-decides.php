@@ -298,6 +298,22 @@ class Test_Gateway_Person_Decides extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Set-motion waits for a person and keeps the other settings; once applied blocks without leitviaMotion get the new
+	 * strength. A value outside off, subtle and bold is refused.
+	 */
+	public function test_motion(): void {
+		update_option( \LeitviaStudio\Admin\Settings::OPTION, array( 'organization_city' => 'Kassel' ) + \LeitviaStudio\Admin\Settings::DEFAULTS );
+		$package = $this->assert_package( self::call( 'leitvia/set-motion', array( 'motion' => 'bold' ) ) );
+		$this->assertSame( 'subtle', \LeitviaStudio\Blocks\Animation::site() );
+		$this->apply_as_person( $package );
+		$this->assertSame( 'bold', \LeitviaStudio\Blocks\Animation::site() );
+		$this->assertSame( 'Kassel', leitvia_studio_setting( 'organization_city' ) );
+		$this->assertStringContainsString( 'is-lv-motion-bold', do_blocks( '<!-- wp:paragraph {"leitviaAnimation":"fade"} --><p>A</p><!-- /wp:paragraph -->' ) );
+		$this->assertWPError( self::call( 'leitvia/set-motion', array( 'motion' => 'loud' ) ) );
+		$this->assertWPError( self::call( 'leitvia/set-motion', array() ) );
+	}
+
+	/**
 	 * The posts page is a setting like the others: an agent proposes an existing page, a person applies it, and the
 	 * front page or a page that does not exist are refused.
 	 */
@@ -322,5 +338,165 @@ class Test_Gateway_Person_Decides extends WP_UnitTestCase {
 		}
 		update_option( 'show_on_front', 'posts' );
 		$this->assertStringContainsString( 'static front page', (string) self::call( 'leitvia/set-posts-page', array( 'page' => $page ) )['notice'] );
+	}
+
+	/**
+	 * Asserts that a call with several operations waits in one package and returns its ID.
+	 *
+	 * @param mixed $result Result.
+	 */
+	private function assert_batch_package( $result ): int {
+		$this->assertIsArray( $result, is_wp_error( $result ) ? $result->get_error_code() . ': ' . $result->get_error_message() : '' );
+		$this->assertSame( 'package', $result['mode'], (string) wp_json_encode( $result ) );
+		$this->assertGreaterThan( 0, $result['package'] );
+		return (int) $result['package'];
+	}
+
+	/**
+	 * Applies a package as the administrator and signs the agent in again.
+	 *
+	 * @param int $package Package ID.
+	 */
+	private function apply_as_person( int $package ): void {
+		wp_set_current_user( $this->admin );
+		$report = Packages::apply( $package );
+		$this->assertSame( 'applied', $report['state'], (string) wp_json_encode( $report ) );
+		wp_set_current_user( $this->agent );
+	}
+
+	/**
+	 * Title, tagline, logo and icon wait for a person; once applied core/site-title and core/site-logo show them and
+	 * WordPress returns the logo as custom_logo. A small icon gets a notice; a post that is no image, an empty call
+	 * and a title without text are refused.
+	 */
+	public function test_site_identity(): void {
+		$image   = self::factory()->attachment->create_upload_object( dirname( __DIR__ ) . '/fixtures/avatar.png', 0 );
+		$result  = self::call(
+			'leitvia/set-site-identity',
+			array(
+				'title'   => 'Example Studio',
+				'tagline' => 'Furniture made to measure',
+				'logo'    => $image,
+				'icon'    => $image,
+			)
+		);
+		$package = $this->assert_batch_package( $result );
+		$this->assertCount( 4, $result['items'] );
+		$this->assertStringContainsString( '512 pixels', (string) $result['notice'] );
+		$this->assertNotSame( 'Example Studio', get_option( 'blogname' ) );
+		$this->apply_as_person( $package );
+		$this->assertSame( 'Example Studio', get_option( 'blogname' ) );
+		$this->assertSame( 'Furniture made to measure', get_option( 'blogdescription' ) );
+		$this->assertSame( $image, (int) get_option( 'site_icon' ) );
+		$this->assertSame( $image, (int) get_theme_mod( 'custom_logo' ) );
+		$this->assertStringContainsString( 'Example Studio', do_blocks( '<!-- wp:site-title /-->' ) );
+		$this->assertStringContainsString( (string) wp_get_attachment_url( $image ), do_blocks( '<!-- wp:site-logo /-->' ) );
+
+		$rejected = self::call( 'leitvia/set-site-identity', array( 'logo' => self::factory()->post->create() ) );
+		$this->assertWPError( $rejected );
+		$this->assertSame( 'logo', $rejected->get_error_data()['reason'] );
+		$this->assertWPError( self::call( 'leitvia/set-site-identity', array() ) );
+		$this->assertWPError( self::call( 'leitvia/set-site-identity', array( 'title' => '<b></b>' ) ) );
+	}
+
+	/**
+	 * The front page is a setting: a person applies it, 0 shows the latest posts again, the posts page is refused and
+	 * a draft gets a notice.
+	 */
+	public function test_front_page(): void {
+		$page  = self::factory()->post->create( array( 'post_type' => 'page' ) );
+		$posts = self::factory()->post->create( array( 'post_type' => 'page' ) );
+		update_option( 'show_on_front', 'posts' );
+		update_option( 'page_for_posts', $posts );
+		$result = self::call( 'leitvia/set-front-page', array( 'page' => $page ) );
+		$this->assertSame( '', (string) ( $result['notice'] ?? '' ) );
+		$this->apply_as_person( $this->assert_batch_package( $result ) );
+		$this->assertSame( 'page', get_option( 'show_on_front' ) );
+		$this->assertSame( $page, (int) get_option( 'page_on_front' ) );
+
+		$rejected = self::call( 'leitvia/set-front-page', array( 'page' => $posts ) );
+		$this->assertWPError( $rejected );
+		$this->assertSame( 'page', $rejected->get_error_data()['reason'] );
+		$this->assertWPError( self::call( 'leitvia/set-front-page', array( 'page' => 999999 ) ) );
+		$draft = self::factory()->post->create(
+			array(
+				'post_type'   => 'page',
+				'post_status' => 'draft',
+			)
+		);
+		$this->assertStringContainsString( 'not published', (string) self::call( 'leitvia/set-front-page', array( 'page' => $draft ) )['notice'] );
+
+		$this->apply_as_person( $this->assert_batch_package( self::call( 'leitvia/set-front-page', array( 'page' => 0 ) ) ) );
+		$this->assertSame( 'posts', get_option( 'show_on_front' ) );
+		$this->assertSame( 0, (int) get_option( 'page_on_front' ) );
+	}
+
+	/**
+	 * Providers are read with their hash and replaced as a whole, sanitized like the settings page: hosts lose scheme
+	 * and path, the key stays when the label changes, a stale hash and a provider without a valid host are refused.
+	 * Built-in services are listed apart.
+	 */
+	public function test_consent_providers(): void {
+		delete_option( \LeitviaStudio\Admin\Settings::OPTION );
+		$read = wp_get_ability( 'leitvia/get-consent-providers' )->execute();
+		$this->assertSame( array(), $read['providers'] );
+		$this->assertContains( 'youtube', array_column( $read['services'], 'key' ) );
+		$planner = array(
+			'label'   => 'Kitchen Planner',
+			'hosts'   => array( 'https://Planner.Example.com/embed' ),
+			'purpose' => 'Plans a kitchen in the browser.',
+			'privacy' => 'https://planner.example.com/privacy',
+		);
+		$result  = self::call(
+			'leitvia/set-consent-providers',
+			array(
+				'providers' => array( $planner ),
+				'base_hash' => $read['hash'],
+			)
+		);
+		$this->apply_as_person( $this->assert_package( $result ) );
+		$read = wp_get_ability( 'leitvia/get-consent-providers' )->execute();
+		$this->assertSame( array( 'planner.example.com' ), $read['providers'][0]['hosts'] );
+		$this->assertSame( 'kitchen-planner', $read['providers'][0]['key'] );
+		$this->assertNotContains( 'kitchen-planner', array_column( $read['services'], 'key' ) );
+		$this->assertArrayHasKey( 'kitchen-planner', \LeitviaStudio\Consent\Consent::services() );
+
+		$renamed = array(
+			'key'   => 'kitchen-planner',
+			'label' => 'Planner',
+		) + $planner;
+		$this->apply_as_person(
+			$this->assert_package(
+				self::call(
+					'leitvia/set-consent-providers',
+					array(
+						'providers' => array( $renamed ),
+						'base_hash' => $read['hash'],
+					)
+				)
+			)
+		);
+		$read = wp_get_ability( 'leitvia/get-consent-providers' )->execute();
+		$this->assertSame( array( 'kitchen-planner', 'Planner' ), array( $read['providers'][0]['key'], $read['providers'][0]['label'] ) );
+
+		$stale = self::call(
+			'leitvia/set-consent-providers',
+			array(
+				'providers' => array(),
+				'base_hash' => 'outdated',
+			)
+		);
+		$this->assertWPError( $stale );
+		$this->assertSame( 'leitvia_stale_hash', $stale->get_error_code() );
+		$invalid = self::call(
+			'leitvia/set-consent-providers',
+			array(
+				'providers' => array( $planner, array( 'hosts' => array( 'not a host' ) ) + $planner ),
+				'base_hash' => $read['hash'],
+			)
+		);
+		$this->assertWPError( $invalid );
+		$this->assertSame( 'providers', $invalid->get_error_data()['reason'] );
+		$this->assertStringContainsString( ': 2.', $invalid->get_error_message() );
 	}
 }

@@ -568,6 +568,55 @@ class Test_Gateway_Setup extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A public content type may not take the address of a published page, whose subpages would lead to a 404, nor
+	 * that of another public type; a free address passes, and defining the type again with its own address as well.
+	 */
+	public function test_define_content_type_refuses_a_taken_address(): void {
+		$this->set_permalink_structure( '/%postname%/' );
+		$this->sign_in( 'full', 'administrator' );
+		$page = self::factory()->post->create(
+			array(
+				'post_type'   => 'page',
+				'post_status' => 'publish',
+				'post_title'  => 'Services',
+				'post_name'   => 'services',
+			)
+		);
+		self::factory()->post->create(
+			array(
+				'post_type'   => 'page',
+				'post_status' => 'publish',
+				'post_parent' => $page,
+				'post_name'   => 'roofs',
+			)
+		);
+		$define = static fn( string $slug, string $label = 'Services' ): array => array(
+			'declaration' => array(
+				'version'   => 1,
+				'postTypes' => array(
+					'lv_service' => array(
+						'label'         => $label,
+						'singularLabel' => 'Service',
+						'public'        => true,
+						'slug'          => $slug,
+					),
+				),
+			),
+			'base_hash'   => Hashes::of( (string) wp_json_encode( get_option( Model::OPTION ) ) ),
+		);
+		$data   = $this->assert_rejected( 'leitvia_check_failed', self::call( 'leitvia/define-content-type', $define( 'services' ) ) );
+		$this->assertSame( '/postTypes/lv_service/slug', $data['findings'][0]['block'] );
+		$this->assertStringContainsString( 'ID ' . $page, $data['findings'][0]['message'] );
+		$data = $this->assert_rejected( 'leitvia_check_failed', self::call( 'leitvia/define-content-type', $define( 'category' ) ) );
+		$this->assertStringContainsString( 'category', $data['findings'][0]['message'] );
+		$this->assertSame( array(), Model::stored() );
+
+		$this->assert_mode( 'live', self::call( 'leitvia/define-content-type', $define( 'our-services' ) ) );
+		$this->assertIsArray( self::call( 'leitvia/define-content-type', $define( 'our-services', 'Our services' ) ) );
+		unregister_post_type( 'lv_service' );
+	}
+
+	/**
 	 * An entry that is defined again keeps what a person added: fields and repeater fields not in the input stay, the
 	 * input updates its own fields, supports and the post types of a taxonomy are joined, relations are replaced.
 	 */
@@ -1326,6 +1375,46 @@ class Test_Gateway_Setup extends WP_UnitTestCase {
 			'values the content sets stay, byte for byte'
 		);
 		$this->assertSame( '<!-- wp:site-title /-->', LeitviaStudio\Gateway\Abilities\Setup::keep_navigation( '<!-- wp:site-title /-->', '<!-- wp:navigation {"submenuVisibility":"click"} /-->' ) );
+	}
+
+	/**
+	 * A template part with a broken block comment is refused before anything is published: attributes that are no
+	 * valid JSON (core's parser would drop them), also next to a navigation whose settings would be kept, and a
+	 * delimiter that does not close, which would show as text. The part stays as it was.
+	 */
+	public function test_update_template_part_refuses_broken_block_comments(): void {
+		$this->sign_in( 'full' );
+		$this->assert_mode(
+			'live',
+			self::call(
+				'leitvia/update-template-part',
+				array(
+					'part'    => 'header',
+					'content' => '<!-- wp:navigation {"ref":4711} /-->',
+				)
+			)
+		);
+		$template = get_block_template( get_stylesheet() . '//header', 'wp_template_part' );
+		$stored   = get_post_field( 'post_content', $template->wp_id );
+		foreach ( array(
+			'trailing comma'     => '<!-- wp:group {"tagName":"header",} --><header class="wp-block-group"><!-- wp:site-title /--></header><!-- /wp:group -->',
+			'next to navigation' => '<!-- wp:group {"tagName":"header"} --><header class="wp-block-group"><!-- wp:site-title {"level":0,} /--><!-- wp:navigation /--></header><!-- /wp:group -->',
+			'unclosed comment'   => '<!-- wp:group {"tagName":"header"} --><header class="wp-block-group"><!-- wp:site-title {"level":0 /--></header><!-- /wp:group -->',
+		) as $case => $content ) {
+			$result = $this->assert_rejected(
+				'leitvia_unsafe_content',
+				self::call(
+					'leitvia/update-template-part',
+					array(
+						'part'      => 'header',
+						'content'   => $content,
+						'base_hash' => Hashes::document( $template->wp_id ),
+					)
+				)
+			);
+			$this->assertSame( 'block_comment', $result['reason'] ?? '', $case );
+			$this->assertSame( $stored, get_post_field( 'post_content', $template->wp_id ), $case );
+		}
 	}
 
 	/**

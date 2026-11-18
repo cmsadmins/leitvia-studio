@@ -1,9 +1,12 @@
 // Settings screen: the option leitvia_studio_settings on DataForm in three tabs (General, Privacy, Design and search),
 // saved at once through /wp/v2/settings with one button. Each field has one plain sentence; what an expert or the
 // privacy policy needs sits in a closed details block below the fields of its tab. The add-on list is on General.
-import { __, sprintf } from '@wordpress/i18n';
-import { useEffect, useState } from '@wordpress/element';
+// Lists (consent providers, area served, opening hours, profiles) are rows or text areas with one entry per line; the
+// server cleans them (Settings::sanitize()).
+import { __, _n, sprintf } from '@wordpress/i18n';
+import { useEffect, useRef, useState } from '@wordpress/element';
 import apiFetch from '@wordpress/api-fetch';
+import { speak } from '@wordpress/a11y';
 import { decodeEntities } from '@wordpress/html-entities';
 import { DataForm, DataViews } from '@wordpress/dataviews/wp';
 import {
@@ -12,6 +15,8 @@ import {
 	Flex,
 	RadioControl,
 	SelectControl,
+	TextControl,
+	TextareaControl,
 } from '@wordpress/components';
 import { errorText } from '../common';
 import Loading from '../loading';
@@ -129,6 +134,317 @@ function EditorialPage( { data, field, onChange } ) {
 	);
 }
 
+/**
+ * A list of texts as a text area with one entry per line. The text stays as typed while the list leaves out empty
+ * lines, so a new line can be started.
+ *
+ * @param {Object}                    props
+ * @param {string}                    props.label    Label.
+ * @param {string}                    props.help     Help text.
+ * @param {string[]}                  props.value    Entries.
+ * @param {(value: string[]) => void} props.onChange Called with the entries.
+ */
+function LinesControl( { label, help, value, onChange } ) {
+	const [ text, setText ] = useState( ( value ?? [] ).join( '\n' ) );
+	return (
+		<TextareaControl
+			__nextHasNoMarginBottom
+			label={ label }
+			help={ help }
+			rows={ 3 }
+			value={ text }
+			onChange={ ( next ) => {
+				setText( next );
+				onChange(
+					next
+						.split( '\n' )
+						.map( ( line ) => line.trim() )
+						.filter( Boolean )
+				);
+			} }
+		/>
+	);
+}
+
+// Settings organization_area_served and organization_same_as: one entry per line.
+function Lines( { data, field, onChange } ) {
+	return (
+		<LinesControl
+			label={ field.label }
+			help={ field.description }
+			value={ data[ field.id ] }
+			onChange={ ( entries ) => onChange( { [ field.id ]: entries } ) }
+		/>
+	);
+}
+
+/**
+ * Rows of a list setting: each row a group with its fields and a remove button, below them a button that adds a row.
+ * Adding and removing is announced; after removing, the focus goes to the add button.
+ *
+ * @param {Object}                                                                        props
+ * @param {string}                                                                        props.label    Legend of the list.
+ * @param {string}                                                                        props.help     Sentence below the legend.
+ * @param {Object[]}                                                                      props.rows     Rows.
+ * @param {Object}                                                                        props.blank    A new row.
+ * @param {string}                                                                        props.name     Name of a row with %d for its number, such as "Provider %d".
+ * @param {string}                                                                        props.add      Label of the add button.
+ * @param {(rows: Object[]) => void}                                                      props.onChange Called with the rows.
+ * @param {(row: Object, change: (changes: Object) => void) => import('react').ReactNode} props.children Fields of a row.
+ */
+function Rows( { label, help, rows, blank, name, add, onChange, children } ) {
+	const addButton = useRef();
+	const change = ( index ) => ( changes ) =>
+		onChange(
+			rows.map( ( row, i ) =>
+				i === index ? { ...row, ...changes } : row
+			)
+		);
+	return (
+		<fieldset className="leitvia-studio-settings__rows">
+			<legend>{ label }</legend>
+			<p>{ help }</p>
+			{ rows.map( ( row, index ) => {
+				const rowName = sprintf( name, index + 1 );
+				return (
+					// The count in the key renews the rows after adding or removing one, so a text area never keeps
+					// the text of the row that stood there before.
+					<fieldset key={ `${ rows.length }-${ index }` }>
+						<legend>{ rowName }</legend>
+						{ children( row, change( index ) ) }
+						<Flex justify="flex-start">
+							<Button
+								__next40pxDefaultSize
+								variant="secondary"
+								isDestructive
+								onClick={ () => {
+									onChange(
+										rows.filter( ( _, i ) => i !== index )
+									);
+									speak(
+										sprintf(
+											/* translators: %s: name of a row, such as Provider 2. */
+											__(
+												'%s removed.',
+												'leitvia-studio'
+											),
+											rowName
+										)
+									);
+									addButton.current?.focus();
+								} }
+							>
+								{ sprintf(
+									/* translators: %s: name of a row, such as Provider 2. */
+									__( 'Remove %s', 'leitvia-studio' ),
+									rowName
+								) }
+							</Button>
+						</Flex>
+					</fieldset>
+				);
+			} ) }
+			<Flex justify="flex-start">
+				<Button
+					ref={ addButton }
+					__next40pxDefaultSize
+					variant="secondary"
+					onClick={ () => {
+						onChange( [ ...rows, blank ] );
+						speak(
+							sprintf(
+								/* translators: %s: name of a row, such as Provider 2. */
+								__( '%s added.', 'leitvia-studio' ),
+								sprintf( name, rows.length + 1 )
+							)
+						);
+					} }
+				>
+					{ add }
+				</Button>
+			</Flex>
+		</fieldset>
+	);
+}
+
+// Setting consent_providers: providers of the block Embed behind consent with name, hosts, purpose and privacy policy.
+function Providers( { data, field, onChange } ) {
+	return (
+		<Rows
+			label={ field.label }
+			help={ field.description }
+			rows={ data.consent_providers ?? [] }
+			blank={ {
+				key: '',
+				label: '',
+				hosts: [],
+				purpose: '',
+				privacy: '',
+			} }
+			/* translators: %d: number of the provider in the list. */
+			name={ __( 'Provider %d', 'leitvia-studio' ) }
+			add={ __( 'Add provider', 'leitvia-studio' ) }
+			onChange={ ( rows ) => onChange( { consent_providers: rows } ) }
+		>
+			{ ( row, change ) => (
+				<>
+					<TextControl
+						__next40pxDefaultSize
+						__nextHasNoMarginBottom
+						label={ __( 'Name', 'leitvia-studio' ) }
+						value={ row.label }
+						onChange={ ( value ) => change( { label: value } ) }
+					/>
+					<LinesControl
+						label={ __( 'Hosts', 'leitvia-studio' ) }
+						help={ __(
+							'One host name per line, such as planner.example.com; its subdomains count too.',
+							'leitvia-studio'
+						) }
+						value={ row.hosts }
+						onChange={ ( hosts ) => change( { hosts } ) }
+					/>
+					<TextControl
+						__next40pxDefaultSize
+						__nextHasNoMarginBottom
+						label={ __( 'Purpose', 'leitvia-studio' ) }
+						help={ __(
+							'One sentence for the placeholder, shown before the sentence on the data the provider receives.',
+							'leitvia-studio'
+						) }
+						value={ row.purpose }
+						onChange={ ( purpose ) => change( { purpose } ) }
+					/>
+					<TextControl
+						__next40pxDefaultSize
+						__nextHasNoMarginBottom
+						type="url"
+						label={ __(
+							'Privacy policy of the provider',
+							'leitvia-studio'
+						) }
+						help={ __(
+							'Address starting with https://.',
+							'leitvia-studio'
+						) }
+						value={ row.privacy }
+						onChange={ ( privacy ) => change( { privacy } ) }
+					/>
+				</>
+			) }
+		</Rows>
+	);
+}
+
+// Days of opening hours as schema.org names them (Organization::DAYS), with their labels.
+const DAYS = [
+	[ 'Monday', __( 'Monday', 'leitvia-studio' ) ],
+	[ 'Tuesday', __( 'Tuesday', 'leitvia-studio' ) ],
+	[ 'Wednesday', __( 'Wednesday', 'leitvia-studio' ) ],
+	[ 'Thursday', __( 'Thursday', 'leitvia-studio' ) ],
+	[ 'Friday', __( 'Friday', 'leitvia-studio' ) ],
+	[ 'Saturday', __( 'Saturday', 'leitvia-studio' ) ],
+	[ 'Sunday', __( 'Sunday', 'leitvia-studio' ) ],
+];
+
+// Setting organization_opening_hours: rows of days with the time the business opens and closes.
+function OpeningHours( { data, field, onChange } ) {
+	return (
+		<Rows
+			label={ field.label }
+			help={ field.description }
+			rows={ data.organization_opening_hours ?? [] }
+			blank={ { days: [], opens: '08:00', closes: '17:00' } }
+			/* translators: %d: number of the row of opening hours. */
+			name={ __( 'Opening hours %d', 'leitvia-studio' ) }
+			add={ __( 'Add opening hours', 'leitvia-studio' ) }
+			onChange={ ( rows ) =>
+				onChange( { organization_opening_hours: rows } )
+			}
+		>
+			{ ( row, change ) => (
+				<>
+					<div className="leitvia-studio-settings__days">
+						{ DAYS.map( ( [ day, label ] ) => (
+							<CheckboxControl
+								key={ day }
+								__nextHasNoMarginBottom
+								label={ label }
+								checked={ row.days.includes( day ) }
+								onChange={ ( checked ) =>
+									change( {
+										days: DAYS.map( ( [ d ] ) => d ).filter(
+											( d ) =>
+												d === day
+													? checked
+													: row.days.includes( d )
+										),
+									} )
+								}
+							/>
+						) ) }
+					</div>
+					<TextControl
+						__next40pxDefaultSize
+						__nextHasNoMarginBottom
+						type="time"
+						label={ __( 'Opens', 'leitvia-studio' ) }
+						value={ row.opens }
+						onChange={ ( opens ) => change( { opens } ) }
+					/>
+					<TextControl
+						__next40pxDefaultSize
+						__nextHasNoMarginBottom
+						type="time"
+						label={ __( 'Closes', 'leitvia-studio' ) }
+						value={ row.closes }
+						onChange={ ( closes ) => change( { closes } ) }
+					/>
+				</>
+			) }
+		</Rows>
+	);
+}
+
+// Kinds of business of Organization::TYPES, in the same order.
+const ORGANIZATION_TYPES = [
+	{
+		value: 'Organization',
+		label: __( 'Organization, no local business', 'leitvia-studio' ),
+	},
+	{ value: 'LocalBusiness', label: __( 'Local business', 'leitvia-studio' ) },
+	{
+		value: 'HomeAndConstructionBusiness',
+		label: __( 'Trade or construction business', 'leitvia-studio' ),
+	},
+	{
+		value: 'GeneralContractor',
+		label: __( 'General contractor', 'leitvia-studio' ),
+	},
+	{ value: 'Electrician', label: __( 'Electrician', 'leitvia-studio' ) },
+	{ value: 'Plumber', label: __( 'Plumber', 'leitvia-studio' ) },
+	{
+		value: 'HVACBusiness',
+		label: __( 'Heating and air conditioning', 'leitvia-studio' ),
+	},
+	{ value: 'RoofingContractor', label: __( 'Roofer', 'leitvia-studio' ) },
+	{
+		value: 'HousePainter',
+		label: __( 'Painter and decorator', 'leitvia-studio' ),
+	},
+	{ value: 'AutoRepair', label: __( 'Car repair', 'leitvia-studio' ) },
+	{ value: 'Restaurant', label: __( 'Restaurant', 'leitvia-studio' ) },
+	{ value: 'Store', label: __( 'Shop', 'leitvia-studio' ) },
+	{
+		value: 'HealthAndBeautyBusiness',
+		label: __( 'Health and beauty', 'leitvia-studio' ),
+	},
+	{
+		value: 'LodgingBusiness',
+		label: __( 'Hotel or holiday home', 'leitvia-studio' ),
+	},
+];
+
 const FIELDS = [
 	{
 		id: 'hide_product_notes',
@@ -199,6 +515,16 @@ const FIELDS = [
 		type: 'text',
 	},
 	{
+		id: 'consent_providers',
+		label: __( 'Providers of embedded content', 'leitvia-studio' ),
+		description: __(
+			'Providers whose content the block Embed behind consent loads, such as a configurator or a booking tool. Each gets its own placeholder and its own "Always allow".',
+			'leitvia-studio'
+		),
+		type: 'array',
+		Edit: Providers,
+	},
+	{
 		id: 'guard_site_editor_contrast',
 		label: __(
 			'Block saving palettes that fail the contrast pairs in the Site Editor',
@@ -265,9 +591,58 @@ const FIELDS = [
 		type: 'email',
 	},
 	{
+		id: 'organization_type',
+		label: __( 'Kind of business', 'leitvia-studio' ),
+		description: __(
+			'Organization, or the kind of local business search engines show for your site.',
+			'leitvia-studio'
+		),
+		type: 'text',
+		Edit: 'select',
+		elements: ORGANIZATION_TYPES,
+	},
+	{
+		id: 'organization_founding_date',
+		label: __( 'Founded', 'leitvia-studio' ),
+		// A date in ISO format, not a range.
+		// eslint-disable-next-line @wordpress/i18n-hyphenated-range
+		description: __(
+			'The year, or year, month and day: 1962 or 1962-04-01.',
+			'leitvia-studio'
+		),
+		type: 'text',
+	},
+	{
+		id: 'organization_area_served',
+		label: __( 'Area served', 'leitvia-studio' ),
+		description: __( 'One town or region per line.', 'leitvia-studio' ),
+		type: 'array',
+		Edit: Lines,
+	},
+	{
+		id: 'organization_opening_hours',
+		label: __( 'Opening hours', 'leitvia-studio' ),
+		description: __(
+			'Only for a local business. One row per group of days with the same hours.',
+			'leitvia-studio'
+		),
+		type: 'array',
+		Edit: OpeningHours,
+	},
+	{
+		id: 'organization_same_as',
+		label: __( 'Profiles on other sites', 'leitvia-studio' ),
+		description: __(
+			'One address per line, starting with https://, such as your page in a business directory.',
+			'leitvia-studio'
+		),
+		type: 'array',
+		Edit: Lines,
+	},
+	{
 		id: 'news_schema',
 		label: __(
-			'Add structured data to posts and author pages',
+			'Add structured data to the front page, posts and author pages',
 			'leitvia-studio'
 		),
 		description: __(
@@ -474,6 +849,7 @@ function Privacy( { form } ) {
 				'consent_embeds',
 				'emoji_script',
 				'map_tile_url',
+				'consent_providers',
 			] ) }
 			<More
 				summary={ __(
@@ -513,6 +889,16 @@ function Privacy( { form } ) {
 						'leitvia-studio'
 					) }
 				/>
+				<Background
+					label={ __(
+						'Providers of embedded content:',
+						'leitvia-studio'
+					) }
+					text={ __(
+						'The block Embed behind consent shows a placeholder with the name, the purpose and the privacy policy of the provider until the visitor loads the content. Nothing is requested from the provider before that, not even a preview image, which comes from your media library. Name each provider in your privacy policy.',
+						'leitvia-studio'
+					) }
+				/>
 			</More>
 		</>
 	);
@@ -531,6 +917,11 @@ function DesignAndSearch( { form } ) {
 				'organization_country',
 				'organization_phone',
 				'organization_email',
+				'organization_type',
+				'organization_founding_date',
+				'organization_area_served',
+				'organization_opening_hours',
+				'organization_same_as',
 				'news_categories',
 				'news_sitemap',
 				'editorial_page',
@@ -558,10 +949,17 @@ function DesignAndSearch( { form } ) {
 					text={ sprintf(
 						/* translators: %s: product name. */
 						__(
-							'Prints JSON-LD for search engines: the article with author and publisher on posts, the author profile on author pages. %s skips it while an SEO plugin is active, so that plugin stays the only source.',
+							'Prints JSON-LD for search engines: the organization on the front page, the article with author and publisher on posts, the author profile on author pages. %s skips it while an SEO plugin is active, so that plugin stays the only source.',
 							'leitvia-studio'
 						),
 						BRAND
+					) }
+				/>
+				<Background
+					label={ __( 'Organization:', 'leitvia-studio' ) }
+					text={ __(
+						'Kind of business, address, founding date, area served, opening hours and profiles describe the organization on the front page, and posts name it as publisher. Opening hours appear only for a local business. Enter only facts that hold today: search engines show them next to your site.',
+						'leitvia-studio'
 					) }
 				/>
 				<Background
@@ -593,6 +991,8 @@ const TABS = [
 export default function Settings() {
 	const [ data, setData ] = useState( null );
 	const [ isSaving, setIsSaving ] = useState( false );
+	// Counts the saves: the tab renders anew with the cleaned values, so text areas of lists drop what the server dropped.
+	const [ saves, setSaves ] = useState( 0 );
 
 	useEffect( () => {
 		apiFetch( { path: `/wp/v2/settings?_fields=${ OPTION }` } )
@@ -616,7 +1016,27 @@ export default function Settings() {
 				data: { [ OPTION ]: data },
 			} );
 			setData( response[ OPTION ] );
+			setSaves( ( count ) => count + 1 );
 			notify( 'success', __( 'Settings saved.', 'leitvia-studio' ) );
+			// Providers without a name or a valid host are not saved (Consent::sanitize_providers()); say so.
+			const dropped =
+				( data.consent_providers ?? [] ).length -
+				( response[ OPTION ].consent_providers ?? [] ).length;
+			if ( dropped > 0 ) {
+				notify(
+					'warning',
+					sprintf(
+						/* translators: %d: number of providers. */
+						_n(
+							'%d provider was not saved: it needs a name and a valid host, and at most 20 providers are kept.',
+							'%d providers were not saved: each needs a name and a valid host, and at most 20 providers are kept.',
+							dropped,
+							'leitvia-studio'
+						),
+						dropped
+					)
+				);
+			}
 		} catch ( error ) {
 			notify(
 				'error',
@@ -663,7 +1083,7 @@ export default function Settings() {
 							gap={ 6 }
 							align="stretch"
 						>
-							<Tab form={ form } />
+							<Tab key={ saves } form={ form } />
 						</Flex>
 					) }
 				</Tabs>

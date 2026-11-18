@@ -23,6 +23,7 @@
 			],
 			"publisher": {
 				"@type": "Organization",
+				"@id": "http://example.org/#organization",
 				"name": "Leitvia News",
 				"url": "http://example.org/",
 				"publishingPrinciples": "http://example.org/editorial-guidelines/"

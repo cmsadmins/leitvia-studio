@@ -1,0 +1,26 @@
+// Size of the placeholder and of the iframe after consent: the same aspect ratio or fixed height for both, so loading
+// the content moves nothing below it (Consent_Embed::render()). The placeholder itself is styled by consent-settings.
+.wp-block-leitvia-consent-embed {
+	iframe {
+		display: block;
+		width: 100%;
+		height: auto;
+		border: 0;
+	}
+
+	@each $name, $ratio in ("16-9": "16 / 9", "4-3": "4 / 3", "1-1": "1 / 1", "9-16": "9 / 16") {
+		&.is-ratio-#{$name} :is(.leitvia-consent__placeholder, iframe) {
+			aspect-ratio: #{$ratio};
+		}
+	}
+
+	// A portrait frame across a wide column would be taller than any screen.
+	&.is-ratio-9-16 {
+		max-width: 28rem;
+		margin-inline: auto;
+	}
+
+	&.has-fixed-height :is(.leitvia-consent__placeholder, iframe) {
+		height: var(--leitvia-embed-height, 37.5rem);
+	}
+}
