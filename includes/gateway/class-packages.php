@@ -832,27 +832,31 @@ final class Packages {
 	}
 
 	/**
-	 * The private area, created with its .htaccess on first use; '' when uploads are not writable.
+	 * The private area, created with its .htaccess on first use; '' when uploads are not writable. A folder that lost
+	 * its .htaccess or index.php (an emptied uploads folder, a clean-up between tests) gets them written again, so no
+	 * image ever waits where the server might serve it.
 	 */
 	private static function private_root(): string {
 		$uploads = wp_upload_dir( null, false );
 		if ( ! empty( $uploads['error'] ) ) {
 			return '';
 		}
-		$root = $uploads['basedir'] . '/' . self::PRIVATE_DIR;
-		if ( ! is_dir( $root ) ) {
-			if ( ! wp_mkdir_p( $root ) ) {
-				return '';
+		$root    = $uploads['basedir'] . '/' . self::PRIVATE_DIR;
+		$created = ! is_dir( $root );
+		if ( $created && ! wp_mkdir_p( $root ) ) {
+			return '';
+		}
+		if ( file_exists( $root . '/.htaccess' ) && file_exists( $root . '/index.php' ) ) {
+			return $root;
+		}
+		// Apache honours the file; elsewhere the random folder names keep the files unguessable. Without both files
+		// the area stays unused.
+		$files = self::filesystem();
+		if ( ! $files || ! $files->put_contents( $root . '/.htaccess', "Require all denied\n" ) || ! $files->put_contents( $root . '/index.php', "<?php\n// Silence is golden.\n" ) ) {
+			if ( $files && $created ) {
+				$files->delete( $root, true );
 			}
-			// Apache honours the file; elsewhere the random folder names keep the files unguessable. Without both files
-			// the area stays unused: no image waits where the server might serve it.
-			$files = self::filesystem();
-			if ( ! $files || ! $files->put_contents( $root . '/.htaccess', "Require all denied\n" ) || ! $files->put_contents( $root . '/index.php', "<?php\n// Silence is golden.\n" ) ) {
-				if ( $files ) {
-					$files->delete( $root, true );
-				}
-				return '';
-			}
+			return '';
 		}
 		return $root;
 	}

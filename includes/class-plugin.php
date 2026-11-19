@@ -178,6 +178,7 @@ final class Plugin {
 		add_action( 'init', array( Blocks\Blocks::class, 'patterns' ) );
 		add_action( 'init', array( Consent\Consent::class, 'register_module' ) );
 		add_filter( 'render_block_core/embed', array( Consent\Consent::class, 'filter_embed' ), 10, 2 );
+		add_filter( 'render_block', array( Consent\Consent::class, 'filter_legacy_embed' ), 10, 2 );
 		add_filter( 'render_block_core/html', array( Consent\Consent::class, 'filter_iframes' ) );
 		add_filter( 'the_content', array( Consent\Consent::class, 'filter_iframes' ), 12 );
 		add_filter( 'render_block_leitvia/consent-settings', array( Consent\Consent::class, 'filter_settings_block' ) );

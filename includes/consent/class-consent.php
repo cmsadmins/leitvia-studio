@@ -310,6 +310,19 @@ final class Consent {
 	}
 
 	/**
+	 * The same for an embed block saved under one of the old names (core-embed/twitter, core-embed/youtube and the
+	 * rest, posts from before WordPress 5.6, the Theme Unit Test Data among them): render_block_core/embed never fires
+	 * for them, so the script of X loaded without consent. Runs on render_block for every block and leaves every other
+	 * block alone.
+	 *
+	 * @param string               $content Rendered block.
+	 * @param array<string, mixed> $block   Parsed block.
+	 */
+	public static function filter_legacy_embed( string $content, array $block ): string {
+		return str_starts_with( (string) ( $block['blockName'] ?? '' ), 'core-embed/' ) ? self::filter_embed( $content, $block ) : $content;
+	}
+
+	/**
 	 * Puts every iframe from another host outside a <template> behind the placeholder, as filter_embed() does for
 	 * core/embed, with the HTML API. Runs on render_block_core/html and on the_content at priority 12 for classic
 	 * content, classic blocks and what autoembed made of a bare URL: after wpautop (10), which would break the markup

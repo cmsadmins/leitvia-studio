@@ -77,6 +77,22 @@ class Test_Consent extends WP_UnitTestCase {
 	}
 
 	/**
+	 * An embed block saved under an old name (core-embed/twitter, before WordPress 5.6) gets the placeholder as well;
+	 * the script of X stays inside the template.
+	 */
+	public function test_legacy_embed_block_gets_the_placeholder(): void {
+		$url    = 'https://x.com/someone/status/123';
+		$markup = '<!-- wp:core-embed/twitter {"url":"' . $url . '","type":"rich","providerNameSlug":"twitter","responsive":true} -->'
+			. "\n" . '<figure class="wp-block-embed-twitter wp-block-embed is-type-rich is-provider-twitter"><div class="wp-block-embed__wrapper">' . "\n" . $url . "\n" . '</div></figure>' . "\n<!-- /wp:core-embed/twitter -->";
+		$html   = apply_filters( 'the_content', $markup );
+		$outer  = self::outside_templates( $html );
+		$this->assertStringContainsString( '<template data-leitvia-consent=', $html );
+		$this->assertStringContainsString( 'has-leitvia-consent', $outer );
+		$this->assertDoesNotMatchRegularExpression( '#<script[^>]+src=#i', $outer );
+		$this->assertStringNotContainsString( 'twitter.com', $outer );
+	}
+
+	/**
 	 * The placeholder names provider and purpose, links to the original and to the privacy policy, and hides the
 	 * button until JavaScript runs.
 	 */

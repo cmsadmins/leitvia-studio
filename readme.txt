@@ -4,7 +4,7 @@ Tags: ai agent, mcp, abilities api, design tokens, block theme
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.48
+Stable tag: 1.3.49
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -274,6 +274,10 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * [Privacy policy of leitvia.com](https://leitvia.com/privacy-policy/)
 
 == Changelog ==
+
+= 1.3.49 =
+* Fix: The private media area of the gateway writes its .htaccess and index.php again when one of them is missing, not only when the folder is new.
+* Fix: An embed block saved under an old name (core-embed/twitter and the others, posts from before WordPress 5.6, the Theme Unit Test Data among them) gets the consent placeholder as well; the script of X loaded without consent.
 
 = 1.3.48 =
 * Fix: Removing the saved link of a bound button (url "") no longer fails as unsafe content.
