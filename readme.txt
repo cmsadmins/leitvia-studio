@@ -4,7 +4,7 @@ Tags: ai agent, mcp, abilities api, design tokens, block theme
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.49
+Stable tag: 1.3.50
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -275,6 +275,11 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 
 == Changelog ==
 
+= 1.3.50 =
+* New: Add-ons add effects of their own to the animation of every block through the filter leitvia_studio_animation_effects: an entry effect plays once like those of Studio, a scroll effect follows the scroll position. Studio validates them, offers them in the Animation panel only on the blocks they fit, loads their style only where they are used and lists their description for agents in the block catalog.
+* Change: leitvia/audit-site reports a page with more than two kinds of scroll effect besides parallax as leitvia/motion; which effects are striking now comes from the same list as the editor.
+* Fix: The circle of the Highlight format draws itself again while it scrolls into view, and no highlight moves with Motion off.
+
 = 1.3.49 =
 * Fix: The private media area of the gateway writes its .htaccess and index.php again when one of them is missing, not only when the folder is new.
 * Fix: An embed block saved under an old name (core-embed/twitter and the others, posts from before WordPress 5.6, the Theme Unit Test Data among them) gets the consent placeholder as well; the script of X loaded without consent.
@@ -308,16 +313,3 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * The readme spells out the labels of the consent placeholder ("Load content from YouTube") instead of a placeholder in angle brackets, which the readme parser of WordPress.org removed.
 * German: the AI connector is called Konnektor and its screen Einstellungen, Konnektoren, as in WordPress itself; the approvals of the AI plugin are Konnektor-Freigaben.
 
-= 1.3.45 =
-* The plugin is listed as Leitvia Studio: AI Agents, MCP and Design Tokens for Block Themes; the slug stays leitvia-studio, and the screens keep the name Leitvia Studio. The readme answers the common questions on AI agents, MCP clients, privacy and accessibility, and keeps the last five versions, older ones are in changelog.txt.
-* Fields, site values, Lab notes and token documents clean their text for its type on every write, not only over REST: tags and scripts are never stored, line breaks stay only in text areas, and a URL, email address, number, date or option keeps only a value of its type.
-* Dates bound to the post date block give WordPress a value it can read, so the date shows on sites in every language; an image field gives the caption and title of the media library, never its address.
-* core/post-meta shows the fields of the content model like leitvia/meta (option labels, dates in the site format, types without single pages); in the editor such a binding becomes leitvia/meta, so typed text is stored the way the field type needs.
-* The check leitvia/bindings refuses bindings that would render nothing (a source that is not registered, an attribute WordPress does not bind, a field that is not declared), and a text edit of a bound attribute is refused with the way to change the value.
-* leitvia/get-content-model lists the binding sources, the attributes WordPress binds per block and the values of bindable site settings with their hash. The new ability leitvia/update-site-values sets those values, such as opening hours, in a change package, and create-content and update-content write repeater rows through rows.
-
-= 1.3.44 =
-* Every REST route of Studio describes its answer in a schema, and OPTIONS shows it; a test keeps it that way for new routes.
-* Child themes of Leitvia: a child theme contract with "extends": "leitvia" adds its patterns to the contract of the parent. Switching between Leitvia and its child theme copies global styles, the active token set and edited templates and template parts to the new theme, without overwriting anything there.
-
-Older versions, 1.0.0 to 1.3.43: [changelog.txt](https://github.com/cmsadmins/leitvia-studio/blob/main/changelog.txt).

@@ -223,4 +223,70 @@ class Test_Animation extends WP_UnitTestCase {
 		$this->assertArrayNotHasKey( 'leitviaAnimation', $catalog['leitvia/reveal']['attributes']['properties'] );
 		$this->assertContains( 'leitvia/reveal', Animation::EXCLUDED );
 	}
+
+	/**
+	 * Effects of add-ons: a scroll effect gets its own classes and its style, neither the reveal style nor the script,
+	 * and only on the blocks it fits; an entry effect plays through the reveal; names of Studio and bad entries are
+	 * ignored; the editor and the audit see them.
+	 */
+	public function test_effects_of_add_ons(): void {
+		wp_register_style( 'addon-motion', false, array(), '1' );
+		$added = static fn(): array => array(
+			'light' => array(
+				'kind'        => 'scroll',
+				'striking'    => true,
+				'blocks'      => array( 'core/heading' ),
+				'style'       => 'addon-motion',
+				'label'       => 'Light up',
+				'description' => 'Headings light up while they scroll by.',
+			),
+			'drop'  => array(
+				'kind' => 'entry',
+			),
+			'line'  => array(
+				'kind' => 'scroll',
+			),
+			'fade'  => array( 'kind' => 'scroll' ),
+			'Bad'   => array( 'kind' => 'scroll' ),
+			'spin'  => array( 'kind' => 'loop' ),
+			'empty' => 'scroll',
+		);
+		add_filter( 'leitvia_studio_animation_effects', $added );
+
+		$effects = Animation::effects();
+		$this->assertSame( array( 'fade', 'rise', 'stagger', 'zoom', 'slide-start', 'slide-end', 'wipe-up', 'wipe-start', 'blur', 'mask', 'parallax', 'light', 'drop', 'line' ), array_keys( $effects ) );
+		$this->assertSame( 'entry', $effects['fade']['kind'], 'an add-on cannot replace an effect of Studio' );
+		$this->assertSame( array( 'light', 'drop', 'line' ), array_column( Animation::editor_effects(), 'value' ) );
+
+		$html = do_blocks( '<!-- wp:heading {"leitviaAnimation":"light"} --><h2 class="wp-block-heading">Title</h2><!-- /wp:heading -->' );
+		$this->assertStringContainsString( '<h2 class="wp-block-heading has-lv-scroll is-lv-scroll-light is-lv-motion-subtle">', $html );
+		$this->assertTrue( wp_style_is( 'addon-motion' ) );
+		$this->assertFalse( wp_style_is( self::STYLE ) );
+		$this->assertStringNotContainsString( 'leitvia-reveal-view-script-module', self::modules() );
+		$this->assertStringNotContainsString( 'lv-', do_blocks( '<!-- wp:paragraph {"leitviaAnimation":"light"} --><p>A</p><!-- /wp:paragraph -->' ), 'only on the blocks it fits' );
+
+		$block = static fn( string $effect, string $name = 'heading' ): string => '<!-- wp:' . $name . ' {"leitviaAnimation":"' . $effect . '"} --><x></x><!-- /wp:' . $name . ' -->';
+		$audit = \LeitviaStudio\Gateway\Abilities\Read_Audit::motion( $block( 'light' ) . $block( 'line' ) . $block( 'parallax', 'cover' ) );
+		$this->assertSame( array(), $audit, 'two scroll effects and parallax are fine' );
+		$audit = \LeitviaStudio\Gateway\Abilities\Read_Audit::motion( $block( 'light' ) . $block( 'line' ) . $block( 'parallax', 'cover' ) . '<!-- wp:paragraph {"leitviaAnimation":"other"} --><p></p><!-- /wp:paragraph -->' );
+		$this->assertSame( array(), $audit, 'unknown effects do not count' );
+		add_filter( 'leitvia_studio_animation_effects', static fn( array $effects ): array => $effects + array( 'tilt' => array( 'kind' => 'scroll' ) ), 20 );
+		$this->assertSame( array( 'The page mixes scroll effects: light, line, tilt; at most 2 kinds besides parallax.' ), \LeitviaStudio\Gateway\Abilities\Read_Audit::motion( $block( 'light' ) . $block( 'line' ) . $block( 'tilt' ) ) );
+		$this->assertSame( array( 'The page mixes striking effects: light, zoom.' ), \LeitviaStudio\Gateway\Abilities\Read_Audit::motion( $block( 'light' ) . $block( 'zoom' ) ), 'add-ons mark effects striking' );
+
+		remove_all_filters( 'leitvia_studio_animation_effects' );
+		$this->assertSame( array(), Animation::editor_effects() );
+	}
+
+	/**
+	 * An entry effect of an add-on plays through the reveal: its classes and the reveal style (the script goes the same
+	 * way as for the effects of Studio, test_effects_and_strength).
+	 */
+	public function test_entry_effect_of_an_add_on_plays_through_the_reveal(): void {
+		$added = static fn(): array => array( 'drop' => array( 'kind' => 'entry' ) );
+		add_filter( 'leitvia_studio_animation_effects', $added );
+		$this->assertStringContainsString( 'has-lv-animation is-lv-animation-drop', do_blocks( '<!-- wp:paragraph {"leitviaAnimation":"drop"} --><p>A</p><!-- /wp:paragraph -->' ) );
+		$this->assertTrue( wp_style_is( self::STYLE ) );
+		remove_filter( 'leitvia_studio_animation_effects', $added );
+	}
 }

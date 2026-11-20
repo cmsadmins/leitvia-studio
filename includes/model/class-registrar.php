@@ -537,6 +537,8 @@ final class Registrar {
 				'leitviaStudioBindings' => $bindings,
 				// Site default of the motion setting, for the panel Animation (src/editor/animation.js).
 				'leitviaStudioMotion'   => \LeitviaStudio\Blocks\Animation::site(),
+				// Effects of add-ons for the same panel; empty, and so left out, without any.
+				'leitviaStudioEffects'  => \LeitviaStudio\Blocks\Animation::editor_effects(),
 			)
 		) as $name => $data ) {
 			wp_add_inline_script( 'leitvia-studio-editor', "window.$name = " . wp_json_encode( $data, JSON_HEX_TAG | JSON_HEX_AMP ) . ';', 'before' );

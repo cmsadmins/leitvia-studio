@@ -44,6 +44,20 @@ const PARALLAX = [ 'core/cover', 'leitvia/timeline' ];
 // Site default of the Studio settings (Registrar::enqueue_editor()): off, subtle or bold.
 const SITE = window.leitviaStudioMotion ?? 'subtle';
 
+// Effects of add-ons (Animation::editor_effects(), filter leitvia_studio_animation_effects): value, label, kind (entry
+// or scroll) and the blocks they fit, empty for any.
+const ADDED = Array.isArray( window.leitviaStudioEffects )
+	? window.leitviaStudioEffects
+	: [];
+
+// Effects bound to the scroll position have no preview: they follow the scroll, not a moment.
+const SCROLL = [
+	'parallax',
+	...ADDED.filter( ( { kind } ) => 'scroll' === kind ).map(
+		( { value } ) => value
+	),
+];
+
 const effects = () => [
 	{ value: 'none', label: __( 'None', 'leitvia-studio' ) },
 	{ value: 'fade', label: __( 'Appear', 'leitvia-studio' ) },
@@ -57,6 +71,7 @@ const effects = () => [
 	{ value: 'mask', label: __( 'Mask', 'leitvia-studio' ) },
 	{ value: 'stagger', label: __( 'One after another', 'leitvia-studio' ) },
 	{ value: 'parallax', label: __( 'Parallax', 'leitvia-studio' ) },
+	...ADDED.map( ( { value, label } ) => ( { value, label } ) ),
 ];
 
 /**
@@ -108,12 +123,18 @@ function Panel( { name, clientId, attributes, setAttributes } ) {
 		( select ) => select( blockEditorStore ).getBlockCount( clientId ) > 0,
 		[ clientId ]
 	);
+	const fits = ( value ) => {
+		const added = ADDED.find( ( item ) => item.value === value );
+		if ( added ) {
+			return ! added.blocks.length || added.blocks.includes( name );
+		}
+		if ( 'stagger' === value ) {
+			return hasChildren;
+		}
+		return 'parallax' !== value || PARALLAX.includes( name );
+	};
 	const options = effects().filter(
-		( { value } ) =>
-			value === effect ||
-			( 'stagger' !== value && 'parallax' !== value ) ||
-			( 'stagger' === value && hasChildren ) ||
-			( 'parallax' === value && PARALLAX.includes( name ) )
+		( { value } ) => value === effect || fits( value )
 	);
 	return (
 		<InspectorControls>
@@ -174,7 +195,7 @@ function Panel( { name, clientId, attributes, setAttributes } ) {
 								'leitvia-studio'
 							) }
 						/>
-						{ 'parallax' !== effect && 'off' !== SITE && (
+						{ ! SCROLL.includes( effect ) && 'off' !== SITE && (
 							<Button
 								__next40pxDefaultSize
 								variant="secondary"
@@ -224,6 +245,7 @@ addFilter(
 								'blur',
 								'mask',
 								'parallax',
+								...ADDED.map( ( { value } ) => value ),
 							],
 							default: 'none',
 						},

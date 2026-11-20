@@ -55,14 +55,15 @@
 
 @supports (animation-timeline: view()) {
 	@media (prefers-reduced-motion: no-preference) {
-		.leitvia-highlight.is-marker,
-		.leitvia-highlight.is-underline {
+		/* Not with "Motion off", from the accessibility bar (html) or the site setting (body). */
+		html:not(.leitvia-motion-off) body:not(.leitvia-motion-off) :is(.leitvia-highlight.is-marker, .leitvia-highlight.is-underline) {
 			animation: leitvia-highlight-draw linear both;
 			animation-timeline: view();
 			animation-range: entry 100% cover 40%;
 		}
 
-		.leitvia-highlight.is-circle::after {
+		/* The ring is the border of the mark itself, so the mark fades it in. */
+		html:not(.leitvia-motion-off) body:not(.leitvia-motion-off) .leitvia-highlight.is-circle {
 			animation: leitvia-highlight-circle linear both;
 			animation-timeline: view();
 			animation-range: entry 100% cover 40%;

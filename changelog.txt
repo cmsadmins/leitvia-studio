@@ -1,6 +1,20 @@
-== Changelog of Leitvia Studio, versions 1.0.0 to 1.3.43 ==
+== Changelog of Leitvia Studio, versions 1.0.0 to 1.3.45 ==
 
 Newer versions are listed in readme.txt.
+
+= 1.3.45 =
+* The plugin is listed as Leitvia Studio: AI Agents, MCP and Design Tokens for Block Themes; the slug stays leitvia-studio, and the screens keep the name Leitvia Studio. The readme answers the common questions on AI agents, MCP clients, privacy and accessibility, and keeps the last five versions, older ones are in changelog.txt.
+* Fields, site values, Lab notes and token documents clean their text for its type on every write, not only over REST: tags and scripts are never stored, line breaks stay only in text areas, and a URL, email address, number, date or option keeps only a value of its type.
+* Dates bound to the post date block give WordPress a value it can read, so the date shows on sites in every language; an image field gives the caption and title of the media library, never its address.
+* core/post-meta shows the fields of the content model like leitvia/meta (option labels, dates in the site format, types without single pages); in the editor such a binding becomes leitvia/meta, so typed text is stored the way the field type needs.
+* The check leitvia/bindings refuses bindings that would render nothing (a source that is not registered, an attribute WordPress does not bind, a field that is not declared), and a text edit of a bound attribute is refused with the way to change the value.
+* leitvia/get-content-model lists the binding sources, the attributes WordPress binds per block and the values of bindable site settings with their hash. The new ability leitvia/update-site-values sets those values, such as opening hours, in a change package, and create-content and update-content write repeater rows through rows.
+
+= 1.3.44 =
+* Every REST route of Studio describes its answer in a schema, and OPTIONS shows it; a test keeps it that way for new routes.
+* Child themes of Leitvia: a child theme contract with "extends": "leitvia" adds its patterns to the contract of the parent. Switching between Leitvia and its child theme copies global styles, the active token set and edited templates and template parts to the new theme, without overwriting anything there.
+
+Older versions, 1.0.0 to 1.3.43: [changelog.txt](https://github.com/cmsadmins/leitvia-studio/blob/main/changelog.txt).
 
 = 1.3.43 =
 * The abilities pass the checks of the WordPress agent skills: every required input has a description, the output of every write says what mode, level, hash, package and snapshot mean, and the annotations match what the abilities do (apply-package, apply-recipe, define-content-type, repair-links and set-alt-text are destructive, plan-page with AI reaches an outside service).

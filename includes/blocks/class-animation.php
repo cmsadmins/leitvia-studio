@@ -22,6 +22,12 @@ defined( 'ABSPATH' ) || exit;
  * "Motion off" of the accessibility bar and in the editor the content is always visible. The site setting motion
  * "off" loads nothing at all and marks the body with leitvia-motion-off, which the theme reads for its hover motion.
  * The editor panel is src/editor/animation.js.
+ *
+ * Add-ons add effects of their own through the filter leitvia_studio_animation_effects (see effects()): an effect of
+ * the kind entry plays once like those of Studio, one of the kind scroll is bound to the scroll position and gets the
+ * classes has-lv-scroll is-lv-scroll-<effect>. Either way the add-on brings the style, Studio loads it where the effect
+ * is used. Its rules keep the end state as the default: without support for scroll-driven animations, with reduced
+ * motion and with motion off the block shows as designed.
  */
 final class Animation {
 
@@ -30,6 +36,29 @@ final class Animation {
 	 * script.
 	 */
 	public const EFFECTS = array( 'fade', 'rise', 'stagger', 'zoom', 'slide-start', 'slide-end', 'wipe-up', 'wipe-start', 'blur', 'mask', 'parallax' );
+
+	/**
+	 * Kinds of motion: entry plays once as the block comes into view, scroll follows the scroll position.
+	 */
+	public const KINDS = array( 'entry', 'scroll' );
+
+	/**
+	 * The effects of Studio with their kind and whether they are striking (one kind per page, see
+	 * Gateway\Abilities\Read_Audit::motion()). EFFECTS lists the same names.
+	 */
+	private const OWN = array(
+		'fade'        => array( 'entry', false ),
+		'rise'        => array( 'entry', false ),
+		'stagger'     => array( 'entry', false ),
+		'zoom'        => array( 'entry', true ),
+		'slide-start' => array( 'entry', true ),
+		'slide-end'   => array( 'entry', true ),
+		'wipe-up'     => array( 'entry', true ),
+		'wipe-start'  => array( 'entry', true ),
+		'blur'        => array( 'entry', true ),
+		'mask'        => array( 'entry', true ),
+		'parallax'    => array( 'scroll', false ),
+	);
 
 	/**
 	 * Strengths: subtle moves 2.5rem in 800 ms, bold twice the way on a longer curve in 1200 ms.
@@ -89,6 +118,69 @@ final class Animation {
 	}
 
 	/**
+	 * All effects, those of Studio first, by name. Each has kind (entry or scroll), striking, blocks (the blocks it
+	 * fits, empty for any), style (handle of the style an add-on registered, empty for Studio), label and description
+	 * (for the editor and the block catalog; empty for Studio, whose effects DESCRIPTION describes). An add-on cannot
+	 * replace an effect of Studio.
+	 *
+	 * @return array<string, array{kind: string, striking: bool, blocks: list<string>, style: string, label: string, description: string}>
+	 */
+	public static function effects(): array {
+		$effects = array();
+		foreach ( self::OWN as $name => list( $kind, $striking ) ) {
+			$effects[ $name ] = array(
+				'kind'        => $kind,
+				'striking'    => $striking,
+				'blocks'      => array(),
+				'style'       => '',
+				'label'       => '',
+				'description' => '',
+			);
+		}
+		/**
+		 * Effects of add-ons for the attribute leitviaAnimation. Add them on leitvia_studio_init, before the blocks are
+		 * registered, so their names reach the enum of the attribute.
+		 *
+		 * @param mixed $added Effects by name (lowercase letters, digits and hyphens):
+		 *     kind (entry or scroll), striking (bool), blocks (block names it fits, empty for any), style (handle of a
+		 *     registered style with its rules), label and description (when it fits, for agents).
+		 */
+		$added = apply_filters( 'leitvia_studio_animation_effects', array() );
+		foreach ( is_array( $added ) ? $added : array() as $name => $effect ) {
+			if ( ! is_string( $name ) || isset( $effects[ $name ] ) || ! preg_match( '/^[a-z][a-z0-9-]*$/', $name ) || ! is_array( $effect ) || ! in_array( $effect['kind'] ?? '', self::KINDS, true ) ) {
+				continue;
+			}
+			$effects[ $name ] = array(
+				'kind'        => (string) $effect['kind'],
+				'striking'    => ! empty( $effect['striking'] ),
+				'blocks'      => array_values( array_filter( (array) ( $effect['blocks'] ?? array() ), 'is_string' ) ),
+				'style'       => (string) ( $effect['style'] ?? '' ),
+				'label'       => (string) ( $effect['label'] ?? $name ),
+				'description' => (string) ( $effect['description'] ?? '' ),
+			);
+		}
+		return $effects;
+	}
+
+	/**
+	 * The effects of add-ons for the editor panel (src/editor/animation.js), which knows those of Studio itself.
+	 *
+	 * @return list<array{value: string, label: string, kind: string, blocks: list<string>}>
+	 */
+	public static function editor_effects(): array {
+		$list = array();
+		foreach ( array_diff_key( self::effects(), self::OWN ) as $name => $effect ) {
+			$list[] = array(
+				'value'  => $name,
+				'label'  => $effect['label'],
+				'kind'   => $effect['kind'],
+				'blocks' => $effect['blocks'],
+			);
+		}
+		return $list;
+	}
+
+	/**
 	 * Registers the attributes on every block but the excluded ones, so the REST API and ServerSideRender accept them.
 	 * With the site setting motion off the reveal block loads neither style nor script. Runs on
 	 * register_block_type_args.
@@ -104,12 +196,19 @@ final class Animation {
 		if ( in_array( $name, self::EXCLUDED, true ) ) {
 			return $args;
 		}
+		$effects     = self::effects();
+		$description = self::DESCRIPTION;
+		foreach ( $effects as $effect => $data ) {
+			if ( '' !== $data['description'] ) {
+				$description .= ' ' . $effect . ' (' . $data['kind'] . ( $data['blocks'] ? ', ' . implode( ', ', $data['blocks'] ) : '' ) . '): ' . $data['description'];
+			}
+		}
 		$args['attributes']                     = (array) ( $args['attributes'] ?? array() );
 		$args['attributes']['leitviaAnimation'] = array(
 			'type'        => 'string',
-			'enum'        => array_merge( array( 'none' ), self::EFFECTS ),
+			'enum'        => array_merge( array( 'none' ), array_keys( $effects ) ),
 			'default'     => 'none',
-			'description' => self::DESCRIPTION,
+			'description' => $description,
 		);
 		$args['attributes']['leitviaMotion']    = array(
 			'type'        => 'string',
@@ -135,11 +234,20 @@ final class Animation {
 		if ( 'off' === $site ) {
 			return $content;
 		}
+		$data = array(
+			'kind'  => 'entry',
+			'style' => '',
+		);
 		if ( 'leitvia/reveal' === $name ) {
 			$effect = 'reveal';
 		} else {
-			$effect = $block['attrs']['leitviaAnimation'] ?? null;
-			if ( ! in_array( $effect, self::EFFECTS, true ) || in_array( $name, self::EXCLUDED, true ) ) {
+			$effect  = $block['attrs']['leitviaAnimation'] ?? null;
+			$effects = self::effects();
+			if ( ! is_string( $effect ) || ! isset( $effects[ $effect ] ) || in_array( $name, self::EXCLUDED, true ) ) {
+				return $content;
+			}
+			$data = $effects[ $effect ];
+			if ( $data['blocks'] && ! in_array( $name, $data['blocks'], true ) ) {
 				return $content;
 			}
 		}
@@ -149,14 +257,24 @@ final class Animation {
 		}
 		if ( 'parallax' === $effect ) {
 			$tags->add_class( 'has-lv-parallax' );
+		} elseif ( 'scroll' === $data['kind'] ) {
+			$tags->add_class( 'has-lv-scroll' );
+			$tags->add_class( 'is-lv-scroll-' . $effect );
 		} elseif ( 'reveal' !== $effect ) {
 			$tags->add_class( 'has-lv-animation' );
 			$tags->add_class( 'is-lv-animation-' . $effect );
 		}
 		$motion = $block['attrs']['leitviaMotion'] ?? null;
 		$tags->add_class( 'is-lv-motion-' . ( in_array( $motion, self::STRENGTHS, true ) ? $motion : $site ) );
-		wp_enqueue_style( generate_block_asset_handle( 'leitvia/reveal', 'style' ) );
-		if ( 'parallax' !== $effect ) {
+		if ( '' !== $data['style'] ) {
+			wp_enqueue_style( $data['style'] );
+		}
+		// Studio's own rules and the reveal of entry effects live in the reveal block; scroll effects of add-ons need
+		// neither.
+		if ( 'scroll' !== $data['kind'] || 'parallax' === $effect ) {
+			wp_enqueue_style( generate_block_asset_handle( 'leitvia/reveal', 'style' ) );
+		}
+		if ( 'scroll' !== $data['kind'] ) {
 			self::enqueue_module( 'leitvia/reveal' );
 		}
 		return $tags->get_updated_html();

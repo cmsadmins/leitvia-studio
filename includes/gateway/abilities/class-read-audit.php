@@ -90,6 +90,12 @@ final class Read_Audit {
 	public const MOTION_MAX = 6;
 
 	/**
+	 * Most kinds of scroll effect besides parallax on one page (text that lights up, a line that draws, an image in
+	 * depth), see motion(). More turn the page into a show.
+	 */
+	public const MOTION_SCROLL = 2;
+
+	/**
 	 * Preset types in markup and the global settings that list their slugs.
 	 */
 	private const PRESETS = array(
@@ -516,8 +522,9 @@ final class Read_Audit {
 	/**
 	 * What makes the motion of a page uneven, one message each: blocks with a strength (leitviaMotion) other than the
 	 * site setting motion, so their durations differ; fade and rise side by side; more than one kind of striking effect
-	 * (zoom, slide, wipe, blur, mask); more than MOTION_STRIKING striking or MOTION_MAX animated blocks. Stagger and
-	 * parallax are part of the motion of any site. Nothing while the site setting is off, since nothing moves then.
+	 * (zoom, slide, wipe, blur, mask and those add-ons mark striking); more than MOTION_SCROLL kinds of scroll effect
+	 * besides parallax; more than MOTION_STRIKING striking or MOTION_MAX animated blocks. Stagger and parallax are part
+	 * of the motion of any site. Nothing while the site setting is off, since nothing moves then.
 	 *
 	 * @param string $content Block markup.
 	 * @return list<string>
@@ -527,6 +534,7 @@ final class Read_Audit {
 		if ( 'off' === $site ) {
 			return array();
 		}
+		$known   = Animation::effects();
 		$effects = array();
 		$other   = 0;
 		$blocks  = parse_blocks( $content );
@@ -537,15 +545,16 @@ final class Read_Audit {
 			$name   = (string) ( $block['blockName'] ?? '' );
 			// As Animation::render(): the reveal block by its own effect, excluded blocks never.
 			$effect = 'leitvia/reveal' === $name ? (string) ( $attrs['effect'] ?? 'rise' ) : ( in_array( $name, Animation::EXCLUDED, true ) ? '' : ( $attrs['leitviaAnimation'] ?? '' ) );
-			if ( ! in_array( $effect, Animation::EFFECTS, true ) ) {
+			if ( ! is_string( $effect ) || ! isset( $known[ $effect ] ) ) {
 				continue;
 			}
 			$effects[] = $effect;
 			$strength  = $attrs['leitviaMotion'] ?? $site;
 			$other    += (int) ( in_array( $strength, Animation::STRENGTHS, true ) && $strength !== $site );
 		}
-		$striking = array_values( array_diff( $effects, array( 'fade', 'rise', 'stagger', 'parallax' ) ) );
+		$striking = array_values( array_filter( $effects, static fn( string $effect ): bool => $known[ $effect ]['striking'] ) );
 		$kinds    = array_unique( $striking );
+		$scroll   = array_unique( array_filter( $effects, static fn( string $effect ): bool => 'scroll' === $known[ $effect ]['kind'] && 'parallax' !== $effect ) );
 		$messages = array();
 		if ( $other ) {
 			/* translators: 1: number of blocks, 2: site setting motion. */
@@ -557,6 +566,10 @@ final class Read_Audit {
 		if ( count( $kinds ) > 1 ) {
 			/* translators: %s: list of effects. */
 			$messages[] = sprintf( __( 'The page mixes striking effects: %s.', 'leitvia-studio' ), implode( ', ', $kinds ) );
+		}
+		if ( count( $scroll ) > self::MOTION_SCROLL ) {
+			/* translators: 1: list of effects, 2: maximum. */
+			$messages[] = sprintf( __( 'The page mixes scroll effects: %1$s; at most %2$d kinds besides parallax.', 'leitvia-studio' ), implode( ', ', $scroll ), self::MOTION_SCROLL );
 		}
 		if ( count( $striking ) > self::MOTION_STRIKING ) {
 			/* translators: 1: number of blocks, 2: maximum. */
