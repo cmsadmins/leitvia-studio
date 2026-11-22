@@ -600,7 +600,8 @@ class Test_Gateway_Maintain extends WP_UnitTestCase {
 
 	/**
 	 * The audit reports internal links without a target and links to the old address of a renamed post, once per
-	 * link; posts, archives, files, the home page, the admin and external links pass. Nothing is requested.
+	 * link; posts, the posts page, archives, files, the home page, the admin and external links pass. Nothing is
+	 * requested.
 	 */
 	public function test_audit_reports_broken_links(): void {
 		$this->set_permalink_structure( '/%postname%/' );
@@ -627,8 +628,20 @@ class Test_Gateway_Maintain extends WP_UnitTestCase {
 				'post_name' => 'new-name',
 			)
 		);
+		// The posts page answers with the blog, so url_to_postid() gives 0 for it; it is a target all the same.
+		$journal = self::factory()->post->create(
+			array(
+				'post_type'   => 'page',
+				'post_status' => 'publish',
+				'post_name'   => 'journal',
+			)
+		);
+		update_option( 'show_on_front', 'page' );
+		update_option( 'page_for_posts', $journal );
 		$home  = home_url();
 		$links = array(
+			'<a href="/journal/">Journal</a>',
+			'<a href="' . $home . '/journal/page/2">Older posts</a>',
 			'<a href="/gone/">Gone page</a>',
 			'<a href="' . $home . '/gone/">Gone again</a>',
 			'<a href="/old-name/">Moved article</a>',
@@ -1292,6 +1305,131 @@ class Test_Gateway_Maintain extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Insert-section puts a new section before, after, at the start or (without a place) at the end of the top-level
+	 * sections and moves one of them; remove-section takes one out, but never the last. The rest of the content stays.
+	 * Sections with move, two places and unknown IDs are refused.
+	 */
+	public function test_insert_move_and_remove_section(): void {
+		update_option( Gateway::OPTION, array( 'profile' => 'full' ) + Gateway::DEFAULTS );
+		$page  = $this->page( self::paragraph( 'First' ) . "\n\n" . self::paragraph( 'Last' ) );
+		$quote = array(
+			array(
+				'pattern' => 'leitvia/content-quote',
+				'edits'   => array(
+					array(
+						'block' => 'p:0.0',
+						'text'  => 'Jane Roe, Walking Club',
+					),
+				),
+			),
+		);
+		$order = static fn(): array => array_map(
+			static fn( array $block ): string => (string) ( $block['attrs']['metadata']['patternName'] ?? trim( wp_strip_all_tags( $block['innerHTML'] ) ) ),
+			array_values( array_filter( parse_blocks( get_post_field( 'post_content', $page ) ), static fn( array $block ): bool => null !== $block['blockName'] ) )
+		);
+		$call  = static fn( string $name, array $input ) => self::call( $name, $page, $input + array( 'post' => $page ) );
+
+		$this->assert_rejected( 'leitvia_invalid_input', $call( 'leitvia/insert-section', array( 'position' => 'end' ) ) );
+		$this->assert_rejected(
+			'leitvia_invalid_input',
+			$call(
+				'leitvia/insert-section',
+				array(
+					'sections' => $quote,
+					'move'     => 'p:0',
+				)
+			)
+		);
+		$this->assert_rejected(
+			'leitvia_invalid_input',
+			$call(
+				'leitvia/insert-section',
+				array(
+					'sections' => $quote,
+					'after'    => 'p:0',
+					'position' => 'end',
+				)
+			)
+		);
+		$this->assert_rejected(
+			'leitvia_not_found',
+			$call(
+				'leitvia/insert-section',
+				array(
+					'sections' => $quote,
+					'after'    => 'p:7',
+				)
+			)
+		);
+		$this->assert_rejected( 'leitvia_unknown_pattern', $call( 'leitvia/insert-section', array( 'sections' => array( array( 'pattern' => 'leitvia/does-not-exist' ) ) ) ) );
+
+		$result = $this->assert_ok(
+			$call(
+				'leitvia/insert-section',
+				array(
+					'sections' => $quote,
+					'after'    => 'p:0',
+				)
+			)
+		);
+		$this->assertSame( 'live', $result['mode'] );
+		$this->assertSame( array( 'First', 'leitvia/content-quote', 'Last' ), $order() );
+		$this->assertStringContainsString( 'Jane Roe, Walking Club', get_post_field( 'post_content', $page ) );
+
+		$this->assert_ok(
+			$call(
+				'leitvia/insert-section',
+				array(
+					'move'   => 'p:2',
+					'before' => 'p:1',
+				)
+			)
+		);
+		$this->assertSame( array( 'First', 'Last', 'leitvia/content-quote' ), $order() );
+		$this->assert_ok(
+			$call(
+				'leitvia/insert-section',
+				array(
+					'move'     => 'p:2',
+					'position' => 'start',
+				)
+			)
+		);
+		$this->assertSame( array( 'leitvia/content-quote', 'First', 'Last' ), $order() );
+
+		$this->assert_rejected( 'leitvia_not_found', $call( 'leitvia/remove-section', array( 'block' => 'p:7' ) ) );
+		$removed = $this->assert_ok( $call( 'leitvia/remove-section', array( 'block' => 'p:0' ) ) );
+		$this->assertSame( array( 'First', 'Last' ), $order() );
+		$this->roll_back( $removed );
+		$this->assertSame( array( 'leitvia/content-quote', 'First', 'Last' ), $order() );
+
+		$single = $this->page( self::paragraph( 'Only' ) );
+		$this->assert_rejected(
+			'leitvia_invalid_input',
+			self::call(
+				'leitvia/remove-section',
+				$single,
+				array(
+					'post'  => $single,
+					'block' => 'p:0',
+				)
+			)
+		);
+		$this->assert_ok(
+			self::call(
+				'leitvia/insert-section',
+				$single,
+				array(
+					'post'     => $single,
+					'sections' => $quote,
+				)
+			)
+		);
+		$blocks = array_values( array_filter( parse_blocks( get_post_field( 'post_content', $single ) ), static fn( array $block ): bool => null !== $block['blockName'] ) );
+		$this->assertSame( 'leitvia/content-quote', $blocks[1]['attrs']['metadata']['patternName'] );
+	}
+
+	/**
 	 * Trash-content waits for a person even in the profile full; the agent cannot apply it. Applied by an
 	 * administrator the page is in the trash of core, and a rollback brings it back with its address. Links to it
 	 * are named. The front page, a page with subpages and a file are refused.
@@ -1340,7 +1478,8 @@ class Test_Gateway_Maintain extends WP_UnitTestCase {
 
 	/**
 	 * Delete-media refuses a file that published content shows and names the place; one only a draft uses waits in a
-	 * package with a notice, and an administrator deletes it with its file. force deletes a file in use as well.
+	 * package with a notice, whose diff says that the file goes for good, and an administrator deletes it with its file.
+	 * force deletes a file in use as well.
 	 */
 	public function test_delete_media(): void {
 		$admin = self::factory()->user->create( array( 'role' => 'administrator' ) );
@@ -1375,6 +1514,13 @@ class Test_Gateway_Maintain extends WP_UnitTestCase {
 		$this->assertSame( 'package', $result['mode'] );
 		$this->assertStringContainsString( (string) $page, (string) $result['notice'] );
 		$this->assertFileExists( $file );
+		// The diff names the deletion with file and size, not the status the state carries as its mark.
+		$items = Packages::detail( $result['package'] )['items'];
+		$diff  = end( $items )['diff'];
+		$this->assertSame( array( 'file' ), array_column( $diff, 'id' ) );
+		$this->assertSame( 'removed', $diff[0]['change'] );
+		$this->assertSame( wp_basename( $file ) . ' (' . size_format( filesize( $file ) ) . ')', $diff[0]['before_text'] );
+		$this->assertStringContainsString( 'for good', $diff[0]['after_text'] );
 		$this->assertNotEmpty( Packages::apply( $result['package'] )['errors'], 'the agent cannot apply it' );
 
 		wp_set_current_user( $admin );

@@ -74,7 +74,7 @@ class Test_Entry_View extends WP_UnitTestCase {
 		$this->assertStringContainsString( '<!-- wp:post-title {"level":1,', $template->content );
 		$this->assertStringContainsString( '"postType":"event"', $template->content );
 		$this->assertStringContainsString( '>More events</h2>', $template->content );
-		$this->assertStringContainsString( '<!-- wp:post-content {"align":"wide",', $template->content, 'wide and full blocks of the content reach the width of the entry' );
+		$this->assertStringContainsString( '<!-- wp:post-content {"align":"full",', $template->content, 'wide and full blocks of the content reach the width of the entry' );
 		foreach ( array( 'post-author-name', 'post-time-to-read', 'post-date', 'hidden-page-post-byline' ) as $absent ) {
 			$this->assertStringNotContainsString( $absent, $template->content, $absent );
 		}

@@ -48,7 +48,7 @@ final class Block_Edit {
 	);
 
 	/**
-	 * Blocks whose image can change.
+	 * Blocks whose image can change. The video of a core/video changes the same way, see video().
 	 */
 	public const IMAGE_BLOCKS = array( 'core/image', 'core/cover' );
 
@@ -574,20 +574,44 @@ final class Block_Edit {
 				return $block;
 			}
 		}
+		// The video comes first: tracks and caption of the same call need its element.
+		if ( isset( $change['video'] ) ) {
+			$block = 'core/video' === $name ? self::video( $block, (array) $change['video'], $target, $rebuild ) : $rebuild;
+			if ( is_wp_error( $block ) ) {
+				return $block;
+			}
+		}
 		if ( isset( $change['columns'] ) ) {
 			$layout = (array) ( $block['attrs']['layout'] ?? array() );
-			if ( 'grid' !== ( $layout['type'] ?? '' ) ) {
-				return self::invalid( 'columns', __( 'Only a grid takes a number of columns: a group or post template with the layout grid. A columns block has one column block per column; take one out with remove or add one with repeat.', 'leitvia-studio' ), $target );
+			if ( 'core/gallery' !== $name && 'grid' !== ( $layout['type'] ?? '' ) ) {
+				return self::invalid( 'columns', __( 'Only a grid or a gallery takes a number of columns: a group or post template with the layout grid, or a gallery block. A columns block has one column block per column; take one out with remove or add one with repeat.', 'leitvia-studio' ), $target );
 			}
 			$columns = (int) $change['columns'];
 			if ( $columns < 1 || $columns > 6 ) {
 				return self::invalid( 'columns', __( 'A grid has 1 to 6 columns.', 'leitvia-studio' ), $target );
 			}
-			// Core renders the grid from the layout in the comment; the saved markup holds none of it.
-			$block['attrs']['layout'] = array(
-				'type'        => 'grid',
-				'columnCount' => $columns,
-			) + $layout;
+			if ( 'core/gallery' !== $name ) {
+				// Core renders the grid from the layout in the comment; the saved markup holds none of it.
+				$block['attrs']['layout'] = array(
+					'type'        => 'grid',
+					'columnCount' => $columns,
+				) + $layout;
+			}
+		}
+		if ( isset( $change['columns'] ) && 'core/gallery' === $name ) {
+			// A gallery saves the count as attribute and as class columns-<n> of its figure (columns-default without).
+			$tags = new \WP_HTML_Tag_Processor( (string) ( $block['innerContent'][0] ?? '' ) );
+			if ( ! $tags->next_tag() ) {
+				return $rebuild;
+			}
+			foreach ( iterator_to_array( $tags->class_list(), false ) as $class ) {
+				if ( str_starts_with( (string) $class, 'columns-' ) ) {
+					$tags->remove_class( (string) $class );
+				}
+			}
+			$tags->add_class( 'columns-' . (int) $change['columns'] );
+			$block['innerContent'][0] = $tags->get_updated_html();
+			$block['attrs']           = self::place( $name, (array) $block['attrs'], 'columns', (int) $change['columns'] );
 		}
 		// The text of a map is its heading.
 		if ( 'leitvia/map' === $name && isset( $change['text'] ) ) {
@@ -685,7 +709,7 @@ final class Block_Edit {
 		$touched += isset( $change['text'] ) ? array( 'text' => $text ) : array();
 		$touched += isset( $change['url'] ) && 'core/button' === $block['blockName'] ? array( 'url' => 'url' ) : array();
 		$touched += isset( $change['caption'] ) ? array( 'caption' => 'caption' ) : array();
-		$touched  = array_merge( array_values( $touched ), isset( $change['image'] ) ? array( 'id', 'url', 'alt' ) : array() );
+		$touched  = array_merge( array_values( $touched ), isset( $change['image'] ) ? array( 'id', 'url', 'alt' ) : array(), isset( $change['video'] ) ? array( 'id', 'src', 'poster' ) : array() );
 		foreach ( $touched as $attribute ) {
 			$binding = $bindings[ $attribute ] ?? null;
 			$source  = is_array( $binding ) ? (string) ( $binding['source'] ?? '' ) : '';
@@ -961,7 +985,7 @@ final class Block_Edit {
 	 * that render on the server or save no markup of their own, the CORE_ATTRIBUTES whose markup is rebuilt here, text
 	 * attributes whose element the block has (sourced()), and leitviaAnimation and leitviaMotion on every block that has them, static markup included: the server adds their
 	 * classes on render, the saved markup stays (animation()). className takes a registered block style on every core
-	 * block that has one (style()). Anything else would leave the saved markup behind.
+	 * block that has one (style()), a heading, paragraph or light group a preset of presets(). Anything else would leave the saved markup behind.
 	 *
 	 * @param array<string, mixed> $block  Parsed block.
 	 * @param array<string, mixed> $attrs  New attribute values.
@@ -1010,6 +1034,14 @@ final class Block_Edit {
 				return $block;
 			}
 		}
+		// Presets of a support with a class on the element of the block, see preset().
+		foreach ( array_intersect_key( self::presets( $block ), $attrs ) as $key => $allowed ) {
+			$block = self::preset( $block, $key, $attrs[ $key ], $allowed, $target, $rebuild );
+			$attrs = array_diff_key( $attrs, array( $key => true ) );
+			if ( is_wp_error( $block ) || ! $attrs ) {
+				return $block;
+			}
+		}
 		$core  = self::CORE_ATTRIBUTES[ $name ] ?? null;
 		$entry = $core ? array( 'attributes' => array( 'properties' => $core ) ) : array_column( \LeitviaStudio\Blocks\Catalog::get(), null, 'name' )[ $name ] ?? null;
 		if ( ! $entry ) {
@@ -1024,7 +1056,7 @@ final class Block_Edit {
 			}
 			if ( isset( $schema['source'] ) ) {
 				$date = 'leitvia/timeline-item' === $name && 'date' === $key;
-				if ( ( ! $date && ! in_array( $schema['source'], array( 'text', 'rich-text', 'html' ), true ) ) || ! is_string( $value ) ) {
+				if ( ( ! $date && ! in_array( $schema['source'], array( 'text', 'rich-text', 'html', 'attribute' ), true ) ) || ! is_string( $value ) ) {
 					return $rebuild;
 				}
 				if ( $date && '' !== $value && ! preg_match( self::TIMELINE_DATE, $value ) ) {
@@ -1426,13 +1458,12 @@ final class Block_Edit {
 			return $rebuild;
 		}
 		$block['innerContent'][0] = substr_replace( $html, $markup, $range[0], $range[1] );
-		unset( $block['attrs']['tracks'] );
-		$block['attrs'] += $stored ? array( 'tracks' => $stored ) : array();
+		$block['attrs']           = self::place( 'core/video', (array) $block['attrs'], 'tracks', $stored ? $stored : null );
 		return $block;
 	}
 
 	/**
-	 * Block with new text attributes in their elements. The counter rebuilds its number, whose parts come and go; any
+	 * Block with new text attributes in their elements or in an attribute of an element. The counter rebuilds its number, whose parts come and go; any
 	 * other block needs the element already, because what its save function leaves out cannot be rebuilt here.
 	 *
 	 * @param array<string, mixed>  $block   Parsed block.
@@ -1464,6 +1495,17 @@ final class Block_Edit {
 				(bool) preg_match( '/^[a-z][a-z0-9]*$/', $selector ) => array( 'tag_name' => $selector ),
 				default => null,
 			};
+			if ( 'attribute' === ( $types[ $key ]['source'] ?? '' ) ) {
+				// An attribute of an element in the markup before the first inner block, such as the aria-label of a slider.
+				$tags = new \WP_HTML_Tag_Processor( (string) ( $block['innerContent'][0] ?? '' ) );
+				// Only the name for screen readers; a link or form target has rules of its own and stays with the markup.
+				if ( '' === trim( $text ) || ! $query || 'aria-label' !== ( $types[ $key ]['attribute'] ?? '' ) || ! $tags->next_tag( $query ) ) {
+					return $rebuild;
+				}
+				$tags->set_attribute( 'aria-label', $text );
+				$block['innerContent'][0] = $tags->get_updated_html();
+				continue;
+			}
 			$found = '' !== trim( $text ) ? self::element( $block, $query ) : null;
 			if ( ! $found ) {
 				return $rebuild;
@@ -1545,13 +1587,89 @@ final class Block_Edit {
 			}
 			$block['innerContent'][0] = $tags->get_updated_html();
 		}
-		// In the order the editor saves the comment: after the attributes of the block, lock and metadata, before the
-		// other supports such as layout and style (the order core registers the attributes in).
-		$order          = array_flip( array_keys( (array) ( $type->attributes ?? array() ) ) );
-		$at             = $order['align'] ?? PHP_INT_MAX;
-		$rest           = array_diff_key( (array) $block['attrs'], array( 'align' => true ) );
-		$before         = array_filter( $rest, static fn( $key ): bool => isset( $order[ $key ] ) && $order[ $key ] < $at, ARRAY_FILTER_USE_KEY );
-		$block['attrs'] = $before + ( null === $align ? array() : array( 'align' => $align ) ) + array_diff_key( $rest, $before );
+		$block['attrs'] = self::place( $name, (array) $block['attrs'], 'align', $align );
+		return $block;
+	}
+
+	/**
+	 * Attributes of a block comment with one attribute set (null removes it) where the editor saves it: in the order
+	 * core registers the attributes in, so after the attributes of the block, lock and metadata and among the supports
+	 * (align, className, style, colors, fontSize, layout).
+	 *
+	 * @param string               $name  Block name.
+	 * @param array<string, mixed> $attrs Attributes of the comment.
+	 * @param string               $key   Attribute.
+	 * @param mixed                $value New value or null.
+	 * @return array<string, mixed>
+	 */
+	private static function place( string $name, array $attrs, string $key, $value ): array {
+		$order  = array_flip( array_keys( (array) ( \WP_Block_Type_Registry::get_instance()->get_registered( $name )->attributes ?? array() ) ) );
+		$at     = $order[ $key ] ?? PHP_INT_MAX;
+		$rest   = array_diff_key( $attrs, array( $key => true ) );
+		$before = array_filter( $rest, static fn( $other ): bool => isset( $order[ $other ] ) && $order[ $other ] < $at, ARRAY_FILTER_USE_KEY );
+		return $before + ( null === $value ? array() : array( $key => $value ) ) + array_diff_key( $rest, $before );
+	}
+
+	/**
+	 * Presets a core block outside the catalog takes as attribute, with the values allowed: fontSize with the font
+	 * sizes of the theme on a heading or paragraph, backgroundColor surface or surface-alt on a group whose ground is
+	 * light already. A dark or accent ground carries text colors of its own; such a band comes from the block style
+	 * Inverse or from another pattern.
+	 *
+	 * @param array<string, mixed> $block Parsed block.
+	 * @return array<string, list<string>>
+	 */
+	public static function presets( array $block ): array {
+		$name = (string) $block['blockName'];
+		if ( in_array( $name, array( 'core/heading', 'core/paragraph' ), true ) ) {
+			$sizes = (array) wp_get_global_settings( array( 'typography', 'fontSizes' ) );
+			// By origin (default, theme, custom) or one flat list, depending on the theme.json.
+			$sizes = isset( $sizes[0] ) ? $sizes : array_merge( array(), ...array_values( array_map( 'array_values', array_filter( $sizes, 'is_array' ) ) ) );
+			return array( 'fontSize' => array_values( array_unique( array_map( 'strval', array_column( $sizes, 'slug' ) ) ) ) );
+		}
+		$light = array( 'surface', 'surface-alt' );
+		$color = (array) ( $block['attrs']['style']['color'] ?? array() );
+		if ( 'core/group' === $name && in_array( $block['attrs']['backgroundColor'] ?? 'surface', $light, true ) && ! isset( $block['attrs']['gradient'] ) && ! isset( $color['background'] ) && ! isset( $color['gradient'] ) ) {
+			return array( 'backgroundColor' => $light );
+		}
+		return array();
+	}
+
+	/**
+	 * Block with a new preset of presets() (null removes it): the attribute in its comment and the class
+	 * has-<slug>-font-size or has-<slug>-background-color with has-background on its element, as the editor saves them.
+	 *
+	 * @param array<string, mixed> $block   Parsed block.
+	 * @param string               $key     fontSize or backgroundColor.
+	 * @param mixed                $value   Slug of the preset or null.
+	 * @param string[]             $allowed Slugs the block takes.
+	 * @param array<string, mixed> $target  Target.
+	 * @param \WP_Error            $rebuild Rejection for static markup.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private static function preset( array $block, string $key, $value, array $allowed, array $target, \WP_Error $rebuild ) {
+		if ( null !== $value && ! in_array( $value, $allowed, true ) ) {
+			/* translators: 1: attribute name, 2: list of values. */
+			return self::invalid( 'attributes', sprintf( __( 'The attribute %1$s takes one of %2$s here, or null to remove it.', 'leitvia-studio' ), $key, implode( ', ', $allowed ) ), $target, 'leitvia/get-tokens' );
+		}
+		$suffix = 'fontSize' === $key ? '-font-size' : '-background-color';
+		$tags   = new \WP_HTML_Tag_Processor( (string) ( $block['innerContent'][0] ?? '' ) );
+		if ( ! $tags->next_tag() ) {
+			return $rebuild;
+		}
+		foreach ( iterator_to_array( $tags->class_list(), false ) as $class ) {
+			if ( ( 'has-background' === $class && 'backgroundColor' === $key ) || ( str_starts_with( (string) $class, 'has-' ) && str_ends_with( (string) $class, $suffix ) ) ) {
+				$tags->remove_class( (string) $class );
+			}
+		}
+		if ( null !== $value ) {
+			$tags->add_class( 'has-' . _wp_to_kebab_case( (string) $value ) . $suffix );
+		}
+		if ( null !== $value && 'backgroundColor' === $key ) {
+			$tags->add_class( 'has-background' );
+		}
+		$block['innerContent'][0] = $tags->get_updated_html();
+		$block['attrs']           = self::place( (string) $block['blockName'], (array) $block['attrs'], $key, $value );
 		return $block;
 	}
 
@@ -1688,6 +1806,60 @@ final class Block_Edit {
 		$attrs         += $meta ? array( 'metadata' => $meta ) : array();
 		$block['attrs'] = $attrs;
 		return array( $block, $tags->get_updated_html() );
+	}
+
+	/**
+	 * Video block with a video of the media library: the video element as the editor saves it, with controls, preload
+	 * none, the URL as src and the poster, and the attachment ID in the comment. The poster is an image of the library,
+	 * without one the featured image of the video; a video without either shows none. A block without a video element,
+	 * as patterns ship it, gets one at the start of its figure. Playback flags and text tracks of the element stay.
+	 *
+	 * @param array<string, mixed> $block   Parsed block.
+	 * @param array<string, mixed> $video   id, poster.
+	 * @param array<string, mixed> $target  Target.
+	 * @param \WP_Error            $rebuild Rejection for static markup.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private static function video( array $block, array $video, array $target, \WP_Error $rebuild ) {
+		$id  = (int) ( $video['id'] ?? 0 );
+		$src = wp_attachment_is( 'video', $id ) && Scope::readable( $id ) ? (string) wp_get_attachment_url( $id ) : '';
+		if ( '' === $src ) {
+			return self::invalid( 'video', __( 'The video is not in the media library. Add it with leitvia/add-media first.', 'leitvia-studio' ), $target, 'leitvia/add-media' );
+		}
+		$image = (int) ( $video['poster'] ?? get_post_thumbnail_id( $id ) );
+		if ( isset( $video['poster'] ) && ( ! wp_attachment_is_image( $image ) || ! Scope::readable( $image ) ) ) {
+			return self::invalid( 'poster', __( 'The poster must be the ID of an image of the media library.', 'leitvia-studio' ), $target, 'leitvia/list-media' );
+		}
+		$poster = $image ? (string) wp_get_attachment_url( $image ) : '';
+		$html   = (string) ( $block['innerContent'][0] ?? '' );
+		$tags   = self::processor( $html );
+		$flags  = array();
+		$inner  = '';
+		if ( $tags->next_tag( 'video' ) ) {
+			foreach ( array( 'autoplay', 'loop', 'muted', 'playsinline' ) as $flag ) {
+				$flags[ $flag ] = null !== $tags->get_attribute( $flag ) ? ' ' . $flag : '';
+			}
+			$range = $tags->inner_range();
+			if ( ! $range || '</video>' !== substr( $html, $range[0] + $range[1], 8 ) ) {
+				return $rebuild;
+			}
+			$inner = substr( $html, $range[0], $range[1] );
+			$from  = $range[2];
+			$html  = substr_replace( $html, '', $from, $range[0] + $range[1] + 8 - $from );
+		} else {
+			$tags  = self::processor( $html );
+			$range = $tags->next_tag( 'figure' ) ? $tags->inner_range() : null;
+			if ( ! $range ) {
+				return $rebuild;
+			}
+			$from = $range[0];
+		}
+		// The order of the attributes is the one the editor saves.
+		$element                  = '<video' . ( $flags['autoplay'] ?? '' ) . ' controls' . ( $flags['loop'] ?? '' ) . ( $flags['muted'] ?? '' )
+			. ( '' !== $poster ? ' poster="' . esc_url( $poster ) . '"' : '' ) . ' preload="none" src="' . esc_url( $src ) . '"' . ( $flags['playsinline'] ?? '' ) . '>' . $inner . '</video>';
+		$block['innerContent'][0] = substr_replace( $html, $element, $from, 0 );
+		$block['attrs']           = self::place( 'core/video', (array) $block['attrs'], 'id', $id );
+		return $block;
 	}
 
 	/**

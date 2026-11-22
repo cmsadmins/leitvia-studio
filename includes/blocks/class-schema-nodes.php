@@ -42,7 +42,8 @@ final class Schema_Nodes {
 			return null;
 		}
 		/**
-		 * Filters the JSON-LD nodes that blocks added on this request.
+		 * Filters the JSON-LD nodes that blocks added on this request. Also the place where a kit adds the node of its
+		 * own entries (a Service on the page of a service): check the request and append the node.
 		 *
 		 * @param list<array<string, mixed>> $nodes Nodes.
 		 */

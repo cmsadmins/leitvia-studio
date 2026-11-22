@@ -262,6 +262,21 @@ class Test_Dtcg extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Optional color roles (contract optionalRoles) get a preset only when the set carries them; a set without them
+	 * compiles to the palette of the required roles alone.
+	 */
+	public function test_optional_color_roles_are_written_only_when_set(): void {
+		$c     = leitvia_studio_contract();
+		$doc   = self::minimal();
+		$slugs = static fn( array $settings ): array => array_column( $settings['color']['palette']['theme'], 'slug' );
+		$plain = $slugs( Dtcg::to_settings( $doc, $c ) );
+		$this->assertSame( array(), array_intersect( array_keys( Dtcg::optional_roles( $c, 'color' ) ), $plain ) );
+
+		$doc['color']['button'] = $doc['color']['accent'];
+		$this->assertSame( array_merge( $plain, array( 'button' ) ), $slugs( Dtcg::to_settings( $doc, $c ) ) );
+	}
+
+	/**
 	 * The role radius.media (contract field choices) takes the value of radius none, s, m or l: an alias takes the
 	 * preset of its target, a copied value passes, any other radius and the pill fail, and a set saved before the role
 	 * existed gets radius.none.

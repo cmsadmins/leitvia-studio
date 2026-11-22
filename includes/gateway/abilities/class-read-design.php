@@ -83,6 +83,8 @@ final class Read_Design {
 							'rules'            => array( 'type' => 'array' ),
 							'roles'            => array( 'type' => 'object' ),
 							'pairs'            => $objects,
+							'optionalRoles'    => array( 'type' => 'object' ),
+							'optionalPairs'    => $objects,
 							'compositionRules' => array( 'type' => 'object' ),
 							'pageFrames'       => $objects,
 							'templateParts'    => $objects,
@@ -481,7 +483,7 @@ final class Read_Design {
 			'sets'       => $sets,
 			'variations' => self::active_variations(),
 			'drift'      => Compiler::drift(),
-			'contrast'   => Contrast::findings( array_values( Dtcg::effective( wp_get_global_settings(), 'color', 'palette' ) ), $contract->pairs() ),
+			'contrast'   => Contrast::findings( ...Contrast::with_optional( array_values( Dtcg::effective( wp_get_global_settings(), 'color', 'palette' ) ), $contract ) ),
 			'hash'       => self::styles_hash(),
 		);
 	}

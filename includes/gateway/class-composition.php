@@ -14,11 +14,18 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Port of scripts/lib/composition.mjs: same rules, same order of findings, same score. The fixtures in
  * tests/fixtures/composition keep PHP and Node equal. A page is the list of pattern slugs of its sections; patterns
- * with role frame are skipped, slugs the contract does not list count as unknownPattern, except the blocks of
- * INTRO_BLOCKS before the first pattern on a template that shows the title itself. Approved Lab patterns
+ * with role frame are skipped, slugs the contract does not list count as unknownPattern. Approved Lab patterns
  * (block:<ID>) join the contract as labPatterns, see lab(); one without composition is known but outside the rhythm.
- * A saved page also hands in the tones of its sections, see tones(): a section made dark on the block itself (style
- * Inverse, ink or accent ground) counts with that tone instead of the one of its pattern.
+ *
+ * Blocks without a pattern are running text, see prose(): paragraphs, lists, images, galleries, accordions or a group
+ * of them. They are no section and no finding; the sections before and after them are no neighbors, and an image, a
+ * gallery or a video among them is a break. Only a layout built by hand (LAYOUT_BLOCKS) and text above the hero of a
+ * template without a title stay unknownPattern.
+ *
+ * A saved page also hands in what its blocks set themselves: the ground of a section, see tones(), instead of the tone
+ * of its pattern, and the sections with the media on the other side, see mirrored(). A media section, see media(), is
+ * a break, stands outside the density run and repeats no neighbor that is none: the video or the wide image is the
+ * change of pace, whatever its padding, layout and ground.
  *
  * Check leitvia/composition (scope page) warns when an agent write leaves a page below the minimum score of the
  * gateway settings and below the score it had before; a warning turns "autonomous" into a change package.
@@ -37,6 +44,16 @@ final class Composition {
 	 * the first section. Page frames on a template with a hero (hook in the intro slot) have no such slot.
 	 */
 	public const INTRO_BLOCKS = array( 'core/paragraph', 'core/heading', 'core/list', 'leitvia/table-of-contents' );
+
+	/**
+	 * Core blocks that lay out a section by hand. One of them without a pattern is no running text.
+	 */
+	public const LAYOUT_BLOCKS = array( 'core/columns', 'core/cover', 'core/media-text' );
+
+	/**
+	 * Blocks that break a run of plain sections when they stand in the running text.
+	 */
+	public const MEDIA_BLOCKS = array( 'core/image', 'core/gallery', 'core/video', 'core/embed' );
 
 	/**
 	 * Registers the check. Runs on leitvia_studio_init.
@@ -62,9 +79,10 @@ final class Composition {
 	 * @param array<string, mixed> $contract Contract data.
 	 * @param string               $template Template slug, '' to skip the hero template rule.
 	 * @param array<int, string>   $tones    Tone per index in slugs from the blocks, see tones().
+	 * @param int[]                $mirrored Indexes in slugs of the sections with the media on the other side.
 	 * @return list<array{rule: string, index: int, message: string}>
 	 */
-	public static function check( array $slugs, array $contract, string $template = '', array $tones = array() ): array {
+	public static function check( array $slugs, array $contract, string $template = '', array $tones = array(), array $mirrored = array() ): array {
 		$rules   = (array) ( $contract['compositionRules'] ?? array() );
 		$by_slug = array();
 		foreach ( array_merge( (array) ( $contract['patterns'] ?? array() ), (array) ( $contract['studioPatterns'] ?? array() ), (array) ( $contract['addonPatterns'] ?? array() ), (array) ( $contract['labPatterns'] ?? array() ) ) as $pattern ) {
@@ -87,30 +105,51 @@ final class Composition {
 				}
 			}
 		}
-		$intro    = ! in_array( $template, $hero_templates, true );
+		$titled   = ! in_array( $template, $hero_templates, true );
+		$lead     = true;
+		$fresh    = false;
+		$relief   = false;
 		$sections = array();
 		foreach ( array_values( $slugs ) as $index => $slug ) {
 			$pattern = $by_slug[ $slug ] ?? null;
-			$intro   = $intro && ! $pattern && in_array( $slug, self::INTRO_BLOCKS, true );
-			if ( $intro ) {
-				continue;
-			}
-			if ( ! $pattern ) {
+			$prose   = ! $pattern && self::prose( (string) $slug, $contract );
+			$lead    = $lead && ! $pattern;
+			if ( $prose && ( $titled || ! $lead ) ) {
+				$fresh  = true;
+				$relief = $relief || in_array( $slug, self::MEDIA_BLOCKS, true );
+			} elseif ( $prose ) {
+				/* translators: 1: section number, 2: block name, 3: template slug. */
+				$add( 'unknownPattern', $index, sprintf( __( 'Section %1$d (%2$s) stands above the first section, but template %3$s starts with a hero; move it below the hero.', 'leitvia-studio' ), $index + 1, $slug, $template ) );
+			} elseif ( ! $pattern && in_array( $slug, self::LAYOUT_BLOCKS, true ) ) {
+				/* translators: 1: section number, 2: block name. */
+				$add( 'unknownPattern', $index, sprintf( __( 'Section %1$d is a layout built by hand with %2$s; replace it with a pattern from leitvia/list-patterns. Text, lists, images, galleries and accordions between sections need no pattern.', 'leitvia-studio' ), $index + 1, $slug ) );
+			} elseif ( ! $pattern ) {
 				/* translators: 1: section number, 2: pattern slug. */
-				$add( 'unknownPattern', $index, sprintf( __( 'Section %1$d uses unknown pattern %2$s.', 'leitvia-studio' ), $index + 1, $slug ) );
+				$add( 'unknownPattern', $index, sprintf( __( 'Section %1$d uses unknown pattern %2$s; use a pattern from leitvia/list-patterns.', 'leitvia-studio' ), $index + 1, $slug ) );
 			} elseif ( isset( $pattern['composition'] ) && 'frame' !== $pattern['composition']['role'] ) {
 				if ( isset( $tones[ $index ] ) && 'image' !== ( $pattern['composition']['tone'] ?? '' ) ) {
 					$pattern['composition']['tone'] = $tones[ $index ];
 				}
+				if ( in_array( $index, $mirrored, true ) ) {
+					$pattern['composition']['layout'] = ( $pattern['composition']['layout'] ?? '' ) . '-mirrored';
+				}
 				$sections[] = $pattern + array(
-					'index' => $index,
-					'n'     => $index + 1,
+					'index'  => $index,
+					'n'      => $index + 1,
+					'fresh'  => $fresh,
+					'relief' => $relief,
+					'media'  => self::media( (string) $slug, $contract ),
 				);
+				$fresh      = false;
+				$relief     = false;
 			}
 		}
 
 		$break_when = (array) ( $rules['breakWhen'] ?? array() );
 		$is_break   = static function ( array $s ) use ( $break_when ): bool {
+			if ( $s['media'] ) {
+				return true;
+			}
 			foreach ( $break_when as $key => $values ) {
 				if ( in_array( 'patterns' === $key ? $s['slug'] : ( $s['composition'][ $key ] ?? null ), (array) $values, true ) ) {
 					return true;
@@ -122,6 +161,7 @@ final class Composition {
 		foreach ( $break_when as $key => $values ) {
 			$hints[] = ( 'patterns' === $key ? 'pattern' : $key ) . ' ' . self::or_list( (array) $values );
 		}
+		$hints[]    = 'a media section (video, gallery or wide image)';
 		$break_hint = implode( '; ', $hints );
 		$repeat     = (array) ( $rules['noAdjacentRepeat'] ?? array() );
 
@@ -130,7 +170,7 @@ final class Composition {
 		$density_run = 0;
 		$last_accent = null;
 		foreach ( $sections as $i => $s ) {
-			$prev = $sections[ $i - 1 ] ?? null;
+			$prev = $s['fresh'] ? null : ( $sections[ $i - 1 ] ?? null );
 			$c    = $s['composition'];
 
 			if ( '' !== $template && 'hero' === $s['area'] && ! in_array( $template, $hero_templates, true ) ) {
@@ -143,13 +183,13 @@ final class Composition {
 				$add( 'heroFirstOnly', $s['index'], sprintf( __( 'Section %d is a hero; only the first section may be a hero.', 'leitvia-studio' ), $s['n'] ) );
 			}
 
-			if ( $prev && $repeat && array_filter( $repeat, static fn( string $key ): bool => ( $prev['composition'][ $key ] ?? null ) !== ( $c[ $key ] ?? null ) ) === array() ) {
+			if ( $prev && $prev['media'] === $s['media'] && $repeat && array_filter( $repeat, static fn( string $key ): bool => ( $prev['composition'][ $key ] ?? null ) !== ( $c[ $key ] ?? null ) ) === array() ) {
 				$what = implode( '/', array_map( static fn( string $key ): string => (string) $c[ $key ], $repeat ) );
 				/* translators: 1: section number, 2: next section number, 3: layout/tone. */
-				$add( 'noAdjacentRepeat', $s['index'], sprintf( __( 'Sections %1$d and %2$d are both %3$s; give one of them another tone or layout.', 'leitvia-studio' ), $prev['n'], $s['n'], $what ) );
+				$add( 'noAdjacentRepeat', $s['index'], sprintf( __( 'Sections %1$d and %2$d are both %3$s; give one of them another ground (backgroundColor surface or surface-alt on its outer block, or the block style Inverse), put its media on the other side (block style Media right), or move another section between them.', 'leitvia-studio' ), $prev['n'], $s['n'], $what ) );
 			}
 
-			$plain_run = $is_break( $s ) ? 0 : $plain_run + 1;
+			$plain_run = $is_break( $s ) ? 0 : ( $s['relief'] ? 1 : $plain_run + 1 );
 			if ( 1 === $plain_run ) {
 				$run_start = $s['n'];
 			}
@@ -170,10 +210,14 @@ final class Composition {
 				);
 			}
 
-			$density_run = $prev && $prev['composition']['density'] === $c['density'] ? $density_run + 1 : 1;
+			if ( $s['media'] ) {
+				$density_run = 0;
+				continue;
+			}
+			$density_run = $prev && ! $prev['media'] && $prev['composition']['density'] === $c['density'] ? $density_run + 1 : 1;
 			if ( isset( $rules['maxDensityRun'] ) && $density_run === (int) $rules['maxDensityRun'] + 1 ) {
 				/* translators: 1: section number, 2: number of sections, 3: density. */
-				$add( 'maxDensityRun', $s['index'], sprintf( __( 'Section %1$d makes %2$d %3$s sections in a row; alternate density.', 'leitvia-studio' ), $s['n'], $density_run, $c['density'] ) );
+				$add( 'maxDensityRun', $s['index'], sprintf( __( 'Section %1$d makes %2$d %3$s sections in a row; move a section of another density or a media section (video, gallery or wide image) between them.', 'leitvia-studio' ), $s['n'], $density_run, $c['density'] ) );
 			}
 		}
 
@@ -193,10 +237,11 @@ final class Composition {
 	 * @param array<string, mixed> $contract Contract data.
 	 * @param string               $template Template slug or ''.
 	 * @param array<int, string>   $tones    Tone per index in slugs, see tones().
+	 * @param int[]                $mirrored Indexes in slugs of the sections with the media on the other side.
 	 * @return array{issues: list<array{rule: string, index: int, message: string}>, score: int}
 	 */
-	public static function score( array $slugs, array $contract, string $template = '', array $tones = array() ): array {
-		$issues  = self::check( $slugs, $contract, $template, $tones );
+	public static function score( array $slugs, array $contract, string $template = '', array $tones = array(), array $mirrored = array() ): array {
+		$issues  = self::check( $slugs, $contract, $template, $tones, $mirrored );
 		$scoring = (array) ( $contract['compositionRules']['scoring'] ?? array() );
 		$score   = 100;
 		foreach ( $issues as $issue ) {
@@ -216,11 +261,12 @@ final class Composition {
 	 * @param array<string, mixed> $contract Contract data.
 	 * @param string               $template Template slug or ''.
 	 * @param array<int, string>   $tones    Tone per index in slugs, see tones(); a replaced section loses its own.
+	 * @param int[]                $mirrored Indexes of the mirrored sections; a replaced section is not mirrored.
 	 * @return array{issues: list<array<string, mixed>>, score: int, suggestions: list<array<string, mixed>>}
 	 */
-	public static function report( array $slugs, array $contract, string $template = '', array $tones = array() ): array {
+	public static function report( array $slugs, array $contract, string $template = '', array $tones = array(), array $mirrored = array() ): array {
 		$slugs                 = array_values( $slugs );
-		$result                = self::score( $slugs, $contract, $template, $tones );
+		$result                = self::score( $slugs, $contract, $template, $tones, $mirrored );
 		$patterns              = array_merge( (array) ( $contract['patterns'] ?? array() ), (array) ( $contract['studioPatterns'] ?? array() ), (array) ( $contract['addonPatterns'] ?? array() ) );
 		$roles                 = array_combine( array_column( $patterns, 'slug' ), array_column( array_column( $patterns, 'composition' ), 'role' ) );
 		$replaced              = array_filter( array_combine( array_column( $patterns, 'slug' ), array_map( static fn( array $pattern ): bool => ! empty( $pattern['docs']['replacedBy'] ), $patterns ) ) );
@@ -235,7 +281,7 @@ final class Composition {
 				}
 				$try                    = $slugs;
 				$try[ $issue['index'] ] = $slug;
-				$new                    = self::score( $try, $contract, $template, array_diff_key( $tones, array( $issue['index'] => true ) ) );
+				$new                    = self::score( $try, $contract, $template, array_diff_key( $tones, array( $issue['index'] => true ) ), array_diff( $mirrored, array( $issue['index'] ) ) );
 				$same                   = array_filter( $new['issues'], static fn( array $found ): bool => $found['rule'] === $issue['rule'] && $found['index'] === $issue['index'] );
 				if ( ! $same && $new['score'] > $result['score'] ) {
 					$candidates[ $slug ] = $new['score'];
@@ -247,9 +293,6 @@ final class Composition {
 			if ( $replace ) {
 				/* translators: 1: finding, 2: section number, 3: pattern slugs. */
 				$text = sprintf( __( '%1$s Replace section %2$d with %3$s.', 'leitvia-studio' ), $issue['message'], $issue['index'] + 1, self::or_list( $replace ) );
-			} elseif ( 'unknownPattern' === $issue['rule'] ) {
-				/* translators: %s: finding. */
-				$text = sprintf( __( '%s Use a pattern from leitvia/list-patterns.', 'leitvia-studio' ), $issue['message'] );
 			}
 			$result['suggestions'][] = array(
 				'rule'         => $issue['rule'],
@@ -303,8 +346,9 @@ final class Composition {
 
 	/**
 	 * Section slugs of block markup: metadata.patternName of each root block (block:<ID> for a Lab pattern), the block
-	 * name for a root block without one; template parts are frames and skipped. Content without any patternName is no
-	 * composed page: empty list.
+	 * name for a root block without one, or the name of the first block of LAYOUT_BLOCKS in it: a group around columns
+	 * is a layout built by hand, a group around text is text. Template parts are frames and skipped. Content without
+	 * any patternName is no composed page: empty list.
 	 *
 	 * @param string $content Block markup.
 	 * @return list<string>
@@ -317,6 +361,8 @@ final class Composition {
 			$from    = (string) ( $block['attrs']['metadata']['patternName'] ?? '' );
 			$pattern = $pattern || '' !== $from;
 			$ref     = Status::of_name( $from );
+			$layout  = '' === $from ? self::find( array( $block ), static fn( array $inner ): bool => in_array( $inner['blockName'] ?? '', self::LAYOUT_BLOCKS, true ) ) : null;
+			$name    = $layout ? (string) $layout['blockName'] : $name;
 			$slugs[] = '' !== $from ? ( str_starts_with( $ref, 'block:' ) ? $ref : $from ) : ( '' !== $name ? $name : 'core/freeform' );
 		}
 		return $pattern ? $slugs : array();
@@ -324,8 +370,9 @@ final class Composition {
 
 	/**
 	 * Tones the root blocks of block markup set themselves, by index as in sections(): ink for the style Inverse or an
-	 * ink ground, accent for an accent ground. A stage pattern switched to Inverse is a dark band, not the light tone
-	 * of its pattern.
+	 * ink ground, otherwise the ground as it is set, a palette slug such as accent, surface or surface-alt (also one of
+	 * a kit), a custom color or a gradient. A stage pattern switched to Inverse is a dark band, not the light tone of
+	 * its pattern, and a section moved from surface to surface-alt no longer repeats its neighbor.
 	 *
 	 * @param string $content Block markup.
 	 * @return array<int, string>
@@ -333,14 +380,109 @@ final class Composition {
 	public static function tones( string $content ): array {
 		$tones = array();
 		foreach ( self::roots( $content ) as $index => $block ) {
-			$bg = $block['attrs']['backgroundColor'] ?? null;
-			if ( 'ink' === $bg || in_array( 'is-style-inverse', explode( ' ', (string) ( $block['attrs']['className'] ?? '' ) ), true ) ) {
+			$attrs = (array) ( $block['attrs'] ?? array() );
+			$bg    = $attrs['backgroundColor'] ?? $attrs['style']['color']['background'] ?? $attrs['gradient'] ?? $attrs['style']['color']['gradient'] ?? null;
+			if ( 'ink' === $bg || self::has_class( $block, 'is-style-inverse' ) ) {
 				$tones[ $index ] = 'ink';
-			} elseif ( 'accent' === $bg ) {
-				$tones[ $index ] = 'accent';
+			} elseif ( is_string( $bg ) && '' !== $bg ) {
+				$tones[ $index ] = $bg;
 			}
 		}
 		return $tones;
+	}
+
+	/**
+	 * Indexes, as in sections(), of the sections whose media stands on the other side: a block with the style Media
+	 * right or a Media & Text block with the media on the right, anywhere in the section. Such a section does not
+	 * repeat the layout of a neighbor with the media on the left.
+	 *
+	 * @param string $content Block markup.
+	 * @return list<int>
+	 */
+	public static function mirrored( string $content ): array {
+		$test = static fn( array $block ): bool => self::has_class( $block, 'is-style-media-right' ) || ( 'core/media-text' === ( $block['blockName'] ?? '' ) && 'right' === ( $block['attrs']['mediaPosition'] ?? '' ) );
+		return array_keys( array_filter( self::roots( $content ), static fn( array $block ): bool => null !== self::find( array( $block ), $test ) ) );
+	}
+
+	/**
+	 * Block IDs of the sections by index as in sections(), '' for a block without one.
+	 *
+	 * @param string $content Block markup.
+	 * @return list<string>
+	 */
+	public static function ids( string $content ): array {
+		return array_map( array( Block_Ids::class, 'id' ), self::roots( $content ) );
+	}
+
+	/**
+	 * Whether a slug that is no pattern is running text: a core block outside LAYOUT_BLOCKS, a block of INTRO_BLOCKS
+	 * or another registered block type (contract data may name them as proseBlocks, as the fixtures do).
+	 *
+	 * @param string               $slug     Slug of a section.
+	 * @param array<string, mixed> $contract Contract data.
+	 */
+	private static function prose( string $slug, array $contract ): bool {
+		if ( in_array( $slug, self::LAYOUT_BLOCKS, true ) ) {
+			return false;
+		}
+		if ( str_starts_with( $slug, 'core/' ) || in_array( $slug, self::INTRO_BLOCKS, true ) ) {
+			return true;
+		}
+		return isset( $contract['proseBlocks'] ) ? in_array( $slug, (array) $contract['proseBlocks'], true ) : \WP_Block_Type_Registry::get_instance()->is_registered( $slug );
+	}
+
+	/**
+	 * Whether a pattern is a media section: its markup holds a video or an embed, or an image, a gallery or a cover
+	 * aligned wide or full. Read from the registered pattern, so a new pattern counts without a list of names
+	 * (contract data may name them as mediaPatterns, as the fixtures do).
+	 * ponytail: judged by the markup of the pattern, not of the page; read the section of the page if edits ever
+	 * remove or add the media of a section.
+	 *
+	 * @param string               $slug     Pattern slug, block:<ID> for a Lab pattern.
+	 * @param array<string, mixed> $contract Contract data.
+	 */
+	private static function media( string $slug, array $contract ): bool {
+		static $cache = array();
+		if ( isset( $contract['mediaPatterns'] ) ) {
+			return in_array( $slug, (array) $contract['mediaPatterns'], true );
+		}
+		if ( ! isset( $cache[ $slug ] ) ) {
+			$pattern        = \WP_Block_Patterns_Registry::get_instance()->get_registered( $slug );
+			$content        = str_starts_with( $slug, 'block:' ) ? (string) get_post_field( 'post_content', (int) substr( $slug, 6 ), 'raw' ) : (string) ( is_array( $pattern ) ? ( $pattern['content'] ?? '' ) : '' );
+			$cache[ $slug ] = null !== self::find(
+				parse_blocks( $content ),
+				static fn( array $block ): bool => 1 === preg_match( '#/(video|embed)$#D', (string) ( $block['blockName'] ?? '' ) )
+					|| ( in_array( $block['blockName'] ?? '', array( 'core/image', 'core/gallery', 'core/cover' ), true ) && in_array( $block['attrs']['align'] ?? '', array( 'wide', 'full' ), true ) )
+			);
+		}
+		return $cache[ $slug ];
+	}
+
+	/**
+	 * First block, inner blocks included, that passes the test.
+	 *
+	 * @param array<int|string, array<string, mixed>> $blocks Parsed blocks.
+	 * @param callable                                $test   Gets a block, returns bool.
+	 * @return array<string, mixed>|null
+	 */
+	private static function find( array $blocks, callable $test ): ?array {
+		foreach ( $blocks as $block ) {
+			$found = $test( $block ) ? $block : self::find( (array) ( $block['innerBlocks'] ?? array() ), $test );
+			if ( $found ) {
+				return $found;
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Whether className of a block holds the class.
+	 *
+	 * @param array<string, mixed> $block Parsed block.
+	 * @param string               $name  Class name.
+	 */
+	private static function has_class( array $block, string $name ): bool {
+		return in_array( $name, explode( ' ', (string) ( $block['attrs']['className'] ?? '' ) ), true );
 	}
 
 	/**
@@ -373,9 +515,10 @@ final class Composition {
 		$compare = $post && 'leitvia/audit-site' !== ( $context['ability'] ?? '' );
 		$saved   = $compare ? self::sections( (string) get_post_field( 'post_content', $post, 'raw' ) ) : array();
 		$data    = self::lab( array_merge( $slugs, $saved ), $contract->data() );
-		$report  = self::report( $slugs, $data, $template, self::tones( $content ) );
+		$report  = self::report( $slugs, $data, $template, self::tones( $content ), self::mirrored( $content ) );
 		$min     = (int) Gateway::settings()['min_composition_score'];
-		$before  = $compare ? self::score( $saved, $data, $template, self::tones( (string) get_post_field( 'post_content', $post, 'raw' ) ) )['score'] : 101;
+		$raw     = $compare ? (string) get_post_field( 'post_content', $post, 'raw' ) : '';
+		$before  = $compare ? self::score( $saved, $data, $template, self::tones( $raw ), self::mirrored( $raw ) )['score'] : 101;
 		if ( $report['score'] >= $min || $report['score'] >= $before ) {
 			return array();
 		}

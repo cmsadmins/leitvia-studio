@@ -1,10 +1,11 @@
 {
-	"name": "intro-only-leading",
+	"name": "hand-built-layout",
 	"template": "page",
 	"sections": [
 		"core/paragraph",
-		"leitvia/cta-contact",
-		"core/paragraph"
+		"leitvia/content-text",
+		"core/columns",
+		"leitvia/cta-contact"
 	],
 	"issues": [
 		[

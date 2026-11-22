@@ -1,0 +1,30 @@
+{
+	"name": "specialist-page",
+	"template": "page",
+	"sections": [
+		"core/paragraph",
+		"leitvia/content-text-figures",
+		"core/gallery",
+		"leitvia/content-text-figures",
+		"leitvia/content-text-figures",
+		"leitvia/content-video-wide",
+		"leitvia/content-text",
+		"core/group",
+		"core/image",
+		"leitvia/content-text-figures",
+		"leitvia/content-gallery",
+		"leitvia/cta-contact-buttons"
+	],
+	"tones": {
+		"4": "surface-alt"
+	},
+	"mirrored": [
+		4
+	],
+	"mediaPatterns": [
+		"leitvia/content-video-wide",
+		"leitvia/content-gallery"
+	],
+	"issues": [],
+	"score": 100
+}

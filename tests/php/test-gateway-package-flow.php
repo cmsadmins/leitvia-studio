@@ -460,6 +460,11 @@ class Test_Gateway_Package_Flow extends WP_UnitTestCase {
 		$package = $this->queue( $post, array( 'post_content' => self::paragraph( 'Agent text' ) ) );
 		$apply   = wp_get_ability( 'leitvia/apply-package' );
 		$this->assertFalse( $apply->get_meta()['annotations']['readonly'] );
+		// Only applying takes a selection of operations, as its description says.
+		$this->assertArrayHasKey( 'operations', $apply->get_input_schema()['properties'] );
+		$this->assertArrayNotHasKey( 'operations', wp_get_ability( 'leitvia/reject-package' )->get_input_schema()['properties'] );
+		// A rollback takes back the whole package; an input it would ignore stays out of its schema.
+		$this->assertArrayNotHasKey( 'operations', wp_get_ability( 'leitvia/rollback' )->get_input_schema()['properties'] );
 
 		$human = $apply->execute( array( 'id' => $package ) );
 		$this->assertWPError( $human );

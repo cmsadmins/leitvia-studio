@@ -259,6 +259,8 @@ class Test_Gateway_Seo extends WP_UnitTestCase {
 		$this->assert_rejected( 'leitvia_invalid_input', 'unsupported_fact', self::update( $page, array( 'title' => 'Bike repairs since 1998' ) ) );
 		$this->assertSame( '', get_post_meta( $page, '_seopress_titles_title', true ) );
 		$this->assertSame( 'package', self::update( $page, array( 'title' => 'Bike repairs from 40 euros' ) )['mode'] );
+		// The year of the date of the post is a fact of the post, though no text names it.
+		$this->assertSame( 'package', self::update( $page, array( 'title' => 'Bike repairs in ' . get_the_date( 'Y', $page ) ) )['mode'] );
 	}
 
 	/**

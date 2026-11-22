@@ -950,8 +950,8 @@ final class Content_Checks {
 			$id      = Block_Ids::id( $block );
 			$bg      = $block['attrs']['backgroundColor'] ?? null;
 			$inverse = in_array( 'is-style-inverse', explode( ' ', (string) ( $block['attrs']['className'] ?? '' ) ), true );
-			// The theme drops a surface ground under Inverse on render (inverse_over_surface()), so the style wins there.
-			$own = $inverse && ( ! is_string( $bg ) || 'surface' === $bg ) ? self::inverse_ground() : ( is_string( $bg ) ? $bg : $ground );
+			// The theme drops a surface or surface-alt ground under Inverse on render (inverse_over_surface()), so the style wins there.
+			$own = $inverse && ( ! is_string( $bg ) || in_array( $bg, array( 'surface', 'surface-alt' ), true ) ) ? self::inverse_ground() : ( is_string( $bg ) ? $bg : $ground );
 			yield array( $block, '' !== $id ? $id : $path . $index, $own, $band );
 			yield from self::grounds( (array) $block['innerBlocks'], $path . $index . '.', $own, $band || $inverse || in_array( $bg, array( 'ink', 'accent' ), true ) );
 		}

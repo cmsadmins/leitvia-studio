@@ -1,0 +1,28 @@
+{
+	"name": "bands-ground-and-side",
+	"template": "page-landing",
+	"sections": [
+		"leitvia/hero-centered",
+		"leitvia/content-text-media",
+		"leitvia/content-text-media",
+		"leitvia/content-text-media",
+		"leitvia/cta-banner"
+	],
+	"tones": {
+		"2": "surface-alt"
+	},
+	"mirrored": [
+		3
+	],
+	"issues": [
+		[
+			"breakWithin",
+			3
+		],
+		[
+			"maxDensityRun",
+			3
+		]
+	],
+	"score": 85
+}

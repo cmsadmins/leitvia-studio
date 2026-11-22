@@ -77,7 +77,7 @@ final class Catalog {
 			),
 		),
 		'core/video' => array(
-			'extension' => 'leitvia/add-media takes the video (MP4 with H.264 or WebM, with poster) and the WebVTT file; the attribute tracks of leitvia/update-block sets it with kind, srclang and label, and its field caption sets the figcaption.',
+			'extension' => 'leitvia/add-media takes the video (MP4 with H.264 or WebM, with poster) and the WebVTT file. The field video of leitvia/update-block and of the block edits sets the file by its ID, with poster, controls and preload none, also on an empty video block; the attribute tracks sets the text tracks with id, kind, srclang and label, align the width, and the field caption the figcaption. No other attribute is set through attributes.',
 			'usage'     => array(
 				'useWhen'   => 'A video file hosted on the site itself, which sends no data to a third party.',
 				'avoidWhen' => 'Videos of a third party; use the embed block with its consent placeholder.',
@@ -150,7 +150,12 @@ final class Catalog {
 		foreach ( self::CORE_EXTENSIONS as $name => $extension ) {
 			$type = $types->get_registered( $name );
 			if ( $type ) {
-				$catalog[] = self::entry( $type, 'core', $extension['usage'] ) + array( 'extension' => $extension['extension'] );
+				$entry = self::entry( $type, 'core', $extension['usage'] ) + array( 'extension' => $extension['extension'] );
+				// A core block whose attributes change through a schema of their own lists that schema, so the catalog
+				// names what leitvia/update-block takes.
+				$core                              = \LeitviaStudio\Gateway\Block_Edit::CORE_ATTRIBUTES[ $name ] ?? null;
+				$entry['attributes']['properties'] = $core ?? $entry['attributes']['properties'];
+				$catalog[]                         = $entry;
 			}
 		}
 		$catalog = self::add_children( $catalog );

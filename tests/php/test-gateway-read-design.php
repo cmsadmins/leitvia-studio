@@ -240,7 +240,19 @@ class Test_Gateway_Read_Design extends WP_UnitTestCase {
 		$all = $this->call( 'leitvia/list-patterns', array( 'per_page' => 50 ) );
 		$this->assertGreaterThan( 50, $all['total'] );
 		$this->assertSame( (int) ceil( $all['total'] / 50 ), $all['pages'] );
-		$item = wp_list_filter( $all['items'], array( 'slug' => self::PATTERN ) );
+		// Every page, so the test does not depend on how many patterns come before Studio's.
+		$items = $all['items'];
+		for ( $page = 2; $page <= $all['pages']; $page++ ) {
+			$next  = $this->call(
+				'leitvia/list-patterns',
+				array(
+					'per_page' => 50,
+					'page'     => $page,
+				)
+			);
+			$items = array_merge( $items, $next['items'] );
+		}
+		$item = wp_list_filter( $items, array( 'slug' => self::PATTERN ) );
 		$item = reset( $item );
 		$this->assertSame( 'theme', $item['source'] );
 		$this->assertSame( 'approved', $item['status'] );
@@ -251,14 +263,7 @@ class Test_Gateway_Read_Design extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'images', $item );
 		$this->assertArrayNotHasKey( 'content', $item );
 
-		$studio = $this->call(
-			'leitvia/list-patterns',
-			array(
-				'per_page' => 50,
-				'page'     => 2,
-			)
-		);
-		$this->assertContains( 'studio', array_merge( wp_list_pluck( $all['items'], 'source' ), wp_list_pluck( $studio['items'], 'source' ) ) );
+		$this->assertContains( 'studio', wp_list_pluck( $items, 'source' ) );
 
 		$hooks = $this->call(
 			'leitvia/list-patterns',

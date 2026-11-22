@@ -7,6 +7,7 @@
 
 namespace LeitviaStudio\Tokens;
 
+use LeitviaStudio\Contract\Contract;
 use WP_Error;
 
 defined( 'ABSPATH' ) || exit;
@@ -172,7 +173,44 @@ final class Contrast {
 		if ( is_wp_error( $settings ) ) {
 			return array();
 		}
-		return self::findings( $settings['color']['palette']['theme'] ?? array(), $contract->pairs() );
+		return self::findings( ...self::with_optional( $settings['color']['palette']['theme'] ?? array(), $contract ) );
+	}
+
+	/**
+	 * Palette and pairs of a contract check, with the optional color roles (contract optionalRoles, optionalPairs). A
+	 * pair of optionalPairs counts once the palette carries one of its optional roles; an optional role it lacks then
+	 * stands for its fallback role. A palette without optional roles is checked against pairs alone, as before.
+	 *
+	 * @param array<int, array<string, mixed>> $palette  Palette presets.
+	 * @param Contract                         $contract Contract of the active theme.
+	 * @return array{0: array<int, array<string, mixed>>, 1: array<int, array{fg: string, bg: string, min: float|int, ring?: string}>}
+	 */
+	public static function with_optional( array $palette, Contract $contract ): array {
+		$optional = Dtcg::optional_roles( $contract, 'color' );
+		$have     = array_column( $palette, 'slug' );
+		$set      = array_intersect( array_keys( $optional ), $have );
+		$pairs    = $contract->pairs();
+		if ( ! $set ) {
+			return array( $palette, $pairs );
+		}
+		foreach ( array_diff_key( $optional, array_flip( $have ) ) as $slug => $fallback ) {
+			$palette[] = array(
+				'slug'  => $slug,
+				'color' => "var(--wp--preset--color--$fallback)",
+			);
+		}
+		/**
+		 * The contract schema holds the form of a pair.
+		 *
+		 * @var array<int, array{fg: string, bg: string, min: float|int, ring?: string}> $more
+		 */
+		$more = (array) ( $contract->data()['optionalPairs'] ?? array() );
+		foreach ( $more as $pair ) {
+			if ( array_intersect( array( $pair['fg'], $pair['bg'] ), $set ) ) {
+				$pairs[] = $pair;
+			}
+		}
+		return array( $palette, $pairs );
 	}
 
 	/**

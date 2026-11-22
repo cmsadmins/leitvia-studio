@@ -90,7 +90,7 @@ final class Packages {
 			'leitvia/apply-package',
 			__( 'Apply change package', 'leitvia-studio' ),
 			__( 'Applies the open operations of a change package, all or the listed ones. Find the package with leitvia/list-packages and check its diff with leitvia/get-package first. Each operation checks its base hash; one whose target changed stays open with a conflict, the others are written with snapshot and audit entry. Agents may only apply operations whose autonomy level is autonomous.', 'leitvia-studio' ),
-			false,
+			true,
 			$id,
 			static function ( array $input ) {
 				$only = array_map( 'intval', (array) ( $input['operations'] ?? array() ) );
@@ -102,7 +102,7 @@ final class Packages {
 			'leitvia/reject-package',
 			__( 'Discard change package', 'leitvia-studio' ),
 			__( 'Discards an open or partly applied change package. Its open operations stay unwritten and their waiting files are deleted, operations already applied stay. Use it for your own package when a run took a wrong turn; users with manage_options may discard any package. The package stays with the state rejected and the audit log keeps the call. It cannot be undone, so build the change again with a new package key.', 'leitvia-studio' ),
-			true,
+			false,
 			$id,
 			static fn( array $input ) => self::own( (int) $input['id'] ) ?? Store::reject( (int) $input['id'] )
 		);
@@ -110,7 +110,7 @@ final class Packages {
 			'leitvia/rollback',
 			__( 'Roll back change package', 'leitvia-studio' ),
 			__( 'Rolls back the applied operations of a change package from their snapshots. Package IDs come from leitvia/list-packages. If anyone changed a target since, nothing is rolled back and leitvia_rollback_conflict lists both hashes and the diff. Agents may only roll back operations whose autonomy level is autonomous.', 'leitvia-studio' ),
-			true,
+			false,
 			$id,
 			static fn( array $input ) => self::guard( (int) $input['id'], static fn( array $entry ): bool => isset( $entry['applied'] ) ) ?? Store::rollback( (int) $input['id'] )
 		);

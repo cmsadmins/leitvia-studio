@@ -1,0 +1,43 @@
+{
+	"name": "monotone-page",
+	"template": "page",
+	"sections": [
+		"leitvia/content-text-figures",
+		"leitvia/content-text-figures",
+		"leitvia/content-text-media",
+		"leitvia/content-two-columns",
+		"leitvia/content-text-figures",
+		"leitvia/content-text-figures"
+	],
+	"issues": [
+		[
+			"noAdjacentRepeat",
+			1
+		],
+		[
+			"noAdjacentRepeat",
+			2
+		],
+		[
+			"maxDensityRun",
+			2
+		],
+		[
+			"noAdjacentRepeat",
+			3
+		],
+		[
+			"breakWithin",
+			3
+		],
+		[
+			"noAdjacentRepeat",
+			4
+		],
+		[
+			"noAdjacentRepeat",
+			5
+		]
+	],
+	"score": 35
+}

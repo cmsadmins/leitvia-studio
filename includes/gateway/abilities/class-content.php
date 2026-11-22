@@ -271,7 +271,7 @@ final class Content {
 		return array(
 			'type'        => 'string',
 			'enum'        => array( 'open', 'closed' ),
-			'description' => __( 'Whether visitors may comment; without it a new post takes the default of the site.', 'leitvia-studio' ),
+			'description' => __( 'Whether visitors may comment; without it a new post is closed for comments, whatever the default of the site. Pingbacks and trackbacks are closed on every new post.', 'leitvia-studio' ),
 		);
 	}
 
@@ -617,6 +617,10 @@ final class Content {
 			if ( in_array( $value, array( '', 0, null, array() ), true ) && ! ( $id && metadata_exists( 'post', $id, (string) $key ) ) ) {
 				unset( $state['meta_input'][ $key ] );
 			}
+		}
+		if ( ! $id ) {
+			// No input opens pingbacks and trackbacks, so a new post never takes them from the default of the site.
+			$state['ping_status'] = 'closed';
 		}
 		$date = (string) ( $state['post_date'] ?? '' );
 		if ( '' !== $date && ( ! $id || get_post_field( 'post_date', $id, 'raw' ) !== $date ) ) {

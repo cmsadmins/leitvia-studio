@@ -51,7 +51,7 @@ final class Site_Editor_Guard {
 		}
 		$theme    = WP_Theme_JSON_Resolver::get_merged_data( 'theme' )->get_settings()['color']['palette']['theme'] ?? array();
 		$palette  = array_merge( array_column( $theme, null, 'slug' ), array_column( $user, null, 'slug' ) );
-		$findings = Contrast::findings( array_values( $palette ), $contract->pairs() );
+		$findings = Contrast::findings( ...Contrast::with_optional( array_values( $palette ), $contract ) );
 		$errors   = array_values( wp_list_filter( $findings, array( 'severity' => 'error' ) ) );
 		if ( ! $errors ) {
 			if ( $findings ) {

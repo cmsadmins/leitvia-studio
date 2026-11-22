@@ -990,6 +990,748 @@
 			]
 		},
 		{
+			"name": "optional roles on their fallbacks",
+			"palette": [
+				{
+					"slug": "surface",
+					"color": "#f7f4ee"
+				},
+				{
+					"slug": "surface-alt",
+					"color": "#efe9de"
+				},
+				{
+					"slug": "ink",
+					"color": "#1c1a17"
+				},
+				{
+					"slug": "ink-muted",
+					"color": "#57514a"
+				},
+				{
+					"slug": "accent",
+					"color": "#2f5d50"
+				},
+				{
+					"slug": "on-accent",
+					"color": "#ffffff"
+				},
+				{
+					"slug": "stroke",
+					"color": "#cfc6b6"
+				},
+				{
+					"slug": "focus",
+					"color": "#1d4ed8"
+				},
+				{
+					"slug": "success",
+					"color": "#2e6b3a"
+				},
+				{
+					"slug": "warning",
+					"color": "#7a4f00"
+				},
+				{
+					"slug": "danger",
+					"color": "#a3242b"
+				},
+				{
+					"slug": "button",
+					"color": "var(--wp--preset--color--ink)"
+				},
+				{
+					"slug": "on-button",
+					"color": "var(--wp--preset--color--surface)"
+				},
+				{
+					"slug": "band",
+					"color": "var(--wp--preset--color--ink)"
+				},
+				{
+					"slug": "band-button",
+					"color": "var(--wp--preset--color--accent)"
+				},
+				{
+					"slug": "on-band-button",
+					"color": "var(--wp--preset--color--on-accent)"
+				}
+			],
+			"pairs": [
+				{
+					"fg": "ink",
+					"bg": "surface",
+					"min": 4.5
+				},
+				{
+					"fg": "ink",
+					"bg": "surface-alt",
+					"min": 4.5
+				},
+				{
+					"fg": "ink-muted",
+					"bg": "surface",
+					"min": 4.5
+				},
+				{
+					"fg": "ink-muted",
+					"bg": "surface-alt",
+					"min": 4.5
+				},
+				{
+					"fg": "accent",
+					"bg": "surface",
+					"min": 4.5
+				},
+				{
+					"fg": "accent",
+					"bg": "surface-alt",
+					"min": 4.5
+				},
+				{
+					"fg": "on-accent",
+					"bg": "accent",
+					"min": 4.5
+				},
+				{
+					"fg": "focus",
+					"bg": "surface",
+					"min": 3
+				},
+				{
+					"fg": "focus",
+					"bg": "surface-alt",
+					"min": 3
+				},
+				{
+					"fg": "focus",
+					"bg": "accent",
+					"min": 3,
+					"ring": "surface"
+				},
+				{
+					"fg": "focus",
+					"bg": "ink",
+					"min": 3,
+					"ring": "surface"
+				},
+				{
+					"fg": "stroke",
+					"bg": "ink",
+					"min": 4.5
+				},
+				{
+					"fg": "stroke",
+					"bg": "surface",
+					"min": 1.3
+				},
+				{
+					"fg": "success",
+					"bg": "surface",
+					"min": 4.5
+				},
+				{
+					"fg": "warning",
+					"bg": "surface",
+					"min": 4.5
+				},
+				{
+					"fg": "danger",
+					"bg": "surface",
+					"min": 4.5
+				},
+				{
+					"fg": "on-button",
+					"bg": "button",
+					"min": 4.5
+				},
+				{
+					"fg": "on-band-button",
+					"bg": "band-button",
+					"min": 4.5
+				},
+				{
+					"fg": "surface",
+					"bg": "band",
+					"min": 4.5
+				},
+				{
+					"fg": "stroke",
+					"bg": "band",
+					"min": 4.5
+				},
+				{
+					"fg": "focus",
+					"bg": "band",
+					"min": 3,
+					"ring": "surface"
+				}
+			],
+			"failures": []
+		},
+		{
+			"name": "optional button and band roles",
+			"palette": [
+				{
+					"slug": "surface",
+					"color": "#f7f4ee"
+				},
+				{
+					"slug": "surface-alt",
+					"color": "#efe9de"
+				},
+				{
+					"slug": "ink",
+					"color": "#1c1a17"
+				},
+				{
+					"slug": "ink-muted",
+					"color": "#57514a"
+				},
+				{
+					"slug": "accent",
+					"color": "#2f5d50"
+				},
+				{
+					"slug": "on-accent",
+					"color": "#ffffff"
+				},
+				{
+					"slug": "stroke",
+					"color": "#cfc6b6"
+				},
+				{
+					"slug": "focus",
+					"color": "#1d4ed8"
+				},
+				{
+					"slug": "success",
+					"color": "#2e6b3a"
+				},
+				{
+					"slug": "warning",
+					"color": "#7a4f00"
+				},
+				{
+					"slug": "danger",
+					"color": "#a3242b"
+				},
+				{
+					"slug": "button",
+					"color": "#1f5fbf"
+				},
+				{
+					"slug": "on-button",
+					"color": "#ffffff"
+				},
+				{
+					"slug": "band",
+					"color": "#0b2a5b"
+				},
+				{
+					"slug": "band-button",
+					"color": "#ffffff"
+				},
+				{
+					"slug": "on-band-button",
+					"color": "#0b2a5b"
+				}
+			],
+			"pairs": [
+				{
+					"fg": "ink",
+					"bg": "surface",
+					"min": 4.5
+				},
+				{
+					"fg": "ink",
+					"bg": "surface-alt",
+					"min": 4.5
+				},
+				{
+					"fg": "ink-muted",
+					"bg": "surface",
+					"min": 4.5
+				},
+				{
+					"fg": "ink-muted",
+					"bg": "surface-alt",
+					"min": 4.5
+				},
+				{
+					"fg": "accent",
+					"bg": "surface",
+					"min": 4.5
+				},
+				{
+					"fg": "accent",
+					"bg": "surface-alt",
+					"min": 4.5
+				},
+				{
+					"fg": "on-accent",
+					"bg": "accent",
+					"min": 4.5
+				},
+				{
+					"fg": "focus",
+					"bg": "surface",
+					"min": 3
+				},
+				{
+					"fg": "focus",
+					"bg": "surface-alt",
+					"min": 3
+				},
+				{
+					"fg": "focus",
+					"bg": "accent",
+					"min": 3,
+					"ring": "surface"
+				},
+				{
+					"fg": "focus",
+					"bg": "ink",
+					"min": 3,
+					"ring": "surface"
+				},
+				{
+					"fg": "stroke",
+					"bg": "ink",
+					"min": 4.5
+				},
+				{
+					"fg": "stroke",
+					"bg": "surface",
+					"min": 1.3
+				},
+				{
+					"fg": "success",
+					"bg": "surface",
+					"min": 4.5
+				},
+				{
+					"fg": "warning",
+					"bg": "surface",
+					"min": 4.5
+				},
+				{
+					"fg": "danger",
+					"bg": "surface",
+					"min": 4.5
+				},
+				{
+					"fg": "on-button",
+					"bg": "button",
+					"min": 4.5
+				},
+				{
+					"fg": "on-band-button",
+					"bg": "band-button",
+					"min": 4.5
+				},
+				{
+					"fg": "surface",
+					"bg": "band",
+					"min": 4.5
+				},
+				{
+					"fg": "stroke",
+					"bg": "band",
+					"min": 4.5
+				},
+				{
+					"fg": "focus",
+					"bg": "band",
+					"min": 3,
+					"ring": "surface"
+				}
+			],
+			"failures": []
+		},
+		{
+			"name": "optional button label too light",
+			"palette": [
+				{
+					"slug": "surface",
+					"color": "#f7f4ee"
+				},
+				{
+					"slug": "surface-alt",
+					"color": "#efe9de"
+				},
+				{
+					"slug": "ink",
+					"color": "#1c1a17"
+				},
+				{
+					"slug": "ink-muted",
+					"color": "#57514a"
+				},
+				{
+					"slug": "accent",
+					"color": "#2f5d50"
+				},
+				{
+					"slug": "on-accent",
+					"color": "#ffffff"
+				},
+				{
+					"slug": "stroke",
+					"color": "#cfc6b6"
+				},
+				{
+					"slug": "focus",
+					"color": "#1d4ed8"
+				},
+				{
+					"slug": "success",
+					"color": "#2e6b3a"
+				},
+				{
+					"slug": "warning",
+					"color": "#7a4f00"
+				},
+				{
+					"slug": "danger",
+					"color": "#a3242b"
+				},
+				{
+					"slug": "button",
+					"color": "#6fa8f5"
+				},
+				{
+					"slug": "on-button",
+					"color": "var(--wp--preset--color--surface)"
+				},
+				{
+					"slug": "band",
+					"color": "var(--wp--preset--color--ink)"
+				},
+				{
+					"slug": "band-button",
+					"color": "var(--wp--preset--color--accent)"
+				},
+				{
+					"slug": "on-band-button",
+					"color": "var(--wp--preset--color--on-accent)"
+				}
+			],
+			"pairs": [
+				{
+					"fg": "ink",
+					"bg": "surface",
+					"min": 4.5
+				},
+				{
+					"fg": "ink",
+					"bg": "surface-alt",
+					"min": 4.5
+				},
+				{
+					"fg": "ink-muted",
+					"bg": "surface",
+					"min": 4.5
+				},
+				{
+					"fg": "ink-muted",
+					"bg": "surface-alt",
+					"min": 4.5
+				},
+				{
+					"fg": "accent",
+					"bg": "surface",
+					"min": 4.5
+				},
+				{
+					"fg": "accent",
+					"bg": "surface-alt",
+					"min": 4.5
+				},
+				{
+					"fg": "on-accent",
+					"bg": "accent",
+					"min": 4.5
+				},
+				{
+					"fg": "focus",
+					"bg": "surface",
+					"min": 3
+				},
+				{
+					"fg": "focus",
+					"bg": "surface-alt",
+					"min": 3
+				},
+				{
+					"fg": "focus",
+					"bg": "accent",
+					"min": 3,
+					"ring": "surface"
+				},
+				{
+					"fg": "focus",
+					"bg": "ink",
+					"min": 3,
+					"ring": "surface"
+				},
+				{
+					"fg": "stroke",
+					"bg": "ink",
+					"min": 4.5
+				},
+				{
+					"fg": "stroke",
+					"bg": "surface",
+					"min": 1.3
+				},
+				{
+					"fg": "success",
+					"bg": "surface",
+					"min": 4.5
+				},
+				{
+					"fg": "warning",
+					"bg": "surface",
+					"min": 4.5
+				},
+				{
+					"fg": "danger",
+					"bg": "surface",
+					"min": 4.5
+				},
+				{
+					"fg": "on-button",
+					"bg": "button",
+					"min": 4.5
+				},
+				{
+					"fg": "on-band-button",
+					"bg": "band-button",
+					"min": 4.5
+				},
+				{
+					"fg": "surface",
+					"bg": "band",
+					"min": 4.5
+				},
+				{
+					"fg": "stroke",
+					"bg": "band",
+					"min": 4.5
+				},
+				{
+					"fg": "focus",
+					"bg": "band",
+					"min": 3,
+					"ring": "surface"
+				}
+			],
+			"failures": [
+				{
+					"fg": "on-button",
+					"bg": "button",
+					"ratio": 2.2256
+				}
+			]
+		},
+		{
+			"name": "optional band too light",
+			"palette": [
+				{
+					"slug": "surface",
+					"color": "#f7f4ee"
+				},
+				{
+					"slug": "surface-alt",
+					"color": "#efe9de"
+				},
+				{
+					"slug": "ink",
+					"color": "#1c1a17"
+				},
+				{
+					"slug": "ink-muted",
+					"color": "#57514a"
+				},
+				{
+					"slug": "accent",
+					"color": "#2f5d50"
+				},
+				{
+					"slug": "on-accent",
+					"color": "#ffffff"
+				},
+				{
+					"slug": "stroke",
+					"color": "#cfc6b6"
+				},
+				{
+					"slug": "focus",
+					"color": "#1d4ed8"
+				},
+				{
+					"slug": "success",
+					"color": "#2e6b3a"
+				},
+				{
+					"slug": "warning",
+					"color": "#7a4f00"
+				},
+				{
+					"slug": "danger",
+					"color": "#a3242b"
+				},
+				{
+					"slug": "button",
+					"color": "var(--wp--preset--color--ink)"
+				},
+				{
+					"slug": "on-button",
+					"color": "var(--wp--preset--color--surface)"
+				},
+				{
+					"slug": "band",
+					"color": "#8fa3bf"
+				},
+				{
+					"slug": "band-button",
+					"color": "var(--wp--preset--color--accent)"
+				},
+				{
+					"slug": "on-band-button",
+					"color": "var(--wp--preset--color--on-accent)"
+				}
+			],
+			"pairs": [
+				{
+					"fg": "ink",
+					"bg": "surface",
+					"min": 4.5
+				},
+				{
+					"fg": "ink",
+					"bg": "surface-alt",
+					"min": 4.5
+				},
+				{
+					"fg": "ink-muted",
+					"bg": "surface",
+					"min": 4.5
+				},
+				{
+					"fg": "ink-muted",
+					"bg": "surface-alt",
+					"min": 4.5
+				},
+				{
+					"fg": "accent",
+					"bg": "surface",
+					"min": 4.5
+				},
+				{
+					"fg": "accent",
+					"bg": "surface-alt",
+					"min": 4.5
+				},
+				{
+					"fg": "on-accent",
+					"bg": "accent",
+					"min": 4.5
+				},
+				{
+					"fg": "focus",
+					"bg": "surface",
+					"min": 3
+				},
+				{
+					"fg": "focus",
+					"bg": "surface-alt",
+					"min": 3
+				},
+				{
+					"fg": "focus",
+					"bg": "accent",
+					"min": 3,
+					"ring": "surface"
+				},
+				{
+					"fg": "focus",
+					"bg": "ink",
+					"min": 3,
+					"ring": "surface"
+				},
+				{
+					"fg": "stroke",
+					"bg": "ink",
+					"min": 4.5
+				},
+				{
+					"fg": "stroke",
+					"bg": "surface",
+					"min": 1.3
+				},
+				{
+					"fg": "success",
+					"bg": "surface",
+					"min": 4.5
+				},
+				{
+					"fg": "warning",
+					"bg": "surface",
+					"min": 4.5
+				},
+				{
+					"fg": "danger",
+					"bg": "surface",
+					"min": 4.5
+				},
+				{
+					"fg": "on-button",
+					"bg": "button",
+					"min": 4.5
+				},
+				{
+					"fg": "on-band-button",
+					"bg": "band-button",
+					"min": 4.5
+				},
+				{
+					"fg": "surface",
+					"bg": "band",
+					"min": 4.5
+				},
+				{
+					"fg": "stroke",
+					"bg": "band",
+					"min": 4.5
+				},
+				{
+					"fg": "focus",
+					"bg": "band",
+					"min": 3,
+					"ring": "surface"
+				}
+			],
+			"failures": [
+				{
+					"fg": "surface",
+					"bg": "band",
+					"ratio": 2.3446
+				},
+				{
+					"fg": "stroke",
+					"bg": "band",
+					"ratio": 1.5205
+				},
+				{
+					"fg": "focus",
+					"bg": "band",
+					"ratio": 2.6038
+				}
+			]
+		},
+		{
 			"name": "exactly at the limits",
 			"palette": [
 				{

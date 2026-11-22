@@ -225,6 +225,17 @@ class Test_Compiler extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A light set with the optional role band fills the inverse bands with it instead of ink.
+	 */
+	public function test_optional_band_role_fills_inverse_bands(): void {
+		self::apply_variation( 'corporate-light' );
+		$doc                  = Compiler::document( self::set_with_accent( '#ff6800' ) );
+		$doc['color']['band'] = $doc['color']['ink'];
+		$data                 = Compiler::inverse( array(), $doc );
+		$this->assertSame( 'var:preset|color|band', $data['styles']['blocks']['core/group']['variations']['inverse']['color']['background'] );
+	}
+
+	/**
 	 * A dark set on a light variation turns the inverse bands dark: surface-alt with ink text and a hairline.
 	 */
 	public function test_dark_set_keeps_inverse_bands_dark(): void {

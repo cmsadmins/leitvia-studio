@@ -95,7 +95,8 @@ final class Autonomy {
 	 * Whether only a person may let a change of this target reach the site: every option (site and reading settings,
 	 * the content model declaration and its site details), the user global styles and the activation of a token set
 	 * into them, since each one changes the whole site. So does removing content (target remove of trash-content and
-	 * delete-media), since visitors lose it. Agents may propose these changes, never make them; no ability touches
+	 * delete-media), since visitors lose it, and replacing the file of an attachment (target remove file of add-media
+	 * with replace), since the old file is gone for good. Agents may propose these changes, never make them; no ability touches
 	 * plugins, themes, users, roles or files outside the uploads at all.
 	 *
 	 * @param array<string, mixed> $target Target of the operation, see Operation.

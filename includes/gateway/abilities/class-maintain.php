@@ -20,10 +20,10 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Abilities leitvia/update-content, leitvia/repair-links, leitvia/set-alt-text, leitvia/replace-pattern,
- * leitvia/trash-content and leitvia/delete-media. Each one changes one post through Pipeline::run(). Link repairs and
- * alt texts are corrections (autonomous by default); a live write of any of them but delete-media gets a change
- * package, so leitvia/rollback can undo it. Trashing and deleting always wait for a person (target remove, see
- * Autonomy::person_decides()).
+ * leitvia/insert-section, leitvia/remove-section, leitvia/trash-content and leitvia/delete-media. Each one changes
+ * one post through Pipeline::run(). Link repairs and alt texts are corrections (autonomous by default); a live write
+ * of any of them but delete-media gets a change package, so leitvia/rollback can undo it. Trashing and deleting
+ * always wait for a person (target remove, see Autonomy::person_decides()).
  */
 final class Maintain {
 
@@ -273,6 +273,56 @@ final class Maintain {
 				'additionalProperties' => false,
 			),
 			array( self::class, 'describe_replace_pattern' )
+		);
+		$insert = array(
+			'destructive' => false,
+			'idempotent'  => false,
+		);
+		$place  = static fn( string $description ): array => array(
+			'type'        => 'string',
+			'minLength'   => 1,
+			'maxLength'   => 200,
+			'description' => $description,
+		);
+		Abilities::write(
+			'leitvia/insert-section',
+			__( 'Insert section', 'leitvia-studio' ),
+			__( 'Inserts sections into the content of an existing post, page or entry, or moves one of its top-level sections; the rest of the content stays as it is. sections takes patterns with edits as in leitvia/compose-page, with the same checks; move takes the ID of a top-level section of the post instead. The place is after or before a top-level section (block ID or path ID from the outline) or position start or end; without a place the sections go to the end. An anchor of a new section must be unique on the whole page. Read the post with leitvia/get-page-outline first and send its hash as base_hash. leitvia/remove-section takes a section out, leitvia/replace-pattern gives one another pattern.', 'leitvia-studio' ),
+			'maintain',
+			$insert,
+			array(
+				'properties'           => array(
+					'post'     => $post,
+					'sections' => Build::sections_schema(),
+					'move'     => $place( __( 'Block ID or path ID of a top-level section of the post that moves to the place, instead of sections.', 'leitvia-studio' ) ),
+					'after'    => $place( __( 'Block ID or path ID of the top-level section the new sections follow.', 'leitvia-studio' ) ),
+					'before'   => $place( __( 'Block ID or path ID of the top-level section the new sections precede.', 'leitvia-studio' ) ),
+					'position' => array(
+						'type'        => 'string',
+						'enum'        => array( 'start', 'end' ),
+						'description' => __( 'Start or end of the content, instead of after or before.', 'leitvia-studio' ),
+					),
+				),
+				'required'             => array( 'post' ),
+				'additionalProperties' => false,
+			),
+			array( self::class, 'describe_insert_section' )
+		);
+		Abilities::write(
+			'leitvia/remove-section',
+			__( 'Remove section', 'leitvia-studio' ),
+			__( 'Takes one top-level section out of the content of a post, page or entry; the rest of the content stays as it is. block is its block ID or path ID from the outline. The last section stays: a whole post goes with leitvia/trash-content. leitvia/rollback of the package brings the section back. Read the post with leitvia/get-page-outline first and send its hash as base_hash.', 'leitvia-studio' ),
+			'maintain',
+			$overwrite,
+			array(
+				'properties'           => array(
+					'post'  => $post,
+					'block' => $place( __( 'Block ID or path ID of a top-level section from the outline.', 'leitvia-studio' ) ),
+				),
+				'required'             => array( 'post', 'block' ),
+				'additionalProperties' => false,
+			),
+			array( self::class, 'describe_remove_section' )
 		);
 		$remove = array(
 			'destructive' => true,
@@ -665,6 +715,127 @@ final class Maintain {
 	}
 
 	/**
+	 * Operation of insert-section: new sections (the checks of compose-page, Build::sections()) or one top-level
+	 * section of the post go to a place among its top-level sections.
+	 *
+	 * @param array<string, mixed> $input Input.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public static function describe_insert_section( array $input ) {
+		$post   = (int) ( $input['post'] ?? 0 );
+		$target = array( 'post' => $post );
+		$move   = (string) ( $input['move'] ?? '' );
+		$place  = array_intersect_key( $input, array_flip( array( 'after', 'before', 'position' ) ) );
+		if ( isset( $input['sections'] ) === ( '' !== $move ) ) {
+			return Block_Edit::invalid( 'change', __( 'Send either sections or move.', 'leitvia-studio' ), $target );
+		}
+		if ( count( $place ) > 1 ) {
+			return Block_Edit::invalid( 'place', __( 'Name one place: after, before or position.', 'leitvia-studio' ), $target, 'leitvia/get-page-outline' );
+		}
+		$sections = '' === $move ? Build::sections( (array) $input['sections'] ) : array();
+		if ( is_wp_error( $sections ) ) {
+			return $sections;
+		}
+		$place = $place ? $place : array( 'position' => 'end' );
+		return array(
+			'area'   => 'content',
+			'target' => $target,
+			'record' => true,
+			'change' => static function ( array $state ) use ( $sections, $move, $place, $target ) {
+				$new = $sections ? Build::compose( $sections ) : '';
+				if ( is_wp_error( $new ) ) {
+					return $new;
+				}
+				[ $markup, $at ] = self::top_level( (string) $state['post_content'] );
+				$ref             = (string) current( $place );
+				foreach ( array_filter( array( $move, isset( $place['position'] ) ? '' : $ref ) ) as $id ) {
+					if ( ! isset( $at[ $id ] ) ) {
+						return self::no_section( $target, $id );
+					}
+				}
+				$offset = match ( key( $place ) ) {
+					'position' => 'start' === $ref ? 0 : count( $markup ),
+					'after'    => $at[ $ref ] + 1,
+					default    => $at[ $ref ],
+				};
+				array_splice( $markup, $offset, 0, array( '' !== $move ? $markup[ $at[ $move ] ] : $new ) );
+				if ( '' !== $move ) {
+					// The old place of the moved section, one further down when its new place is above it.
+					unset( $markup[ $at[ $move ] + ( $offset <= $at[ $move ] ? 1 : 0 ) ] );
+				}
+				$anchors = array();
+				foreach ( $sections as $section ) {
+					foreach ( (array) $section['edits'] as $edit ) {
+						$anchors = array_merge( $anchors, Block_Edit::anchors( (array) $edit ), Block_Edit::anchors( (array) ( $edit['insert'] ?? array() ) ) );
+					}
+				}
+				// An anchor of a new section must be unique on the whole page, as in compose-page.
+				$content = Block_Edit::unique_anchors( implode( "\n\n", $markup ), $anchors, $target );
+				return is_wp_error( $content ) ? $content : array( 'post_content' => $content ) + $state;
+			},
+		);
+	}
+
+	/**
+	 * Operation of remove-section: the content without one top-level section.
+	 *
+	 * @param array<string, mixed> $input Input.
+	 * @return array<string, mixed>
+	 */
+	public static function describe_remove_section( array $input ): array {
+		$block  = (string) ( $input['block'] ?? '' );
+		$target = array(
+			'post'  => (int) ( $input['post'] ?? 0 ),
+			'block' => $block,
+		);
+		return array(
+			'area'   => 'content',
+			'target' => $target,
+			'record' => true,
+			'change' => static function ( array $state ) use ( $block, $target ) {
+				[ $markup, $at ] = self::top_level( (string) $state['post_content'] );
+				if ( ! isset( $at[ $block ] ) ) {
+					return self::no_section( $target, $block );
+				}
+				if ( 1 === count( $markup ) ) {
+					return Block_Edit::invalid( 'block', __( 'This is the last section of the post. Replace it with leitvia/replace-pattern, or trash the post with leitvia/trash-content.', 'leitvia-studio' ), $target, 'leitvia/trash-content' );
+				}
+				unset( $markup[ $at[ $block ] ] );
+				return array( 'post_content' => implode( "\n\n", $markup ) ) + $state;
+			},
+		);
+	}
+
+	/**
+	 * Top-level sections of a content: their markup in order, and the index of each by its leitviaId and its path ID.
+	 *
+	 * @param string $content Block markup.
+	 * @return array{0: list<string>, 1: array<string, int>}
+	 */
+	private static function top_level( string $content ): array {
+		$markup = array();
+		$at     = array();
+		foreach ( Block_Ids::blocks( parse_blocks( $content ) ) as $index => $block ) {
+			$markup[]            = serialize_block( $block );
+			$at[ 'p:' . $index ] = $index;
+			if ( '' !== Block_Ids::id( $block ) ) {
+				$at[ Block_Ids::id( $block ) ] = $index;
+			}
+		}
+		return array( $markup, $at );
+	}
+
+	/**
+	 * Rejection for a section ID the post does not have at the top level.
+	 *
+	 * @param array<string, mixed> $target Target.
+	 * @param string               $id     Block ID or path ID.
+	 */
+	private static function no_section( array $target, string $id ): \WP_Error {
+		return Rejection::make( 'leitvia_not_found', __( 'There is no top-level section with this ID. Read the outline for the current IDs.', 'leitvia-studio' ), 404, 'block', array( 'block' => $id ) + $target, 'leitvia/get-page-outline' );
+	}
+
+	/**
 	 * Replacement markup with the texts and button links of the old section, in order per block type.
 	 *
 	 * @param array<string, mixed> $old    Old section.
@@ -1008,7 +1179,7 @@ final class Maintain {
 		$path     = trim( (string) wp_parse_url( $absolute, PHP_URL_PATH ), '/' );
 		$home_dir = trim( (string) ( $home['path'] ?? '' ), '/' );
 		$below    = ltrim( substr( $path, strlen( $home_dir ) ), '/' );
-		if ( $path === $home_dir || str_contains( wp_basename( $path ), '.' ) || str_starts_with( $below . '/', 'wp-admin/' ) || url_to_postid( $absolute ) || self::archive( $below ) ) {
+		if ( $path === $home_dir || str_contains( wp_basename( $path ), '.' ) || str_starts_with( $below . '/', 'wp-admin/' ) || url_to_postid( $absolute ) || self::posts_page( $below ) || self::archive( $below ) ) {
 			return '';
 		}
 		$ids = get_posts(
@@ -1023,6 +1194,29 @@ final class Maintain {
 			)
 		);
 		return $ids ? (string) get_permalink( (int) $ids[0] ) : null;
+	}
+
+	/**
+	 * Whether a path below home is the posts page (page_for_posts) or one of its further pages. url_to_postid() gives 0
+	 * for it, since its query is the blog and no single page, and its rewrite rule is the one of any page. With Polylang
+	 * the posts page of each language counts, with or without the language in the path.
+	 *
+	 * @param string $path Path below home, without slashes around it.
+	 */
+	private static function posts_page( string $path ): bool {
+		$page = (int) get_option( 'page_for_posts' );
+		if ( ! $page ) {
+			return false;
+		}
+		$path  = (string) preg_replace( '#/page/\d+$#', '', $path );
+		$pages = function_exists( 'pll_get_post_translations' ) ? (array) pll_get_post_translations( $page ) : array();
+		foreach ( array( '' => $page ) + $pages as $language => $id ) {
+			$uri = (string) get_page_uri( (int) $id );
+			if ( '' !== $uri && in_array( $path, array( $uri, $language . '/' . $uri ), true ) ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**

@@ -118,10 +118,13 @@ class Test_Theme_Blog extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The blog heading names the posts page and takes its excerpt as lead; without a posts page the default texts stay.
+	 * The blog heading names the posts page and takes its excerpt as lead; without a posts page the default title stays
+	 * and there is no lead.
 	 */
 	public function test_blog_heading_follows_posts_page(): void {
 		$this->assertStringContainsString( 'Latest writing</h1>', self::content( 'leitvia/hidden-page-blog-heading' ) );
+		// No excerpt, no lead: the theme never speaks a sample sentence for the site.
+		$this->assertStringNotContainsString( 'has-lead-font-size', self::content( 'leitvia/hidden-page-blog-heading' ) );
 
 		$journal = self::factory()->post->create(
 			array(

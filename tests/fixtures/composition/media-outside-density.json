@@ -1,0 +1,17 @@
+{
+	"name": "media-outside-density",
+	"template": "page-landing",
+	"sections": [
+		"leitvia/hero-centered",
+		"leitvia/content-text-media",
+		"leitvia/content-video",
+		"leitvia/content-steps",
+		"leitvia/content-text-media",
+		"leitvia/cta-banner"
+	],
+	"mediaPatterns": [
+		"leitvia/content-video"
+	],
+	"issues": [],
+	"score": 100
+}

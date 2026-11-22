@@ -442,7 +442,8 @@ final class Packages {
 			if ( $page ) {
 				$new['value'] = (string) $page;
 			}
-			// Content whose featured image waits in this package (target media) gets the ID the image got.
+			// Content whose featured image waits in this package (target media) gets the ID the image got; so does a
+			// video whose poster waits in it.
 			$file  = (string) ( $entry['target']['media'] ?? '' );
 			$image = '' !== $file ? self::created_media( $operations, $file ) : 0;
 			if ( $image ) {
@@ -695,6 +696,21 @@ final class Packages {
 	}
 
 	/**
+	 * Type and name of a document: a PDF by core's check of name and content, under the extension .pdf and with the
+	 * signature of the format at the start of the file; null otherwise. No other document type is taken: office files
+	 * carry macros and archives carry anything.
+	 *
+	 * @param string $bytes File content.
+	 * @param string $name  File name.
+	 * @return array{type: string, name: non-empty-string}|null
+	 */
+	public static function document_type( string $bytes, string $name ): ?array {
+		$type = self::allowed_type( $bytes, $name );
+		$safe = $type && 'application/pdf' === $type['type'] && str_starts_with( $bytes, '%PDF-' );
+		return $safe && 'pdf' === strtolower( pathinfo( $type['name'], PATHINFO_EXTENSION ) ) ? $type : null;
+	}
+
+	/**
 	 * Runs a check or upload of a captions file with .vtt allowed for a user who may upload files. Core allows it on a
 	 * single site, but a network allows only its list of file types. Only for this call: nothing else on the site can
 	 * upload such a file through it.
@@ -740,7 +756,7 @@ final class Packages {
 	}
 
 	/**
-	 * Writes an image, video or captions file of an operation to the private area: a folder with a random name below uploads/leitvia-studio/private,
+	 * Writes an image, video, captions file or PDF of an operation to the private area: a folder with a random name below uploads/leitvia-studio/private,
 	 * which denies web access where the server reads .htaccess. The pipeline moves it into the uploads folder when it
 	 * writes the attachment; rejecting the package deletes it.
 	 *
@@ -749,9 +765,9 @@ final class Packages {
 	 * @return string Path, '' on failure.
 	 */
 	public static function stash_file( string $name, string $bytes ): string {
-		// Only images, videos and captions of a type the site allows, under the name core's check gives them; never a
-		// script or other file.
-		$type = self::image_type( $bytes, $name ) ?? self::video_type( $bytes, $name ) ?? self::track_type( $bytes, $name );
+		// Only images, videos, captions and PDFs of a type the site allows, under the name core's check gives them;
+		// never a script or other file.
+		$type = self::image_type( $bytes, $name ) ?? self::video_type( $bytes, $name ) ?? self::track_type( $bytes, $name ) ?? self::document_type( $bytes, $name );
 		if ( ! $type ) {
 			return '';
 		}
@@ -790,6 +806,42 @@ final class Packages {
 			$state['meta_input']['_wp_attachment_metadata']['file'] = _wp_relative_upload_path( $upload['file'] );
 		}
 		return $state;
+	}
+
+	/**
+	 * Puts the private file of add-media with replace in the place of the file of an attachment: the same path and so
+	 * the same address. The bytes are checked once more against the name and the type of the attachment. The old file
+	 * and its sizes are deleted for good, the metadata and sizes made anew; nothing brings the old file back.
+	 * ponytail: an image is not scaled down to core's limit here, as that would rename it; one core rotates by its
+	 * EXIF orientation still gets a new name from core. Strip the orientation before, or handle it here if it matters.
+	 *
+	 * @param int    $id   Attachment ID.
+	 * @param string $path Path of the new file in the private area.
+	 * @return bool Whether the file was replaced; false before the old file is touched, unless the move itself fails.
+	 */
+	public static function swap_file( int $id, string $path ): bool {
+		$file   = self::private_file( $path );
+		$target = (string) get_attached_file( $id );
+		$files  = self::filesystem();
+		$bytes  = '' !== $file && '' !== $target && $files ? $files->get_contents( $file ) : false;
+		$name   = wp_basename( $target );
+		$type   = false === $bytes ? null : ( self::image_type( $bytes, $name ) ?? self::video_type( $bytes, $name ) ?? self::track_type( $bytes, $name ) ?? self::document_type( $bytes, $name ) );
+		if ( ! $files || false === $bytes || ! $type || $type['name'] !== $name || get_post_mime_type( $id ) !== $type['type'] || ! $files->put_contents( $target . '.new', $bytes ) ) {
+			return false;
+		}
+		require_once ABSPATH . 'wp-admin/includes/image.php';
+		require_once ABSPATH . 'wp-admin/includes/media.php';
+		$meta = wp_get_attachment_metadata( $id, true );
+		// As wp_delete_attachment(): '' without backup sizes, which core skips; (array) would make it array( '' ).
+		wp_delete_attachment_files( $id, is_array( $meta ) ? $meta : array(), get_post_meta( $id, '_wp_attachment_backup_sizes', true ), $target );
+		if ( ! $files->move( $target . '.new', $target, true ) ) {
+			return false;
+		}
+		clearstatcache();
+		add_filter( 'big_image_size_threshold', '__return_false', 99 );
+		wp_update_attachment_metadata( $id, wp_generate_attachment_metadata( $id, $target ) );
+		remove_filter( 'big_image_size_threshold', '__return_false', 99 );
+		return true;
 	}
 
 	/**

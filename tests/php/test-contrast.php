@@ -31,6 +31,28 @@ class Test_Contrast extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Optional roles: a palette without them is checked against the required pairs alone; with one of them the pairs
+	 * that name it join and every other optional role stands in as a reference to its fallback.
+	 */
+	public function test_optional_roles_join_the_check_only_when_set(): void {
+		switch_theme( 'leitvia' );
+		wp_clean_theme_json_cache();
+		LeitviaStudio\Plugin::forget_contract();
+		$c       = leitvia_studio_contract();
+		$palette = wp_get_global_settings( array( 'color', 'palette', 'theme' ) );
+		$this->assertSame( array( $palette, $c->pairs() ), Contrast::with_optional( $palette, $c ) );
+
+		$palette[]         = array(
+			'slug'  => 'button',
+			'color' => '#6fa8f5',
+		);
+		list( $p, $pairs ) = Contrast::with_optional( $palette, $c );
+		$this->assertSame( 'var(--wp--preset--color--surface)', array_column( $p, 'color', 'slug' )['on-button'] );
+		$this->assertSame( array( array( 'on-button', 'button' ) ), array_map( static fn( array $x ): array => array( $x['fg'], $x['bg'] ), array_slice( $pairs, count( $c->pairs() ) ) ) );
+		$this->assertSame( array( 'on-button' ), array_column( Contrast::check_palette( $p, $pairs ), 'fg' ) );
+	}
+
+	/**
 	 * Known ratios, unsupported formats and missing roles.
 	 */
 	public function test_known_values_and_bad_input(): void {

@@ -99,8 +99,12 @@ class Test_Gateway_Composition extends WP_UnitTestCase {
 	 * @param array<string, mixed> $fixture Fixture.
 	 */
 	public function test_fixture_parity( array $fixture ): void {
-		$contract = array( 'labPatterns' => $fixture['labPatterns'] ?? array() ) + self::contract();
-		$result   = Composition::score( $fixture['sections'], $contract, (string) ( $fixture['template'] ?? '' ), (array) ( $fixture['tones'] ?? array() ) );
+		$contract = array(
+			'labPatterns'   => $fixture['labPatterns'] ?? array(),
+			'mediaPatterns' => $fixture['mediaPatterns'] ?? array(),
+			'proseBlocks'   => $fixture['proseBlocks'] ?? array(),
+		) + self::contract();
+		$result   = Composition::score( $fixture['sections'], $contract, (string) ( $fixture['template'] ?? '' ), (array) ( $fixture['tones'] ?? array() ), (array) ( $fixture['mirrored'] ?? array() ) );
 		$this->assertSame( $fixture['issues'], array_map( static fn( array $issue ): array => array( $issue['rule'], $issue['index'] ), $result['issues'] ) );
 		$this->assertSame( $fixture['score'], $result['score'] );
 	}
@@ -121,9 +125,90 @@ class Test_Gateway_Composition extends WP_UnitTestCase {
 	 */
 	public function test_messages(): void {
 		$issues = Composition::check( array( 'leitvia/hero-centered', 'leitvia/content-text-media', 'leitvia/content-two-columns' ), self::contract() );
-		$this->assertSame( 'Sections 2 and 3 are both split/surface; give one of them another tone or layout.', $issues[0]['message'] );
+		$this->assertSame( 'Sections 2 and 3 are both split/surface; give one of them another ground (backgroundColor surface or surface-alt on its outer block, or the block style Inverse), put its media on the other side (block style Media right), or move another section between them.', $issues[0]['message'] );
 		$issues = Composition::check( array( 'leitvia/hero-split-image', 'leitvia/content-feature-grid', 'leitvia/content-faq', 'leitvia/teaser-services', 'leitvia/content-steps' ), self::contract() );
-		$this->assertSame( 'Sections 1 to 4 have no break; add one of: tone image, accent or ink; layout full-bleed; pattern leitvia/content-quote.', $issues[0]['message'] );
+		$this->assertSame( 'Sections 1 to 4 have no break; add one of: tone image, accent or ink; layout full-bleed; pattern leitvia/content-quote; a media section (video, gallery or wide image).', $issues[0]['message'] );
+		$issues = Composition::check( array( 'leitvia/hero-centered', 'core/columns', 'leitvia/no-such-pattern' ), self::contract() );
+		$this->assertSame( 'Section 2 is a layout built by hand with core/columns; replace it with a pattern from leitvia/list-patterns. Text, lists, images, galleries and accordions between sections need no pattern.', $issues[0]['message'] );
+		$this->assertSame( 'Section 3 uses unknown pattern leitvia/no-such-pattern; use a pattern from leitvia/list-patterns.', $issues[1]['message'] );
+	}
+
+	/**
+	 * A page of a subject built with care, as it is saved: text, drawings and galleries between the sections, the same
+	 * pattern on another ground and with the media on the other side, a video. No finding. The same sections without
+	 * the text, the grounds and the sides are monotone and score low, with the block ID and the way out per finding.
+	 */
+	public function test_saved_page_counts_as_built(): void {
+		_register_theme_block_patterns();
+		$section = static fn( string $slug, string $id, string $attrs = '', string $inner = '' ): string => '<!-- wp:group {"metadata":{"patternName":"' . $slug . '","leitviaId":"' . $id . '"}' . $attrs . '} --><div class="wp-block-group">' . $inner . '</div><!-- /wp:group -->';
+		$text    = '<!-- wp:paragraph --><p>How the joint is built.</p><!-- /wp:paragraph -->';
+		$right   = '<!-- wp:columns {"className":"is-style-media-right"} --><div class="wp-block-columns is-style-media-right"></div><!-- /wp:columns -->';
+		$figures = 'leitvia/content-text-media';
+		$careful = $text
+			. $section( $figures, 'aaaa0001', ',"backgroundColor":"surface"' )
+			. '<!-- wp:gallery --><figure class="wp-block-gallery"></figure><!-- /wp:gallery -->'
+			. $section( $figures, 'aaaa0002', ',"backgroundColor":"surface"' )
+			. $section( $figures, 'aaaa0003', ',"backgroundColor":"surface-alt"', $right )
+			. $section( 'leitvia/content-video', 'aaaa0004', ',"backgroundColor":"surface"' )
+			. $section( $figures, 'aaaa0005', ',"backgroundColor":"surface"' )
+			. '<!-- wp:group --><div class="wp-block-group">' . $text . '<!-- wp:list --><ul class="wp-block-list"></ul><!-- /wp:list --></div><!-- /wp:group -->'
+			. '<!-- wp:leitvia/faq /-->'
+			. $section( $figures, 'aaaa0006', ',"backgroundColor":"surface"', $right )
+			. $section( 'leitvia/cta-contact', 'aaaa0007', ',"backgroundColor":"surface-alt"' );
+		$this->assertSame( array( 'core/paragraph', $figures, 'core/gallery', $figures, $figures, 'leitvia/content-video', $figures, 'core/group', 'leitvia/faq', $figures, 'leitvia/cta-contact' ), Composition::sections( $careful ) );
+		$this->assertSame( array( 4, 9 ), Composition::mirrored( $careful ) );
+		$this->assertSame( 'aaaa0003', Composition::ids( $careful )[4] );
+		$this->assertSame( 'surface-alt', Composition::tones( $careful )[4] );
+
+		$create  = fn( string $content ): int => self::factory()->post->create(
+			array(
+				'post_type'    => 'page',
+				'post_status'  => 'publish',
+				'post_content' => $content,
+				'meta_input'   => array( '_wp_page_template' => 'page' ),
+			)
+		);
+		$ability = wp_get_ability( 'leitvia/check-composition' );
+		$result  = $ability->execute( array( 'post' => $create( $careful ) ) );
+		$this->assertSame( array(), $result['issues'], wp_json_encode( $result['issues'] ) );
+		$this->assertSame( 100, $result['score'] );
+
+		// The outline scores like the page once it names the ground and the side its edits set.
+		$slugs   = array( $figures, $figures, $figures, 'leitvia/content-video', $figures, 'leitvia/cta-contact' );
+		$outline = $ability->execute(
+			array(
+				'slugs'    => $slugs,
+				'template' => 'page',
+				'tones'    => array( '2' => 'surface-alt' ),
+				'mirrored' => array( 2 ),
+			)
+		);
+		$this->assertIsArray( $outline, is_wp_error( $outline ) ? $outline->get_error_message() : '' );
+		$this->assertSame( array( array( 'noAdjacentRepeat', 1 ), array( 'maxDensityRun', 2 ) ), array_map( static fn( array $issue ): array => array( $issue['rule'], $issue['index'] ), $outline['issues'] ) );
+
+		$plain    = array_map( static fn( int $n ): string => $section( $figures, 'bbbb000' . $n, ',"backgroundColor":"surface"' ), range( 1, 6 ) );
+		$monotone = $ability->execute( array( 'post' => $create( implode( '', $plain ) ) ) );
+		$this->assertLessThan( 50, $monotone['score'] );
+		$this->assertSame( 'bbbb0002', $monotone['issues'][0]['block'] );
+		$this->assertSame( 'bbbb0002', $monotone['suggestions'][0]['block'] );
+		$this->assertStringContainsString( 'block style Media right', $monotone['issues'][0]['message'] );
+		$this->assertContains( 'maxDensityRun', array_column( $monotone['issues'], 'rule' ) );
+		$this->assertContains( 'breakWithin', array_column( $monotone['issues'], 'rule' ) );
+
+		// A what-if on the saved page: tones and mirrored lie over what its blocks set.
+		$better = $ability->execute(
+			array(
+				'post'     => $create( implode( '', $plain ) ),
+				'tones'    => array( '1' => 'surface-alt' ),
+				'mirrored' => array( 3 ),
+			)
+		);
+		$this->assertGreaterThan( $monotone['score'], $better['score'] );
+
+		// A section laid out by hand is still no pattern, also inside a group.
+		$hand = '<!-- wp:group --><div class="wp-block-group"><!-- wp:columns --><div class="wp-block-columns"></div><!-- /wp:columns --></div><!-- /wp:group -->';
+		$this->assertSame( array( $figures, 'core/columns' ), Composition::sections( $section( $figures, 'cccc0001' ) . $hand ) );
+		$this->assertSame( array( 'unknownPattern' ), array_column( Composition::check( array( $figures, 'core/columns' ), self::contract(), 'page' ), 'rule' ) );
 	}
 
 	/**
@@ -141,7 +226,8 @@ class Test_Gateway_Composition extends WP_UnitTestCase {
 
 	/**
 	 * A section made dark on its root block (Inverse, ink or accent ground) counts with that tone: a stage switched to
-	 * Inverse breaks a run of light sections, so a saved page scores like its tones and not like its patterns.
+	 * Inverse breaks a run of light sections, so a saved page scores like its tones and not like its patterns. A list
+	 * of slugs takes the same tones as input.
 	 */
 	public function test_tones_from_markup(): void {
 		$markup = '<!-- wp:template-part {"slug":"header"} /-->'
@@ -151,6 +237,7 @@ class Test_Gateway_Composition extends WP_UnitTestCase {
 		$this->assertSame(
 			array(
 				0 => 'ink',
+				1 => 'surface-alt',
 				2 => 'accent',
 			),
 			Composition::tones( $markup )
@@ -169,6 +256,24 @@ class Test_Gateway_Composition extends WP_UnitTestCase {
 		);
 		$this->assertSame( 85, Read_Composition::check( array( 'post' => $create( $light ) ) )['score'] );
 		$this->assertSame( 95, Read_Composition::check( array( 'post' => $create( $dark ) ) )['score'] );
+		// A planned page scores like the saved one when the call names the tones its edits will set.
+		$this->assertSame(
+			85,
+			Read_Composition::check(
+				array(
+					'slugs'    => $slugs,
+					'template' => 'page-landing',
+				)
+			)['score']
+		);
+		$planned = Read_Composition::check(
+			array(
+				'slugs'    => $slugs,
+				'template' => 'page-landing',
+				'tones'    => array( '2' => 'ink' ),
+			)
+		);
+		$this->assertSame( 95, $planned['score'] );
 	}
 
 	/**

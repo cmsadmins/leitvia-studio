@@ -144,6 +144,8 @@ final class Plugin {
 		add_action( 'init', array( Admin\Admin::class, 'register_status_column' ), 20 );
 		add_action( 'after_setup_theme', array( News\Image_Sizes::class, 'register' ) );
 		add_action( 'wp_head', array( News\Schema::class, 'print' ) );
+		add_filter( 'block_core_breadcrumbs_items', array( News\Schema::class, 'remember_breadcrumbs' ), PHP_INT_MAX );
+		add_action( 'wp', array( News\Schema::class, 'forget_breadcrumbs' ) );
 		add_action( 'wp_head', array( News\Head::class, 'print' ), 5 );
 		add_filter( 'pre_get_document_title', array( News\Head::class, 'title' ) );
 		add_filter( 'wp_robots', array( News\Head::class, 'robots' ) );

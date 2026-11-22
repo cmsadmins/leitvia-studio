@@ -125,6 +125,13 @@ class Test_Gateway_Diff extends WP_UnitTestCase {
 			)
 		);
 		$this->assertSame( 'field:post_content', $styles[0]['id'] );
+
+		// A long value shows from shortly before its first difference, not its unchanged start.
+		$long = str_repeat( 'field ', 200 );
+		$late = Diff::states( array( 'value' => $long . 'required' ), array( 'value' => $long . 'optional' ) );
+		$this->assertStringEndsWith( 'required', $late[0]['before_text'] );
+		$this->assertStringEndsWith( 'optional', $late[0]['after_text'] );
+		$this->assertLessThanOrEqual( 300, mb_strlen( $late[0]['after_text'] ) );
 	}
 
 	/**

@@ -550,6 +550,15 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 				self::deprecate( 'leitvia/cta-banner', 'leitvia/cta-split' );
 				return array( 'post' => $this->page( LeitviaStudio\Gateway\Abilities\Build::name_sections( (string) $banner, 'leitvia/cta-banner' ) ) );
 			},
+			'leitvia/insert-section'        => fn(): array => array(
+				'post'     => $this->page( $paragraph . $paragraph ),
+				'move'     => 'p:1',
+				'position' => 'start',
+			),
+			'leitvia/remove-section'        => fn(): array => array(
+				'post'  => $this->page( $paragraph . $paragraph ),
+				'block' => 'p:1',
+			),
 			'leitvia/trash-content'         => fn(): array => array( 'post' => $this->page() ),
 			'leitvia/delete-media'          => static fn(): array => array( 'id' => self::factory()->attachment->create_upload_object( dirname( __DIR__ ) . '/fixtures/avatar.png', 0 ) ),
 		);

@@ -349,7 +349,8 @@ final class Pipeline {
 		// 7. Execution.
 		// A package key from the caller always means a package: an agent may hold itself to more than the autonomy asks.
 		// A setting that points to a page waiting in the package (target page, see Recipes) can only wait as well.
-		// So can content whose featured image waits in the package (target media, see Abilities\Content).
+		// So can content whose featured image waits in the package (target media, see Abilities\Content), and a video
+		// whose poster does (Abilities\Build).
 		$strict = '' !== $op->package && ( ! Recipes::collects( $op->package ) || isset( $op->target['page'] ) || isset( $op->target['media'] ) );
 		$mode   = match ( true ) {
 			$package > 0            => 'live',
@@ -661,7 +662,9 @@ final class Pipeline {
 				'post_name'      => '',
 				'post_parent'    => 0,
 				'menu_order'     => 0,
-				'comment_status' => get_default_comment_status( (string) $op->target['post_type'] ),
+				// Comments stay closed unless the operation opens them: an agent builds pages and posts nobody moderates
+				// yet. Reviews of a product keep the setting of the shop.
+				'comment_status' => 'product' === $op->target['post_type'] ? get_default_comment_status( 'product' ) : 'closed',
 			);
 			// A new product brings the props of create-product, see Commerce::CREATE_PROPS.
 			if ( 'product' === $op->target['post_type'] && Commerce::handles( 'product' ) ) {
@@ -672,7 +675,9 @@ final class Pipeline {
 		if ( is_wp_error( $after ) ) {
 			return $after;
 		}
-		$after = array_intersect_key( (array) $after, $start + ( $op->creates() ? array_flip( self::CREATE_FIELDS ) : array() ) ) + $start;
+		// An attachment whose file add-media replaces (target remove file) carries the new file in its state.
+		$more  = $op->creates() ? self::CREATE_FIELDS : ( 'file' === ( $op->target['remove'] ?? '' ) ? array( 'file' ) : array() );
+		$after = array_intersect_key( (array) $after, $start + array_flip( $more ) ) + $start;
 		if ( ! $op->creates() && isset( $start['meta_input'] ) ) {
 			// Only the meta keys of META; an existing post takes no other meta through the pipeline.
 			$after['meta_input'] = array_intersect_key( (array) $after['meta_input'], $start['meta_input'] );
@@ -1216,7 +1221,11 @@ final class Pipeline {
 		}
 		// A new attachment waits in the private area until now, see Packages::stash_file().
 		$private = (string) ( $after['file'] ?? '' );
-		if ( '' !== $private ) {
+		// The file that replaces the one of an existing attachment takes its place after the write, see below.
+		$swap = '' !== $private && ! $op->creates();
+		if ( $swap ) {
+			unset( $after['file'] );
+		} elseif ( '' !== $private ) {
 			$after = Packages::promote_file( $after );
 			if ( ! $after ) {
 				return self::failed( $result['target'] );
@@ -1286,16 +1295,19 @@ final class Pipeline {
 			$lost = self::lost_attributes( (string) $after['post_excerpt'], (string) get_post_field( 'post_excerpt', $id, 'raw' ) );
 		}
 		$failed = $failed || (bool) $lost;
+		// Only now that the write went through the old file goes: Packages::swap_file() deletes it with its sizes and
+		// makes the metadata anew.
+		$failed = $failed || ( $swap && ! Packages::swap_file( $id, $private ) );
 		if ( $failed ) {
 			self::without_kses( static fn() => self::restore( $op, $before, $created ) );
-			if ( '' !== $private ) {
+			if ( '' !== $private && ! $swap ) {
 				wp_delete_file( (string) $after['file'] );
 			}
 		} elseif ( '' !== $private ) {
 			Packages::discard_file( array( 'file' => $private ) );
 			// The smaller sizes core makes on upload, so the image gets a srcset and phones load a small file; for a
 			// video its length and size, as on upload.
-			if ( $id && ( wp_attachment_is_image( $id ) || wp_attachment_is( 'video', $id ) ) ) {
+			if ( $id && ! $swap && ( wp_attachment_is_image( $id ) || wp_attachment_is( 'video', $id ) ) ) {
 				require_once ABSPATH . 'wp-admin/includes/image.php';
 				require_once ABSPATH . 'wp-admin/includes/media.php';
 				wp_update_attachment_metadata( $id, wp_generate_attachment_metadata( $id, (string) $after['file'] ) );

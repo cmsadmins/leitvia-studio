@@ -547,7 +547,7 @@ final class Seo {
 			return $state;
 		}
 		$meta        = self::PLUGINS[ self::plugin() ]['meta'];
-		$unsupported = self::unsupported( implode( ' ', $texts ), $state );
+		$unsupported = self::unsupported( implode( ' ', $texts ), $state, $target );
 		if ( $unsupported ) {
 			/* translators: %s: numbers */
 			return Block_Edit::invalid( 'unsupported_fact', sprintf( __( 'The page does not say %s. Use only facts from the title, excerpt or content of the post.', 'leitvia-studio' ), implode( ', ', $unsupported ) ), $target, 'leitvia/get-page-outline' );
@@ -562,15 +562,20 @@ final class Seo {
 
 	/**
 	 * Numbers of a text that the title, excerpt and content of the post do not contain. A number is the commonest fact
-	 * a summary invents (prices, years, counts).
+	 * a summary invents (prices, years, counts). The year the post appears in and the year of its last change count as
+	 * said: the page shows its date, and a new post without a date appears now.
 	 * ponytail: numbers only; names and claims without digits pass, the skill asks agents to keep to the page.
 	 *
-	 * @param string               $text  New title and description.
-	 * @param array<string, mixed> $state State of the post.
+	 * @param string               $text   New title and description.
+	 * @param array<string, mixed> $state  State of the post.
+	 * @param array<string, mixed> $target Target with the post ID, 0 for a new post.
 	 * @return list<string>
 	 */
-	private static function unsupported( string $text, array $state ): array {
-		$source = (string) preg_replace( '/\s+/u', ' ', html_entity_decode( wp_strip_all_tags( ( $state['post_title'] ?? '' ) . ' ' . ( $state['post_excerpt'] ?? '' ) . ' ' . ( $state['post_content'] ?? '' ) . ' ' . get_bloginfo( 'name' ) ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
+	private static function unsupported( string $text, array $state, array $target ): array {
+		$post   = (int) ( $target['post'] ?? 0 );
+		$date   = (string) ( $state['post_date'] ?? '' );
+		$years  = substr( '' !== $date ? $date : current_time( 'mysql' ), 0, 4 ) . ' ' . ( $post ? substr( (string) get_post_field( 'post_modified', $post, 'raw' ), 0, 4 ) : '' );
+		$source = (string) preg_replace( '/\s+/u', ' ', html_entity_decode( wp_strip_all_tags( ( $state['post_title'] ?? '' ) . ' ' . ( $state['post_excerpt'] ?? '' ) . ' ' . ( $state['post_content'] ?? '' ) . ' ' . get_bloginfo( 'name' ) ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) ) . ' ' . $years;
 		preg_match_all( '/\d+(?:[.,:]\d+)*/u', $text, $numbers );
 		return array_values( array_unique( array_filter( $numbers[0], static fn( string $number ): bool => ! str_contains( $source, $number ) ) ) );
 	}

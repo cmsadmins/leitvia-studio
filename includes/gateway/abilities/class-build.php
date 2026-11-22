@@ -48,7 +48,7 @@ final class Build {
 	/**
 	 * Keys of a block edit that Block_Edit::apply() takes.
 	 */
-	private const CHANGES = array( 'attributes', 'text', 'link_text', 'url', 'add_link', 'caption', 'anchor', 'columns', 'image' );
+	private const CHANGES = array( 'attributes', 'text', 'link_text', 'url', 'add_link', 'caption', 'anchor', 'columns', 'image', 'video' );
 
 	/**
 	 * Registers the abilities. Runs on leitvia_studio_init.
@@ -61,7 +61,7 @@ final class Build {
 		Abilities::write(
 			'leitvia/compose-page',
 			__( 'Compose page', 'leitvia-studio' ),
-			__( 'Creates a page from patterns in the order of a page frame of the contract. Plan it with leitvia/plan-page first; base_hash is empty for the new page. Per section texts (also quote citations and details summaries), links, images, captions, catalog attributes, an HTML anchor and the columns of a grid at block IDs of the pattern outline can change, remove and repeat take blocks from a parent or add copies, for fewer or more entries than the pattern, and insert adds a block of leitvia/list-blocks after a block, given as name with attributes, anchor and inner blocks, never as markup; a text that would drop a link is refused. Edits apply in order. Each section keeps metadata.patternName (core/block/<ID> for a Lab pattern). Unknown patterns are rejected with a pointer to leitvia/list-patterns, deprecated ones with their replacement, Lab patterns that are not approved (also through a part) with leitvia_pattern_not_approved. Later changes go through leitvia/update-content and leitvia/update-block.', 'leitvia-studio' ),
+			__( 'Creates a page from patterns in the order of a page frame of the contract. Plan it with leitvia/plan-page first; base_hash is empty for the new page. Per section texts (also quote citations and details summaries), links, images, captions, catalog attributes, an HTML anchor and the columns of a grid at block IDs of the pattern outline can change, remove and repeat take blocks from a parent or add copies, for fewer or more entries than the pattern, and insert adds a block of leitvia/list-blocks after a block, given as name with attributes, anchor and inner blocks, never as markup; a text that would drop a link is refused. Edits apply in order. Each section keeps metadata.patternName (core/block/<ID> for a Lab pattern). Unknown patterns are rejected with a pointer to leitvia/list-patterns, deprecated ones with their replacement, Lab patterns that are not approved (also through a part) with leitvia_pattern_not_approved. Later changes go through leitvia/update-content and leitvia/update-block, further sections through leitvia/insert-section.', 'leitvia-studio' ),
 			'build',
 			$create,
 			array(
@@ -111,7 +111,7 @@ final class Build {
 		Abilities::write(
 			'leitvia/update-block',
 			__( 'Update block', 'leitvia-studio' ),
-			__( 'Changes one block found by its ID or path ID: attributes from the block catalog and the level of a heading, the text of a paragraph, heading, list item or button, the citation of a quote, the summary of a details block, the link of a button or of the one link in a text (link_text names the linked part), or the image of an image or cover block with alt text. add_link sets a new link on a passage of a text, caption the caption of an image, video, audio, gallery, table or embed, anchor the HTML anchor of a block with the support anchor (unique on the page), columns the column count of a grid (group or post template with the layout grid). A timeline entry takes date, dateLabel and heading as attributes. Attributes that a static block keeps in its markup, such as prefix, value, suffix and label of a counter, change like any other. query of a core/query merges into its settings. tracks of a core/video replaces its text tracks: each names a WebVTT file from leitvia/add-media by id, with kind, srclang and label. A spotlight point moves with attributes x and y in percent. The effect on scroll (leitviaAnimation, leitviaMotion) changes on every block that has it, core blocks and saved markup included, since only the block comment changes. Static markup is rebuilt with the HTML API; changes it cannot rebuild safely are rejected with leitvia_static_markup. Read the post with leitvia/get-page-outline first and send its hash as base_hash; get-block shows the current attributes. For several text changes in one post use leitvia/update-content.', 'leitvia-studio' ),
+			__( 'Changes one block found by its ID or path ID: attributes from the block catalog and the level of a heading, the text of a paragraph, heading, list item or button, the citation of a quote, the summary of a details block, the link of a button or of the one link in a text (link_text names the linked part), or the image of an image or cover block with alt text. video sets the video of a core/video from the media library by its ID, with poster, controls and preload none, also on the empty video of a pattern. add_link sets a new link on a passage of a text, caption the caption of an image, video, audio, gallery, table or embed, anchor the HTML anchor of a block with the support anchor (unique on the page), columns the column count of a grid (group or post template with the layout grid) or of a gallery. A heading or paragraph takes fontSize with a font size of the tokens, a group with a light ground takes backgroundColor surface or surface-alt, each as attribute. label changes the name for screen readers (aria-label) of a slider, announcement bar or accessibility bar. A timeline entry takes date, dateLabel and heading as attributes. Attributes that a static block keeps in its markup, such as prefix, value, suffix and label of a counter, change like any other. query of a core/query merges into its settings. tracks of a core/video replaces its text tracks: each names a WebVTT file from leitvia/add-media by id, with kind, srclang and label. A spotlight point moves with attributes x and y in percent. The effect on scroll (leitviaAnimation, leitviaMotion) changes on every block that has it, core blocks and saved markup included, since only the block comment changes. Static markup is rebuilt with the HTML API; changes it cannot rebuild safely are rejected with leitvia_static_markup. Read the post with leitvia/get-page-outline first and send its hash as base_hash; get-block shows the current attributes. For several text changes in one post use leitvia/update-content.', 'leitvia-studio' ),
 			'build',
 			array(
 				'destructive' => true,
@@ -180,38 +180,49 @@ final class Build {
 		Abilities::write(
 			'leitvia/add-media',
 			__( 'Add media', 'leitvia-studio' ),
-			__( 'Adds an image to the media library from a URL of this site or as Base64 data up to 5 MB, with alt text or marked as decorative. It also takes a WebVTT file with captions for a video (.vtt, UTF-8, starts with WEBVTT, no alt text) and a video hosted on this site, MP4 (H.264) or WebM up to 50 MB, with poster and caption instead of alt text. It needs the right to upload files. URLs of other hosts are rejected; nothing is fetched from them. base_hash is empty. Images already in the library are used by their ID in compose-page and update-block, a WebVTT file by its ID in tracks of update-block, a video by its ID and URL in a core/video.', 'leitvia-studio' ),
+			__( 'Adds an image to the media library from a URL of this site or as Base64 data up to 5 MB, with alt text or marked as decorative. It also takes a WebVTT file with captions for a video (.vtt, UTF-8, starts with WEBVTT, no alt text) and a video hosted on this site, MP4 (H.264) or WebM up to 50 MB, with poster and caption instead of alt text (poster_file names a poster image that still waits in the same package), and a PDF up to 5 MB (.pdf, with the PDF signature at its start) with a title that says what the document is, without alt text; no other document type. It needs the right to upload files. URLs of other hosts are rejected; nothing is fetched from them. base_hash is empty. With replace the file takes the place of the file of an attachment under the same ID and address, for a new cut of a video or a corrected PDF; a person applies that. Images already in the library are used by their ID in compose-page and update-block, a WebVTT file by its ID in tracks of update-block, a video by its ID in the field video of update-block, a PDF by its URL from the result or leitvia/list-media in url or add_link of update-block.', 'leitvia-studio' ),
 			'build',
 			$create,
 			array(
 				'properties'           => array(
-					'url'        => array(
+					'url'         => array(
 						'type'   => 'string',
 						'format' => 'uri',
 					),
-					'data'       => array(
+					'data'        => array(
 						'type'      => 'string',
 						'maxLength' => (int) ceil( max( self::MAX_MEDIA_BYTES, self::max_video_bytes() ) / 3 ) * 4 + 4,
 					),
-					'filename'   => array(
+					'filename'    => array(
 						'type'      => 'string',
 						'maxLength' => 200,
 					),
-					'title'      => array(
-						'type'      => 'string',
-						'maxLength' => 200,
+					'title'       => array(
+						'type'        => 'string',
+						'maxLength'   => 200,
+						'description' => __( 'Title in the media library, the file name without it. Give a PDF a title that says what the document is.', 'leitvia-studio' ),
 					),
-					'alt'        => array(
+					'alt'         => array(
 						'type'      => 'string',
 						'maxLength' => 500,
 					),
-					'decorative' => array( 'type' => 'boolean' ),
-					'poster'     => array(
+					'decorative'  => array( 'type' => 'boolean' ),
+					'replace'     => array(
+						'type'        => 'integer',
+						'minimum'     => 1,
+						'description' => __( 'Attachment ID of a file of the media library whose file this one replaces: ID, address, title, alt text and every place that uses it stay, the metadata and the image sizes are made anew. The new file must have the same type. The old file is gone for good, so the change always waits in a change package for a person. Send only the file with it; base_hash may stay empty.', 'leitvia-studio' ),
+					),
+					'poster'      => array(
 						'type'        => 'integer',
 						'minimum'     => 1,
 						'description' => __( 'Video only: attachment ID of an image of the media library that shows before the video plays, a still of it. Also set it as poster of the core/video.', 'leitvia-studio' ),
 					),
-					'caption'    => array(
+					'poster_file' => array(
+						'type'        => 'string',
+						'maxLength'   => 200,
+						'description' => __( 'Video only, instead of poster: file name of an image an earlier leitvia/add-media added under the same package key and that still waits there. Applying the package writes the image first and sets it as poster of the video, so image and video go into one package.', 'leitvia-studio' ),
+					),
+					'caption'     => array(
 						'type'        => 'string',
 						'maxLength'   => 2000,
 						'description' => __( 'Video only: what the video shows, in plain text, as caption of the file in the media library. A video without speech needs this text on the page as well.', 'leitvia-studio' ),
@@ -375,7 +386,7 @@ final class Build {
 					'type'        => 'integer',
 					'minimum'     => 1,
 					'maximum'     => 6,
-					'description' => __( 'Column count of a grid: a group or post template with the layout grid, such as the cards of a teaser pattern. Four cards take 2: with 4 a narrower window still wraps to 3 + 1.', 'leitvia-studio' ),
+					'description' => __( 'Column count of a grid or a gallery: a group or post template with the layout grid, such as the cards of a teaser pattern, or a gallery block. Four cards take 2: with 4 a narrower window still wraps to 3 + 1.', 'leitvia-studio' ),
 				),
 				'image'     => array(
 					'type'                 => 'object',
@@ -391,6 +402,24 @@ final class Build {
 							'description' => __( 'Alt text of the image here. Left out, the image keeps its alt text from the media library; an image without one needs alt or decorative true.', 'leitvia-studio' ),
 						),
 						'decorative' => array( 'type' => 'boolean' ),
+					),
+					'required'             => array( 'id' ),
+					'additionalProperties' => false,
+				),
+				'video'     => array(
+					'type'                 => 'object',
+					'description'          => __( 'Video of a core/video from the media library: sets src, poster, controls and preload none, also on a video block that is still empty. caption and attributes with tracks or align go in the same edit. Text tracks the block has stay; send tracks when the new video has other captions.', 'leitvia-studio' ),
+					'properties'           => array(
+						'id'     => array(
+							'type'        => 'integer',
+							'minimum'     => 1,
+							'description' => __( 'Attachment ID of the video, from leitvia/list-media or leitvia/add-media.', 'leitvia-studio' ),
+						),
+						'poster' => array(
+							'type'        => 'integer',
+							'minimum'     => 1,
+							'description' => __( 'Attachment ID of the image that shows before the video plays. Left out, the poster the video got in leitvia/add-media.', 'leitvia-studio' ),
+						),
 					),
 					'required'             => array( 'id' ),
 					'additionalProperties' => false,
@@ -414,7 +443,7 @@ final class Build {
 		}
 		$schema['properties']['attributes'] = array(
 			'type'        => 'object',
-			'description' => __( 'Attributes from leitvia/list-blocks; for a core/heading its level, 1 to 6; for a core/query query with perPage, pages, offset, postType, order, orderBy, sticky and inherit (perPage counts with inherit false); for a core/video tracks, each with id, kind, srclang and label; for a leitvia/timeline-item date (YYYY, YYYY-MM or YYYY-MM-DD, empty for a free label), dateLabel and heading; leitviaAnimation and leitviaMotion on every block that lists them, also next to other attributes (null removes either); className (is-style-<name>, null removes the style and keeps other classes) on every core block with registered block styles; align on every block whose supports.align in leitvia/list-blocks names the value (null removes it); on core/image also width, height, aspectRatio, scale, sizeSlug, linkDestination, href, lightbox (null removes one). null for an attribute the block does not have changes nothing.', 'leitvia-studio' ),
+			'description' => __( 'Attributes from leitvia/list-blocks; for a core/heading its level, 1 to 6; for a core/query query with perPage, pages, offset, postType, order, orderBy, sticky and inherit (perPage counts with inherit false); for a core/video tracks, each with id, kind, srclang and label (its file, poster, controls and preload come from the field video); for a leitvia/timeline-item date (YYYY, YYYY-MM or YYYY-MM-DD, empty for a free label), dateLabel and heading; leitviaAnimation and leitviaMotion on every block that lists them, also next to other attributes (null removes either); className (is-style-<name>, null removes the style and keeps other classes) on every core block with registered block styles; align on every block whose supports.align in leitvia/list-blocks names the value (null removes it); on core/image also width, height, aspectRatio, scale, sizeSlug, linkDestination, href, lightbox (null removes one). null for an attribute the block does not have changes nothing.', 'leitvia-studio' ),
 		);
 		return $schema;
 	}
@@ -577,7 +606,7 @@ final class Build {
 		$block  = (string) ( $input['block'] ?? '' );
 		$change = array_intersect_key( $input, array_flip( self::CHANGES ) );
 		if ( ! array_diff_key( $change, array( 'link_text' => true ) ) ) {
-			return Block_Edit::invalid( 'change', __( 'Name what to change: attributes, text, url, add_link, caption, anchor, columns or image.', 'leitvia-studio' ), array( 'post' => $post ) );
+			return Block_Edit::invalid( 'change', __( 'Name what to change: attributes, text, url, add_link, caption, anchor, columns, image or video.', 'leitvia-studio' ), array( 'post' => $post ) );
 		}
 		return array(
 			'area'   => in_array( get_post_type( $post ), self::STRUCTURE_TYPES, true ) ? 'structure' : 'content',
@@ -667,7 +696,8 @@ final class Build {
 
 	/**
 	 * Operation of add-media. The file is checked here and put in the private area of packages by the change; the
-	 * pipeline moves it into the uploads folder only when it writes the attachment.
+	 * pipeline moves it into the uploads folder only when it writes the attachment. With replace it takes the place of
+	 * the file of an attachment instead, see replace_media().
 	 *
 	 * @param array<string, mixed> $input Input.
 	 * @return array<string, mixed>|\WP_Error
@@ -692,7 +722,7 @@ final class Build {
 		$most = self::max_video_bytes();
 		if ( $size > max( self::MAX_MEDIA_BYTES, $most ) ) {
 			/* translators: %d: largest video in MB */
-			return Block_Edit::invalid( 'size', sprintf( __( 'The file is too large: images and captions up to 5 MB, videos up to %d MB.', 'leitvia-studio' ), (int) floor( $most / MB_IN_BYTES ) ) );
+			return Block_Edit::invalid( 'size', sprintf( __( 'The file is too large: images, captions and PDF files up to 5 MB, videos up to %d MB.', 'leitvia-studio' ), (int) floor( $most / MB_IN_BYTES ) ) );
 		}
 		$video = Packages::video_type( $file, $name );
 		if ( ! $video && $size > self::MAX_MEDIA_BYTES ) {
@@ -705,16 +735,25 @@ final class Build {
 		$track = null;
 		$type  = $video ?? Packages::image_type( $file, $name );
 		if ( ! $type ) {
-			$track = Packages::track_type( $file, $name );
+			// A captions file and a PDF show no picture: neither takes alt text.
+			$track = Packages::track_type( $file, $name ) ?? Packages::document_type( $file, $name );
 			$type  = $track;
 		}
 		if ( ! $type ) {
-			return Block_Edit::invalid( 'type', __( 'Only images of a type this site allows can be added, JPEG, PNG, GIF, WebP or AVIF, WebVTT files that start with WEBVTT in UTF-8, and videos as MP4 with H.264 or WebM.', 'leitvia-studio' ) );
+			return Block_Edit::invalid( 'type', __( 'Only images of a type this site allows can be added, JPEG, PNG, GIF, WebP or AVIF, WebVTT files that start with WEBVTT in UTF-8, videos as MP4 with H.264 or WebM, and PDF files.', 'leitvia-studio' ) );
+		}
+		if ( isset( $input['replace'] ) ) {
+			return self::replace_media( (int) $input['replace'], $input, $file, $type );
 		}
 		$extra = array();
-		if ( isset( $input['poster'] ) || isset( $input['caption'] ) ) {
-			if ( ! $video ) {
-				return Block_Edit::invalid( 'poster', __( 'Only a video takes a poster and a caption.', 'leitvia-studio' ) );
+		$waits = '';
+		if ( isset( $input['poster'] ) || isset( $input['poster_file'] ) || isset( $input['caption'] ) ) {
+			if ( ! $video || isset( $input['poster'], $input['poster_file'] ) ) {
+				return Block_Edit::invalid( 'poster', __( 'Only a video takes a poster and a caption, and its poster either by ID or by file name.', 'leitvia-studio' ) );
+			}
+			$waits = self::waiting_poster( $input );
+			if ( is_wp_error( $waits ) ) {
+				return $waits;
 			}
 			$poster = (int) ( $input['poster'] ?? 0 );
 			if ( isset( $input['poster'] ) && ( ! wp_attachment_is_image( $poster ) || ! Scope::readable( $poster ) ) ) {
@@ -733,16 +772,78 @@ final class Build {
 		if ( $findings ) {
 			return Rejection::make( 'leitvia_check_failed', __( 'The image needs alt text that describes it, or mark it as decorative.', 'leitvia-studio' ), 422, 'checks', array(), '', 'once', array( 'findings' => $findings ) );
 		}
-		$alt   = $video ? '' : $alt;
+		$alt   = $video || 'application/pdf' === $type['type'] ? '' : $alt;
 		$title = (string) ( $input['title'] ?? '' );
 		return array(
 			'area'   => 'content',
+			// A poster that waits in the package (target media) becomes the featured image of the video when the package
+			// is applied, see Packages::apply().
 			'target' => array(
 				'post'      => 0,
 				'post_type' => 'attachment',
-			),
+			) + ( '' !== $waits ? array( 'media' => $waits ) : array() ),
 			'change' => static fn( array $state ) => self::new_media( $state, $name, $file, $type['type'], $alt, $title, $extra ),
 		);
+	}
+
+	/**
+	 * Operation of add-media with replace: the attachment keeps its ID, its address and its texts, only the file
+	 * changes, to one of the same type. The pipeline swaps the file after the write (target remove file, see
+	 * Packages::swap_file()); the old file is gone then, so a person decides as for delete-media
+	 * (Autonomy::person_decides()).
+	 *
+	 * @param int                                         $id    Attachment ID.
+	 * @param array<string, mixed>                        $input Input.
+	 * @param string                                      $bytes Content of the new file, checked.
+	 * @param array{type: string, name: non-empty-string} $type  Its type and name.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private static function replace_media( int $id, array $input, string $bytes, array $type ) {
+		$target = array( 'post' => $id );
+		if ( 'attachment' !== get_post_type( $id ) || ! Scope::readable( $id ) ) {
+			return Rejection::make( 'leitvia_not_found', __( 'There is no file with this ID in the media library. List the media for the current IDs.', 'leitvia-studio' ), 404, 'id', $target, 'leitvia/list-media' );
+		}
+		if ( array_intersect_key( $input, array_flip( array( 'title', 'alt', 'decorative', 'poster', 'poster_file', 'caption' ) ) ) ) {
+			return Block_Edit::invalid( 'replace', __( 'With replace only the file changes: send no title, alt text, poster or caption. Alt text changes with leitvia/set-alt-text.', 'leitvia-studio' ), $target, 'leitvia/set-alt-text' );
+		}
+		$old = (string) get_post_mime_type( $id );
+		if ( $old !== $type['type'] ) {
+			/* translators: 1: MIME type of the file in the library, 2: MIME type of the new file */
+			return Block_Edit::invalid( 'replace', sprintf( __( 'The new file must have the type of the file it replaces: the library holds %1$s, this is %2$s. Add a file of another type as a new one.', 'leitvia-studio' ), $old, $type['type'] ), $target );
+		}
+		return array(
+			'area'      => 'content',
+			'target'    => $target + array( 'remove' => 'file' ),
+			// The post fields stay as they are, so the hash only guards against a change in between.
+			'base_hash' => '' !== (string) ( $input['base_hash'] ?? '' ) ? (string) $input['base_hash'] : \LeitviaStudio\Gateway\Hashes::document( $id ),
+			'notice'    => __( 'The address stays the same, so browsers and caches may show the old file for a while. An image of another size gets other file names for its smaller sizes; content that names such a size by its address needs the image set again with leitvia/update-block.', 'leitvia-studio' ),
+			'change'    => static function ( array $state ) use ( $bytes, $type ) {
+				$path = Packages::stash_file( $type['name'], $bytes );
+				return '' !== $path ? array( 'file' => $path ) + $state : Rejection::make( 'leitvia_execution_failed', __( 'The file could not be saved; nothing was changed. Try again later.', 'leitvia-studio' ), 500, 'execution', array(), '', 'never' );
+			},
+		);
+	}
+
+	/**
+	 * File name of the image poster_file names, '' when it names none; a rejection when no image of add-media with
+	 * that name waits in the package of the key. The same rule as for a featured image that waits, see
+	 * Content::waiting_media().
+	 *
+	 * @param array<string, mixed> $input Input.
+	 * @return string|\WP_Error
+	 */
+	private static function waiting_poster( array $input ) {
+		$file = sanitize_file_name( (string) ( $input['poster_file'] ?? '' ) );
+		if ( '' === $file ) {
+			return '';
+		}
+		$package = '' !== (string) ( $input['package'] ?? '' ) ? Packages::find( (string) $input['package'] ) : 0;
+		foreach ( $package ? Packages::operations( $package ) : array() as $entry ) {
+			if ( 'leitvia/add-media' === ( $entry['ability'] ?? '' ) && ! isset( $entry['applied'] ) && str_starts_with( (string) ( $entry['state']['post_mime_type'] ?? '' ), 'image/' ) && wp_basename( (string) ( $entry['state']['file'] ?? '' ) ) === $file ) {
+				return $file;
+			}
+		}
+		return Block_Edit::invalid( 'poster_file', __( 'No image with this file name waits in the package of this key. Add it with leitvia/add-media and the same package key first, or name an image of the library by its ID in poster.', 'leitvia-studio' ), array(), 'leitvia/add-media' );
 	}
 
 	/**

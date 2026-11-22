@@ -334,7 +334,7 @@ final class Compiler {
 	 * Sets the block style inverse of group and cover to the scheme of the set. The style variations carry it: light
 	 * ones put surface text on ink, dark ones ink text on surface-alt with a hairline. A set replaces the colors of a
 	 * variation but not this mapping, so a dark set on a light variation turned every "dark" band light. The scheme is
-	 * dark when surface is darker than ink.
+	 * dark when surface is darker than ink. A light set with the optional role band puts the band on it instead of ink.
 	 *
 	 * @param array<string, mixed> $data User global styles data.
 	 * @param array<string, mixed> $doc  Token document.
@@ -360,7 +360,7 @@ final class Compiler {
 			)
 			: array(
 				'color' => array(
-					'background' => 'var:preset|color|ink',
+					'background' => 'var:preset|color|' . ( isset( $doc['color']['band'] ) ? 'band' : 'ink' ),
 					'text'       => 'var:preset|color|surface',
 				),
 			);

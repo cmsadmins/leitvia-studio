@@ -673,6 +673,22 @@ class Test_Gateway_Content extends WP_UnitTestCase {
 		$this->assertSame( 'live', $update['mode'] );
 		$this->assertSame( 'open', get_post( $post )->comment_status );
 		$this->assertNotSame( $result['hash'], $update['hash'] );
+
+		// Without the input a new post is closed for comments and pings, though the site opens both by default.
+		update_option( 'default_comment_status', 'open' );
+		update_option( 'default_ping_status', 'open' );
+		$result = self::call(
+			'leitvia/create-content',
+			array(
+				'post_type' => 'post',
+				'title'     => 'Quiet by default',
+				'content'   => self::TEXT,
+				'status'    => 'publish',
+			)
+		);
+		$this->assertIsArray( $result, $result instanceof WP_Error ? $result->get_error_message() : '' );
+		$this->assertSame( 'closed', get_post( $result['target']['post'] )->comment_status );
+		$this->assertSame( 'closed', get_post( $result['target']['post'] )->ping_status );
 		$this->assertWPError(
 			self::call(
 				'leitvia/update-content',

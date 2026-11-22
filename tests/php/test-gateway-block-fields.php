@@ -259,6 +259,167 @@ class Test_Gateway_Block_Fields extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A video names its poster by file name while the image still waits in the same package: applying writes the image
+	 * first and sets it as featured image of the video. Without an image of that name in the package, without a
+	 * package key and together with poster the call is refused.
+	 */
+	public function test_add_media_video_with_waiting_poster(): void {
+		$dir   = dirname( __DIR__ ) . '/fixtures/';
+		$mp4   = self::file( (string) file_get_contents( $dir . 'clip.mp4' ), 'process.mp4' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Test fixture.
+		$image = self::call(
+			'leitvia/add-media',
+			self::file( (string) file_get_contents( $dir . 'avatar.png' ), 'still.png' ) + array( // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Test fixture.
+				'alt'     => 'Still of the process',
+				'package' => 'video-1',
+			)
+		);
+		$this->assertSame( 'package', $image['mode'] );
+
+		$refused = array(
+			'no image of that name' => array(
+				'poster_file' => 'other.png',
+				'package'     => 'video-1',
+			),
+			'no package key'        => array( 'poster_file' => 'still.png' ),
+			'poster and file'       => array(
+				'poster_file' => 'still.png',
+				'poster'      => 1,
+				'package'     => 'video-1',
+			),
+		);
+		foreach ( $refused as $case => $input ) {
+			$rejected = self::call( 'leitvia/add-media', $mp4 + $input );
+			$this->assertWPError( $rejected, $case );
+			$this->assertSame( 'leitvia_invalid_input', $rejected->get_error_code(), $case );
+		}
+
+		$video = self::call(
+			'leitvia/add-media',
+			$mp4 + array(
+				'poster_file' => 'still.png',
+				'package'     => 'video-1',
+			)
+		);
+		$this->assertSame( array( 'package', $image['package'] ), array( $video['mode'], $video['package'] ) );
+
+		$report = Packages::apply( $video['package'] );
+		$this->assertSame( array( 1, 2 ), $report['applied'], (string) wp_json_encode( $report ) );
+		$applied = array_column( array_column( Packages::detail( $video['package'] )['items'], 'applied' ), 'post' );
+		$this->assertTrue( wp_attachment_is( 'video', $applied[1] ) );
+		$this->assertSame( $applied[0], get_post_thumbnail_id( $applied[1] ) );
+	}
+
+	/**
+	 * Add-media with replace puts a new file under the ID and the address of an attachment and keeps its title; the
+	 * diff names the old file and says that it goes for good. Another type, further fields and an unknown ID are
+	 * refused and leave the file as it is.
+	 */
+	public function test_add_media_replaces_the_file(): void {
+		$old   = "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF\n";
+		$new   = "%PDF-1.7\n1 0 obj\n<< /Type /Catalog /Lang (en) >>\nendobj\n%%EOF\n";
+		$added = self::call( 'leitvia/add-media', self::file( $old, 'terms.pdf' ) + array( 'title' => 'Terms' ) );
+		$this->assert_done( $added );
+		$id   = (int) $added['target']['post'];
+		$path = (string) get_attached_file( $id );
+		$url  = (string) wp_get_attachment_url( $id );
+
+		$refused = array(
+			'another type'  => array( 'leitvia_invalid_input', self::file( self::VTT, 'terms.vtt' ) + array( 'replace' => $id ) ),
+			'with a title'  => array(
+				'leitvia_invalid_input',
+				self::file( $new, 'terms-new.pdf' ) + array(
+					'replace' => $id,
+					'title'   => 'New terms',
+				),
+			),
+			'an unknown ID' => array( 'leitvia_not_found', self::file( $new, 'terms-new.pdf' ) + array( 'replace' => $id + 1000 ) ),
+		);
+		foreach ( $refused as $case => $input ) {
+			$rejected = self::call( 'leitvia/add-media', $input[1] );
+			$this->assertWPError( $rejected, $case );
+			$this->assertSame( $input[0], $rejected->get_error_code(), $case );
+		}
+		$this->assertSame( $old, file_get_contents( $path ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Test.
+
+		$result = self::call(
+			'leitvia/add-media',
+			self::file( $new, 'terms-new.pdf' ) + array(
+				'replace' => $id,
+				'package' => 'terms-1',
+			)
+		);
+		$this->assert_done( $result );
+		$this->assertSame( array( 'package', $id ), array( $result['mode'], (int) $result['target']['post'] ) );
+		$diff = Packages::detail( $result['package'] )['items'][0]['diff'][0];
+		$this->assertSame( array( 'file', 'changed' ), array( $diff['id'], $diff['change'] ) );
+		$this->assertStringContainsString( 'terms.pdf', $diff['before_text'] );
+		$this->assertStringContainsString( 'gone for good', $diff['after_text'] );
+		$this->assertSame( $old, file_get_contents( $path ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Test.
+
+		// The old file goes for good, so a person with delete_post applies it, as for delete-media.
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+		$report = Packages::apply( $result['package'] );
+		$this->assertSame( array( 1 ), $report['applied'], (string) wp_json_encode( $report ) );
+		clearstatcache();
+		$this->assertSame( $new, file_get_contents( $path ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Test.
+		$this->assertFileDoesNotExist( $path . '.new' );
+		$this->assertSame( array( $path, $url, 'Terms' ), array( get_attached_file( $id ), wp_get_attachment_url( $id ), get_the_title( $id ) ) );
+	}
+
+	/**
+	 * Add-media takes a PDF with its title and without alt text, only with the signature of the format under its
+	 * extension and up to the size of an image; any other document and a script under the extension are refused.
+	 */
+	public function test_add_media_takes_pdf(): void {
+		$pdf    = '%PDF-1.4
+1 0 obj
+<< /Type /Catalog >>
+endobj
+trailer
+<< /Root 1 0 R >>
+%%EOF
+';
+		$result = self::call(
+			'leitvia/add-media',
+			self::file( $pdf, 'price-list.pdf' ) + array(
+				'title' => 'Price list 2026',
+				'alt'   => 'A PDF shows no picture',
+			)
+		);
+		$this->assert_done( $result );
+		$id = (int) $result['target']['post'];
+		$this->assertSame( 'application/pdf', get_post_mime_type( $id ) );
+		$this->assertSame( 'Price list 2026', get_the_title( $id ) );
+		$this->assertSame( '', (string) get_post_meta( $id, '_wp_attachment_image_alt', true ) );
+		$this->assertSame( $pdf, file_get_contents( get_attached_file( $id ) ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Test.
+		$this->assertStringEndsWith( '.pdf', (string) wp_get_attachment_url( $id ) );
+
+		$refused = array(
+			'no signature'        => self::file(
+				'Price list
+',
+				'plain.pdf'
+			),
+			'signature not first' => self::file(
+				'<?php echo 1; ?>
+' . $pdf,
+				'code.pdf'
+			),
+			'a page as PDF'       => self::file( '<html><script>alert(1)</script></html>', 'page.pdf' ),
+			'PDF named .docx'     => self::file( $pdf, 'price-list.docx' ),
+			'PDF named .php'      => self::file( $pdf, 'price-list.php' ),
+			'PDF named .png'      => self::file( $pdf, 'price-list.png' ) + array( 'alt' => 'Price list' ),
+			'above 5 MB'          => self::file( $pdf . str_repeat( ' ', \LeitviaStudio\Gateway\Abilities\Build::MAX_MEDIA_BYTES ), 'large.pdf' ),
+			'poster for a PDF'    => self::file( $pdf, 'poster.pdf' ) + array( 'caption' => 'Only a video takes one.' ),
+		);
+		foreach ( $refused as $case => $input ) {
+			$rejected = self::call( 'leitvia/add-media', $input );
+			$this->assertWPError( $rejected, $case );
+			$this->assertSame( 'leitvia_invalid_input', $rejected->get_error_code(), $case );
+		}
+	}
+
+	/**
 	 * Tracks reach attribute and markup, survive the write and render; only WebVTT files of the library count; an empty
 	 * list removes them. Caption and tracks work together on one video.
 	 */
@@ -353,6 +514,85 @@ class Test_Gateway_Block_Fields extends WP_UnitTestCase {
 			$this->assertIsString( $content, is_wp_error( $content ) ? $content->get_error_message() : '' );
 			$this->assertMatchesRegularExpression( '/<figure class="' . $class . '[^"]* alignfull">/', $content );
 		}
+	}
+
+	/**
+	 * The field video fills the empty video block of a pattern from the media library: the element as the editor saves
+	 * it, the ID in the comment, the poster of the video or the one named, with tracks, align and caption in the same
+	 * call. A second video replaces the first and keeps flags and tracks. Other blocks, files that are no video and a
+	 * poster that is no image are refused; the catalog lists only what attributes takes.
+	 */
+	public function test_update_block_video_from_the_library(): void {
+		$dir    = dirname( __DIR__ ) . '/fixtures/';
+		$video  = self::factory()->attachment->create_upload_object( $dir . 'clip.mp4', 0 );
+		$other  = self::factory()->attachment->create_upload_object( $dir . 'clip.webm', 0 );
+		$poster = self::factory()->attachment->create_upload_object( $dir . 'avatar.png', 0 );
+		$still  = self::factory()->attachment->create_upload_object( $dir . 'avatar.png', 0 );
+		update_post_meta( $video, '_thumbnail_id', $poster );
+		$track = $this->track();
+		$page  = self::page( "<!-- wp:video -->\n<figure class=\"wp-block-video\"><figcaption class=\"wp-element-caption\">Placeholder</figcaption></figure>\n<!-- /wp:video -->" );
+
+		$content = self::edit(
+			$page,
+			array(
+				'video'      => array( 'id' => $video ),
+				'caption'    => 'The process in five steps.',
+				'attributes' => array(
+					'align'  => 'wide',
+					'tracks' => array(
+						array(
+							'id'      => $track,
+							'srclang' => 'en',
+							'label'   => 'English',
+						),
+					),
+				),
+			)
+		);
+		$this->assertIsString( $content, is_wp_error( $content ) ? $content->get_error_message() : '' );
+		$this->assertStringContainsString( '<figure class="wp-block-video alignwide"><video controls poster="' . wp_get_attachment_url( $poster ) . '" preload="none" src="' . wp_get_attachment_url( $video ) . '"><track ', $content );
+		$this->assertStringContainsString( '</video><figcaption class="wp-element-caption">The process in five steps.</figcaption></figure>', $content );
+		$block = parse_blocks( $content )[0];
+		// metadata holds the block ID Block_Ids adds on save.
+		$this->assertSame( array( 'id', 'tracks', 'align' ), array_keys( array_diff_key( $block['attrs'], array( 'metadata' => true ) ) ) );
+		$this->assertSame( $video, $block['attrs']['id'] );
+
+		// Another video with a poster of its own: one element, the flags and the tracks stay.
+		$page    = self::page( "<!-- wp:video {\"id\":1} -->\n<figure class=\"wp-block-video\"><video controls loop muted src=\"/old.mp4\" playsinline><track src=\"/a.vtt\" label=\"A\" srclang=\"en\" kind=\"captions\"/></video></figure>\n<!-- /wp:video -->" );
+		$content = self::edit(
+			$page,
+			array(
+				'video' => array(
+					'id'     => $other,
+					'poster' => $still,
+				),
+			)
+		);
+		$this->assertIsString( $content, is_wp_error( $content ) ? $content->get_error_message() : '' );
+		$this->assertStringContainsString( '<figure class="wp-block-video"><video controls loop muted poster="' . wp_get_attachment_url( $still ) . '" preload="none" src="' . wp_get_attachment_url( $other ) . '" playsinline><track src="/a.vtt"', $content );
+		$this->assertSame( 1, substr_count( $content, '<video' ) );
+		$this->assertStringNotContainsString( '/old.mp4', $content );
+		$this->assertSame( $other, parse_blocks( $content )[0]['attrs']['id'] );
+
+		$this->assert_rejected( 'leitvia_invalid_input', self::edit( $page, array( 'video' => array( 'id' => $poster ) ) ) );
+		$this->assert_rejected(
+			'leitvia_invalid_input',
+			self::edit(
+				$page,
+				array(
+					'video' => array(
+						'id'     => $video,
+						'poster' => $track,
+					),
+				)
+			)
+		);
+		$this->assert_rejected( 'leitvia_invalid_input', self::edit( $page, array( 'attributes' => array( 'src' => '/other.mp4' ) ) ) );
+		$text = self::page( "<!-- wp:paragraph -->\n<p>Text</p>\n<!-- /wp:paragraph -->" );
+		$this->assert_rejected( 'leitvia_static_markup', self::edit( $text, array( 'video' => array( 'id' => $video ) ) ) );
+
+		$catalog = array_column( Catalog::get(), null, 'name' );
+		$this->assertSame( array( 'tracks' ), array_keys( $catalog['core/video']['attributes']['properties'] ) );
 	}
 
 	/**
@@ -860,5 +1100,47 @@ class Test_Gateway_Block_Fields extends WP_UnitTestCase {
 		);
 		$this->assertIsArray( $inserted, is_wp_error( $inserted ) ? $inserted->get_error_message() : '' );
 		$this->assertSame( 'wide', $inserted['attrs']['align'] );
+	}
+	/**
+	 * Presets and counts a section needs without new markup: the ground of a light group (surface, surface-alt), the
+	 * font size of a heading, the columns of a gallery and the name for screen readers a block keeps as aria-label.
+	 * Attribute and class change together, as the editor saves them; anything else is refused.
+	 */
+	public function test_update_block_presets_gallery_columns_and_label(): void {
+		$group   = self::page( '<!-- wp:group {"layout":{"type":"constrained"}} --><div class="wp-block-group"><!-- wp:paragraph --><p>Text</p><!-- /wp:paragraph --></div><!-- /wp:group -->' );
+		$content = self::edit( $group, array( 'attributes' => array( 'backgroundColor' => 'surface-alt' ) ) );
+		$this->assertIsString( $content, is_wp_error( $content ) ? $content->get_error_message() : '' );
+		$this->assertSame( 'surface-alt', parse_blocks( $content )[0]['attrs']['backgroundColor'] );
+		$this->assertMatchesRegularExpression( '/<div class="wp-block-group has-surface-alt-background-color has-background">/', $content );
+		$this->assert_rejected( 'leitvia_invalid_input', self::edit( $group, array( 'attributes' => array( 'backgroundColor' => 'ink' ) ) ) );
+		$content = self::edit( $group, array( 'attributes' => array( 'backgroundColor' => null ) ) );
+		$this->assertStringContainsString( '<div class="wp-block-group">', $content );
+		$this->assertArrayNotHasKey( 'backgroundColor', parse_blocks( $content )[0]['attrs'] );
+
+		$dark = self::page( '<!-- wp:group {"backgroundColor":"ink","textColor":"surface","layout":{"type":"constrained"}} --><div class="wp-block-group has-surface-color has-ink-background-color has-text-color has-background"><!-- wp:paragraph --><p>Text</p><!-- /wp:paragraph --></div><!-- /wp:group -->' );
+		$this->assert_rejected( 'leitvia_invalid_input', self::edit( $dark, array( 'attributes' => array( 'backgroundColor' => 'surface' ) ) ) );
+
+		$heading = self::page( '<!-- wp:heading --><h2 class="wp-block-heading">Title</h2><!-- /wp:heading -->' );
+		$content = self::edit( $heading, array( 'attributes' => array( 'fontSize' => 'heading-m' ) ) );
+		$this->assertIsString( $content, is_wp_error( $content ) ? $content->get_error_message() : '' );
+		$this->assertStringContainsString( '<h2 class="wp-block-heading has-heading-m-font-size">Title</h2>', $content );
+		$this->assertSame( 'heading-m', parse_blocks( $content )[0]['attrs']['fontSize'] );
+		$this->assert_rejected( 'leitvia_invalid_input', self::edit( $heading, array( 'attributes' => array( 'fontSize' => 'giant' ) ) ) );
+
+		$image   = '<!-- wp:image --><figure class="wp-block-image"><img src="https://example.org/a.jpg" alt="A"/></figure><!-- /wp:image -->';
+		$gallery = self::page( '<!-- wp:gallery {"columns":4,"linkTo":"none"} --><figure class="wp-block-gallery has-nested-images columns-4 is-cropped">' . $image . $image . '</figure><!-- /wp:gallery -->' );
+		$content = self::edit( $gallery, array( 'columns' => 2 ) );
+		$this->assertIsString( $content, is_wp_error( $content ) ? $content->get_error_message() : '' );
+		$this->assertSame( 2, parse_blocks( $content )[0]['attrs']['columns'] );
+		$this->assertStringContainsString( 'columns-2', $content );
+		$this->assertStringNotContainsString( 'columns-4', $content );
+		// The input schema of the ability stops a count outside 1 to 6 before the edit runs.
+		$this->assert_rejected( 'ability_invalid_input', self::edit( $gallery, array( 'columns' => 9 ) ) );
+
+		$bar     = self::page( '<!-- wp:leitvia/announcement-bar --><section class="wp-block-leitvia-announcement-bar alignfull" aria-label="Announcement"><p class="wp-block-leitvia-announcement-bar__text">New prices</p></section><!-- /wp:leitvia/announcement-bar -->' );
+		$content = self::edit( $bar, array( 'attributes' => array( 'label' => 'Hinweis' ) ) );
+		$this->assertIsString( $content, is_wp_error( $content ) ? $content->get_error_message() : '' );
+		$this->assertStringContainsString( 'aria-label="Hinweis"', $content );
+		$this->assertStringContainsString( '>New prices</p>', $content );
 	}
 }

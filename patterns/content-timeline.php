@@ -1,6 +1,6 @@
 <?php
 /**
- * Pattern "Timeline with introduction": a heading, a short introduction and a link on the left, five dated entries of
+ * Pattern "Timeline with introduction": an eyebrow, a heading, a short introduction and a link on the left, five dated entries of
  * the timeline block on the right. Registered as leitvia-studio/content-timeline (Blocks::patterns()).
  *
  * @package LeitviaStudio
@@ -16,6 +16,9 @@ ob_start();
 	<div class="wp-block-columns alignwide">
 		<!-- wp:column {"width":"38%","style":{"spacing":{"blockGap":"var:preset|spacing|s"}}} -->
 		<div class="wp-block-column" style="flex-basis:38%">
+			<!-- wp:paragraph {"className":"is-style-eyebrow","textColor":"accent"} -->
+			<p class="is-style-eyebrow has-accent-color has-text-color"><?php echo esc_html__( 'Background', 'leitvia-studio' ); ?></p>
+			<!-- /wp:paragraph -->
 			<!-- wp:heading {"fontSize":"heading-l"} -->
 			<h2 class="wp-block-heading has-heading-l-font-size"><?php echo esc_html__( 'How the new library came about', 'leitvia-studio' ); ?></h2>
 			<!-- /wp:heading -->
@@ -69,7 +72,7 @@ ob_start();
 <?php
 return array(
 	'title'       => __( 'Timeline with introduction', 'leitvia-studio' ),
-	'description' => __( 'Heading, short introduction and a link on the left, five dated entries of a timeline on the right. Use to tell how a project, a decision or a story developed over time.', 'leitvia-studio' ),
+	'description' => __( 'Eyebrow, heading, short introduction and a link on the left, five dated entries of a timeline on the right. Use to tell how a project, a decision or a story developed over time.', 'leitvia-studio' ),
 	'categories'  => array( 'text' ),
 	'keywords'    => array( __( 'timeline', 'leitvia-studio' ), __( 'history', 'leitvia-studio' ), __( 'dates', 'leitvia-studio' ), __( 'milestones', 'leitvia-studio' ) ),
 	'content'     => (string) ob_get_clean(),

@@ -181,11 +181,15 @@ final class Dtcg {
 			}
 			$presets   = array();
 			$fallbacks = self::role_fallbacks( $c, $group );
+			$optional  = self::optional_roles( $c, $group );
 			foreach ( $slugs as $slug ) {
 				// A role added in a minor contract version names an older role as fallback, so sets saved before stay valid.
 				if ( ! isset( $tokens[ $slug ] ) && isset( $fallbacks[ $slug ], $tokens[ $fallbacks[ $slug ] ] ) ) {
 					$tokens[ $slug ] = $tokens[ $fallbacks[ $slug ] ];
 					unset( $tokens[ $slug ]['$extensions'][ self::EXT ]['name'] );
+				}
+				if ( ! isset( $tokens[ $slug ] ) && isset( $optional[ $slug ] ) ) {
+					continue;
 				}
 				if ( ! isset( $tokens[ $slug ] ) ) {
 					/* translators: %s: token path, for example color.focus. */
@@ -502,7 +506,26 @@ final class Dtcg {
 	 */
 	private static function role_slugs( Contract $c, string $group ): array {
 		$roles = $c->data()['roles'][ $group ] ?? array();
-		return is_array( $roles ) ? array_values( array_filter( array_column( $roles, 'slug' ), 'is_string' ) ) : array();
+		$slugs = is_array( $roles ) ? array_values( array_filter( array_column( $roles, 'slug' ), 'is_string' ) ) : array();
+		return $slugs ? array_merge( $slugs, array_keys( self::optional_roles( $c, $group ) ) ) : $slugs;
+	}
+
+	/**
+	 * Roles a token set may leave out (contract optionalRoles): slug => role whose look stays without it. No preset is
+	 * written for a role the set does not carry, so the theme falls back in its CSS and older sets compile as before.
+	 *
+	 * @param Contract $c     Contract of the active theme.
+	 * @param string   $group Role group.
+	 * @return array<string, string>
+	 */
+	public static function optional_roles( Contract $c, string $group ): array {
+		$roles = array();
+		foreach ( (array) ( $c->data()['optionalRoles'][ $group ] ?? array() ) as $role ) {
+			if ( is_string( $role['slug'] ?? null ) && is_string( $role['fallback'] ?? null ) ) {
+				$roles[ $role['slug'] ] = $role['fallback'];
+			}
+		}
+		return $roles;
 	}
 
 	/**

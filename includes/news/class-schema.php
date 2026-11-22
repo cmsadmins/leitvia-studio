@@ -36,6 +36,13 @@ final class Schema {
 	public const IMAGE_MIN_WIDTH = 1200;
 
 	/**
+	 * Items of the breadcrumbs block of this request, see remember_breadcrumbs().
+	 *
+	 * @var array<int, mixed>
+	 */
+	private static array $trail = array();
+
+	/**
 	 * Prints the JSON-LD for the current request. Runs on wp_head.
 	 */
 	public static function print(): void {
@@ -67,6 +74,12 @@ final class Schema {
 			$nodes = array( self::collection_page( null ) );
 		} elseif ( ( is_category() || is_tag() ) && $object instanceof WP_Term ) {
 			$nodes = array( self::collection_page( $object ), self::breadcrumbs( $object ) );
+		}
+		// The trail the page shows wins over the computed one and gives pages and entries of other types theirs.
+		$visible = is_front_page() ? null : self::visible_breadcrumbs();
+		if ( $visible ) {
+			$nodes   = array_values( array_filter( $nodes, static fn( array $node ): bool => 'BreadcrumbList' !== $node['@type'] ) );
+			$nodes[] = $visible;
 		}
 		return $nodes ? array(
 			'@context' => 'https://schema.org',
@@ -118,6 +131,10 @@ final class Schema {
 			'author'              => array( self::person( (int) $post->post_author ) ),
 			'publisher'           => self::organization(),
 		);
+		// An account that carries the name of the organization writes for it: the author is the organization, no person.
+		if ( 0 === strcasecmp( $data['author'][0]['name'], (string) $data['publisher']['name'] ) ) {
+			$data['author'] = array( array( '@id' => Organization::id() ) );
+		}
 		$excerpt = self::text( $post->post_excerpt );
 		if ( '' !== $excerpt ) {
 			$data['description'] = $excerpt;
@@ -212,6 +229,56 @@ final class Schema {
 			'@type'           => 'BreadcrumbList',
 			'itemListElement' => $items,
 		);
+	}
+
+	/**
+	 * Remembers the items of the breadcrumbs block as the page prints them. Runs last on block_core_breadcrumbs_items;
+	 * the template renders before wp_head, so print() finds them.
+	 *
+	 * @param mixed $items Breadcrumb items, each with label and, except for the current page, url.
+	 * @return mixed
+	 */
+	public static function remember_breadcrumbs( $items ) {
+		self::$trail = is_array( $items ) ? $items : array();
+		return $items;
+	}
+
+	/**
+	 * A new request starts without a trail (action wp).
+	 */
+	public static function forget_breadcrumbs(): void {
+		self::$trail = array();
+	}
+
+	/**
+	 * BreadcrumbList from the breadcrumbs the page shows, so both name the same trail; null when the page shows none
+	 * or a single item. The current page has no link on screen; here it carries its own address, as the computed trail
+	 * does, so a reader that requires item on every entry takes the list.
+	 *
+	 * @return array<string, mixed>|null
+	 */
+	public static function visible_breadcrumbs(): ?array {
+		$items  = array();
+		$object = get_queried_object();
+		$here   = $object instanceof WP_Post ? (string) get_permalink( $object ) : ( $object instanceof WP_Term ? self::term_link( $object ) : '' );
+		foreach ( self::$trail as $crumb ) {
+			$name = is_array( $crumb ) ? self::text( (string) ( $crumb['label'] ?? '' ) ) : '';
+			if ( '' !== $name ) {
+				$items[] = array(
+					'@type'    => 'ListItem',
+					'position' => count( $items ) + 1,
+					'name'     => $name,
+				) + array_filter( array( 'item' => (string) ( $crumb['url'] ?? '' ) ) );
+			}
+		}
+		$last = count( $items ) - 1;
+		if ( $last > 0 && ! isset( $items[ $last ]['item'] ) && '' !== $here ) {
+			$items[ $last ]['item'] = $here;
+		}
+		return count( $items ) > 1 ? array(
+			'@type'           => 'BreadcrumbList',
+			'itemListElement' => $items,
+		) : null;
 	}
 
 	/**
@@ -335,11 +402,11 @@ final class Schema {
 	}
 
 	/**
-	 * Plain text as readers see it: no tags, entities decoded.
+	 * Plain text as readers see it: no tags, entities decoded, no soft hyphens.
 	 *
 	 * @param string $html Text that may contain markup or entities.
 	 */
 	public static function text( string $html ): string {
-		return trim( html_entity_decode( wp_strip_all_tags( $html ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
+		return trim( str_replace( "\u{AD}", '', html_entity_decode( wp_strip_all_tags( $html ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) ) );
 	}
 }

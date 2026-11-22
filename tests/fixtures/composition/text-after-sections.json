@@ -1,0 +1,16 @@
+{
+	"name": "text-after-sections",
+	"template": "page",
+	"sections": [
+		"core/paragraph",
+		"leitvia/cta-contact",
+		"core/paragraph",
+		"core/list",
+		"acme/accordion"
+	],
+	"proseBlocks": [
+		"acme/accordion"
+	],
+	"issues": [],
+	"score": 100
+}

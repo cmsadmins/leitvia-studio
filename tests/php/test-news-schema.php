@@ -337,6 +337,55 @@ class Test_News_Schema extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The breadcrumbs a page shows are its BreadcrumbList: the same items in the same order, the current page with its
+	 * own address, no soft hyphens. On a post they replace the computed trail, and the next request starts without them.
+	 */
+	public function test_visible_breadcrumbs_are_the_breadcrumb_list(): void {
+		$parent = self::factory()->post->create(
+			array(
+				'post_type'  => 'page',
+				'post_title' => 'Services',
+			)
+		);
+		$child  = self::factory()->post->create(
+			array(
+				'post_type'   => 'page',
+				'post_title'  => 'Roof&shy;repairs',
+				'post_parent' => $parent,
+			)
+		);
+		$this->go_to( get_permalink( $child ) );
+		$this->assertNull( Schema::current(), 'no breadcrumbs on the page, no node' );
+		do_blocks( '<!-- wp:breadcrumbs /-->' );
+		$items = $this->node( 'BreadcrumbList' )['itemListElement'];
+		$this->assertSame( array( 1, 2, 3 ), array_column( $items, 'position' ) );
+		$this->assertSame( array( 'Services', 'Roofrepairs' ), array_slice( array_column( $items, 'name' ), 1 ) );
+		$this->assertSame( array( home_url( '/' ), get_permalink( $parent ), get_permalink( $child ) ), array_column( $items, 'item' ) );
+
+		$this->go_to( get_permalink( $this->post ) );
+		$computed = $this->node( 'BreadcrumbList' );
+		do_blocks( '<!-- wp:breadcrumbs /-->' );
+		$this->assertNotSame( $computed, $this->node( 'BreadcrumbList' ) );
+		$this->go_to( get_permalink( $this->post ) );
+		$this->assertSame( $computed, $this->node( 'BreadcrumbList' ) );
+	}
+
+	/**
+	 * A post by an account named like the organization has the organization as its author.
+	 */
+	public function test_organization_as_author(): void {
+		wp_update_user(
+			array(
+				'ID'           => $this->author,
+				'display_name' => 'Leitvia News',
+			)
+		);
+		$this->go_to( get_permalink( $this->post ) );
+		$data = $this->node( 'NewsArticle' );
+		$this->assertSame( array( array( '@id' => $data['publisher']['@id'] ) ), $data['author'] );
+	}
+
+	/**
 	 * BCP 47 tags from WordPress locales.
 	 */
 	public function test_language(): void {

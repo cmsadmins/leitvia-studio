@@ -34,13 +34,29 @@ final class Diff {
 	private const FIELDS = array( 'post_title', 'post_excerpt', 'post_status', 'post_name', 'post_parent', 'menu_order', 'post_date', 'terms', 'meta_input', 'rows', 'product', 'term', 'attribute', 'review', 'value' );
 
 	/**
-	 * Diff of a stored operation against the current state of its target.
+	 * Diff of a stored operation against the current state of its target. A delete-media shows one entry file with the
+	 * change removed: file name and size before, and after the sentence that the file goes for good. An add-media with
+	 * replace shows the same entry with the change changed and the size of the new file.
 	 *
 	 * @param array<string, mixed> $entry Stored operation.
 	 * @param int                  $max   Size limit in bytes.
 	 * @return list<array<string, mixed>>|\WP_Error
 	 */
 	public static function operation( array $entry, int $max = self::MAX_BYTES ) {
+		// Delete-media deletes the attachment with its files for good; the status trash of its state is only the mark
+		// the pipeline reads. The diff says what happens, with the file and its size.
+		// Add-media with replace changes no post field, only the file (target remove file).
+		$post   = (int) ( $entry['target']['post'] ?? 0 );
+		$remove = 'attachment' === get_post_type( $post ) ? (string) ( $entry['target']['remove'] ?? '' ) : '';
+		$file   = (string) get_attached_file( $post );
+		$old    = wp_basename( $file ) . ' (' . size_format( (int) wp_filesize( $file ) ) . ')';
+		if ( 'delete' === $remove ) {
+			return array( self::entry( 'file', 'removed', $old, __( 'Deleted for good with all its sizes. A rollback does not bring the file back.', 'leitvia-studio' ) ) );
+		}
+		if ( 'file' === $remove ) {
+			/* translators: %s: size of the new file, such as 2 MB */
+			return array( self::entry( 'file', 'changed', $old, sprintf( __( 'A new file (%s) under the same ID and address. The old file is gone for good; a rollback does not bring it back.', 'leitvia-studio' ), size_format( (int) wp_filesize( (string) ( $entry['state']['file'] ?? '' ) ) ) ) ) );
+		}
 		return self::states( self::before( $entry ), (array) $entry['state'], $max );
 	}
 
@@ -152,7 +168,13 @@ final class Diff {
 			if ( ! array_key_exists( $field, $after ) || ( array_key_exists( $field, $before ) && $before[ $field ] == $after[ $field ] ) ) { // phpcs:ignore Universal.Operators.StrictComparisons.LooseEqual -- Stored states went through JSON.
 				continue;
 			}
-			$changes[] = self::entry( 'field:' . $field, array_key_exists( $field, $before ) ? 'changed' : 'added', self::text( $before[ $field ] ?? '' ), self::text( $after[ $field ] ) );
+			// Long values, such as a content model, show from shortly before their first difference: cut at the start
+			// alone, a change further down would look like no change.
+			$old       = self::text( $before[ $field ] ?? '', PHP_INT_MAX );
+			$new       = self::text( $after[ $field ], PHP_INT_MAX );
+			$same      = mb_strlen( mb_strcut( $old, 0, strspn( $old ^ $new, "\0" ) ) );
+			$from      = max( mb_strlen( $old ), mb_strlen( $new ) ) > self::TEXT_LENGTH ? max( 0, $same - 60 ) : 0;
+			$changes[] = self::entry( 'field:' . $field, array_key_exists( $field, $before ) ? 'changed' : 'added', mb_substr( $old, $from, self::TEXT_LENGTH ), mb_substr( $new, $from, self::TEXT_LENGTH ) );
 		}
 		if ( $blocks ) {
 			$changes = array_merge( $changes, self::blocks( (string) ( $before['post_content'] ?? '' ), (string) $after['post_content'] ) );
@@ -320,11 +342,12 @@ final class Diff {
 	/**
 	 * Short plain text of markup or a value.
 	 *
-	 * @param mixed $value Markup, scalar or array.
+	 * @param mixed $value  Markup, scalar or array.
+	 * @param int   $length Longest text in characters.
 	 */
-	private static function text( $value ): string {
+	private static function text( $value, int $length = self::TEXT_LENGTH ): string {
 		$text = is_scalar( $value ) ? (string) $value : (string) wp_json_encode( $value );
 		$text = html_entity_decode( wp_strip_all_tags( $text ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
-		return mb_substr( trim( (string) preg_replace( '/\s+/u', ' ', $text ) ), 0, self::TEXT_LENGTH );
+		return mb_substr( trim( (string) preg_replace( '/\s+/u', ' ', $text ) ), 0, $length );
 	}
 }
