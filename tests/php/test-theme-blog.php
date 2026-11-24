@@ -62,8 +62,9 @@ class Test_Theme_Blog extends WP_UnitTestCase {
 		$this->assertCount( 4, $list['innerBlocks'] );
 		foreach ( $list['innerBlocks'] as $item ) {
 			$this->assertSame( 'core/list-item', $item['blockName'] );
-			$this->assertSame( 1, substr_count( $item['innerHTML'], '<a ' ) );
-			$this->assertMatchesRegularExpression( '#<li><a href="[^"]*">[^<]+ \([A-Z]+, [\d.]+ [KM]B\)</a> [^<]+\.</li>#', trim( $item['innerHTML'] ) );
+			// The sample links have no address until the site sets its files (theme 1.2.59).
+			$this->assertSame( 1, preg_match_all( '#<a[ >]#', $item['innerHTML'] ) );
+			$this->assertMatchesRegularExpression( '#<li><a(?: href="[^"]*")?>[^<]+ \([A-Z]+, [\d.]+ [KM]B\)</a> [^<]+\.</li>#', trim( $item['innerHTML'] ) );
 		}
 		$this->assertStringNotContainsString( '<svg', $content );
 		$this->assertStringNotContainsString( '<img', $content );

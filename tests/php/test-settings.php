@@ -71,6 +71,10 @@ class Test_Settings extends WP_UnitTestCase {
 					'type'    => 'boolean',
 					'default' => true,
 				),
+				'formal_address'             => array(
+					'type'    => 'boolean',
+					'default' => false,
+				),
 				'editorial_page'             => array(
 					'type'    => 'integer',
 					'default' => 0,
@@ -106,7 +110,7 @@ class Test_Settings extends WP_UnitTestCase {
 					'default' => '',
 				),
 			),
-			array_slice( $schema['properties'], 0, 19 )
+			array_slice( $schema['properties'], 0, 20 )
 		);
 	}
 
@@ -117,7 +121,7 @@ class Test_Settings extends WP_UnitTestCase {
 		$properties = get_registered_settings()['leitvia_studio_settings']['show_in_rest']['schema']['properties'];
 		$this->assertSame(
 			array( 'consent_providers', 'organization_type', 'organization_founding_date', 'organization_founder', 'organization_copyright_since', 'organization_copyright_holder', 'organization_area_served', 'organization_opening_hours', 'organization_same_as', 'organization_rating_value', 'organization_rating_count', 'organization_rating_source', 'organization_rating_confirmed', 'ai_crawlers', 'llms_txt', 'llms_summary', 'llms_pages', 'redirects' ),
-			array_keys( array_slice( $properties, 19 ) )
+			array_keys( array_slice( $properties, 20 ) )
 		);
 		$this->assertSame( 'array', $properties['consent_providers']['type'] );
 		$this->assertSame( array( 'key', 'label', 'hosts', 'purpose', 'privacy' ), array_keys( $properties['consent_providers']['items']['properties'] ) );
@@ -233,6 +237,7 @@ class Test_Settings extends WP_UnitTestCase {
 				'news_categories'               => array(),
 				'news_sitemap'                  => true,
 				'title_site_name'               => true,
+				'formal_address'                => false,
 				'editorial_page'                => 0,
 				'motion'                        => 'subtle',
 				'organization_street'           => '',
@@ -345,6 +350,7 @@ class Test_Settings extends WP_UnitTestCase {
 				'news_categories'               => array(),
 				'news_sitemap'                  => true,
 				'title_site_name'               => true,
+				'formal_address'                => false,
 				'editorial_page'                => 0,
 				'motion'                        => 'subtle',
 				'organization_street'           => '',
@@ -391,6 +397,7 @@ class Test_Settings extends WP_UnitTestCase {
 				'news_categories'               => array(),
 				'news_sitemap'                  => true,
 				'title_site_name'               => true,
+				'formal_address'                => false,
 				'editorial_page'                => 0,
 				'motion'                        => 'subtle',
 				'organization_street'           => '',

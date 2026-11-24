@@ -216,8 +216,8 @@ final class Content_Checks {
 	}
 
 	/**
-	 * Check leitvia/link-text: no empty links, no vague link texts without an accessible name, no href="#" or empty
-	 * href.
+	 * Check leitvia/link-text: no empty links, no vague link texts without an accessible name, no href="#", no empty
+	 * href and no link without href (a sample link of a pattern).
 	 *
 	 * @param string               $content Block markup.
 	 * @param array<string, mixed> $context Context.
@@ -241,6 +241,9 @@ final class Content_Checks {
 					$findings[] = self::finding( 'leitvia/link-text', 'error', $id, __( 'The link points to "#" and goes nowhere.', 'leitvia-studio' ), __( 'Link to the real target, or use a button block for an action.', 'leitvia-studio' ) );
 				} elseif ( true === $href || ( is_string( $href ) && '' === trim( $href ) ) ) {
 					$findings[] = self::finding( 'leitvia/link-text', 'error', $id, __( 'The link has an empty address and goes nowhere.', 'leitvia-studio' ), __( 'Link to the real target, or use a button block for an action.', 'leitvia-studio' ) );
+				} elseif ( null === $href ) {
+					// The sample links and buttons of the theme patterns have no address (theme 1.2.59 and later).
+					$findings[] = self::finding( 'leitvia/link-text', 'error', $id, __( 'The link has no address yet, it is a sample link of the pattern.', 'leitvia-studio' ), __( 'Link to the real target, or use a button block for an action.', 'leitvia-studio' ) );
 				}
 				if ( '' !== $label ) {
 					continue;

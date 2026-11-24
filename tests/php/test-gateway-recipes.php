@@ -513,8 +513,8 @@ class Test_Gateway_Recipes extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The footer pattern of a recipe has sample links to "#": the recipe writes the footer with the pages of
-	 * footerNavigation instead, by title and address, and no link to "#" stays.
+	 * The footer pattern of a recipe has sample links without an address: the recipe writes the footer with the pages of
+	 * footerNavigation instead, by title and address, and no sample link stays.
 	 */
 	public function test_footer_links_recipe_pages(): void {
 		$this->set_permalink_structure( '/%postname%/' );
@@ -523,6 +523,7 @@ class Test_Gateway_Recipes extends WP_UnitTestCase {
 		$footer = get_block_template( get_stylesheet() . '//footer', 'wp_template_part' );
 		$this->assertNotNull( $footer );
 		$this->assertStringNotContainsString( '"url":"#"', $footer->content );
+		$this->assertDoesNotMatchRegularExpression( '/<!-- wp:navigation-link \{(?:(?!"url":)[^\n])*? \/-->/', $footer->content );
 		$links = array();
 		foreach ( parse_blocks( $footer->content ) as $block ) {
 			array_push( $links, ...self::navigation_links( $block ) );

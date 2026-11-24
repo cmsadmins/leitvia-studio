@@ -4,7 +4,7 @@ Tags: ai agent, mcp, abilities api, design tokens, block theme
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.53
+Stable tag: 1.3.54
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -277,6 +277,12 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 
 == Changelog ==
 
+= 1.3.54 =
+* Change: Recipes recognize the sample links of the theme footers by their missing address (Leitvia 1.2.59 and later) as well as by "#", and put the pages of footerNavigation in their place.
+* Change: The link text check reports a link without an address, such as a sample link or button of a pattern, as it reports a link to "#".
+* New: Formal address setting (formal_address); set it with the new field "address" (informal or formal) of leitvia/set-organization. A site language such as de_DE_formal counts as formal.
+* Fix: A number field of the content model now keeps the value 0 when it comes from a change package.
+
 = 1.3.53 =
 * New: The Cookie settings link of the theme footers opens a dialog with the consent settings of the site, or a note when no service waits for consent; recipes keep the link at the end of the footer menu.
 * New: leitvia/set-redirects knows 302 and 410 (gone, without a target) besides 301, and old addresses with a query such as /?p=45 or /?attachment_id=123, in any order of the parameters; up to 1000 rows.
@@ -355,8 +361,3 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * New: Add-ons add effects of their own to the animation of every block through the filter leitvia_studio_animation_effects: an entry effect plays once like those of Studio, a scroll effect follows the scroll position. Studio validates them, offers them in the Animation panel only on the blocks they fit, loads their style only where they are used and lists their description for agents in the block catalog.
 * Change: leitvia/audit-site reports a page with more than two kinds of scroll effect besides parallax as leitvia/motion; which effects are striking now comes from the same list as the editor.
 * Fix: The circle of the Highlight format draws itself again while it scrolls into view, and no highlight moves with Motion off.
-
-= 1.3.49 =
-* Fix: The private media area of the gateway writes its .htaccess and index.php again when one of them is missing, not only when the folder is new.
-* Fix: An embed block saved under an old name (core-embed/twitter and the others, posts from before WordPress 5.6, the Theme Unit Test Data among them) gets the consent placeholder as well; the script of X loaded without consent.
-

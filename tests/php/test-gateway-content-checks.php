@@ -103,7 +103,7 @@ class Test_Gateway_Content_Checks extends WP_UnitTestCase {
 		return array(
 			'headings'       => array( 'leitvia/headings', 'headings', array( 'error head0001', 'error p:1', 'error p:2' ) ),
 			'alt-text'       => array( 'leitvia/alt-text', 'alt-text', array( 'error img00001', 'error p:1', 'warning p:2', 'error p:3.0' ) ),
-			'link-text'      => array( 'leitvia/link-text', 'link-text', array( 'error par00001', 'error p:1', 'error p:1', 'error p:2.0', 'error p:3' ) ),
+			'link-text'      => array( 'leitvia/link-text', 'link-text', array( 'error par00001', 'error p:1', 'error p:1', 'error p:2.0', 'error p:3', 'error p:4.0' ) ),
 			'block-validity' => array( 'leitvia/block-validity', 'block-validity', array( 'error htm00001', 'error p:2', 'error p:3' ) ),
 			'tokens'         => array( 'leitvia/content-tokens', 'content-tokens', array( 'error grp00001', 'error grp00001', 'error p:0.0', 'error p:0.0' ) ),
 			'contrast'       => array( 'leitvia/content-contrast', 'content-contrast', array( 'error grp00001', 'error p:1.0' ) ),

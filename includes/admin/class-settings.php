@@ -34,6 +34,7 @@ final class Settings {
 		'news_categories'               => array(),
 		'news_sitemap'                  => true,
 		'title_site_name'               => true,
+		'formal_address'                => false,
 		'editorial_page'                => 0,
 		'motion'                        => 'subtle',
 		'organization_street'           => '',

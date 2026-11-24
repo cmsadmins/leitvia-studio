@@ -1180,7 +1180,7 @@ final class Block_Edit {
 
 	/**
 	 * New content of a text element: the escaped text, with its one link around the linked part; the opening tag of the
-	 * link stays as it was, only href changes with url. Plain text may replace a sample link to "#".
+	 * link stays as it was, only href changes with url. Plain text may replace a sample link without an address or to "#".
 	 *
 	 * @param string               $inner   Old content of the element.
 	 * @param array<string, mixed> $change  text, link_text and url.
@@ -1228,7 +1228,7 @@ final class Block_Edit {
 		$at    = '' !== $label ? strpos( $text, $label ) : false;
 		$href  = new \WP_HTML_Tag_Processor( $open );
 		$href->next_tag();
-		// A sample link to "#" leads nowhere; plain text may replace it.
+		// A sample link without an address (or to "#") leads nowhere; plain text may replace it.
 		if ( false === $at && ! isset( $change['link_text'] ) && ! isset( $change['url'] ) && in_array( trim( (string) $href->get_attribute( 'href' ) ), array( '', '#' ), true ) ) {
 			return esc_html( $text );
 		}

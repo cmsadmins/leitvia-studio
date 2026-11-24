@@ -3,7 +3,7 @@
  * Plugin Name:       Leitvia Studio: AI Agents, MCP and Design Tokens for Block Themes
  * Plugin URI:        https://leitvia.com/features/
  * Description:       AI agents such as Claude Code build and maintain block theme sites over MCP or REST. Every change is checked, reviewable and can be rolled back.
- * Version:           1.3.53
+ * Version:           1.3.54
  * Requires at least: 7.1
  * Requires PHP:      8.2
  * Author:            CMS ADMINS
@@ -18,7 +18,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-const LEITVIA_STUDIO_VERSION = '1.3.53';
+const LEITVIA_STUDIO_VERSION = '1.3.54';
 const LEITVIA_STUDIO_API     = 1;
 // Oldest Extension API version add-ons may still declare; raised two major Studio versions after a breaking change.
 const LEITVIA_STUDIO_API_MIN = 1;
@@ -48,6 +48,8 @@ require __DIR__ . '/includes/functions.php';
 add_filter( 'load_script_translation_file', array( \LeitviaStudio\Translations::class, 'script_file' ), 10, 3 );
 add_filter( 'load_script_translations', array( \LeitviaStudio\Translations::class, 'script_translations' ), 10, 4 );
 add_action( 'after_setup_theme', array( \LeitviaStudio\Translations::class, 'load' ) );
+// Formal address (du or Sie) of the default texts visitors read, see LeitviaStudio\Address.
+\LeitviaStudio\Address::register( 'leitvia-studio', array( \LeitviaStudio\Address::class, 'studio' ) );
 
 add_action( 'plugins_loaded', array( \LeitviaStudio\Plugin::class, 'boot' ) );
 // Gravatar stays off after a deactivation and the usage index counts as unbuilt (see LeitviaStudio\Avatars\Avatars::deactivate()).

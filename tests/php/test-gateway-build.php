@@ -180,7 +180,7 @@ class Test_Gateway_Build extends WP_UnitTestCase {
 		$this->assertStringNotContainsString( 'Achterberg', $post->post_content );
 		$this->assertTrue( $roots[0]['attrs']['metadata']['leitviaDecorative'] );
 		$this->assertStringContainsString( '>Walks between towns</h1>', $post->post_content );
-		$this->assertStringContainsString( 'href="/routes/">See the routes</a>', $post->post_content );
+		$this->assertMatchesRegularExpression( '#<a href="/routes/"[^>]*>See the routes</a>#', $post->post_content );
 	}
 
 	/**
@@ -736,7 +736,7 @@ class Test_Gateway_Build extends WP_UnitTestCase {
 			array(
 				'post_type'    => 'page',
 				'post_status'  => 'draft',
-				'post_content' => wp_slash( str_replace( 'href="#"', 'href="/routes/"', $pattern['content'] ) ),
+				'post_content' => wp_slash( str_replace( '<a class="wp-block-button__link', '<a href="/routes/" class="wp-block-button__link', $pattern['content'] ) ),
 				'meta_input'   => array( '_wp_page_template' => 'page-landing' ),
 			)
 		);

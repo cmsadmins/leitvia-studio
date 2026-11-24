@@ -203,7 +203,7 @@ final class Setup {
 		Abilities::write(
 			'leitvia/set-organization',
 			__( 'Set organization details', 'leitvia-studio' ),
-			__( 'Sets the details of the organization behind the site: kind of business (type, Organization or a type of LocalBusiness; type falls back to Organization), address, phone, email, founding date (founding_date, YYYY, YYYY-MM or YYYY-MM-DD), founder or owner (founder, a person, printed as schema.org founder), the copyright line of the footer (copyright_since, the first year as YYYY, and copyright_holder, the name after the years; the theme Leitvia then shows the first year, a dash, the current year and the holder), area served (area_served, places), opening hours (opening_hours, rows of days with opens and closes as HH:MM, only printed for a local business), profiles on other sites (same_as, https addresses) and the rating on a review site (aggregate_rating: value 1 to 5, count of reviews, source_url where it is shown, confirmed true only after a person checked it there; printed as aggregateRating and allowed as a star in SEO titles only when confirmed, with count and source; null removes it). Leitvia Studio prints them as structured data on the front page and as publisher of posts while no SEO plugin is active; the name and the logo stay those of the site. Only the fields you send change, an empty string or an empty list clears one. leitvia/get-seo returns the current values. base_hash is empty. Use only facts the person gave or the site shows; never guess opening hours. Like every setting it waits in a change package for a person.', 'leitvia-studio' ),
+			__( 'Sets the details of the organization behind the site: kind of business (type, Organization or a type of LocalBusiness; type falls back to Organization), address, phone, email, founding date (founding_date, YYYY, YYYY-MM or YYYY-MM-DD), founder or owner (founder, a person, printed as schema.org founder), the copyright line of the footer (copyright_since, the first year as YYYY, and copyright_holder, the name after the years; the theme Leitvia then shows the first year, a dash, the current year and the holder), area served (area_served, places), opening hours (opening_hours, rows of days with opens and closes as HH:MM, only printed for a local business), profiles on other sites (same_as, https addresses), the rating on a review site (aggregate_rating: value 1 to 5, count of reviews, source_url where it is shown, confirmed true only after a person checked it there; printed as aggregateRating and allowed as a star in SEO titles only when confirmed, with count and source; null removes it) and how the default texts visitors read address them (address: informal, the default, or formal, in German du or Sie; it covers messages, hints, confirmations and emails of forms and the dialog of the privacy settings, also those of add-ons that register their texts; a site language such as de_DE_formal is formal anyway). Leitvia Studio prints them as structured data on the front page and as publisher of posts while no SEO plugin is active; the name and the logo stay those of the site. Only the fields you send change, an empty string or an empty list clears one. leitvia/get-seo returns the current values. base_hash is empty. Use only facts the person gave or the site shows; never guess opening hours. Like every setting it waits in a change package for a person.', 'leitvia-studio' ),
 			'setup',
 			$replace,
 			array(
@@ -279,6 +279,11 @@ final class Setup {
 							'type'    => 'string',
 							'pattern' => '^https://',
 						),
+					),
+					'address'          => array(
+						'type'        => 'string',
+						'enum'        => array( 'informal', 'formal' ),
+						'description' => __( 'informal (du) or formal (Sie).', 'leitvia-studio' ),
 					),
 					'aggregate_rating' => array(
 						'type'                 => array( 'object', 'null' ),
@@ -867,10 +872,13 @@ final class Setup {
 				$fields[ $setting ] = $rating[ $key ] ?? Settings::DEFAULTS[ $setting ];
 			}
 		}
+		if ( isset( $input['address'] ) ) {
+			$fields[ \LeitviaStudio\Address::SETTING ] = 'formal' === $input['address'];
+		}
 		$target = array( 'option' => Settings::OPTION );
 		if ( ! $fields ) {
 			/* translators: %s: list of field names. */
-			return Block_Edit::invalid( 'change', sprintf( __( 'Name what to change: %s.', 'leitvia-studio' ), implode( ', ', array_merge( Organization::FIELDS, array( 'aggregate_rating' ) ) ) ), $target );
+			return Block_Edit::invalid( 'change', sprintf( __( 'Name what to change: %s.', 'leitvia-studio' ), implode( ', ', array_merge( Organization::FIELDS, array( 'aggregate_rating', 'address' ) ) ) ), $target );
 		}
 		return array(
 			'area'      => 'structure',

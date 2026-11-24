@@ -674,7 +674,9 @@ final class Content {
 
 	/**
 	 * Fields of a state for wp_insert_post(): without terms and rows, without empty meta the post does not have yet, with
-	 * post_date_gmt when the date changes, so a draft keeps the date it was given.
+	 * post_date_gmt when the date changes, so a draft keeps the date it was given. 0 in a number or integer field of the
+	 * content model is a value (a price of 0 is free), not empty; a state from a change package carries it as 0 even
+	 * when it was sent as 0.0, since JSON drops the fraction.
 	 *
 	 * @param int                  $id    Post ID, 0 for a new post.
 	 * @param array<string, mixed> $state State.
@@ -682,7 +684,12 @@ final class Content {
 	 */
 	public static function prepare( int $id, array $state ): array {
 		unset( $state['terms'], $state['rows'] );
+		$type    = (string) ( $state['post_type'] ?? get_post_type( $id ) );
+		$numbers = array_keys( array_filter( self::fields( $type ), static fn( array $field ): bool => in_array( $field['type'] ?? '', array( 'number', 'integer' ), true ) ) );
 		foreach ( (array) ( $state['meta_input'] ?? array() ) as $key => $value ) {
+			if ( is_numeric( $value ) && in_array( (string) $key, $numbers, true ) ) {
+				continue;
+			}
 			if ( in_array( $value, array( '', 0, null, array() ), true ) && ! ( $id && metadata_exists( 'post', $id, (string) $key ) ) ) {
 				unset( $state['meta_input'][ $key ] );
 			}

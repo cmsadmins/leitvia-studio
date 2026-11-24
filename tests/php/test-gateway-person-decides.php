@@ -314,6 +314,46 @@ class Test_Gateway_Person_Decides extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The form of address of set-organization waits for a person and keeps the other settings; once applied the default texts visitors read speak
+	 * formally, in German with Sie, while English has one form. A formal locale speaks formally without the setting.
+	 */
+	public function test_address(): void {
+		update_option( \LeitviaStudio\Admin\Settings::OPTION, array( 'organization_city' => 'Kassel' ) + \LeitviaStudio\Admin\Settings::DEFAULTS );
+		$package = $this->assert_package( self::call( 'leitvia/set-organization', array( 'address' => 'formal' ) ) );
+		$this->assertFalse( \LeitviaStudio\Address::formal() );
+		$text = 'Choose which scripts of other providers may load on this site. Providers you always allow:';
+		$this->assertSame( $text, __( $text, 'leitvia-studio' ) ); // phpcs:ignore WordPress.WP.I18n.NonSingularStringLiteralText -- The text of the dialog.
+		$this->apply_as_person( $package );
+		$this->assertTrue( \LeitviaStudio\Address::formal() );
+		$this->assertSame( 'Kassel', leitvia_studio_setting( 'organization_city' ) );
+		$this->assertSame( $text, __( $text, 'leitvia-studio' ), 'English has one form' ); // phpcs:ignore WordPress.WP.I18n.NonSingularStringLiteralText -- As above.
+		// A German catalog with both forms, as the zip carries it.
+		$mo = new MO();
+		$mo->add_entry( new Translation_Entry( array( 'singular' => $text, 'translations' => array( 'Wähle, welche Skripte laden.' ) ) ) ); // phpcs:ignore WordPress.Arrays.ArrayDeclarationSpacing.AssociativeArrayFound -- Test fixture.
+		$mo->add_entry( new Translation_Entry( array( 'singular' => $text, 'context' => \LeitviaStudio\Address::CONTEXT, 'translations' => array( 'Wählen Sie, welche Skripte laden.' ) ) ) ); // phpcs:ignore WordPress.Arrays.ArrayDeclarationSpacing.AssociativeArrayFound -- Test fixture.
+		$file = get_temp_dir() . 'leitvia-studio-address-de_DE.mo';
+		$mo->export_to_file( $file );
+		$locale = static fn(): string => 'de_DE';
+		add_filter( 'locale', $locale );
+		unload_textdomain( 'leitvia-studio' );
+		load_textdomain( 'leitvia-studio', $file );
+		$formal = __( $text, 'leitvia-studio' ); // phpcs:ignore WordPress.WP.I18n.NonSingularStringLiteralText -- As above.
+		update_option( \LeitviaStudio\Admin\Settings::OPTION, array( \LeitviaStudio\Address::SETTING => false ) + \LeitviaStudio\Admin\Settings::DEFAULTS );
+		$informal      = __( $text, 'leitvia-studio' ); // phpcs:ignore WordPress.WP.I18n.NonSingularStringLiteralText -- As above.
+		$locale_formal = static fn(): string => 'de_DE_formal';
+		add_filter( 'locale', $locale_formal, 11 );
+		$by_locale     = __( $text, 'leitvia-studio' ); // phpcs:ignore WordPress.WP.I18n.NonSingularStringLiteralText -- As above.
+		remove_filter( 'locale', $locale_formal, 11 );
+		unload_textdomain( 'leitvia-studio' );
+		remove_filter( 'locale', $locale );
+		wp_delete_file( $file );
+		$this->assertSame( 'Wählen Sie, welche Skripte laden.', $formal );
+		$this->assertSame( 'Wähle, welche Skripte laden.', $informal );
+		$this->assertSame( 'Wählen Sie, welche Skripte laden.', $by_locale, 'a formal locale speaks formally without the setting' );
+		$this->assertWPError( self::call( 'leitvia/set-organization', array( 'address' => 'polite' ) ) );
+	}
+
+	/**
 	 * The posts page is a setting like the others: an agent proposes an existing page, a person applies it, and the
 	 * front page or a page that does not exist are refused.
 	 */

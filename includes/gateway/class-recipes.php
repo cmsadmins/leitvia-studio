@@ -23,7 +23,7 @@ defined( 'ABSPATH' ) || exit;
  * Steps and the abilities they call, in this order: contentModel (leitvia/define-content-type with declaration),
  * tokenSet (leitvia/create-token-set with title and document), variation (leitvia/set-variation with variation),
  * templateParts (leitvia/update-template-part with part and pattern, or with content when the pattern holds sample
- * links to "#": the footer gets the pages of footerNavigation instead, a part with edits gets them as a page section
+ * links without an address: the footer gets the pages of footerNavigation instead, a part with edits gets them as a page section
  * does), pages (leitvia/compose-page), navigation (leitvia/update-navigation with items of label and url), reading,
  * connect (settings that point to recipe pages) and options. A step whose ability is not registered is reported as unavailable.
  * The building blocks a recipe lists (buildingBlocks) are added after the content model, see Building_Blocks.
@@ -563,7 +563,7 @@ final class Recipes {
 				continue;
 			}
 			// A part names its pattern, or the pattern with edits at block IDs as a page section does: the button and the
-			// service bar of a header pattern link to "#" until the recipe gives them targets.
+			// service bar of a header pattern have no address until the recipe gives them targets.
 			$edits   = is_array( $pattern ) ? (array) ( $pattern['edits'] ?? array() ) : array();
 			$pattern = is_array( $pattern ) ? (string) ( $pattern['pattern'] ?? '' ) : (string) $pattern;
 			// A part changed after the recipe wrote it (by hand, by a kit or by an agent) is kept, like a page that exists.
@@ -574,7 +574,7 @@ final class Recipes {
 				$steps[] = self::step( 'templateParts', 'leitvia/update-template-part', 'exists', array( 'part' => (string) $part ) );
 				continue;
 			}
-			// Only a recipe that names footerNavigation rewrites the links to "#"; without it the pattern stays as it is, so
+			// Only a recipe that names footerNavigation rewrites the sample links; without it the pattern stays as it is, so
 			// a kit can still put its own pages in place of those links.
 			$part_content = 'footer' === $part && ! empty( $recipe['footerNavigation'] )
 				? self::linked_part( $pattern, self::links( (array) $recipe['footerNavigation'], $recipe, array(), $coming ) )
@@ -814,9 +814,10 @@ final class Recipes {
 	}
 
 	/**
-	 * Markup of a template part pattern without its sample links: every navigation link to "#" is dropped, the first
-	 * navigation gets the links instead, and a navigation left without links is dropped, since core would fill it with
-	 * every page. '' when the pattern has no link to "#", so the part is written from the pattern itself.
+	 * Markup of a template part pattern without its sample links: every navigation link without an address (or to "#",
+	 * as the theme wrote them before 1.2.59) is dropped, the first navigation gets the links instead, and a navigation
+	 * left without links is dropped, since core would fill it with every page. '' when the pattern has no such link, so
+	 * the part is written from the pattern itself.
 	 *
 	 * @param string                                  $pattern Pattern name.
 	 * @param list<array{label: string, url: string}> $links   Links for the first navigation.
@@ -824,7 +825,7 @@ final class Recipes {
 	private static function linked_part( string $pattern, array $links ): string {
 		$registered = \WP_Block_Patterns_Registry::get_instance()->get_registered( $pattern );
 		$content    = $registered ? (string) $registered['content'] : '';
-		if ( ! str_contains( $content, '"url":"#"' ) ) {
+		if ( ! preg_match( '/<!-- wp:navigation-link \{(?:(?!"url":)[^\n])*? \/-->|"url":"#"/', $content ) ) {
 			return '';
 		}
 		$markup = '';
@@ -835,7 +836,7 @@ final class Recipes {
 	}
 
 	/**
-	 * Markup of a parsed block with its navigation links to "#" replaced, see linked_part(); '' to drop it. Inner
+	 * Markup of a parsed block with its sample navigation links replaced, see linked_part(); '' to drop it. Inner
 	 * blocks are serialized into the inner content of their parent.
 	 *
 	 * @param array{blockName: string|null, attrs: array<string, mixed>, innerBlocks: array<int, mixed>, innerHTML: string, innerContent: array<int, string|null>} $block Parsed block.
@@ -843,7 +844,7 @@ final class Recipes {
 	 */
 	private static function replace_links( array $block, array &$links ): string {
 		if ( 'core/navigation' === $block['blockName'] ) {
-			$kept = array_filter( $block['innerBlocks'], static fn( $inner ): bool => is_array( $inner ) && '#' !== ( $inner['attrs']['url'] ?? '' ) );
+			$kept = array_filter( $block['innerBlocks'], static fn( $inner ): bool => is_array( $inner ) && ! ( 'core/navigation-link' === $inner['blockName'] && in_array( $inner['attrs']['url'] ?? '', array( '', '#' ), true ) ) );
 			// Links within the page, such as the Cookie settings link of the footers (#leitvia-consent), stay last.
 			$own  = array_filter( $kept, static fn( array $inner ): bool => str_starts_with( (string) ( $inner['attrs']['url'] ?? '' ), '#' ) );
 			$kept = array_map( 'serialize_block', array_diff_key( $kept, $own ) );
