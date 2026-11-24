@@ -4,7 +4,7 @@ Tags: ai agent, mcp, abilities api, design tokens, block theme
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.52
+Stable tag: 1.3.53
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -12,7 +12,7 @@ AI agents such as Claude Code build and maintain block theme sites over MCP or R
 
 == Description ==
 
-Leitvia Studio lets AI agents such as Claude Code, Codex or Cursor build and maintain WordPress sites with block themes through 73 abilities, and every change passes checks for design, accessibility and content before it goes live. It is free and made for developers, agencies and site owners who want an AI agent to do the work without administrator rights.
+Leitvia Studio lets AI agents such as Claude Code, Codex or Cursor build and maintain WordPress sites with block themes through 74 abilities, and every change passes checks for design, accessibility and content before it goes live. It is free and made for developers, agencies and site owners who want an AI agent to do the work without administrator rights.
 
 The abilities belong to the WordPress [Abilities API](https://developer.wordpress.org/apis/abilities-api/) and run over MCP or the REST API. Everything Studio creates is stored in WordPress core structures (patterns, global styles, post types, block bindings), so the site keeps working when you deactivate the plugin. It works with any block theme and fits best with the free theme [Leitvia](https://github.com/cmsadmins/leitvia).
 
@@ -99,7 +99,7 @@ Token sets can name [Libre Franklin](https://github.com/googlefonts/Libre-Frankl
 
 The Map block bundles [Leaflet](https://leafletjs.com/) 1.9.4 by Volodymyr Agafonkin and contributors into `build/blocks/map/leaflet.js`, loaded only after the visitor agrees to load the map, and ships its stylesheet as `build/blocks/map/leaflet.css`. Leaflet is licensed under the BSD 2-Clause License, which is compatible with the GPL; the license text is in `licenses/LEAFLET.txt`.
 
-Icons: 118 icons of [Lucide](https://lucide.dev/) 1.60.0, ISC License (some from Feather, MIT), in `assets/icons/lucide.json`, license in `licenses/LUCIDE.txt`.
+Icons: 122 icons of [Lucide](https://lucide.dev/) 1.60.0, ISC License (some from Feather, MIT), in `assets/icons/lucide.json`, license in `licenses/LUCIDE.txt`.
 
 The pattern illustration `assets/images/landscape.webp` was drawn for Leitvia by CMS ADMINS and is licensed under the GPL, version 2 or later, like the plugin.
 
@@ -119,7 +119,7 @@ The `src/` folder contains the source code of the files in `build/`, and `webpac
 
 = What is Leitvia Studio? =
 
-Leitvia Studio is a free WordPress plugin that lets AI agents build and maintain sites with block themes through 73 abilities of the WordPress Abilities API, with checks, an autonomy level per area, a review inbox and rollback. It also adds a Pattern Lab, design tokens in the DTCG format, a content model with block bindings, site recipes and blocks for privacy, accessibility and offers. It needs WordPress 7.1 and PHP 8.2 or later.
+Leitvia Studio is a free WordPress plugin that lets AI agents build and maintain sites with block themes through 74 abilities of the WordPress Abilities API, with checks, an autonomy level per area, a review inbox and rollback. It also adds a Pattern Lab, design tokens in the DTCG format, a content model with block bindings, site recipes and blocks for privacy, accessibility and offers. It needs WordPress 7.1 and PHP 8.2 or later.
 
 = Does Leitvia Studio work with Claude, ChatGPT or Cursor? =
 
@@ -277,6 +277,17 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 
 == Changelog ==
 
+= 1.3.53 =
+* New: The Cookie settings link of the theme footers opens a dialog with the consent settings of the site, or a note when no service waits for consent; recipes keep the link at the end of the footer menu.
+* New: leitvia/set-redirects knows 302 and 410 (gone, without a target) besides 301, and old addresses with a query such as /?p=45 or /?attachment_id=123, in any order of the parameters; up to 1000 rows.
+* New: Filter leitvia_studio_contact_form_send hands a checked message of the contact form to an extension, such as a ticket system.
+* New: leitvia/set-page-structure sets the lead symbol of a hub (icon, shown by icon blocks bound to leitvia/page-symbol), a hub for posts, the topics of related news (news) and the products of an add-on (offerings); an empty call names all fields. Filters leitvia_studio_page_symbol, leitvia_studio_page_service, leitvia_studio_term_meta and leitvia_studio_gateway_taxonomies for add-ons.
+* New: Posts carry a table of contents and the card of their service in the sidebar of the theme. NewsArticle headlines stay within 110 characters, authors without an account get an author page (author_page) and a Person with sameAs, the news sitemap names the organization and the RSS feed carries the featured image as media:content.
+* New: Setting title_site_name and the ability leitvia/set-seo-titles: titles read "Title | Site name" when the whole stays within 60 characters and does not name the site already, for pages, posts, entries and archives, not the front page.
+* New: Token iconStroke sets the line width of the icon and icon list blocks; four more Lucide icons (box, layers, message-square, pen-tool), 122 in all.
+* New: Date and time formats follow the site language (filter leitvia_studio_date_formats); formats chosen by hand stay.
+* New: The packages of a service may carry price_from (the price specification gets minPrice) and addon (an Offer of its own that leaves lowPrice and highPrice to the others), for add-ons that keep prices.
+
 = 1.3.52 =
 * New: leitvia/import-post imports a post, page or entry of another site for a migration: its HTML and the shortcodes of WPBakery and Impreza become core blocks, images of the old host come into the media library once, links become paths, a second call with the same source updates the post, and dry_run shows the result first. Filter leitvia_studio_import_content for readers of add-ons.
 * New: leitvia/compose-page rebuilds an existing page with post: all its sections are replaced in one step, and the checks see only the finished page. The page remembers its page frame.
@@ -349,10 +360,3 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * Fix: The private media area of the gateway writes its .htaccess and index.php again when one of them is missing, not only when the folder is new.
 * Fix: An embed block saved under an old name (core-embed/twitter and the others, posts from before WordPress 5.6, the Theme Unit Test Data among them) gets the consent placeholder as well; the script of X loaded without consent.
 
-= 1.3.48 =
-* Fix: Removing the saved link of a bound button (url "") no longer fails as unsafe content.
-* Fix: New strings show in German even when the WordPress.org language pack lacks them; the bundled translations fill the gaps in PHP and scripts.
-* Fix: Map zoom and popup close buttons stay readable in dark bands (WCAG 1.4.11).
-* Change: The link of each place on a map opens the OpenStreetMap route planner with the place as destination.
-* Fix: update-block and insert set align on every block with supports.align, using the values it supports (for example leitvia/consent-embed).
-* Fix: update-block with image { id } keeps the alt text from the media library when alt is left out.

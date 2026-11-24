@@ -15,6 +15,7 @@ use LeitviaStudio\Gateway\Scope;
 use LeitviaStudio\Gateway\Composition;
 use LeitviaStudio\Organization\Organization;
 use LeitviaStudio\Seo\Cluster;
+use LeitviaStudio\Seo\Related_News;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -144,7 +145,7 @@ final class Seo {
 		Abilities::read(
 			'leitvia/get-seo',
 			__( 'Get SEO data', 'leitvia-studio' ),
-			__( 'Returns the SEO data of posts, pages and entries from the active SEO plugin. Supported are Yoast SEO, Rank Math, SEOPress and The SEO Framework. Per item: title, meta description, canonical, noindex, nofollow, Open Graph title, description and image, focus keyword and schema type. schema_type is the article type Leitvia Studio prints for a post (NewsArticle or BlogPosting), null where it prints none; structure holds the page frame, hub and service of a page (leitvia/set-page-structure). indexable says whether the site is open to search engines, news_sitemap is the address of the news sitemap of Leitvia Studio or null, organization holds the details of leitvia/set-organization: type, name, url, address, phone, email, founding date, founder, start year and holder of the copyright line, area served, opening hours, profiles and aggregate_rating. redirects lists the rows of leitvia/set-redirects, llms whether llms.txt was asked for (requested) and is served (enabled), held_back why a requested file is not served (site closed to search engines, SEO plugin), its address, summary, extra pages and whether AI crawlers may crawl (leitvia/set-llms). An empty value means the plugin falls back to its template. defaults holds what WordPress itself would print and a description suggested from the excerpt; without an SEO plugin plugin names Leitvia Studio, with an unsupported one seo is null, and notice says why. hash is the base_hash of leitvia/update-seo. IDs that are no readable content come back under skipped.', 'leitvia-studio' ),
+			__( 'Returns the SEO data of posts, pages and entries from the active SEO plugin. Supported are Yoast SEO, Rank Math, SEOPress and The SEO Framework. Per item: title, meta description, canonical, noindex, nofollow, Open Graph title, description and image, focus keyword and schema type. schema_type is the article type Leitvia Studio prints for a post (NewsArticle or BlogPosting), null where it prints none; structure holds the page frame, hub, service and offerings of a page (leitvia/set-page-structure). indexable says whether the site is open to search engines, news_sitemap is the address of the news sitemap of Leitvia Studio or null, organization holds the details of leitvia/set-organization: type, name, url, address, phone, email, founding date, founder, start year and holder of the copyright line, area served, opening hours, profiles and aggregate_rating. redirects lists the rows of leitvia/set-redirects, llms whether llms.txt was asked for (requested) and is served (enabled), held_back why a requested file is not served (site closed to search engines, SEO plugin), its address, summary, extra pages and whether AI crawlers may crawl (leitvia/set-llms). An empty value means the plugin falls back to its template. defaults holds what WordPress itself would print and a description suggested from the excerpt; without an SEO plugin plugin names Leitvia Studio, with an unsupported one seo is null, and notice says why. hash is the base_hash of leitvia/update-seo. IDs that are no readable content come back under skipped.', 'leitvia-studio' ),
 			array(
 				'type'                 => 'object',
 				'properties'           => array(
@@ -261,7 +262,7 @@ final class Seo {
 			'leitvia/update-seo',
 			__( 'Update SEO data', 'leitvia-studio' ),
 			/* translators: 1: most characters of a title, 2: fewest characters of a description, 3: most characters of a description */
-			sprintf( __( 'Writes SEO title, meta description and robots of one post through the active SEO plugin. The heading of the page stays. It covers posts, pages and entries in Yoast SEO, Rank Math, SEOPress or The SEO Framework; without an SEO plugin Leitvia Studio stores them and prints them in the head, the title as written, without the site name; with another SEO plugin it is rejected with leitvia_no_seo_plugin. Read the post with leitvia/get-seo first and send its hash as base_hash. A title has at most %1$d characters, a description %2$d to %3$d; an empty string hands the field back to the template of the plugin, without a plugin to what WordPress prints. Say only what the page says: every number in title or description must appear in the title, excerpt or content of the post. A star rating (a number beside a star sign or written as 4.8/5) needs the confirmed aggregate_rating of leitvia/set-organization and must equal its value; its count of reviews counts as said. Autonomy and change packages work as for leitvia/update-content; a live write gets a change package for leitvia/rollback.', 'leitvia-studio' ), self::TITLE_MAX, self::DESCRIPTION_MIN, self::DESCRIPTION_MAX ),
+			sprintf( __( 'Writes SEO title, meta description and robots of one post through the active SEO plugin. The heading of the page stays. It covers posts, pages and entries in Yoast SEO, Rank Math, SEOPress or The SEO Framework; without an SEO plugin Leitvia Studio stores them and prints them in the head, the title as written, followed by " | " and the site name where it fits (leitvia/set-seo-titles); with another SEO plugin it is rejected with leitvia_no_seo_plugin. Read the post with leitvia/get-seo first and send its hash as base_hash. A title has at most %1$d characters, a description %2$d to %3$d; an empty string hands the field back to the template of the plugin, without a plugin to what WordPress prints. Say only what the page says: every number in title or description must appear in the title, excerpt or content of the post. A star rating (a number beside a star sign or written as 4.8/5) needs the confirmed aggregate_rating of leitvia/set-organization and must equal its value; its count of reviews counts as said. Autonomy and change packages work as for leitvia/update-content; a live write gets a change package for leitvia/rollback.', 'leitvia-studio' ), self::TITLE_MAX, self::DESCRIPTION_MIN, self::DESCRIPTION_MAX ),
 			'maintain',
 			array(
 				'destructive' => true,
@@ -299,7 +300,7 @@ final class Seo {
 		Abilities::write(
 			'leitvia/set-page-structure',
 			__( 'Set page structure', 'leitvia-studio' ),
-			__( 'Sets what a page is within the site, for breadcrumbs, structured data, llms.txt and the composition check. frame is the type of a page frame of the contract (hub for the overview of a topic, audience, service), so check-composition counts the sections that frame requires or recommends; compose-page sets it too. hub is the ID of the overview page the page belongs to: pages keep flat addresses, and the breadcrumbs (block and BreadcrumbList) show Home, the hub of the hub, the hub and the page; the hub wins over a parent page, and a page without a hub keeps the trail of its parents. service is what the page offers: name, description, price as a number, currency (EUR), vat_included (false for a net price) and unit (per month); with a price Leitvia Studio prints a Service with an Offer and a UnitPriceSpecification, without an SEO plugin. max_price makes the price a range (from price up to max_price, an AggregateOffer); offers lists the packages of the service, each with name, price and optional max_price (its price is a range), description and unit (up to 10), printed as one Offer per package in an AggregateOffer with the lowest price and the highest of all prices and ranges, and price may then stay empty. Use only what the page itself says. An empty string, 0 or null clears a field. Read the page with leitvia/get-page-outline first and send its hash as base_hash; autonomy and change packages work as for leitvia/update-content.', 'leitvia-studio' ),
+			__( 'Sets what a page is within the site, for breadcrumbs, structured data, llms.txt and the composition check. frame is the type of a page frame of the contract (hub for the overview of a topic, audience, service), so check-composition counts the sections that frame requires or recommends; compose-page sets it too. hub is the ID of the overview page the page belongs to: pages keep flat addresses, and the breadcrumbs (block and BreadcrumbList) show Home, the hub of the hub, the hub and the page; the hub wins over a parent page, and a page without a hub keeps the trail of its parents. service is what the page offers: name, description, price as a number, currency (EUR), vat_included (false for a net price) and unit (per month); with a price Leitvia Studio prints a Service with an Offer and a UnitPriceSpecification, without an SEO plugin. max_price makes the price a range (from price up to max_price, an AggregateOffer); offers lists the packages of the service, each with name, price and optional max_price (its price is a range), description and unit (up to 10), printed as one Offer per package in an AggregateOffer with the lowest price and the highest of all prices and ranges, and price may then stay empty. offerings links the page to offerings an add-on keeps (line: slug of a line, skus: article numbers); such an add-on shows them on the page and takes the service of the page from them. Use only what the page itself says. An empty string, 0 or null clears a field. Read the page with leitvia/get-page-outline first and send its hash as base_hash; autonomy and change packages work as for leitvia/update-content.', 'leitvia-studio' ),
 			'maintain',
 			array(
 				'destructive' => false,
@@ -307,22 +308,52 @@ final class Seo {
 			),
 			array(
 				'properties'           => array(
-					'post'    => array(
+					'post'      => array(
 						'type'        => 'integer',
 						'minimum'     => 1,
 						'description' => __( 'ID of a page from leitvia/list-content.', 'leitvia-studio' ),
 					),
-					'frame'   => array(
+					'news'      => array(
+						'type'                 => array( 'object', 'null' ),
+						'description'          => __( 'Topic of the news of a page: categories and tags by ID or slug, as posts carry them (terms in leitvia/list-content). The pattern Related news on the page lists the latest posts with any of them, the latest posts when none has one. null clears it.', 'leitvia-studio' ),
+						'properties'           => array(
+							'categories' => array(
+								'type'        => 'array',
+								'maxItems'    => Related_News::MAX,
+								'uniqueItems' => true,
+								'items'       => array(
+									'type'      => array( 'integer', 'string' ),
+									'maxLength' => 200,
+								),
+							),
+							'tags'       => array(
+								'type'        => 'array',
+								'maxItems'    => Related_News::MAX,
+								'uniqueItems' => true,
+								'items'       => array(
+									'type'      => array( 'integer', 'string' ),
+									'maxLength' => 200,
+								),
+							),
+						),
+						'additionalProperties' => false,
+					),
+					'frame'     => array(
 						'type'        => 'string',
 						'maxLength'   => 40,
 						'description' => __( 'Type of a page frame of the contract, for example hub; empty clears it.', 'leitvia-studio' ),
 					),
-					'hub'     => array(
+					'hub'       => array(
 						'type'        => 'integer',
 						'minimum'     => 0,
-						'description' => __( 'ID of the published overview page above this page; 0 clears it.', 'leitvia-studio' ),
+						'description' => __( 'ID of the published overview page above this page; 0 clears it. For a post: the page of the service the post is about, shown beside the post.', 'leitvia-studio' ),
 					),
-					'service' => array(
+					'icon'      => array(
+						'type'        => 'string',
+						'maxLength'   => 40,
+						'description' => __( 'Lead symbol of a hub: the name of an icon from leitvia/list-blocks (Lucide), shown by icon blocks bound to leitvia/page-symbol, such as the panel of the pattern hero-symbol; empty clears it.', 'leitvia-studio' ),
+					),
+					'service'   => array(
 						'type'                 => array( 'object', 'null' ),
 						'properties'           => array(
 							'name'         => array(
@@ -399,17 +430,77 @@ final class Seo {
 						'required'             => array( 'name' ),
 						'additionalProperties' => false,
 					),
+					'offerings' => array(
+						'type'                 => array( 'object', 'null' ),
+						'description'          => __( 'Offerings an add-on keeps that this page presents: line is the slug of a line of offerings, skus lists article numbers of single offerings (they win over line). Leitvia Studio stores the link; an add-on that keeps offerings shows them on the page and gives the page its service from them. null clears it.', 'leitvia-studio' ),
+						'properties'           => array(
+							'line' => array(
+								'type'      => 'string',
+								'maxLength' => 200,
+								'pattern'   => '^[a-z0-9-]*$',
+							),
+							'skus' => array(
+								'type'        => 'array',
+								'maxItems'    => Cluster::MAX_SKUS,
+								'uniqueItems' => true,
+								'items'       => array(
+									'type'    => 'string',
+									'pattern' => Cluster::SKU,
+								),
+							),
+						),
+						'additionalProperties' => false,
+					),
 				),
 				'required'             => array( 'post' ),
 				'additionalProperties' => false,
 			),
 			array( self::class, 'describe_structure' )
 		);
+		Abilities::write(
+			'leitvia/set-seo-titles',
+			__( 'Set SEO titles', 'leitvia-studio' ),
+			/* translators: %d: most characters of a title. */
+			sprintf( __( 'Sets whether titles in search results end with " | " and the site name, without an SEO plugin. site_name true (the default) adds it to the titles of pages, posts, entries and archives, stored with leitvia/update-seo or built by WordPress, as long as the whole title keeps to %d characters and does not name the site already; the front page keeps its title. false leaves a stored title as written and the others as WordPress builds them. base_hash is empty. Like every setting it waits in a change package for a person.', 'leitvia-studio' ), self::TITLE_MAX ),
+			'setup',
+			array(
+				'destructive' => true,
+				'idempotent'  => true,
+			),
+			array(
+				'type'                 => 'object',
+				'properties'           => array(
+					'site_name' => array(
+						'type'        => 'boolean',
+						'description' => __( 'true adds the site name where it fits, false leaves titles without it.', 'leitvia-studio' ),
+					),
+				),
+				'required'             => array( 'site_name' ),
+				'additionalProperties' => false,
+			),
+			array( self::class, 'describe_titles' )
+		);
 	}
 
 	/**
-	 * Operation of set-page-structure: the meta Composition::FRAME_META, Cluster::HUB_META and Cluster::SERVICE_META
-	 * of a page, checked before anything changes.
+	 * Operation of set-seo-titles: the setting title_site_name.
+	 *
+	 * @param array<string, mixed> $input Input.
+	 * @return array<string, mixed>
+	 */
+	public static function describe_titles( array $input ): array {
+		$on = (bool) $input['site_name'];
+		return array(
+			'area'      => 'structure',
+			'target'    => array( 'option' => \LeitviaStudio\Admin\Settings::OPTION ),
+			'base_hash' => \LeitviaStudio\Gateway\Hashes::of( (string) wp_json_encode( get_option( \LeitviaStudio\Admin\Settings::OPTION ) ) ),
+			'change'    => static fn( array $state ): array => array( 'value' => array( 'title_site_name' => $on ) + (array) $state['value'] ),
+		);
+	}
+
+	/**
+	 * Operation of set-page-structure: the meta Composition::FRAME_META, Cluster::HUB_META, Cluster::SERVICE_META and
+	 * Cluster::OFFERINGS_META of a page, checked before anything changes.
 	 *
 	 * @param array<string, mixed> $input Input.
 	 * @return array<string, mixed>|\WP_Error
@@ -417,7 +508,11 @@ final class Seo {
 	public static function describe_structure( array $input ) {
 		$post   = (int) ( $input['post'] ?? 0 );
 		$target = array( 'post' => $post );
-		if ( 'page' !== get_post_type( $post ) || ! Scope::readable( $post ) ) {
+		$type   = get_post_type( $post );
+		if ( 'post' === $type && Scope::readable( $post ) && array_diff( array_keys( $input ), array( 'post', 'hub', 'base_hash' ) ) ) {
+			return Block_Edit::invalid( 'post', __( 'A post takes only hub, the page of the service it is about.', 'leitvia-studio' ), $target );
+		}
+		if ( ! in_array( $type, array( 'page', 'post' ), true ) || ! Scope::readable( $post ) ) {
 			return Block_Edit::invalid( 'post', __( 'Set the structure of a page agents can read.', 'leitvia-studio' ), $target, 'leitvia/list-content' );
 		}
 		$meta = array();
@@ -437,6 +532,13 @@ final class Seo {
 				return Block_Edit::invalid( 'hub', __( 'This hub would lead back to the page itself; a page cannot be above its own hub.', 'leitvia-studio' ), $target + array( 'hub' => $hub ) );
 			}
 			$meta[ Cluster::HUB_META ] = $hub ? $hub : '';
+		}
+		if ( array_key_exists( 'icon', $input ) ) {
+			$icon = (string) $input['icon'];
+			if ( '' !== $icon && ! isset( \LeitviaStudio\Blocks\Icon::icons()[ $icon ] ) ) {
+				return Block_Edit::invalid( 'icon', __( 'There is no icon of this name; leitvia/list-blocks names the icons.', 'leitvia-studio' ), $target + array( 'icon' => $icon ), 'leitvia/list-blocks' );
+			}
+			$meta[ Cluster::ICON_META ] = $icon;
 		}
 		if ( array_key_exists( 'service', $input ) ) {
 			$service = is_array( $input['service'] ) ? $input['service'] : array();
@@ -479,8 +581,37 @@ final class Seo {
 				static fn( $value ): bool => null !== $value && '' !== $value && array() !== $value
 			) : '';
 		}
+		if ( array_key_exists( 'offerings', $input ) ) {
+			$offerings                       = is_array( $input['offerings'] ) ? $input['offerings'] : array();
+			$line                            = sanitize_title( (string) ( $offerings['line'] ?? '' ) );
+			$skus                            = array_values( array_unique( array_map( 'strval', (array) ( $offerings['skus'] ?? array() ) ) ) );
+			$meta[ Cluster::OFFERINGS_META ] = '' === $line && ! $skus ? '' : array_filter(
+				array(
+					'line' => $line,
+					'skus' => $skus,
+				)
+			);
+		}
+		if ( array_key_exists( 'news', $input ) ) {
+			if ( 'page' !== get_post_field( 'post_type', $post ) ) {
+				return Block_Edit::invalid( 'news', __( 'Only a page names the topic of its news; a post takes the related posts of its categories.', 'leitvia-studio' ), $target );
+			}
+			$news = array();
+			foreach ( Related_News::TAXONOMIES as $key => $taxonomy ) {
+				$ids = array();
+				foreach ( (array) ( $input['news'][ $key ] ?? array() ) as $name ) {
+					$term = is_int( $name ) ? get_term( $name, $taxonomy ) : get_term_by( 'slug', sanitize_title( (string) $name ), $taxonomy );
+					if ( ! $term instanceof \WP_Term ) {
+						return Block_Edit::invalid( 'news', __( 'Name categories and tags that exist, by ID or slug as posts carry them in leitvia/list-content.', 'leitvia-studio' ), $target + array( $key => $name ), 'leitvia/list-content' );
+					}
+					$ids[] = $term->term_id;
+				}
+				$news[ $key ] = array_slice( array_values( array_unique( $ids ) ), 0, Related_News::MAX );
+			}
+			$meta[ Related_News::META ] = array_filter( $news ) ? array_filter( $news ) : '';
+		}
 		if ( ! $meta ) {
-			return Block_Edit::invalid( 'change', __( 'Name what to change: frame, hub or service.', 'leitvia-studio' ), $target );
+			return Block_Edit::invalid( 'change', __( 'Name what to change: frame, hub, icon, service, offerings or news.', 'leitvia-studio' ), $target );
 		}
 		return array(
 			'area'   => 'content',
@@ -563,9 +694,16 @@ final class Seo {
 				'schema_type' => self::schema_type( $post ),
 			) + ( 'page' === $post->post_type ? array(
 				'structure' => array(
-					'frame'   => (string) get_post_meta( $id, Composition::FRAME_META, true ),
-					'hub'     => (int) get_post_meta( $id, Cluster::HUB_META, true ),
-					'service' => Cluster::service( $id ),
+					'frame'     => (string) get_post_meta( $id, Composition::FRAME_META, true ),
+					'hub'       => (int) get_post_meta( $id, Cluster::HUB_META, true ),
+					'icon'      => (string) get_post_meta( $id, Cluster::ICON_META, true ),
+					'service'   => Cluster::service( $id ),
+					'offerings' => Cluster::offerings( $id ),
+					'news'      => Related_News::of( $id ),
+				),
+			) : array() ) + ( 'post' === $post->post_type ? array(
+				'structure' => array(
+					'hub' => (int) get_post_meta( $id, Cluster::HUB_META, true ),
 				),
 			) : array() );
 		}

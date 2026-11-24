@@ -87,12 +87,21 @@ final class Scope {
 	}
 
 	/**
-	 * Taxonomies in scope: TAXONOMIES while WooCommerce is active, none otherwise.
+	 * Taxonomies in scope: TAXONOMIES while WooCommerce is active, none otherwise, plus taxonomies of the content model
+	 * a filter adds.
 	 *
 	 * @return list<string>
 	 */
 	public static function taxonomies(): array {
-		return self::commerce() ? self::TAXONOMIES : array();
+		$default = self::commerce() ? self::TAXONOMIES : array();
+		/**
+		 * Filters the taxonomies whose terms agents may change through the pipeline. A filter can add taxonomies of the
+		 * content model, for example the lines of an add-on whose terms carry an icon; any other taxonomy is dropped.
+		 *
+		 * @param list<string> $taxonomies Taxonomies.
+		 */
+		$filtered = (array) apply_filters( 'leitvia_studio_gateway_taxonomies', $default );
+		return array_values( array_filter( array_unique( array_map( 'strval', $filtered ) ), static fn( string $taxonomy ): bool => in_array( $taxonomy, $default, true ) || Registrar::owns_taxonomy( $taxonomy ) ) );
 	}
 
 	/**

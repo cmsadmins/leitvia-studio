@@ -700,6 +700,19 @@ const FIELDS = [
 		Edit: 'toggle',
 	},
 	{
+		id: 'title_site_name',
+		label: __(
+			'Add the site name to titles where it fits',
+			'leitvia-studio'
+		),
+		description: __(
+			'Search results show "Title | Site name" while the whole stays within 60 characters and the title does not name the site yet. Without an SEO plugin.',
+			'leitvia-studio'
+		),
+		type: 'boolean',
+		Edit: 'toggle',
+	},
+	{
 		id: 'editorial_page',
 		label: __( 'Page with your editorial guidelines', 'leitvia-studio' ),
 		description: __(
@@ -954,6 +967,7 @@ function DesignAndSearch( { form } ) {
 				'organization_same_as',
 				'news_categories',
 				'news_sitemap',
+				'title_site_name',
 				'editorial_page',
 			] ) }
 			<More>

@@ -325,6 +325,38 @@ Elements of Studio fixed to the bottom edge, such as the chapter button of the t
 
 The blocks Icon, Icon list and Icon list item draw the bundled Lucide set. The filter `leitvia_studio_icons` adds icons by name: `array( 'my-mark' => array( 'svg' => '<path d="…"/>', 'viewBox' => '0 0 100 100', 'paint' => 'fill' ) )`. `svg` is the inner markup without the `svg` element and is printed as it is, so clean it before (only shapes, no scripts, events, links or styles). `viewBox` defaults to `0 0 24 24`, `paint` to `stroke` (drawn like Lucide, `stroke="currentColor"` with width 2 on the 24 grid and in proportion on another viewBox, 4 on `0 0 48 48`) or `fill` (`fill="currentColor"`, no stroke attributes). Names start with a lowercase letter, followed by lowercase letters, digits and hyphens; a name of the bundled set is ignored, so the set stays stable, and invalid entries are dropped. The icon picker of the editor shows them after the bundled icons, titled by their name with hyphens as spaces (`window.leitviaStudioIcons`). A block whose icon is gone renders nothing. Studio reads the filter once per request after `init`; call `LeitviaStudio\Blocks\Icon::flush()` when the source of your icons changes, for example on `update_option_my_addon_icons`.
 
+The line width of stroke icons follows the optional token `iconStroke` of the token set (a number from 1 to 3, written as `settings.custom.iconStroke`, CSS `--wp--custom--icon-stroke`, default 2). Icons on another viewBox scale it through `--leitvia-icon-scale`. A block style of an add-on that wants a lighter line uses `stroke-width: calc((var(--wp--custom--icon-stroke, 2) - 0.25) * var(--leitvia-icon-scale, 1))` on `.leitvia-icon[stroke]`.
+
+### Lead symbol of a page
+
+`leitvia/set-page-structure` takes `icon`, the name of an icon, as the lead symbol of a page (post meta `LeitviaStudio\Seo\Cluster::ICON_META`). The binding source `leitvia/page-symbol` gives it to the `icon` attribute of `leitvia/icon`, for the page itself or for each page of a query loop: `<!-- wp:leitvia/icon {"icon":"layers","metadata":{"bindings":{"icon":{"source":"leitvia/page-symbol"}}}} /-->`. Without a symbol, or with a name no icon has, the block keeps its own icon. An add-on gives pages a symbol from its own data with the filter `leitvia_studio_page_symbol`:
+
+```php
+add_filter(
+	'leitvia_studio_page_symbol',
+	static fn( string $icon, int $post_id ): string => '' !== $icon ? $icon : my_addon_icon_of_page( $post_id ),
+	10,
+	2
+);
+```
+
+## Post template of the theme Leitvia
+
+The template `single` of the theme Leitvia asks plugins for block markup through `leitvia_post_aside` (top of the sidebar beside the post), `leitvia_post_aside_end` (end of the sidebar) and `leitvia_post_end` (end of the post, above the author box). Studio adds the table of contents at the top of the sidebar and a card for the service the post is about (`leitvia/set-page-structure` with `hub` on a post): in the sidebar on large screens (class `leitvia-wide-only`) and at the end of the post on small ones (`leitvia-narrow-only`). An add-on appends its own markup and returns the string it got plus its blocks.
+
+## Date and time format
+
+Once per site language (the option `WPLANG`) Studio sets the date and time format of that language, `j. F Y` and `H:i` for German, the translation of WordPress for languages it does not list, and leaves a format alone that differs from the English default and from the value Studio set last. The filter `leitvia_studio_date_formats` changes the formats of a locale or returns `null` to leave the site as it is:
+
+```php
+add_filter(
+	'leitvia_studio_date_formats',
+	static fn( ?array $formats, string $locale ): ?array => 'fr_FR' === $locale ? array( 'date' => 'j F Y', 'time' => 'G\hi' ) : $formats,
+	10,
+	2
+);
+```
+
 ## Consent for third-party content
 
 Studio replaces every `core/embed` block from another host with a placeholder while the setting "Ask visitors before loading embedded content from other sites" (`consent_embeds`) is on. The placeholder names the provider, links to its privacy policy and to the content, and keeps the embed in a `<template>` until the visitor loads it. "Always allow" stores the service key in `localStorage['leitvia-consent:<path of the site>']` (a JSON list, for example under `leitvia-consent:/`); the block `leitvia/consent-settings` lists these keys and revokes them.
@@ -407,6 +439,44 @@ add_filter(
 );
 ```
 
+## Services and offerings of a page
+
+A page states its service with `leitvia/set-page-structure` (`service`: name, price, packages). It may instead name offerings an add-on keeps (`offerings`: `line`, the slug of a line of offerings, and `skus`, article numbers), stored in the post meta `LeitviaStudio\Seo\Cluster::OFFERINGS_META` and read with `Cluster::offerings( $page_id )`. Studio only stores that link. An add-on that keeps offerings with prices gives the page its service through `leitvia_studio_page_service`, in the shape of `Cluster::service()` or `null`; the Service and AggregateOffer of the structured data, the prices in `/llms.txt` and `structure.service` of `leitvia/get-seo` then come from it, so a price lives in one place:
+
+```php
+add_filter(
+	'leitvia_studio_page_service',
+	static function ( $service, int $page_id ) {
+		$line = \LeitviaStudio\Seo\Cluster::offerings( $page_id )['line'];
+		return '' === $line ? $service : my_addon_service_of_line( $line );
+	},
+	10,
+	2
+);
+```
+
+The filter also runs for entries of other types, for example a page of one offering, when an add-on calls `Cluster::service_node()` for them.
+
+## Term meta in the pipeline
+
+The state of a term that the pipeline writes holds its name, description and parent, plus the meta keys `leitvia_studio_term_meta` names for its taxonomy; writes set them, rollbacks restore them and the hash of the term covers them. An add-on with fields on its own terms adds their keys:
+
+```php
+add_filter(
+	'leitvia_studio_term_meta',
+	static function ( array $keys ): array {
+		$keys['my_addon_line'][] = 'my_addon_icon';
+		return $keys;
+	}
+);
+```
+
+Terms of such a taxonomy reach agents only when it belongs to the content model and `leitvia_studio_gateway_taxonomies` adds it (without WooCommerce the list is empty):
+
+```php
+add_filter( 'leitvia_studio_gateway_taxonomies', static fn( array $taxonomies ): array => array_merge( $taxonomies, array( 'my_addon_line' ) ) );
+```
+
 ## Table of contents in a template
 
 The block `leitvia/table-of-contents` also works in a template, for example in a column beside `core/post-content`: placed before the content in the markup, it lists the headings of the post on screen at its own levels, and those headings get the ids it links to, as when the block sits in the post. Placed after the content, it lists the headings, but they keep their saved ids only.
@@ -423,6 +493,24 @@ A form takes submissions for 7 days after its page was rendered. A site that cac
 
 ```php
 add_filter( 'leitvia_studio_contact_form_max_age', static fn() => 30 * DAY_IN_SECONDS );
+```
+
+An add-on can take a checked message instead of the mail, for example to hand it to a ticket system. The filter `leitvia_studio_contact_form_send` runs after the checks (trap, time, rate limit, required fields) and before the mail. Return `true` when the add-on took the message, a `WP_Error` whose message the visitor sees, or `null` to let the block send its mail. `$submission` holds `name`, `email` (checked), `message`, `subject` (from the block, may be empty), `form` (key of the form) and `post` (ID of the page, 0 for none):
+
+```php
+add_filter(
+	'leitvia_studio_contact_form_send',
+	static function ( $result, array $submission ) {
+		if ( null !== $result ) {
+			return $result;
+		}
+		return my_addon_create_ticket( $submission['email'], $submission['message'] )
+			? true
+			: new WP_Error( 'my_addon_down', __( 'Your message could not be sent. Please try again later.', 'my-addon' ) );
+	},
+	10,
+	2
+);
 ```
 
 ## Brand

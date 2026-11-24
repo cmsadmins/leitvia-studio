@@ -13,6 +13,12 @@
 	}
 }
 
+// Line width from the token iconStroke of the token set (default 2, the width of Lucide), scaled for a viewBox that
+// is not 24 high (Icon::svg() sets --leitvia-icon-scale). Fill icons have no stroke attribute.
+.leitvia-icon[stroke] {
+	stroke-width: calc(var(--wp--custom--icon-stroke, 2) * var(--leitvia-icon-scale, 1));
+}
+
 // The link keeps the color of the icon and a target of at least 24 by 24 px around small icons (WCAG 2.5.8).
 .wp-block-leitvia-icon__link {
 	display: inline-flex;

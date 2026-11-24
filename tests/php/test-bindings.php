@@ -410,6 +410,7 @@ class Test_Bindings extends WP_UnitTestCase {
 		} finally {
 			unregister_block_bindings_source( 'leitvia/setting' );
 			unregister_block_bindings_source( 'leitvia/relation' );
+			unregister_block_bindings_source( 'leitvia/page-symbol' );
 			LeitviaStudio\Model\Bindings::register();
 		}
 	}

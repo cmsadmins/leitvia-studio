@@ -37,6 +37,11 @@ final class Schema {
 	public const IMAGE_MIN_WIDTH = 1200;
 
 	/**
+	 * Longest headline Google asks for in article structured data, in characters.
+	 */
+	public const HEADLINE_MAX = 110;
+
+	/**
 	 * Items of the breadcrumbs block of this request, see remember_breadcrumbs().
 	 *
 	 * @var array<int, mixed>
@@ -147,7 +152,7 @@ final class Schema {
 		$url  = (string) get_permalink( $post );
 		$data = array(
 			'@type'               => self::is_news( $post ) ? 'NewsArticle' : ( 'page' === $post->post_type ? 'Article' : 'BlogPosting' ),
-			'headline'            => self::text( get_the_title( $post ) ),
+			'headline'            => self::headline( self::text( get_the_title( $post ) ) ),
 			'url'                 => $url,
 			'mainEntityOfPage'    => array(
 				'@type' => 'WebPage',
@@ -162,7 +167,7 @@ final class Schema {
 			'publisher'           => self::organization(),
 		);
 		// An account that carries the name of the organization writes for it: the author is the organization, no person.
-		if ( 0 === strcasecmp( $data['author'][0]['name'], (string) $data['publisher']['name'] ) ) {
+		if ( 0 === strcasecmp( (string) $data['author'][0]['name'], (string) $data['publisher']['name'] ) ) {
 			$data['author'] = array( array( '@id' => Organization::id() ) );
 		}
 		$excerpt = self::text( $post->post_excerpt );
@@ -403,17 +408,66 @@ final class Schema {
 	public const AUTHOR_NAME_META = '_leitvia_author_name';
 
 	/**
-	 * The author of a post: the Person of a name without an account (AUTHOR_NAME_META), else of its user.
+	 * Post meta with the ID of a page about the author of AUTHOR_NAME_META (leitvia/update-content author_page).
+	 */
+	public const AUTHOR_PAGE_META = '_leitvia_author_page';
+
+	/**
+	 * A headline of at most HEADLINE_MAX characters: a longer title is cut at the last word that fits, with an
+	 * ellipsis.
+	 *
+	 * @param string $title Plain title.
+	 */
+	public static function headline( string $title ): string {
+		if ( mb_strlen( $title ) <= self::HEADLINE_MAX ) {
+			return $title;
+		}
+		$cut   = mb_substr( $title, 0, self::HEADLINE_MAX - 1 );
+		$space = mb_strrpos( $cut, ' ' );
+		return rtrim( false !== $space && $space > self::HEADLINE_MAX / 2 ? mb_substr( $cut, 0, $space ) : $cut, ' ,;:.-' ) . '…';
+	}
+
+	/**
+	 * Address of the published page about the author of a post without an account (AUTHOR_PAGE_META), '' without one.
 	 *
 	 * @param WP_Post $post Post.
-	 * @return array<string, string>
+	 */
+	public static function author_page_url( WP_Post $post ): string {
+		$page = (int) get_post_meta( $post->ID, self::AUTHOR_PAGE_META, true );
+		return $page && 'page' === get_post_type( $page ) && 'publish' === get_post_status( $page ) ? (string) get_permalink( $page ) : '';
+	}
+
+	/**
+	 * The author link of a post whose author has no account and a page of their own (AUTHOR_PAGE_META) leads to that
+	 * page, in the byline and the author box as in the structured data. Runs on author_link.
+	 *
+	 * @param mixed $link    Address of the author archive.
+	 * @param mixed $user_id User ID.
+	 * @return mixed
+	 */
+	public static function author_link( $link, $user_id = 0 ) {
+		$post = get_post();
+		if ( ! $post || (int) $user_id !== (int) $post->post_author || '' === (string) get_post_meta( $post->ID, self::AUTHOR_NAME_META, true ) ) {
+			return $link;
+		}
+		$page = self::author_page_url( $post );
+		return '' !== $page ? $page : $link;
+	}
+
+	/**
+	 * The author of a post: the Person of a name without an account (AUTHOR_NAME_META) with the address of their page
+	 * (AUTHOR_PAGE_META) when there is one, else of its user.
+	 *
+	 * @param WP_Post $post Post.
+	 * @return array<string, mixed>
 	 */
 	private static function author( WP_Post $post ): array {
 		$name = self::text( (string) get_post_meta( $post->ID, self::AUTHOR_NAME_META, true ) );
+		$page = '' !== $name ? self::author_page_url( $post ) : '';
 		return '' !== $name ? array(
 			'@type' => 'Person',
 			'name'  => $name,
-		) : self::person( (int) $post->post_author );
+		) + ( '' !== $page ? array( 'url' => $page ) : array() ) : self::person( (int) $post->post_author );
 	}
 
 	/**
@@ -434,10 +488,10 @@ final class Schema {
 	}
 
 	/**
-	 * Person with name, author page and biography when there is one.
+	 * Person with name, author page, biography and the website of the profile (sameAs) when there are some.
 	 *
 	 * @param int $user_id User ID.
-	 * @return array<string, string>
+	 * @return array<string, mixed>
 	 */
 	private static function person( int $user_id ): array {
 		$person      = array(
@@ -448,6 +502,10 @@ final class Schema {
 		$description = self::text( get_the_author_meta( 'description', $user_id ) );
 		if ( '' !== $description ) {
 			$person['description'] = $description;
+		}
+		$website = esc_url_raw( (string) get_the_author_meta( 'user_url', $user_id ) );
+		if ( '' !== $website ) {
+			$person['sameAs'] = array( $website );
 		}
 		return $person;
 	}

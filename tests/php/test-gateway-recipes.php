@@ -529,12 +529,14 @@ class Test_Gateway_Recipes extends WP_UnitTestCase {
 		}
 		$this->assertSame(
 			array(
-				'Services' => home_url( '/services/' ),
-				'About'    => home_url( '/about/' ),
-				'Contact'  => home_url( '/contact/' ),
-				'Imprint'  => home_url( '/imprint/' ),
+				'Services'        => home_url( '/services/' ),
+				'About'           => home_url( '/about/' ),
+				'Contact'         => home_url( '/contact/' ),
+				'Imprint'         => home_url( '/imprint/' ),
+				'Cookie settings' => '#' . \LeitviaStudio\Consent\Consent_Link::ID,
 			),
-			array_column( $links, 'url', 'label' )
+			array_column( $links, 'url', 'label' ),
+			'the Cookie settings link of the pattern stays, after the pages'
 		);
 		foreach ( array( 'services', 'about', 'contact', 'imprint' ) as $slug ) {
 			$this->assertSame( home_url( '/' . $slug . '/' ), get_permalink( get_page_by_path( $slug ) ), 'the link leads to the page' );
@@ -560,7 +562,13 @@ class Test_Gateway_Recipes extends WP_UnitTestCase {
 		foreach ( parse_blocks( get_block_template( get_stylesheet() . '//footer', 'wp_template_part' )->content ) as $block ) {
 			array_push( $footer, ...self::navigation_links( $block ) );
 		}
-		$this->assertSame( array( 'Imprint' => home_url( '/imprint/' ) ), array_column( $footer, 'url', 'label' ) );
+		$this->assertSame(
+			array(
+				'Imprint'         => home_url( '/imprint/' ),
+				'Cookie settings' => '#' . \LeitviaStudio\Consent\Consent_Link::ID,
+			),
+			array_column( $footer, 'url', 'label' )
+		);
 
 		$this->run_recipe(
 			array(

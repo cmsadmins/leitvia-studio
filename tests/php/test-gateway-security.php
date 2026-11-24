@@ -428,6 +428,7 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 			'leitvia/set-organization'      => static fn(): array => array( 'city' => 'Berlin' ),
 			'leitvia/set-site-identity'     => static fn(): array => array( 'tagline' => 'Made to measure' ),
 			'leitvia/set-motion'            => static fn(): array => array( 'motion' => 'bold' ),
+			'leitvia/set-seo-titles'        => static fn(): array => array( 'site_name' => false ),
 			'leitvia/set-redirects'         => static fn(): array => array(
 				'redirects' => array(
 					array(

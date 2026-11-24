@@ -844,7 +844,9 @@ final class Recipes {
 	private static function replace_links( array $block, array &$links ): string {
 		if ( 'core/navigation' === $block['blockName'] ) {
 			$kept = array_filter( $block['innerBlocks'], static fn( $inner ): bool => is_array( $inner ) && '#' !== ( $inner['attrs']['url'] ?? '' ) );
-			$kept = array_map( 'serialize_block', $kept );
+			// Links within the page, such as the Cookie settings link of the footers (#leitvia-consent), stay last.
+			$own  = array_filter( $kept, static fn( array $inner ): bool => str_starts_with( (string) ( $inner['attrs']['url'] ?? '' ), '#' ) );
+			$kept = array_map( 'serialize_block', array_diff_key( $kept, $own ) );
 			foreach ( $links as $link ) {
 				$kept[] = '<!-- wp:navigation-link ' . serialize_block_attributes(
 					array(
@@ -854,6 +856,7 @@ final class Recipes {
 					)
 				) . ' /-->';
 			}
+			$kept  = array_merge( $kept, array_map( 'serialize_block', $own ) );
 			$links = array();
 			if ( ! $kept ) {
 				return '';

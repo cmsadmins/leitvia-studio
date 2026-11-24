@@ -50,6 +50,49 @@ final class Bindings {
 				'uses_context'       => $context,
 			)
 		);
+		register_block_bindings_source(
+			'leitvia/page-symbol',
+			array(
+				'label'              => __( 'Lead symbol of the page', 'leitvia-studio' ),
+				'get_value_callback' => array( self::class, 'page_symbol' ),
+				'uses_context'       => $context,
+			)
+		);
+	}
+
+	/**
+	 * The icon attribute of leitvia/icon can be bound, for the lead symbol of a page (leitvia/page-symbol). Runs on
+	 * block_bindings_supported_attributes_leitvia/icon.
+	 *
+	 * @param mixed $attributes Attributes a binding can set.
+	 * @return array<string>
+	 */
+	public static function icon_attributes( $attributes ): array {
+		return array_values( array_unique( array_merge( (array) $attributes, array( 'icon' ) ) ) );
+	}
+
+	/**
+	 * Lead symbol of the post in the block context (the page itself, or each page of a query loop): the icon name of
+	 * leitvia/set-page-structure (Cluster::ICON_META), through the filter leitvia_studio_page_symbol, so an add-on can
+	 * give one from its own data. Null without one or for a name no icon has, so the icon of the block stays.
+	 *
+	 * @param array<string, mixed> $args      Source arguments, none.
+	 * @param \WP_Block            $block     Block instance.
+	 * @param string               $attribute Bound attribute.
+	 */
+	public static function page_symbol( array $args, \WP_Block $block, string $attribute ): ?string {
+		$post = self::readable_post( (int) ( $block->context['postId'] ?? 0 ), false );
+		if ( 'icon' !== $attribute || ! $post ) {
+			return null;
+		}
+		/**
+		 * Filters the lead symbol of a page: the name of an icon of the icon blocks, '' for none.
+		 *
+		 * @param string $icon    Icon of leitvia/set-page-structure, '' without one.
+		 * @param int    $post_id Post ID.
+		 */
+		$icon = (string) apply_filters( 'leitvia_studio_page_symbol', (string) get_post_meta( $post->ID, \LeitviaStudio\Seo\Cluster::ICON_META, true ), $post->ID );
+		return '' !== $icon && isset( \LeitviaStudio\Blocks\Icon::icons()[ $icon ] ) ? $icon : null;
 	}
 
 	/**

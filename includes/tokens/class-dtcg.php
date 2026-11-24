@@ -50,6 +50,15 @@ final class Dtcg {
 		'eyebrow'   => 'eyebrow',
 	);
 
+	/**
+	 * Optional token iconStroke: the line width of stroke icons (leitvia/icon, icon list) on the 24 grid of Lucide, a
+	 * number from ICON_STROKE_MIN to ICON_STROKE_MAX, written as settings.custom.iconStroke, which core prints as
+	 * --wp--custom--icon-stroke. Without it the icons keep the width 2 of Lucide.
+	 */
+	public const ICON_STROKE     = 'iconStroke';
+	public const ICON_STROKE_MIN = 1;
+	public const ICON_STROKE_MAX = 3;
+
 	public const MAX_BYTES     = 512 * 1024;
 	public const MAX_DEPTH     = 32;
 	private const ALIAS_DEPTH  = 10;
@@ -129,6 +138,13 @@ final class Dtcg {
 					'$value' => (int) $weight,
 				);
 			}
+		}
+		$stroke = $settings['custom'][ self::ICON_STROKE ] ?? null;
+		if ( is_numeric( $stroke ) && (float) $stroke >= self::ICON_STROKE_MIN && (float) $stroke <= self::ICON_STROKE_MAX ) {
+			$doc[ self::ICON_STROKE ] = array(
+				'$type'  => 'number',
+				'$value' => self::number( (string) $stroke ),
+			);
 		}
 		// The widths only when they differ from theme.json, so an export of the theme keeps following the theme.
 		$theme = (array) ( \WP_Theme_JSON_Resolver::get_theme_data()->get_settings()['layout'] ?? array() );
@@ -269,7 +285,37 @@ final class Dtcg {
 		if ( is_wp_error( $weights ) ) {
 			return $weights;
 		}
-		return $settings + ( $layout ? array( 'layout' => $layout ) : array() ) + ( $weights ? array( 'custom' => array( 'fontWeight' => $weights ) ) : array() );
+		$stroke = self::icon_stroke( $doc[ self::ICON_STROKE ] ?? null, array_key_exists( self::ICON_STROKE, $doc ) );
+		if ( is_wp_error( $stroke ) ) {
+			return $stroke;
+		}
+		$custom = ( $weights ? array( 'fontWeight' => $weights ) : array() ) + ( null !== $stroke ? array( self::ICON_STROKE => $stroke ) : array() );
+		return $settings + ( $layout ? array( 'layout' => $layout ) : array() ) + ( $custom ? array( 'custom' => $custom ) : array() );
+	}
+
+	/**
+	 * Line width of the token iconStroke, null without it: a number token from ICON_STROKE_MIN to ICON_STROKE_MAX.
+	 *
+	 * @param mixed $token Resolved node iconStroke.
+	 * @param bool  $given Whether the document has the node.
+	 * @return int|float|null|WP_Error
+	 */
+	private static function icon_stroke( $token, bool $given ) {
+		if ( ! $given ) {
+			return null;
+		}
+		$value = is_array( $token ) ? ( $token['$value'] ?? null ) : null;
+		if ( ! is_array( $token ) || ( isset( $token['$type'] ) && 'number' !== $token['$type'] ) || ! ( is_int( $value ) || is_float( $value ) ) || $value < self::ICON_STROKE_MIN || $value > self::ICON_STROKE_MAX ) {
+			return self::error(
+				'icon_stroke',
+				/* translators: 1: token, iconStroke, 2: smallest width, 3: largest width. */
+				__( 'The token %1$s must be a number token from %2$s to %3$s, the line width of the icons.', 'leitvia-studio' ),
+				self::ICON_STROKE,
+				(string) self::ICON_STROKE_MIN,
+				(string) self::ICON_STROKE_MAX
+			);
+		}
+		return $value;
 	}
 
 	/**

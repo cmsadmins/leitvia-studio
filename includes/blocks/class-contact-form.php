@@ -20,7 +20,8 @@ defined( 'ABSPATH' ) || exit;
  * The block renders itself as a leitvia/form-errors block: that block fills its summary from aria-invalid and
  * aria-describedby on the server, validates in the browser and brings its stylesheet. No script of its own.
  *
- * Nothing is stored. The rate limit keeps a counter under a salted hash of the IP address for an hour.
+ * Nothing is stored. An extension can take a checked message instead of the mail through the filter
+ * leitvia_studio_contact_form_send. The rate limit keeps a counter under a salted hash of the IP address for an hour.
  */
 final class Contact_Form {
 
@@ -157,6 +158,30 @@ final class Contact_Form {
 			return array( 'alert' => __( 'Too many messages came from your connection. Please try again later.', 'leitvia-studio' ) ) + $result;
 		}
 		set_transient( $limit, $count + 1, HOUR_IN_SECONDS );
+		$submission = array(
+			'name'    => $values['name'],
+			'email'   => $email,
+			'message' => $values['message'],
+			'subject' => sanitize_text_field( (string) ( $attributes['subject'] ?? '' ) ),
+			'form'    => $key,
+			'post'    => (int) get_queried_object_id(),
+		);
+		/**
+		 * Lets an extension take a checked message instead of the mail, for example to hand it to a ticket system.
+		 * Return true when it took the message, a WP_Error to show its message to the visitor, or null to let the block
+		 * send its mail. Recipient and subject come from the block, never from the request.
+		 *
+		 * @param true|\WP_Error|null  $result     null by default.
+		 * @param array<string, mixed> $submission name, email (checked), message, subject (of the block, may be empty),
+		 *                                         form (key of the form) and post (ID of the page, 0 for none).
+		 */
+		$taken = apply_filters( 'leitvia_studio_contact_form_send', null, $submission );
+		if ( true === $taken ) {
+			return array( 'sent' => true ) + $result;
+		}
+		if ( is_wp_error( $taken ) ) {
+			return array( 'alert' => $taken->get_error_message() ) + $result;
+		}
 		if ( self::mail( $attributes, $values, $email ) ) {
 			return array( 'sent' => true ) + $result;
 		}

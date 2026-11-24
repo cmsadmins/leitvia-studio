@@ -21,6 +21,11 @@ defined( 'ABSPATH' ) || exit;
  * A page may also offer a service with a price (SERVICE_META): Schema prints a Service with its provider and an Offer
  * whose UnitPriceSpecification says whether VAT is included. Only what the page states belongs there, the skill asks
  * for it; the price is never invented by the checks.
+ *
+ * A page may name offerings an add-on keeps (OFFERINGS_META, also leitvia/set-page-structure): a line of offerings by
+ * its slug or single offerings by article number. Studio only stores the link; an add-on that keeps offerings with
+ * prices gives the page its service from them through the filter leitvia_studio_page_service, so a price lives in one
+ * place.
  */
 final class Cluster {
 
@@ -30,9 +35,30 @@ final class Cluster {
 	public const HUB_META = '_leitvia_hub';
 
 	/**
+	 * Post meta with the lead symbol of a page, an icon name (leitvia/set-page-structure icon), read by the binding
+	 * source leitvia/page-symbol (Model\Bindings::page_symbol()).
+	 */
+	public const ICON_META = '_leitvia_page_icon';
+
+	/**
 	 * Post meta with the service of the page: name, description, price, currency, vat_included and unit.
 	 */
 	public const SERVICE_META = '_leitvia_service';
+
+	/**
+	 * Post meta with the offerings an add-on keeps that the page presents: line (a slug) and skus (article numbers).
+	 */
+	public const OFFERINGS_META = '_leitvia_offerings';
+
+	/**
+	 * Article numbers of offerings: a letter or digit, then letters, digits, dots, hyphens and underscores.
+	 */
+	public const SKU = '^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$';
+
+	/**
+	 * Most article numbers a page names.
+	 */
+	public const MAX_SKUS = 20;
 
 	/**
 	 * Most hubs above a page; deeper chains and loops end there.
@@ -146,13 +172,48 @@ final class Cluster {
 	 * The service of a page from SERVICE_META, cleaned: name, description, price as a number, max_price for a range,
 	 * currency (EUR unless set), vat_included, unit and offers, the packages with name, price, description and unit;
 	 * null without a name or with a broken value. With packages and no price, price is the lowest package price; a
-	 * package has max_price when its price is a range.
+	 * package has max_price when its price is a range. Goes through the filter leitvia_studio_page_service.
 	 *
 	 * @param int $page Page ID.
-	 * @return array{name: string, description: string, price: float|null, max_price: float|null, currency: string, vat_included: bool, unit: string, offers: list<array{name: string, price: float, max_price: float|null, description: string, unit: string}>}|null
+	 * @return array{name: string, description: string, price: float|null, max_price: float|null, price_from: bool, currency: string, vat_included: bool, unit: string, offers: list<array{name: string, price: float, max_price: float|null, price_from: bool, addon: bool, description: string, unit: string}>}|null
 	 */
 	public static function service( int $page ): ?array {
-		$service = get_post_meta( $page, self::SERVICE_META, true );
+		$stored = self::clean_service( get_post_meta( $page, self::SERVICE_META, true ) );
+		/**
+		 * Filters the service of a page or entry, for example to take its packages and prices from offerings an add-on
+		 * keeps (see OFFERINGS_META), so the price lives in one place. Return the shape of Cluster::service() or null for
+		 * none; it is cleaned as a stored service is, and Schema, llms.txt and leitvia/get-seo use it.
+		 *
+		 * @param array<string, mixed>|null $stored  The service stored with leitvia/set-page-structure, or null.
+		 * @param int                       $page    Post ID.
+		 */
+		$service = apply_filters( 'leitvia_studio_page_service', $stored, $page );
+		return $service === $stored ? $stored : self::clean_service( $service );
+	}
+
+	/**
+	 * The offerings a page names in OFFERINGS_META: line, a slug or '', and skus, article numbers.
+	 *
+	 * @param int $page Page ID.
+	 * @return array{line: string, skus: list<string>}
+	 */
+	public static function offerings( int $page ): array {
+		$stored = get_post_meta( $page, self::OFFERINGS_META, true );
+		$stored = is_array( $stored ) ? $stored : array();
+		$skus   = array_values( array_filter( array_map( 'strval', (array) ( $stored['skus'] ?? array() ) ), static fn( string $sku ): bool => (bool) preg_match( '/' . self::SKU . '/', $sku ) ) );
+		return array(
+			'line' => sanitize_title( (string) ( $stored['line'] ?? '' ) ),
+			'skus' => array_slice( $skus, 0, self::MAX_SKUS ),
+		);
+	}
+
+	/**
+	 * A service as SERVICE_META stores it, cleaned, see service(); null without a name.
+	 *
+	 * @param mixed $service Stored service.
+	 * @return array{name: string, description: string, price: float|null, max_price: float|null, price_from: bool, currency: string, vat_included: bool, unit: string, offers: list<array{name: string, price: float, max_price: float|null, price_from: bool, addon: bool, description: string, unit: string}>}|null
+	 */
+	private static function clean_service( $service ): ?array {
 		$service = is_array( $service ) ? $service : array();
 		$name    = trim( (string) ( $service['name'] ?? '' ) );
 		if ( '' === $name ) {
@@ -170,6 +231,8 @@ final class Cluster {
 					'name'        => $label,
 					'price'       => $cost,
 					'max_price'   => null !== $top && $top > $cost ? $top : null,
+					'price_from'  => ! empty( $offer['price_from'] ),
+					'addon'       => ! empty( $offer['addon'] ),
 					'description' => trim( (string) ( $offer['description'] ?? '' ) ),
 					'unit'        => trim( (string) ( $offer['unit'] ?? '' ) ),
 				);
@@ -183,6 +246,7 @@ final class Cluster {
 			'description'  => trim( (string) ( $service['description'] ?? '' ) ),
 			'price'        => $price,
 			'max_price'    => null !== $price && null !== $max && $max > $price ? $max : null,
+			'price_from'   => ! empty( $service['price_from'] ),
 			'currency'     => preg_match( '/^[A-Z]{3}$/', (string) ( $service['currency'] ?? '' ) ) ? (string) $service['currency'] : 'EUR',
 			'vat_included' => ! empty( $service['vat_included'] ),
 			'unit'         => trim( (string) ( $service['unit'] ?? '' ) ),
@@ -195,7 +259,8 @@ final class Cluster {
 	 * UnitPriceSpecification with valueAddedTaxIncluded; with packages one Offer per package inside an AggregateOffer
 	 * with the lowest and highest price, with max_price an AggregateOffer for the range. highPrice is the top of every
 	 * price and range, of the service and of its packages; a package with a range carries minPrice and maxPrice in its
-	 * price specification. null for a page without a service.
+	 * price specification, and so does a price from (price_from) with minPrice alone. An offer only sold with another
+	 * (addon) is an Offer of its own but leaves lowPrice and highPrice to the others. null for a page without a service.
 	 *
 	 * @param WP_Post              $page         Page.
 	 * @param array<string, mixed> $organization Organization node.
@@ -213,7 +278,7 @@ final class Cluster {
 			'url'      => $url,
 			'provider' => $organization,
 		) + array_filter( array( 'description' => $service['description'] ) );
-		$offer = static fn( float $price, string $unit, array $extra = array(), ?float $max = null ): array => $extra + array(
+		$offer = static fn( float $price, string $unit, array $extra = array(), ?float $max = null, bool $from = false ): array => $extra + array(
 			'@type'              => 'Offer',
 			'price'              => $price,
 			'priceCurrency'      => $service['currency'],
@@ -226,11 +291,13 @@ final class Cluster {
 			) + ( null === $max ? array() : array(
 				'minPrice' => $price,
 				'maxPrice' => $max,
-			) ) + array_filter( array( 'unitText' => $unit ) ),
+			) ) + ( null === $max && $from ? array( 'minPrice' => $price ) : array() ) + array_filter( array( 'unitText' => $unit ) ),
 		);
 		if ( $service['offers'] ) {
-			$prices         = array_column( $service['offers'], 'price' );
-			$tops           = array_merge( $prices, array_filter( array_column( $service['offers'], 'max_price' ), 'is_float' ), null === $service['max_price'] ? array() : array( $service['max_price'] ) );
+			$base           = array_values( array_filter( $service['offers'], static fn( array $package ): bool => empty( $package['addon'] ) ) );
+			$base           = $base ? $base : $service['offers'];
+			$prices         = array_column( $base, 'price' );
+			$tops           = array_merge( $prices, array_filter( array_column( $base, 'max_price' ), 'is_float' ), null === $service['max_price'] ? array() : array( $service['max_price'] ) );
 			$node['offers'] = array(
 				'@type'         => 'AggregateOffer',
 				'lowPrice'      => min( $prices ),
@@ -238,7 +305,7 @@ final class Cluster {
 				'priceCurrency' => $service['currency'],
 				'offerCount'    => count( $service['offers'] ),
 				'offers'        => array_map(
-					static fn( array $package ): array => $offer( $package['price'], '' !== $package['unit'] ? $package['unit'] : $service['unit'], array( 'name' => $package['name'] ) + array_filter( array( 'description' => $package['description'] ) ), $package['max_price'] ),
+					static fn( array $package ): array => $offer( $package['price'], '' !== $package['unit'] ? $package['unit'] : $service['unit'], array( 'name' => $package['name'] ) + array_filter( array( 'description' => $package['description'] ) ), $package['max_price'], ! empty( $package['price_from'] ) ),
 					$service['offers']
 				),
 			);
@@ -251,7 +318,7 @@ final class Cluster {
 				'url'           => $url,
 			);
 		} elseif ( null !== $service['price'] ) {
-			$node['offers'] = $offer( $service['price'], $service['unit'] );
+			$node['offers'] = $offer( $service['price'], $service['unit'], array(), null, ! empty( $service['price_from'] ) );
 		}
 		return $node;
 	}
@@ -271,12 +338,20 @@ final class Cluster {
 	}
 
 	/**
-	 * Published pages that offer a service with a price.
+	 * Published pages that offer a service with a price, stored or from the offerings they name.
 	 *
 	 * @return list<WP_Post>
 	 */
 	public static function service_pages(): array {
-		return array_values( array_filter( self::pages( array( 'meta_key' => self::SERVICE_META ) ), static fn( WP_Post $page ): bool => null !== ( self::service( $page->ID )['price'] ?? null ) ) ); // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Few pages carry a service.
+		$query = array(
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- Few pages carry a service.
+			'meta_query' => array(
+				'relation' => 'OR',
+				array( 'key' => self::SERVICE_META ),
+				array( 'key' => self::OFFERINGS_META ),
+			),
+		);
+		return array_values( array_filter( self::pages( $query ), static fn( WP_Post $page ): bool => null !== ( self::service( $page->ID )['price'] ?? null ) ) );
 	}
 
 	/**

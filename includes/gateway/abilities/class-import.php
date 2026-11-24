@@ -201,6 +201,7 @@ final class Import {
 								'maxLength'   => 100,
 								'description' => __( 'Name of an author of the old site who has no account here, as the old site showed it: the post shows it as its author name and in its structured data (Person), and no user is created. Written on every import, so a second one can add or correct it; leitvia/update-content takes it too.', 'leitvia-studio' ),
 							),
+							'author_page'    => Content::author_page_schema(),
 							'parent'         => array(
 								'type'    => 'integer',
 								'minimum' => 1,
@@ -336,6 +337,9 @@ final class Import {
 		// written on the first import and on every later one, so a second import can add or correct it.
 		if ( isset( $input['author_name'] ) ) {
 			$write['author_name'] = (string) $input['author_name'];
+		}
+		if ( isset( $input['author_page'] ) ) {
+			$write['author_page'] = (int) $input['author_page'];
 		}
 		if ( isset( $input['featured_image']['url'] ) ) {
 			$alt   = trim( (string) ( $input['featured_image']['alt'] ?? '' ) );

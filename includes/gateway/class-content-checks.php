@@ -492,7 +492,7 @@ final class Content_Checks {
 	/**
 	 * Ids a link may point to that the template gives the page, not the content.
 	 */
-	public const PAGE_IDS = array( 'top', 'main', 'content', 'wp--skip-link--target', 'comments', 'respond' );
+	public const PAGE_IDS = array( 'top', 'main', 'content', 'wp--skip-link--target', 'comments', 'respond', 'leitvia-consent' );
 
 	/**
 	 * Check leitvia/anchors: a link to #anchor has to find its anchor in the part of the post it stands in. In a post

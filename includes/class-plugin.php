@@ -137,6 +137,7 @@ final class Plugin {
 		add_filter( 'rest_request_before_callbacks', array( Model\Building_Block_Views::class, 'pattern_request' ), 10, 3 );
 		add_action( 'admin_enqueue_scripts', array( self::class, 'enqueue_model_editor' ), 21 );
 		add_action( 'init', array( Model\Bindings::class, 'register' ) );
+		add_filter( 'block_bindings_supported_attributes_leitvia/icon', array( Model\Bindings::class, 'icon_attributes' ) );
 		Model\Author_Name::boot();
 		add_filter( 'render_block_core/list', array( Model\Bindings::class, 'list_items' ), 10, 3 );
 		add_filter( 'get_block_type_uses_context', array( Model\Bindings::class, 'list_context' ), 10, 2 );
@@ -154,11 +155,14 @@ final class Plugin {
 		add_action( 'wp', array( News\Schema::class, 'forget_breadcrumbs' ) );
 		add_action( 'wp_head', array( News\Head::class, 'print' ), 5 );
 		add_filter( 'pre_get_document_title', array( News\Head::class, 'title' ) );
+		add_filter( 'document_title_separator', array( News\Head::class, 'separator' ) );
+		add_filter( 'document_title_parts', array( News\Head::class, 'parts' ) );
 		add_filter( 'wp_robots', array( News\Head::class, 'robots' ) );
 		add_action( 'wp_head', array( Blocks\Schema_Nodes::class, 'print' ) );
 		add_action( 'wp_head', array( self::class, 'defer_modules' ), 1 );
 		// Start year and holder of the copyright line of the theme Leitvia, from the organization details.
 		add_filter( 'leitvia_copyright', array( Organization\Organization::class, 'copyright' ) );
+		add_filter( 'leitvia_related_terms', array( Seo\Related_News::class, 'terms' ), 10, 2 );
 		add_filter( 'leitvia_editorial_url', static fn( $url ): string => '' !== (string) $url ? (string) $url : News\Schema::editorial_url() );
 		add_action( 'init', array( News\Sitemap::class, 'register' ) );
 		add_filter( 'query_vars', array( News\Sitemap::class, 'query_vars' ) );
@@ -166,6 +170,12 @@ final class Plugin {
 		add_action( 'template_redirect', array( News\Sitemap::class, 'maybe_render' ), 1 );
 		add_filter( 'robots_txt', array( News\Sitemap::class, 'robots' ), 20 );
 		add_action( 'transition_post_status', array( News\Sitemap::class, 'forget' ), 10, 3 );
+		add_action( 'rss2_ns', array( News\Feed::class, 'namespace' ) );
+		add_action( 'rss2_item', array( News\Feed::class, 'item' ) );
+		add_filter( 'leitvia_post_aside', array( News\Aside::class, 'top' ) );
+		add_filter( 'leitvia_post_aside_end', array( News\Aside::class, 'end' ) );
+		add_filter( 'leitvia_post_end', array( News\Aside::class, 'post_end' ) );
+		add_action( 'init', array( Date_Formats::class, 'maybe_apply' ) );
 		add_action( 'leitvia_studio_init', array( Blocks\Blocks::class, 'register' ) );
 		add_filter( 'block_categories_all', array( Blocks\Blocks::class, 'category' ) );
 		add_filter( 'render_block_core/tabs', array( Blocks\Tabs::class, 'render_tabs' ) );
@@ -184,6 +194,7 @@ final class Plugin {
 		add_filter( 'render_block_core/group', array( Blocks\Faq::class, 'section' ), 10, 2 );
 		add_filter( 'get_the_author_display_name', array( News\Schema::class, 'author_name' ), 10, 2 );
 		add_filter( 'the_author', array( News\Schema::class, 'author_name' ) );
+		add_filter( 'author_link', array( News\Schema::class, 'author_link' ), 10, 2 );
 		add_filter( 'page_template_hierarchy', array( News\Schema::class, 'article_page_template' ) );
 		// leitvia/set-permalinks writes the options; the rewrite rules follow on the next request, as after the screen.
 		foreach ( array( 'permalink_structure', 'category_base', 'tag_base' ) as $option ) {
@@ -205,6 +216,8 @@ final class Plugin {
 		add_filter( 'render_block_core/html', array( Consent\Consent::class, 'filter_iframes' ) );
 		add_filter( 'the_content', array( Consent\Consent::class, 'filter_iframes' ), 12 );
 		add_filter( 'render_block_leitvia/consent-settings', array( Consent\Consent::class, 'filter_settings_block' ) );
+		add_filter( 'leitvia_consent_link', array( Consent\Consent_Link::class, 'attributes' ) );
+		add_action( 'wp_footer', array( Consent\Consent_Link::class, 'dialog' ) );
 		add_filter( 'wp_script_attributes', array( Consent\Scripts::class, 'script_attributes' ) );
 		add_filter( 'wp_inline_script_attributes', array( Consent\Scripts::class, 'inline_attributes' ), 10, 2 );
 		add_filter( 'script_loader_tag', array( Consent\Scripts::class, 'loader_tag' ), 999, 3 );

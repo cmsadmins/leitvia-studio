@@ -18,8 +18,63 @@ defined( 'ABSPATH' ) || exit;
  * Prints what leitvia/update-seo stored for a page (Seo::PLUGINS entry leitvia), so the title of search results can
  * differ from the heading of the page, plus the canonical address of archives, which core prints for single pages
  * only. All of it steps back when an SEO plugin is active. Pages without stored values keep what WordPress prints.
+ *
+ * With the setting title_site_name (leitvia/set-seo-titles, on by default) every title but the one of the front page
+ * ends with " | " and the site name, stored or built by WordPress, on pages, posts, entries and archives alike, as long
+ * as the whole title keeps to Seo::TITLE_MAX characters and does not name the site already; otherwise the title stands
+ * alone. Off, a stored title stands as written and WordPress builds the others with its own separator.
  */
 final class Head {
+
+	/**
+	 * Separator between the title and the site name.
+	 */
+	public const SEPARATOR = '|';
+
+	/**
+	 * Whether titles take the site name: setting title_site_name, no SEO plugin, not the front page.
+	 */
+	private static function site_name_on(): bool {
+		return leitvia_studio_setting( 'title_site_name' ) && 'leitvia' === Seo::plugin() && ! is_front_page();
+	}
+
+	/**
+	 * A title with " | " and the site name when the whole fits Seo::TITLE_MAX and the title does not name the site.
+	 *
+	 * @param string $title Title without the site name.
+	 */
+	public static function with_site_name( string $title ): string {
+		$site = html_entity_decode( wp_strip_all_tags( (string) get_bloginfo( 'name' ) ), ENT_QUOTES, 'UTF-8' );
+		$full = $title . ' ' . self::SEPARATOR . ' ' . $site;
+		return '' === $site || '' === $title || false !== mb_stripos( $title, $site ) || mb_strlen( $full ) > Seo::TITLE_MAX ? $title : $full;
+	}
+
+	/**
+	 * The separator of the titles WordPress builds while titles take the site name. Filter document_title_separator.
+	 *
+	 * @param mixed $separator Separator.
+	 */
+	public static function separator( $separator ): string {
+		return self::site_name_on() ? self::SEPARATOR : (string) $separator;
+	}
+
+	/**
+	 * The parts of a title WordPress builds: the site name stays only where with_site_name() would add it. Filter
+	 * document_title_parts.
+	 *
+	 * @param mixed $parts Title parts: title, page, tagline, site.
+	 * @return mixed
+	 */
+	public static function parts( $parts ) {
+		if ( ! is_array( $parts ) || ! self::site_name_on() || ! isset( $parts['site'] ) ) {
+			return $parts;
+		}
+		$title = html_entity_decode( wp_strip_all_tags( implode( ' ' . self::SEPARATOR . ' ', array_filter( array( $parts['title'] ?? '', $parts['page'] ?? '' ) ) ) ), ENT_QUOTES, 'UTF-8' );
+		if ( self::with_site_name( $title ) === $title ) {
+			unset( $parts['site'] );
+		}
+		return $parts;
+	}
 
 	/**
 	 * Stored value of the current page, '' when there is none or an SEO plugin takes care of it.
@@ -41,7 +96,10 @@ final class Head {
 	 */
 	public static function title( $title ): string {
 		$stored = self::stored( 'title' );
-		return '' !== $stored ? $stored : (string) $title;
+		if ( '' === $stored ) {
+			return (string) $title;
+		}
+		return self::site_name_on() ? self::with_site_name( $stored ) : $stored;
 	}
 
 	/**

@@ -149,7 +149,9 @@ final class Sitemap {
 				'suppress_filters' => false,
 			)
 		);
-		$name = self::escape( Schema::text( get_bloginfo( 'name' ) ) );
+		// The publication is the publisher of the articles (Organization), the site name without organization details.
+		$name = Schema::text( (string) ( \LeitviaStudio\Organization\Organization::node()['name'] ?? '' ) );
+		$name = self::escape( '' !== $name ? $name : Schema::text( get_bloginfo( 'name' ) ) );
 		$xml  = '<?xml version="1.0" encoding="UTF-8"?>' . "\n"
 			. '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">' . "\n";
 		foreach ( $posts as $post ) {

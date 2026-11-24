@@ -120,6 +120,8 @@ $leitvia_studio_uninstall_site = static function (): void {
 	delete_option( 'leitvia_studio_restore_show_avatars' );
 	delete_option( 'leitvia_studio_flush_rewrite' );
 	delete_option( 'leitvia_studio_news_sitemap_rules' );
+	// The language the date formats were set for; the formats stay, they are settings of the site.
+	delete_option( 'leitvia_studio_date_locale' );
 	delete_transient( 'leitvia_news_sitemap' );
 	delete_option( 'leitvia_studio_model_checked' );
 	// Overlay state, windows and the compiled overlay sets: the transients leitvia_studio_overlay_*. With an external

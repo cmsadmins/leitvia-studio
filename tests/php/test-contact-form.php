@@ -378,6 +378,37 @@ class Test_Contact_Form extends WP_UnitTestCase {
 	}
 
 	/**
+	 * An extension takes the message instead of the mail with true, shows its error with a WP_Error, and null keeps
+	 * the mail; the submission holds the checked values and the subject of the block.
+	 */
+	public function test_send_filter(): void {
+		$seen   = array();
+		$answer = true;
+		$filter = static function ( $result, array $submission ) use ( &$seen, &$answer ) {
+			$seen[] = $submission;
+			return $answer;
+		};
+		add_filter( 'leitvia_studio_contact_form_send', $filter, 10, 2 );
+		$html = $this->submit( array( 'subject' => 'Taken' ) );
+		$this->assertStringContainsString( 'has been sent', $html );
+		$this->assertCount( 0, $this->mails );
+		$this->assertSame( 'alex@example.com', $seen[0]['email'] );
+		$this->assertSame( 'Hello there', $seen[0]['message'] );
+		$this->assertSame( 'Taken', $seen[0]['subject'] );
+
+		$answer = new WP_Error( 'down', 'The desk is closed.' );
+		$html   = $this->submit( array( 'subject' => 'Refused' ) );
+		$this->assertStringContainsString( 'The desk is closed.', $html );
+		$this->assertStringContainsString( 'Hello there</textarea>', $html );
+		$this->assertCount( 0, $this->mails );
+
+		$answer = null;
+		$this->submit( array( 'subject' => 'Mailed' ) );
+		$this->assertCount( 1, $this->mails );
+		remove_filter( 'leitvia_studio_contact_form_send', $filter, 10 );
+	}
+
+	/**
 	 * The address the redirect leads to shows the confirmation of this form only.
 	 */
 	public function test_confirmation_after_the_redirect(): void {

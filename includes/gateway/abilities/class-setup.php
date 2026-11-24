@@ -314,7 +314,7 @@ final class Setup {
 			'leitvia/set-redirects',
 			__( 'Set redirects', 'leitvia-studio' ),
 			/* translators: %d: most rows */
-			sprintf( __( 'Sets the permanent redirects (301) of moved addresses, for a migration or a new structure. Rows of from, a path of this site such as /old-page/, and to, a path of this site or an https address. The list replaces the saved one (at most %d rows, read the current one with leitvia/get-seo); an empty list removes all. A request of a from path goes to its target before the page loads; query strings and a trailing slash do not matter. Rows that lead back to a path they passed (a loop) are refused, as are the start page as from and a target equal to its from. Inactive while an SEO plugin is active, which brings its own redirects. base_hash is empty. Like every setting it waits in a change package for a person.', 'leitvia-studio' ), \LeitviaStudio\Seo\Redirects::MAX ),
+			sprintf( __( 'Sets the redirects of moved and removed addresses, for a migration or a new structure. Rows of from, a path of this site such as /old-page/, status and to. A from with a query, such as /?p=45 or /?attachment_id=123 of an old site, matches only that query (in any order of its parameters) and comes before the row of its bare path; a from without a query matches its path with any query. status 301 (the default) moves for good, 302 for a while; both need to, a path of this site or an https address. status 410 says the page is gone for good (search engines drop it faster than a 404) and takes no to; the visitor sees the 404 page of the theme. The list replaces the saved one (at most %d rows, read the current one with leitvia/get-seo); an empty list removes all. A request of a from path gets its answer before the page loads; a trailing slash and the case do not matter. Rows that lead back to a path they passed (a loop) are refused, as are the start page as from, a target equal to its from and a 410 with a target. Inactive while an SEO plugin is active, which brings its own redirects. base_hash is empty. Like every setting it waits in a change package for a person.', 'leitvia-studio' ), \LeitviaStudio\Seo\Redirects::MAX ),
 			'setup',
 			$replace,
 			array(
@@ -326,20 +326,26 @@ final class Setup {
 						'items'       => array(
 							'type'                 => 'object',
 							'properties'           => array(
-								'from' => array(
+								'from'   => array(
 									'type'        => 'string',
 									'pattern'     => '^/',
 									'maxLength'   => 300,
-									'description' => __( 'Old path of this site, for example /old-page/.', 'leitvia-studio' ),
+									'description' => __( 'Old path of this site, for example /old-page/, with a query when the old address had one, for example /?p=45.', 'leitvia-studio' ),
 								),
-								'to'   => array(
+								'to'     => array(
 									'type'        => 'string',
 									'pattern'     => '^(/|https://)',
 									'maxLength'   => 500,
-									'description' => __( 'New path of this site or an https address.', 'leitvia-studio' ),
+									'description' => __( 'New path of this site or an https address; needed for 301 and 302, left out for 410.', 'leitvia-studio' ),
+								),
+								'status' => array(
+									'type'        => 'integer',
+									'enum'        => \LeitviaStudio\Seo\Redirects::STATUSES,
+									'default'     => 301,
+									'description' => __( '301 moved for good, 302 moved for a while, 410 gone for good.', 'leitvia-studio' ),
 								),
 							),
-							'required'             => array( 'from', 'to' ),
+							'required'             => array( 'from' ),
 							'additionalProperties' => false,
 						),
 					),
@@ -887,9 +893,9 @@ final class Setup {
 		$rows   = \LeitviaStudio\Seo\Redirects::sanitize( $given );
 		if ( count( $rows ) !== count( $given ) ) {
 			$kept = array_column( $rows, 'from' );
-			$bad  = array_values( array_filter( array_map( static fn( $row ): string => is_array( $row ) ? (string) ( $row['from'] ?? '' ) : '', $given ), static fn( string $from ): bool => ! in_array( \LeitviaStudio\Seo\Redirects::path( $from ), $kept, true ) ) );
+			$bad  = array_values( array_filter( array_map( static fn( $row ): string => is_array( $row ) ? (string) ( $row['from'] ?? '' ) : '', $given ), static fn( string $from ): bool => ! in_array( \LeitviaStudio\Seo\Redirects::from( $from ), $kept, true ) ) );
 			/* translators: %s: paths */
-			return Block_Edit::invalid( 'redirects', sprintf( __( 'These rows are no valid redirect: %s. from is a path of the site other than the start page, used once; to is another path or an https address.', 'leitvia-studio' ), implode( ', ', $bad ) ), $target );
+			return Block_Edit::invalid( 'redirects', sprintf( __( 'These rows are no valid redirect: %s. from is a path of the site, with or without a query, other than the bare start page, used once; status is 301, 302 or 410; to is another path or an https address for 301 and 302 and left out for 410.', 'leitvia-studio' ), implode( ', ', $bad ) ), $target );
 		}
 		$loops = \LeitviaStudio\Seo\Redirects::loops( $rows );
 		if ( $loops ) {
@@ -1846,7 +1852,7 @@ final class Setup {
 		if ( 'tel' === $scheme ) {
 			return (bool) preg_match( '#^\+?[0-9][0-9 ().\-/]{2,30}$#D', rawurldecode( substr( $url, 4 ) ) );
 		}
-		if ( str_starts_with( $url, '/' ) && ! str_starts_with( $url, '//' ) ) {
+		if ( ( str_starts_with( $url, '/' ) && ! str_starts_with( $url, '//' ) ) || '#' . \LeitviaStudio\Consent\Consent_Link::ID === $url ) {
 			return true;
 		}
 		$host = strtolower( (string) wp_parse_url( $url, PHP_URL_HOST ) );

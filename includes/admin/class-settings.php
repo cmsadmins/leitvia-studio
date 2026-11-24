@@ -33,6 +33,7 @@ final class Settings {
 		'map_tile_url'                  => 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
 		'news_categories'               => array(),
 		'news_sitemap'                  => true,
+		'title_site_name'               => true,
 		'editorial_page'                => 0,
 		'motion'                        => 'subtle',
 		'organization_street'           => '',
@@ -120,8 +121,9 @@ final class Settings {
 		'redirects'                  => array(
 			'type'                 => 'object',
 			'properties'           => array(
-				'from' => array( 'type' => 'string' ),
-				'to'   => array( 'type' => 'string' ),
+				'from'   => array( 'type' => 'string' ),
+				'to'     => array( 'type' => 'string' ),
+				'status' => array( 'type' => 'integer' ),
 			),
 			'additionalProperties' => false,
 		),

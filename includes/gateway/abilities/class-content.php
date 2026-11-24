@@ -144,6 +144,7 @@ final class Content {
 					),
 					'author'         => self::author_schema(),
 					'author_name'    => self::author_name_schema(),
+					'author_page'    => self::author_page_schema(),
 					'terms'          => self::terms_schema(),
 					'fields'         => self::fields_schema(),
 					'rows'           => self::rows_schema(),
@@ -306,6 +307,19 @@ final class Content {
 			'type'        => 'string',
 			'maxLength'   => 100,
 			'description' => __( 'Name of an author without an account here, for example from a migration: the post shows it as its author name and in its structured data (Person), and no user is created. Empty removes it, then the post shows its user again.', 'leitvia-studio' ),
+		);
+	}
+
+	/**
+	 * Schema of the page about an author without an account.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function author_page_schema(): array {
+		return array(
+			'type'        => 'integer',
+			'minimum'     => 0,
+			'description' => __( 'ID of a published page about the author of author_name, such as an about or team page: the author name links to it and the structured data (Person) names it as url, which Google News asks for. 0 removes it.', 'leitvia-studio' ),
 		);
 	}
 
@@ -632,8 +646,25 @@ final class Content {
 		// The name of an author without an account; Hashes leaves it out while it is empty, so the hash of every other
 		// post stays as it was.
 		$state['meta_input'][ \LeitviaStudio\News\Schema::AUTHOR_NAME_META ] = (string) get_post_meta( $id, \LeitviaStudio\News\Schema::AUTHOR_NAME_META, true );
+		$state['meta_input'][ \LeitviaStudio\News\Schema::AUTHOR_PAGE_META ] = (string) get_post_meta( $id, \LeitviaStudio\News\Schema::AUTHOR_PAGE_META, true );
+		// The lead symbol of a page and the hub of a post (set-page-structure icon and hub); Hashes leaves them out while
+		// they are empty, so the hash of every other page and post stays as it was.
+		if ( 'page' === $type ) {
+			$state['meta_input'][ \LeitviaStudio\Seo\Cluster::ICON_META ] = (string) get_post_meta( $id, \LeitviaStudio\Seo\Cluster::ICON_META, true );
+		} elseif ( 'post' === $type ) {
+			$state['meta_input'][ \LeitviaStudio\Seo\Cluster::HUB_META ] = (string) get_post_meta( $id, \LeitviaStudio\Seo\Cluster::HUB_META, true );
+		}
 		foreach ( array_merge( array_keys( self::fields( $type ) ), Seo::keys(), 'page' === $type ? self::PAGE_META : array() ) as $key ) {
 			$state['meta_input'][ $key ] = get_post_meta( $id, $key, true );
+		}
+		if ( 'page' === $type ) {
+			// The offerings of an add-on a page names (set-page-structure offerings); Hashes leaves them out while they
+			// are empty, so the hash of every other page stays as it was.
+			$state['meta_input'][ \LeitviaStudio\Seo\Cluster::OFFERINGS_META ] = get_post_meta( $id, \LeitviaStudio\Seo\Cluster::OFFERINGS_META, true );
+		}
+		if ( 'page' === $type ) {
+			// The topic of the news of a page (set-page-structure news); not counted while empty, as offerings.
+			$state['meta_input'][ \LeitviaStudio\Seo\Related_News::META ] = get_post_meta( $id, \LeitviaStudio\Seo\Related_News::META, true );
 		}
 		foreach ( self::repeaters( $type ) as $key => $repeater ) {
 			$state['rows'][ $key ] = self::rows( $id, $repeater );
@@ -737,6 +768,13 @@ final class Content {
 		}
 		if ( isset( $input['author_name'] ) ) {
 			$state['meta_input'][ \LeitviaStudio\News\Schema::AUTHOR_NAME_META ] = sanitize_text_field( (string) $input['author_name'] );
+		}
+		if ( isset( $input['author_page'] ) ) {
+			$page = (int) $input['author_page'];
+			if ( $page && ( 'page' !== get_post_type( $page ) || 'publish' !== get_post_status( $page ) ) ) {
+				return Block_Edit::invalid( 'author_page', __( 'The author page is a published page.', 'leitvia-studio' ), $target + array( 'author_page' => $page ), 'leitvia/list-content' );
+			}
+			$state['meta_input'][ \LeitviaStudio\News\Schema::AUTHOR_PAGE_META ] = $page ? $page : '';
 		}
 		foreach ( (array) ( $input['terms'] ?? array() ) as $taxonomy => $values ) {
 			$terms = self::terms( (string) $taxonomy, (array) $values, $state, $target );

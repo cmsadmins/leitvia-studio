@@ -123,7 +123,8 @@ class Test_Gateway_Seo extends WP_UnitTestCase {
 		$item = $result['items'][0];
 		$this->assertSame( '', $item['seo']['title'] );
 		$this->assertSame( Hashes::document( $page ), $item['hash'] );
-		$this->assertSame( 'Repairs - Bike Shop', $item['defaults']['title'] );
+		// The site name follows the title after a bar (setting title_site_name, on by default).
+		$this->assertSame( 'Repairs | Bike Shop', $item['defaults']['title'] );
 		$this->assertSame( 'We repair city bikes and e-bikes in 2 days, from 40 euros.', $item['defaults']['description'] );
 		$this->assertSame( get_permalink( $page ), $item['defaults']['canonical'] );
 		add_filter( 'leitvia_studio_seo_plugin_active', '__return_true' );
@@ -153,7 +154,7 @@ class Test_Gateway_Seo extends WP_UnitTestCase {
 		);
 		$this->assertIsArray( $result, $result instanceof WP_Error ? $result->get_error_message() : '' );
 		$this->assertSame( 'Repairs', get_post( $page )->post_title );
-		$this->assertSame( 'Bike repairs in 2 days', wp_get_document_title() );
+		$this->assertSame( 'Bike repairs in 2 days | Bike Shop', wp_get_document_title() );
 		$this->assertTrue( apply_filters( 'wp_robots', array() )['noindex'] );
 		$this->assertStringContainsString( '<meta name="description" content="We repair city bikes', get_echo( array( Head::class, 'print' ) ) );
 

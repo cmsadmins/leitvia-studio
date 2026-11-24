@@ -45,7 +45,7 @@ final class Compiler {
 		$findings = array();
 		foreach ( array_keys( $doc ) as $group ) {
 			$group = (string) $group;
-			if ( str_starts_with( $group, '$' ) || isset( Dtcg::GROUPS[ $group ] ) || in_array( $group, array( 'size', 'fontWeight' ), true ) ) {
+			if ( str_starts_with( $group, '$' ) || isset( Dtcg::GROUPS[ $group ] ) || in_array( $group, array( 'size', 'fontWeight', Dtcg::ICON_STROKE ), true ) ) {
 				continue;
 			}
 			$findings[] = array(
@@ -296,6 +296,11 @@ final class Compiler {
 		}
 		if ( isset( $data['settings']['layout'] ) && ! $data['settings']['layout'] ) {
 			unset( $data['settings']['layout'] );
+		}
+		// The line width of the icons (token iconStroke); a set without it gives the 2 of Lucide back.
+		unset( $data['settings']['custom'][ Dtcg::ICON_STROKE ] );
+		if ( isset( $settings['custom'][ Dtcg::ICON_STROKE ] ) ) {
+			$data['settings']['custom'][ Dtcg::ICON_STROKE ] = $settings['custom'][ Dtcg::ICON_STROKE ];
 		}
 		return self::weights( $data, (array) ( $settings['custom']['fontWeight'] ?? array() ) );
 	}

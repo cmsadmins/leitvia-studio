@@ -392,6 +392,72 @@ class Test_Seo_Cluster extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The ability set-page-structure stores the offerings a page names and clears them with null; an add-on gives the page its
+	 * service through leitvia_studio_page_service, which the Service node and llms.txt then show; the term meta of an
+	 * add-on joins the state of a term.
+	 */
+	public function test_offerings_and_service_filter(): void {
+		$page = $this->page( 'Care' );
+		$done = self::structure(
+			$page,
+			array(
+				'offerings' => array(
+					'line' => 'website-care',
+					'skus' => array( 'CARE-S', 'CARE-M' ),
+				),
+			)
+		);
+		$this->assertSame( 'live', $done['mode'], wp_json_encode( $done ) );
+		$this->assertSame(
+			array(
+				'line' => 'website-care',
+				'skus' => array( 'CARE-S', 'CARE-M' ),
+			),
+			Cluster::offerings( $page )
+		);
+		$this->assertSame( 'website-care', wp_get_ability( 'leitvia/get-seo' )->execute( array( 'posts' => array( $page ) ) )['items'][0]['structure']['offerings']['line'] );
+		$this->assertNull( Cluster::service( $page ) );
+		$this->assertSame( array(), Cluster::service_pages() );
+
+		$service = static fn( $stored, int $id ) => Cluster::offerings( $id )['line'] ? array(
+			'name'         => 'Website care',
+			'description'  => '',
+			'price'        => 29.0,
+			'max_price'    => null,
+			'currency'     => 'EUR',
+			'vat_included' => false,
+			'unit'         => 'per month',
+			'offers'       => array(),
+		) : $stored;
+		add_filter( 'leitvia_studio_page_service', $service, 10, 2 );
+		$node    = Cluster::service_node( get_post( $page ), array( '@id' => 'org' ) );
+		$pages   = Cluster::service_pages();
+		$text    = Llms::text();
+		remove_filter( 'leitvia_studio_page_service', $service, 10 );
+		$this->assertSame( 29.0, $node['offers']['price'] );
+		$this->assertSame( array( $page ), wp_list_pluck( $pages, 'ID' ) );
+		$this->assertStringContainsString( '[Care](' . get_permalink( $page ) . '): Care for small companies. From 29 EUR per month, plus VAT.', $text );
+
+		self::structure( $page, array( 'offerings' => null ) );
+		$this->assertSame( '', get_post_meta( $page, Cluster::OFFERINGS_META, true ) );
+		$this->assertWPError( self::structure( $page, array( 'offerings' => array( 'skus' => array( '-bad' ) ) ) ), 'the schema refuses an article number' );
+
+		register_taxonomy( 'my_line', 'post' );
+		$term = (int) wp_insert_term( 'Care', 'my_line' )['term_id'];
+		update_term_meta( $term, 'my_icon', 'wrench' );
+		$keys  = static fn( array $keys ): array => array( 'my_line' => array( 'my_icon' ) ) + $keys;
+		add_filter( 'leitvia_studio_term_meta', $keys );
+		$state = \LeitviaStudio\Gateway\Pipeline::term_state( $term );
+		remove_filter( 'leitvia_studio_term_meta', $keys );
+		$this->assertSame( 'wrench', $state['term']['my_icon'] );
+		$add = static fn( array $taxonomies ): array => array_merge( $taxonomies, array( 'my_line' ) );
+		add_filter( 'leitvia_studio_gateway_taxonomies', $add );
+		$this->assertNotContains( 'my_line', \LeitviaStudio\Gateway\Scope::taxonomies(), 'only taxonomies of the content model join the scope' );
+		remove_filter( 'leitvia_studio_gateway_taxonomies', $add );
+		unregister_taxonomy( 'my_line' );
+	}
+
+	/**
 	 * On a site closed to search engines set-llms saves the wish and says why the file waits; get-seo shows the wish
 	 * apart from what takes effect.
 	 */
@@ -468,16 +534,66 @@ class Test_Seo_Cluster extends WP_UnitTestCase {
 					'from' => '/away/',
 					'to'   => 'http://example.com/',
 				),
+				array(
+					'from'   => '/gone/',
+					'status' => 410,
+				),
+				array(
+					'from'   => '/gone-with-target/',
+					'to'     => '/x/',
+					'status' => 410,
+				),
+				array(
+					'from'   => '/for-now/',
+					'to'     => '/sale/',
+					'status' => 302,
+				),
+				array(
+					'from'   => '/teapot/',
+					'to'     => '/x/',
+					'status' => 418,
+				),
+				array(
+					'from'   => '/no-target/',
+					'status' => 301,
+				),
 			)
 		);
 		$this->assertSame(
 			array(
 				array(
-					'from' => '/old-page',
-					'to'   => '/new-page/',
+					'from'   => '/old-page',
+					'to'     => '/new-page/',
+					'status' => 301,
+				),
+				array(
+					'from'   => '/gone',
+					'status' => 410,
+				),
+				array(
+					'from'   => '/for-now',
+					'to'     => '/sale/',
+					'status' => 302,
 				),
 			),
 			$rows
+		);
+		$this->assertSame(
+			array(),
+			Redirects::loops(
+				array(
+					array(
+						'from'   => '/a',
+						'to'     => '/b/',
+						'status' => 301,
+					),
+					array(
+						'from'   => '/b',
+						'status' => 410,
+					),
+				)
+			),
+			'a 410 ends the chain'
 		);
 		$loop = array(
 			array(
@@ -513,8 +629,125 @@ class Test_Seo_Cluster extends WP_UnitTestCase {
 				)
 			)
 		);
+		$this->assert_rejected(
+			'redirects',
+			$set(
+				array(
+					array(
+						'from'   => '/gone/',
+						'to'     => '/x/',
+						'status' => 410,
+					),
+				)
+			)
+		);
 		$this->apply( $set( $rows ) );
 		$this->assertSame( $rows, leitvia_studio_setting( 'redirects' ) );
+
+		// The answers: 410 turns the query into a 404 and says 410, 302 leads to its target.
+		$codes = array();
+		add_filter(
+			'status_header',
+			static function ( $header, $code ) use ( &$codes ) {
+				$codes[] = (int) $code;
+				return $header;
+			},
+			5,
+			2
+		);
+		$this->go_to( home_url( '/gone/' ) );
+		$_SERVER['REQUEST_URI'] = '/gone/';
+		Redirects::gone();
+		$this->assertTrue( is_404() );
+		$this->assertContains( 410, $codes );
+		$this->assertStringContainsString( '410 Gone', Redirects::status_gone( 'HTTP/1.1 404 Not Found', 404 ) );
+		$to = '';
+		add_filter(
+			'wp_redirect',
+			static function ( $location, $status ) use ( &$to ) {
+				$to = $status . ' ' . $location;
+				throw new \RuntimeException( 'redirected' );
+			},
+			10,
+			2
+		);
+		$_SERVER['REQUEST_URI'] = '/for-now/?x=1';
+		try {
+			Redirects::maybe_redirect();
+		} catch ( \RuntimeException $e ) {
+			unset( $e );
+		}
+		$this->assertSame( '302 ' . home_url( '/sale/' ), $to );
+
+		// A from with a query matches that query in any order of its parameters and comes before its bare path; other
+		// queries fall back to the bare path. The bare start page stays no from, the start page with a query is one.
+		$this->assertSame( '/?a=1&p=45', Redirects::from( '/?p=45&a=1' ) );
+		$this->assertSame( '', Redirects::from( '/' ) );
+		$this->assertSame( '', Redirects::from( '/x/?' ) );
+		$query = Redirects::sanitize(
+			array(
+				array(
+					'from' => '/?p=45',
+					'to'   => '/news/first/',
+				),
+				array(
+					'from' => '/media/?x=1&attachment_id=7',
+					'to'   => '/photo/',
+				),
+				array(
+					'from' => '/media/',
+					'to'   => '/gallery/',
+				),
+			)
+		);
+		$this->assertCount( 3, $query );
+		$this->apply( $set( $query ) );
+		$go = static function ( string $uri ) use ( &$to ): string {
+			$to                     = '';
+			$_SERVER['REQUEST_URI'] = $uri;
+			try {
+				Redirects::maybe_redirect();
+			} catch ( \RuntimeException $e ) {
+				unset( $e );
+			}
+			return $to;
+		};
+		$this->assertSame( '301 ' . home_url( '/news/first/' ), $go( '/?p=45' ) );
+		$this->assertSame( '301 ' . home_url( '/photo/' ), $go( '/media/?attachment_id=7&x=1' ) );
+		$this->assertSame( '301 ' . home_url( '/gallery/' ), $go( '/media/?attachment_id=8' ) );
+		$this->assertSame( '', $go( '/?p=46' ) );
+
+		// A refused row is named by its from, a valid row with a query is not.
+		$bad = $set(
+			array(
+				array(
+					'from' => '/?p=45',
+					'to'   => '/news/',
+				),
+				array(
+					'from'   => '/?p=46',
+					'to'     => '/news/',
+					'status' => 410,
+				),
+			)
+		);
+		$this->assert_rejected( 'redirects', $bad );
+		$this->assertStringContainsString( ': /?p=46.', $bad->get_error_message() );
+		$this->assertStringNotContainsString( '/?p=45', $bad->get_error_message() );
+
+		// At most MAX rows; the last one still answers.
+		$many = array();
+		for ( $i = 1; $i <= Redirects::MAX + 1; $i++ ) {
+			$many[] = array(
+				'from' => '/?attachment_id=' . $i,
+				'to'   => '/media/',
+			);
+		}
+		$many = Redirects::sanitize( $many );
+		$this->assertCount( Redirects::MAX, $many );
+		$this->apply( $set( $many ) );
+		$this->assertSame( '301 ' . home_url( '/media/' ), $go( '/?attachment_id=' . Redirects::MAX ) );
+		$this->assertSame( '', $go( '/?attachment_id=' . ( Redirects::MAX + 1 ) ) );
 	}
 
 	/**

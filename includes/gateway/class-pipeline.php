@@ -52,6 +52,24 @@ final class Pipeline {
 	public const TERM_META = array( 'product_cat' => array( 'thumbnail_id' ) );
 
 	/**
+	 * Meta keys of the state of a term of a taxonomy: TERM_META and what add-ons add.
+	 *
+	 * @param string $taxonomy Taxonomy.
+	 * @return list<string>
+	 */
+	public static function term_meta( string $taxonomy ): array {
+		/**
+		 * Filters the term meta keys that belong to the state of a term, by taxonomy, so writes through the pipeline set
+		 * them, rollbacks restore them and hashes cover them. For example an icon of the terms of an add-on:
+		 * $keys['my_addon_line'][] = 'my_addon_icon'.
+		 *
+		 * @param array<string, list<string>> $keys Meta keys by taxonomy.
+		 */
+		$keys = (array) apply_filters( 'leitvia_studio_term_meta', self::TERM_META );
+		return array_values( array_filter( array_map( 'strval', (array) ( $keys[ $taxonomy ] ?? array() ) ) ) );
+	}
+
+	/**
 	 * Options an operation may target: the organization data of the site, the reading settings, the pages a recipe
 	 * connects and the options a recipe may turn off (see schemas/recipe.schema.json). Every option counts as
 	 * organization data. The site settings of the content model are open as well, see model_setting(), and the options
@@ -642,7 +660,7 @@ final class Pipeline {
 			'description' => $term->description,
 			'parent'      => (int) $term->parent,
 		);
-		foreach ( self::TERM_META[ $term->taxonomy ] ?? array() as $key ) {
+		foreach ( self::term_meta( $term->taxonomy ) as $key ) {
 			$state[ $key ] = (string) get_term_meta( $term_id, $key, true );
 		}
 		return array( 'term' => $state );
@@ -1441,7 +1459,7 @@ final class Pipeline {
 		if ( is_wp_error( wp_update_term( $id, $term->taxonomy, wp_slash( $args ) ) ) ) {
 			return false;
 		}
-		foreach ( self::TERM_META[ $term->taxonomy ] ?? array() as $key ) {
+		foreach ( self::term_meta( $term->taxonomy ) as $key ) {
 			if ( array_key_exists( $key, $fields ) ) {
 				update_term_meta( $id, $key, (string) $fields[ $key ] );
 			}

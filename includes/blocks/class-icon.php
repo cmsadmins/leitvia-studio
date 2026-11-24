@@ -168,7 +168,8 @@ final class Icon {
 	/**
 	 * The SVG of an icon. Without a label it is decorative and hidden from assistive technology; with one it is an
 	 * image named by the label. The class leitvia-icon--<name> lets a theme style one icon. A stroke icon gets the
-	 * stroke attributes of Lucide (stroke_width()), a fill icon fill="currentColor" and none of them. Empty for an
+	 * stroke attributes of Lucide (stroke_width()), a fill icon fill="currentColor" and none of them. The stylesheets of the
+	 * icon blocks set the line width from the token iconStroke (--wp--custom--icon-stroke, default 2). Empty for an
 	 * unknown name.
 	 *
 	 * @param string $name  Icon name.
@@ -181,6 +182,9 @@ final class Icon {
 		}
 		$a11y  = '' === $label ? 'aria-hidden="true" focusable="false"' : sprintf( 'role="img" aria-label="%s"', esc_attr( $label ) );
 		$paint = 'fill' === $icon['paint'] ? 'fill="currentColor"' : 'fill="none" stroke="currentColor" stroke-width="' . self::stroke_width( $icon['viewBox'] ) . '" stroke-linecap="round" stroke-linejoin="round"';
+		// The stylesheets of the icon blocks scale the token iconStroke by the height of a viewBox other than 24.
+		$scale  = (float) ( explode( ' ', $icon['viewBox'] )[3] ?? 24 ) / 24;
+		$paint .= 'fill' !== $icon['paint'] && $scale > 0 && 1.0 !== $scale ? ' style="--leitvia-icon-scale:' . self::number( $scale ) . '"' : '';
 		// The markup comes from the bundled file or from an add-on that cleaned it, not from the post, so it is not
 		// escaped.
 		return sprintf(

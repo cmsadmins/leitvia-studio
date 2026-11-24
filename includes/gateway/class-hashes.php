@@ -91,6 +91,25 @@ final class Hashes {
 		if ( '' === ( $content['meta_input'][ \LeitviaStudio\News\Schema::AUTHOR_NAME_META ] ?? null ) ) {
 			unset( $content['meta_input'][ \LeitviaStudio\News\Schema::AUTHOR_NAME_META ] );
 		}
+		// The same for the page of such an author, so hashes read before it existed stay valid.
+		if ( '' === ( $content['meta_input'][ \LeitviaStudio\News\Schema::AUTHOR_PAGE_META ] ?? null ) ) {
+			unset( $content['meta_input'][ \LeitviaStudio\News\Schema::AUTHOR_PAGE_META ] );
+		}
+		// The same for the lead symbol of a page and the hub of a post (pages have always counted their hub).
+		if ( '' === ( $content['meta_input'][ \LeitviaStudio\Seo\Cluster::ICON_META ] ?? null ) ) {
+			unset( $content['meta_input'][ \LeitviaStudio\Seo\Cluster::ICON_META ] );
+		}
+		if ( 'post' === $post->post_type && '' === ( $content['meta_input'][ \LeitviaStudio\Seo\Cluster::HUB_META ] ?? null ) ) {
+			unset( $content['meta_input'][ \LeitviaStudio\Seo\Cluster::HUB_META ] );
+		}
+		// Offerings a page does not name do not count either.
+		if ( '' === ( $content['meta_input'][ \LeitviaStudio\Seo\Cluster::OFFERINGS_META ] ?? null ) ) {
+			unset( $content['meta_input'][ \LeitviaStudio\Seo\Cluster::OFFERINGS_META ] );
+		}
+		// Nor does a topic of news a page does not name.
+		if ( '' === ( $content['meta_input'][ \LeitviaStudio\Seo\Related_News::META ] ?? null ) ) {
+			unset( $content['meta_input'][ \LeitviaStudio\Seo\Related_News::META ] );
+		}
 		if ( $legacy && isset( $content['meta_input'] ) ) {
 			unset( $content['meta_input']['_wp_page_template'] );
 			if ( ! $content['meta_input'] ) {

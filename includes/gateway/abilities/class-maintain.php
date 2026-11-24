@@ -130,6 +130,7 @@ final class Maintain {
 					),
 					'author'         => Content::author_schema(),
 					'author_name'    => Content::author_name_schema(),
+					'author_page'    => Content::author_page_schema(),
 					'terms'          => Content::terms_schema(),
 					'fields'         => Content::fields_schema(),
 					'rows'           => Content::rows_schema(),
@@ -389,7 +390,7 @@ final class Maintain {
 			),
 			'is_string'
 		);
-		$extra    = array_intersect_key( $input, array_flip( array( 'date', 'author', 'author_name', 'terms', 'fields', 'rows', 'featured_image' ) ) );
+		$extra    = array_intersect_key( $input, array_flip( array( 'date', 'author', 'author_name', 'author_page', 'terms', 'fields', 'rows', 'featured_image' ) ) );
 		$status   = isset( $input['status'] ) ? (string) $input['status'] : null;
 		$template = isset( $input['template'] ) ? (string) $input['template'] : null;
 		$parent   = isset( $input['parent'] ) ? (int) $input['parent'] : null;
