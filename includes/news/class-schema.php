@@ -17,7 +17,8 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Prints one JSON-LD block in the head, always an @graph: on single posts the article (NewsArticle for news posts, see
  * is_news(), else BlogPosting) with author and publisher plus a BreadcrumbList; on the posts page and on category and
- * tag archives a CollectionPage listing the posts of the page, on the archives with a BreadcrumbList; a ProfilePage on
+ * tag archives a CollectionPage listing the posts of the page, on the archives with a BreadcrumbList; on pages a
+ * BreadcrumbList through their parents or hubs and the Service they offer (Seo\Cluster); a ProfilePage on
  * author archives; on the front page a WebSite that names the organization by @id and the organization as a node of
  * its own, an Organization or a LocalBusiness with address, opening hours and profiles from the settings
  * (Organization). Off with the setting news_schema and whenever an SEO plugin is active, so a page never carries two
@@ -74,6 +75,8 @@ final class Schema {
 			$nodes = array( self::collection_page( null ) );
 		} elseif ( ( is_category() || is_tag() ) && $object instanceof WP_Term ) {
 			$nodes = array( self::collection_page( $object ), self::breadcrumbs( $object ) );
+		} elseif ( is_page() && $object instanceof WP_Post ) {
+			$nodes = array_values( array_filter( array( self::is_article_page( $object ) ? self::article( $object ) : null, \LeitviaStudio\Seo\Cluster::trail( $object ), \LeitviaStudio\Seo\Cluster::service_node( $object, self::organization() ) ) ) );
 		}
 		// The trail the page shows wins over the computed one and gives pages and entries of other types theirs.
 		$visible = is_front_page() ? null : self::visible_breadcrumbs();
@@ -108,7 +111,34 @@ final class Schema {
 	}
 
 	/**
-	 * NewsArticle for news posts (is_news()), else BlogPosting.
+	 * Whether a page is an article under a page address: composed with the page frame article or given the template
+	 * page-article. It shows author and dates as a post does, and its structured data is an Article.
+	 *
+	 * @param WP_Post $post Page.
+	 */
+	public static function is_article_page( WP_Post $post ): bool {
+		return 'page' === $post->post_type && ( 'article' === get_post_meta( $post->ID, \LeitviaStudio\Gateway\Composition::FRAME_META, true ) || 'page-article' === get_page_template_slug( $post ) );
+	}
+
+	/**
+	 * A page with the frame article and the default template takes the template page-article of the theme, when the
+	 * theme has one: set-page-structure can mark a page as an article without touching its template. Runs on
+	 * page_template_hierarchy.
+	 *
+	 * @param mixed $templates Template candidates.
+	 * @return mixed
+	 */
+	public static function article_page_template( $templates ) {
+		$post = get_queried_object();
+		if ( ! is_array( $templates ) || ! $post instanceof WP_Post || '' !== get_page_template_slug( $post ) || ! self::is_article_page( $post ) ) {
+			return $templates;
+		}
+		array_unshift( $templates, 'page-article.php' );
+		return $templates;
+	}
+
+	/**
+	 * NewsArticle for news posts (is_news()), Article for an article page (is_article_page()), else BlogPosting.
 	 *
 	 * @param WP_Post $post Post.
 	 * @return array<string, mixed>
@@ -116,7 +146,7 @@ final class Schema {
 	public static function article( WP_Post $post ): array {
 		$url  = (string) get_permalink( $post );
 		$data = array(
-			'@type'               => self::is_news( $post ) ? 'NewsArticle' : 'BlogPosting',
+			'@type'               => self::is_news( $post ) ? 'NewsArticle' : ( 'page' === $post->post_type ? 'Article' : 'BlogPosting' ),
 			'headline'            => self::text( get_the_title( $post ) ),
 			'url'                 => $url,
 			'mainEntityOfPage'    => array(
@@ -128,7 +158,7 @@ final class Schema {
 			'dateModified'        => get_the_modified_date( 'c', $post ),
 			'inLanguage'          => self::language( self::locale( $post ) ),
 			'isAccessibleForFree' => true,
-			'author'              => array( self::person( (int) $post->post_author ) ),
+			'author'              => array( self::author( $post ) ),
 			'publisher'           => self::organization(),
 		);
 		// An account that carries the name of the organization writes for it: the author is the organization, no person.
@@ -365,6 +395,42 @@ final class Schema {
 			$data['description'] = $description;
 		}
 		return $data;
+	}
+
+	/**
+	 * Post meta with the name of an author without an account, from a migration (leitvia/import-post author_name).
+	 */
+	public const AUTHOR_NAME_META = '_leitvia_author_name';
+
+	/**
+	 * The author of a post: the Person of a name without an account (AUTHOR_NAME_META), else of its user.
+	 *
+	 * @param WP_Post $post Post.
+	 * @return array<string, string>
+	 */
+	private static function author( WP_Post $post ): array {
+		$name = self::text( (string) get_post_meta( $post->ID, self::AUTHOR_NAME_META, true ) );
+		return '' !== $name ? array(
+			'@type' => 'Person',
+			'name'  => $name,
+		) : self::person( (int) $post->post_author );
+	}
+
+	/**
+	 * The author name of a post that names an author without an account shows that name, as core/post-author-name and
+	 * the byline print it. Runs on get_the_author_display_name.
+	 *
+	 * @param mixed $name    Display name.
+	 * @param mixed $user_id User ID asked for, false for the author of the current post.
+	 * @return mixed
+	 */
+	public static function author_name( $name, $user_id = false ) {
+		$post = get_post();
+		if ( ! $post || ( $user_id && (int) $user_id !== (int) $post->post_author ) ) {
+			return $name;
+		}
+		$own = (string) get_post_meta( $post->ID, self::AUTHOR_NAME_META, true );
+		return '' !== $own ? $own : $name;
 	}
 
 	/**

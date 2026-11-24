@@ -1045,6 +1045,14 @@
 					"color": "var(--wp--preset--color--surface)"
 				},
 				{
+					"slug": "button-hover",
+					"color": "var(--wp--preset--color--accent)"
+				},
+				{
+					"slug": "on-button-hover",
+					"color": "var(--wp--preset--color--on-accent)"
+				},
+				{
 					"slug": "band",
 					"color": "var(--wp--preset--color--ink)"
 				},
@@ -1143,6 +1151,11 @@
 				{
 					"fg": "on-button",
 					"bg": "button",
+					"min": 4.5
+				},
+				{
+					"fg": "on-button-hover",
+					"bg": "button-hover",
 					"min": 4.5
 				},
 				{
@@ -1225,6 +1238,14 @@
 					"color": "#ffffff"
 				},
 				{
+					"slug": "button-hover",
+					"color": "var(--wp--preset--color--accent)"
+				},
+				{
+					"slug": "on-button-hover",
+					"color": "var(--wp--preset--color--on-accent)"
+				},
+				{
 					"slug": "band",
 					"color": "#0b2a5b"
 				},
@@ -1326,6 +1347,11 @@
 					"min": 4.5
 				},
 				{
+					"fg": "on-button-hover",
+					"bg": "button-hover",
+					"min": 4.5
+				},
+				{
 					"fg": "on-band-button",
 					"bg": "band-button",
 					"min": 4.5
@@ -1403,6 +1429,14 @@
 				{
 					"slug": "on-button",
 					"color": "var(--wp--preset--color--surface)"
+				},
+				{
+					"slug": "button-hover",
+					"color": "var(--wp--preset--color--accent)"
+				},
+				{
+					"slug": "on-button-hover",
+					"color": "var(--wp--preset--color--on-accent)"
 				},
 				{
 					"slug": "band",
@@ -1503,6 +1537,11 @@
 				{
 					"fg": "on-button",
 					"bg": "button",
+					"min": 4.5
+				},
+				{
+					"fg": "on-button-hover",
+					"bg": "button-hover",
 					"min": 4.5
 				},
 				{
@@ -1589,6 +1628,14 @@
 				{
 					"slug": "on-button",
 					"color": "var(--wp--preset--color--surface)"
+				},
+				{
+					"slug": "button-hover",
+					"color": "var(--wp--preset--color--accent)"
+				},
+				{
+					"slug": "on-button-hover",
+					"color": "var(--wp--preset--color--on-accent)"
 				},
 				{
 					"slug": "band",
@@ -1689,6 +1736,11 @@
 				{
 					"fg": "on-button",
 					"bg": "button",
+					"min": 4.5
+				},
+				{
+					"fg": "on-button-hover",
+					"bg": "button-hover",
 					"min": 4.5
 				},
 				{

@@ -449,10 +449,19 @@ final class Packages {
 			if ( $image ) {
 				$new['meta_input']['_thumbnail_id'] = $image;
 			}
+			// An imported post whose parent was imported into this package (target parent_source) gets the ID the
+			// parent got when it was applied.
+			$source = (string) ( $entry['target']['parent_source'] ?? '' );
+			$parent = '' !== $source ? self::created_import( $operations, $source ) : 0;
+			if ( $parent ) {
+				$new['post_parent'] = $parent;
+			}
+			$target = array_diff_key( (array) $entry['target'], array( 'parent_source' => true ) );
 			$result = match ( true ) {
-				'' !== $slug && ! $page  => Rejection::make( 'leitvia_page_missing', __( 'The page this setting points to is not applied yet. Apply the page first.', 'leitvia-studio' ), 409, 'page_missing', array( 'option' => (string) ( $entry['target']['option'] ?? '' ) ), '', 'never', array( 'page' => $slug ) ),
-				'' !== $file && ! $image => Rejection::make( 'leitvia_media_missing', __( 'The image this content uses is not applied yet. Apply the image first.', 'leitvia-studio' ), 409, 'media_missing', array( 'post' => 0 ), '', 'never', array( 'file' => $file ) ),
-				default                  => Pipeline::run( new Operation( (string) $entry['ability'], (string) $entry['area'], (array) $entry['target'], $base, static fn(): array => $new, (array) $entry['kinds'] ), $id ),
+				'' !== $slug && ! $page     => Rejection::make( 'leitvia_page_missing', __( 'The page this setting points to is not applied yet. Apply the page first.', 'leitvia-studio' ), 409, 'page_missing', array( 'option' => (string) ( $entry['target']['option'] ?? '' ) ), '', 'never', array( 'page' => $slug ) ),
+				'' !== $file && ! $image    => Rejection::make( 'leitvia_media_missing', __( 'The image this content uses is not applied yet. Apply the image first.', 'leitvia-studio' ), 409, 'media_missing', array( 'post' => 0 ), '', 'never', array( 'file' => $file ) ),
+				'' !== $source && ! $parent => Rejection::make( 'leitvia_parent_missing', __( 'The parent of this post is not applied yet. Apply the parent first.', 'leitvia-studio' ), 409, 'parent_missing', array( 'post' => (int) ( $entry['target']['post'] ?? 0 ) ), '', 'never', array( 'parent_source' => $source ) ),
+				default                     => Pipeline::run( new Operation( (string) $entry['ability'], (string) $entry['area'], $target, $base, static fn(): array => $new, (array) $entry['kinds'] ), $id ),
 			};
 			if ( is_wp_error( $result ) ) {
 				$data = (array) $result->get_error_data();
@@ -509,6 +518,21 @@ final class Packages {
 	private static function created_page( array $operations, string $slug ): int {
 		foreach ( $operations as $entry ) {
 			if ( empty( $entry['target']['post'] ) && 'page' === ( $entry['state']['post_type'] ?? '' ) && ( $entry['state']['post_name'] ?? '' ) === $slug ) {
+				return (int) ( $entry['applied']['post'] ?? 0 );
+			}
+		}
+		return 0;
+	}
+
+	/**
+	 * ID of the post an applied import operation of the package created from this source address, 0 for none.
+	 *
+	 * @param list<array<string, mixed>> $operations Operations of the package.
+	 * @param string                     $source     Source address of the import.
+	 */
+	private static function created_import( array $operations, string $source ): int {
+		foreach ( $operations as $entry ) {
+			if ( empty( $entry['target']['post'] ) && ( $entry['state']['meta_input'][ Abilities\Import::SOURCE_META ] ?? '' ) === $source ) {
 				return (int) ( $entry['applied']['post'] ?? 0 );
 			}
 		}

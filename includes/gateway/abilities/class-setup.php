@@ -42,6 +42,14 @@ final class Setup {
 	/**
 	 * Settings of a core/navigation in a template part that update-template-part keeps, see keep_navigation().
 	 */
+	/**
+	 * The model a building block adds right now (Building_Blocks::model_step()), so define-content-type takes the
+	 * showInAbilities the block declares itself: the person who applies the building block decides on it with the block.
+	 *
+	 * @var array<string, mixed>|null
+	 */
+	public static ?array $building_block = null;
+
 	public const NAVIGATION_KEEP = array( 'submenuVisibility', 'overlay', 'overlayMenu', 'overlayBackgroundColor', 'overlayTextColor', 'ariaLabel' );
 
 	/**
@@ -143,6 +151,38 @@ final class Setup {
 			array( self::class, 'describe_set_posts_page' )
 		);
 		Abilities::write(
+			'leitvia/set-permalinks',
+			__( 'Set permalinks', 'leitvia-studio' ),
+			/* translators: %postname%, %post_id%, %year%, %monthnum% and %category% are permalink tags of WordPress, keep them as they are. */
+			__( 'Sets the permalink structure of posts and the bases of category and tag addresses, as in Settings, Permalinks, for a migration that keeps the addresses of the old site: structure such as /news/%postname%/ or /%postname%/ (needs %postname% or %post_id%), category_base and tag_base such as topic (empty for the default). Pages keep their addresses, posts take the structure. Only the fields you send change; the rewrite rules are rebuilt on the next request. base_hash is empty. Like every setting it waits in a change package for a person; notice warns when published posts change their address, which leitvia/set-redirects can lead from the old addresses.', 'leitvia-studio' ),
+			'setup',
+			$replace,
+			array(
+				'properties' => array(
+					'structure'     => array(
+						'type'        => 'string',
+						'maxLength'   => 200,
+						'pattern'     => '^/[A-Za-z0-9%_/.-]*$',
+						/* translators: The words between percent signs are permalink tags of WordPress, keep them as they are. */
+						'description' => __( 'Permalink structure of posts with tags such as %postname%, %post_id%, %year%, %monthnum%, %category%, starting with a slash.', 'leitvia-studio' ),
+					),
+					'category_base' => array(
+						'type'        => 'string',
+						'maxLength'   => 100,
+						'pattern'     => '^[a-z0-9-]*$',
+						'description' => __( 'Base of category addresses, empty for category.', 'leitvia-studio' ),
+					),
+					'tag_base'      => array(
+						'type'        => 'string',
+						'maxLength'   => 100,
+						'pattern'     => '^[a-z0-9-]*$',
+						'description' => __( 'Base of tag addresses, empty for tag.', 'leitvia-studio' ),
+					),
+				),
+			) + $object,
+			array( self::class, 'describe_set_permalinks' )
+		);
+		Abilities::write(
 			'leitvia/set-privacy-page',
 			__( 'Set privacy policy page', 'leitvia-studio' ),
 			__( 'Makes an existing page the privacy policy page of the site; 0 clears it. Contact forms, comment forms and the footer link to it. base_hash is empty. The page must exist, so create it first and wait until a package with it is applied. Like every setting it waits in a change package for a person. notice says so while the page is not published, and leitvia/audit-site reports contact forms without such a page.', 'leitvia-studio' ),
@@ -163,34 +203,46 @@ final class Setup {
 		Abilities::write(
 			'leitvia/set-organization',
 			__( 'Set organization details', 'leitvia-studio' ),
-			__( 'Sets the details of the organization behind the site: kind of business (type, Organization or a type of LocalBusiness; type falls back to Organization), address, phone, email, founding date (founding_date, YYYY, YYYY-MM or YYYY-MM-DD), area served (area_served, places), opening hours (opening_hours, rows of days with opens and closes as HH:MM, only printed for a local business) and profiles on other sites (same_as, https addresses). Leitvia Studio prints them as structured data on the front page and as publisher of posts while no SEO plugin is active; the name and the logo stay those of the site. Only the fields you send change, an empty string or an empty list clears one. leitvia/get-seo returns the current values. base_hash is empty. Use only facts the person gave or the site shows; never guess opening hours. Like every setting it waits in a change package for a person.', 'leitvia-studio' ),
+			__( 'Sets the details of the organization behind the site: kind of business (type, Organization or a type of LocalBusiness; type falls back to Organization), address, phone, email, founding date (founding_date, YYYY, YYYY-MM or YYYY-MM-DD), founder or owner (founder, a person, printed as schema.org founder), the copyright line of the footer (copyright_since, the first year as YYYY, and copyright_holder, the name after the years; the theme Leitvia then shows the first year, a dash, the current year and the holder), area served (area_served, places), opening hours (opening_hours, rows of days with opens and closes as HH:MM, only printed for a local business), profiles on other sites (same_as, https addresses) and the rating on a review site (aggregate_rating: value 1 to 5, count of reviews, source_url where it is shown, confirmed true only after a person checked it there; printed as aggregateRating and allowed as a star in SEO titles only when confirmed, with count and source; null removes it). Leitvia Studio prints them as structured data on the front page and as publisher of posts while no SEO plugin is active; the name and the logo stay those of the site. Only the fields you send change, an empty string or an empty list clears one. leitvia/get-seo returns the current values. base_hash is empty. Use only facts the person gave or the site shows; never guess opening hours. Like every setting it waits in a change package for a person.', 'leitvia-studio' ),
 			'setup',
 			$replace,
 			array(
 				'properties' => array(
-					'type'          => array(
+					'type'             => array(
 						'type' => 'string',
 						'enum' => Organization::TYPES,
 					),
-					'street'        => array( 'type' => 'string' ),
-					'postal_code'   => array( 'type' => 'string' ),
-					'city'          => array( 'type' => 'string' ),
-					'country'       => array(
+					'street'           => array( 'type' => 'string' ),
+					'postal_code'      => array( 'type' => 'string' ),
+					'city'             => array( 'type' => 'string' ),
+					'country'          => array(
 						'type'    => 'string',
 						'pattern' => '^([A-Z]{2})?$',
 					),
-					'phone'         => array( 'type' => 'string' ),
-					'email'         => array( 'type' => 'string' ),
-					'founding_date' => array(
+					'phone'            => array( 'type' => 'string' ),
+					'email'            => array( 'type' => 'string' ),
+					'founding_date'    => array(
 						'type'    => 'string',
 						'pattern' => Organization::DATE,
 					),
-					'area_served'   => array(
+					'founder'          => array(
+						'type'      => 'string',
+						'maxLength' => 200,
+					),
+					'copyright_since'  => array(
+						'type'    => 'string',
+						'pattern' => Organization::YEAR,
+					),
+					'copyright_holder' => array(
+						'type'      => 'string',
+						'maxLength' => 200,
+					),
+					'area_served'      => array(
 						'type'     => 'array',
 						'maxItems' => 50,
 						'items'    => array( 'type' => 'string' ),
 					),
-					'opening_hours' => array(
+					'opening_hours'    => array(
 						'type'     => 'array',
 						'maxItems' => 14,
 						'items'    => array(
@@ -220,7 +272,7 @@ final class Setup {
 							'additionalProperties' => false,
 						),
 					),
-					'same_as'       => array(
+					'same_as'          => array(
 						'type'     => 'array',
 						'maxItems' => 50,
 						'items'    => array(
@@ -228,9 +280,103 @@ final class Setup {
 							'pattern' => '^https://',
 						),
 					),
+					'aggregate_rating' => array(
+						'type'                 => array( 'object', 'null' ),
+						'properties'           => array(
+							'value'      => array(
+								'type'        => 'string',
+								'pattern'     => '^([1-4](\\.\\d)?|5(\\.0)?)$',
+								'description' => __( 'Average rating from 1 to 5 with a dot, for example 4.8.', 'leitvia-studio' ),
+							),
+							'count'      => array(
+								'type'        => 'integer',
+								'minimum'     => 1,
+								'description' => __( 'Number of reviews the rating comes from.', 'leitvia-studio' ),
+							),
+							'source_url' => array(
+								'type'        => 'string',
+								'pattern'     => '^https://',
+								'description' => __( 'Address of the page where the rating is shown, such as the profile on a review site.', 'leitvia-studio' ),
+							),
+							'confirmed'  => array(
+								'type'        => 'boolean',
+								'description' => __( 'true only when a person compared value and count with the source.', 'leitvia-studio' ),
+							),
+						),
+						'required'             => array( 'value', 'count', 'source_url', 'confirmed' ),
+						'additionalProperties' => false,
+					),
 				),
 			) + $object,
 			array( self::class, 'describe_set_organization' )
+		);
+		Abilities::write(
+			'leitvia/set-redirects',
+			__( 'Set redirects', 'leitvia-studio' ),
+			/* translators: %d: most rows */
+			sprintf( __( 'Sets the permanent redirects (301) of moved addresses, for a migration or a new structure. Rows of from, a path of this site such as /old-page/, and to, a path of this site or an https address. The list replaces the saved one (at most %d rows, read the current one with leitvia/get-seo); an empty list removes all. A request of a from path goes to its target before the page loads; query strings and a trailing slash do not matter. Rows that lead back to a path they passed (a loop) are refused, as are the start page as from and a target equal to its from. Inactive while an SEO plugin is active, which brings its own redirects. base_hash is empty. Like every setting it waits in a change package for a person.', 'leitvia-studio' ), \LeitviaStudio\Seo\Redirects::MAX ),
+			'setup',
+			$replace,
+			array(
+				'properties' => array(
+					'redirects' => array(
+						'type'        => 'array',
+						'maxItems'    => \LeitviaStudio\Seo\Redirects::MAX,
+						'description' => __( 'Every redirect of the site; the list replaces the saved one.', 'leitvia-studio' ),
+						'items'       => array(
+							'type'                 => 'object',
+							'properties'           => array(
+								'from' => array(
+									'type'        => 'string',
+									'pattern'     => '^/',
+									'maxLength'   => 300,
+									'description' => __( 'Old path of this site, for example /old-page/.', 'leitvia-studio' ),
+								),
+								'to'   => array(
+									'type'        => 'string',
+									'pattern'     => '^(/|https://)',
+									'maxLength'   => 500,
+									'description' => __( 'New path of this site or an https address.', 'leitvia-studio' ),
+								),
+							),
+							'required'             => array( 'from', 'to' ),
+							'additionalProperties' => false,
+						),
+					),
+				),
+				'required'   => array( 'redirects' ),
+			) + $object,
+			array( self::class, 'describe_set_redirects' )
+		);
+		Abilities::write(
+			'leitvia/set-llms',
+			__( 'Set llms.txt and AI crawlers', 'leitvia-studio' ),
+			/* translators: %d: most characters of the summary */
+			sprintf( __( 'Sets llms.txt, the file at the root of the site that tells AI assistants what the site is about, and whether robots.txt lets AI crawlers in. llms.txt is built on each request: the site name, summary (at most %d characters, empty for the tagline), the pages with the page frame hub, the pages with a service and price (leitvia/set-page-structure) and the extra pages of pages (IDs, published). enabled switches the file off and on, ai_crawlers false disallows the crawlers of AI search and assistants in robots.txt (default true, they may crawl as every other crawler). Without an SEO plugin and only on a site open to search engines: otherwise the setting is saved and notice says what holds the file back, get-seo shows llms.requested, llms.enabled and llms.held_back. Only the fields you send change. base_hash is empty. Like every setting it waits in a change package for a person.', 'leitvia-studio' ), \LeitviaStudio\Admin\Settings::SUMMARY_MAX ),
+			'setup',
+			$replace,
+			array(
+				'properties' => array(
+					'enabled'     => array( 'type' => 'boolean' ),
+					'summary'     => array(
+						'type'      => 'string',
+						'maxLength' => \LeitviaStudio\Admin\Settings::SUMMARY_MAX,
+					),
+					'pages'       => array(
+						'type'     => 'array',
+						'maxItems' => \LeitviaStudio\Seo\Llms::MAX_PAGES,
+						'items'    => array(
+							'type'    => 'integer',
+							'minimum' => 1,
+						),
+					),
+					'ai_crawlers' => array(
+						'type'        => 'boolean',
+						'description' => __( 'false disallows the crawlers of AI search and assistants in robots.txt.', 'leitvia-studio' ),
+					),
+				),
+			) + $object,
+			array( self::class, 'describe_set_llms' )
 		);
 		Abilities::write(
 			'leitvia/set-motion',
@@ -437,7 +583,7 @@ final class Setup {
 					'type'        => 'string',
 					'minLength'   => 1,
 					'maxLength'   => 2000,
-					'description' => __( 'Address of this site, https, mailto: or tel:.', 'leitvia-studio' ),
+					'description' => __( 'Address of this site, https, mailto: or tel:. An item with sub items may leave it out: it then only opens its submenu.', 'leitvia-studio' ),
 				),
 				'items' => array(
 					'type'     => 'array',
@@ -463,7 +609,7 @@ final class Setup {
 					),
 				),
 			),
-			'required'             => array( 'label', 'url' ),
+			'required'             => array( 'label' ),
 			'additionalProperties' => false,
 		);
 		Abilities::write(
@@ -495,7 +641,7 @@ final class Setup {
 		Abilities::write(
 			'leitvia/update-template-part',
 			__( 'Update template part', 'leitvia-studio' ),
-			__( 'Replaces a template part of the contract, such as header, footer or sidebar, with a pattern made for its area or with changed block markup. Part names come from leitvia/get-contract; with Polylang <part>-<language> (header-de) is the part the theme shows for that language and is created in the area of its part. Patterns come from leitvia/list-patterns. The change publishes the part, a draft one too: core shows no draft part, so where the area level is draft it waits in a change package. The base hash is the hash of the template part. leitvia/get-contract returns it per part under hashes.templateParts.', 'leitvia-studio' ),
+			__( 'Replaces a template part of the contract, such as header, footer or sidebar, with a pattern made for its area or with changed block markup. Part names come from leitvia/get-contract; with Polylang <part>-<language> (header-de) is the part the theme shows for that language and is created in the area of its part. Patterns come from leitvia/list-patterns; edits change the pattern at block IDs of leitvia/get-pattern first, as the sections of leitvia/compose-page do, so a footer or header needs no markup of its own. The change publishes the part, a draft one too: core shows no draft part, so where the area level is draft it waits in a change package. The base hash is the hash of the template part. leitvia/get-contract returns it per part under hashes.templateParts.', 'leitvia-studio' ),
 			'setup',
 			$replace,
 			array(
@@ -506,6 +652,7 @@ final class Setup {
 						'description' => __( 'Name of a template part from leitvia/get-contract, such as header or footer.', 'leitvia-studio' ),
 					),
 					'pattern' => array( 'type' => 'string' ),
+					'edits'   => array( 'description' => __( 'Only with pattern: edits at block IDs of the pattern, as in the sections of leitvia/compose-page.', 'leitvia-studio' ) ) + Build::edits_schema(),
 					'content' => array(
 						'type'      => 'string',
 						'minLength' => 1,
@@ -708,15 +855,88 @@ final class Setup {
 				$fields[ 'organization_' . $field ] = $input[ $field ];
 			}
 		}
+		if ( array_key_exists( 'aggregate_rating', $input ) ) {
+			$rating = is_array( $input['aggregate_rating'] ) ? $input['aggregate_rating'] : array();
+			foreach ( Organization::RATING_FIELDS as $key => $setting ) {
+				$fields[ $setting ] = $rating[ $key ] ?? Settings::DEFAULTS[ $setting ];
+			}
+		}
 		$target = array( 'option' => Settings::OPTION );
 		if ( ! $fields ) {
 			/* translators: %s: list of field names. */
-			return Block_Edit::invalid( 'change', sprintf( __( 'Name what to change: %s.', 'leitvia-studio' ), implode( ', ', Organization::FIELDS ) ), $target );
+			return Block_Edit::invalid( 'change', sprintf( __( 'Name what to change: %s.', 'leitvia-studio' ), implode( ', ', array_merge( Organization::FIELDS, array( 'aggregate_rating' ) ) ) ), $target );
 		}
 		return array(
 			'area'      => 'structure',
 			'target'    => $target,
 			'base_hash' => Hashes::of( (string) wp_json_encode( get_option( Settings::OPTION ) ) ),
+			'change'    => static fn( array $state ): array => array( 'value' => $fields + (array) $state['value'] ),
+		);
+	}
+
+	/**
+	 * Operation of set-redirects: the setting redirects over the saved Studio settings, after Redirects::sanitize()
+	 * and the check for loops; a row the sanitizer drops is refused, so nothing changes silently.
+	 *
+	 * @param array<string, mixed> $input Input.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public static function describe_set_redirects( array $input ) {
+		$target = array( 'option' => Settings::OPTION );
+		$given  = array_values( (array) ( $input['redirects'] ?? array() ) );
+		$rows   = \LeitviaStudio\Seo\Redirects::sanitize( $given );
+		if ( count( $rows ) !== count( $given ) ) {
+			$kept = array_column( $rows, 'from' );
+			$bad  = array_values( array_filter( array_map( static fn( $row ): string => is_array( $row ) ? (string) ( $row['from'] ?? '' ) : '', $given ), static fn( string $from ): bool => ! in_array( \LeitviaStudio\Seo\Redirects::path( $from ), $kept, true ) ) );
+			/* translators: %s: paths */
+			return Block_Edit::invalid( 'redirects', sprintf( __( 'These rows are no valid redirect: %s. from is a path of the site other than the start page, used once; to is another path or an https address.', 'leitvia-studio' ), implode( ', ', $bad ) ), $target );
+		}
+		$loops = \LeitviaStudio\Seo\Redirects::loops( $rows );
+		if ( $loops ) {
+			/* translators: %s: paths */
+			return Block_Edit::invalid( 'redirects', sprintf( __( 'These redirects lead back to themselves: %s. Point each to the final address.', 'leitvia-studio' ), implode( ', ', $loops ) ), $target );
+		}
+		return array(
+			'area'      => 'structure',
+			'target'    => $target,
+			'base_hash' => Hashes::of( (string) wp_json_encode( get_option( Settings::OPTION ) ) ),
+			'change'    => static fn( array $state ): array => array( 'value' => array( 'redirects' => $rows ) + (array) $state['value'] ),
+		);
+	}
+
+	/**
+	 * Operation of set-llms: llms_txt, llms_summary, llms_pages and ai_crawlers over the saved Studio settings.
+	 *
+	 * @param array<string, mixed> $input Input.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public static function describe_set_llms( array $input ) {
+		$target = array( 'option' => Settings::OPTION );
+		$fields = array();
+		foreach ( array(
+			'enabled'     => 'llms_txt',
+			'summary'     => 'llms_summary',
+			'pages'       => 'llms_pages',
+			'ai_crawlers' => 'ai_crawlers',
+		) as $key => $setting ) {
+			if ( array_key_exists( $key, $input ) ) {
+				$fields[ $setting ] = $input[ $key ];
+			}
+		}
+		foreach ( (array) ( $fields['llms_pages'] ?? array() ) as $page ) {
+			if ( 'publish' !== get_post_status( (int) $page ) || ! Scope::readable( (int) $page ) ) {
+				return Block_Edit::invalid( 'pages', __( 'llms.txt lists published pages and posts agents can read only.', 'leitvia-studio' ), $target + array( 'post' => (int) $page ), 'leitvia/list-content' );
+			}
+		}
+		if ( ! $fields ) {
+			return Block_Edit::invalid( 'change', __( 'Name what to change: enabled, summary, pages or ai_crawlers.', 'leitvia-studio' ), $target );
+		}
+		$on = array_key_exists( 'llms_txt', $fields ) ? (bool) $fields['llms_txt'] : (bool) leitvia_studio_setting( 'llms_txt' );
+		return array(
+			'area'      => 'structure',
+			'target'    => $target,
+			'base_hash' => Hashes::of( (string) wp_json_encode( get_option( Settings::OPTION ) ) ),
+			'notice'    => $on ? \LeitviaStudio\Seo\Llms::held_back() : '',
 			'change'    => static fn( array $state ): array => array( 'value' => $fields + (array) $state['value'] ),
 		);
 	}
@@ -735,6 +955,43 @@ final class Setup {
 			'base_hash' => Hashes::of( (string) wp_json_encode( get_option( Settings::OPTION ) ) ),
 			'change'    => static fn( array $state ): array => array( 'value' => array( 'motion' => $motion ) + (array) $state['value'] ),
 		);
+	}
+
+	/**
+	 * Operations of set-permalinks: permalink_structure, category_base and tag_base, one per field sent. A structure
+	 * needs a tag that names one post. While the site has published posts and the structure changes, notice says that
+	 * their addresses move.
+	 *
+	 * @param array<string, mixed> $input Input.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public static function describe_set_permalinks( array $input ) {
+		$target = array( 'option' => 'permalink_structure' );
+		$ops    = array();
+		if ( array_key_exists( 'structure', $input ) ) {
+			$structure = '/' . trim( (string) $input['structure'], '/' ) . '/';
+			if ( ! preg_match( '/%(postname|post_id)%/', $structure ) ) {
+				return Block_Edit::invalid( 'structure', __( 'A permalink structure names one post with %postname% or %post_id%, such as /news/%postname%/.', 'leitvia-studio' ), $target );
+			}
+			$posts  = (int) wp_count_posts( 'post' )->publish;
+			$notice = (string) get_option( 'permalink_structure' ) !== $structure && $posts
+				/* translators: %d: number of published posts. */
+				? sprintf( _n( '%d published post changes its address. Lead the old address to the new one with leitvia/set-redirects, so links and search results keep working.', '%d published posts change their addresses. Lead the old addresses to the new ones with leitvia/set-redirects, so links and search results keep working.', $posts, 'leitvia-studio' ), $posts )
+				: '';
+			$ops[] = self::option_op( 'permalink_structure', $structure, $notice );
+		}
+		foreach ( array(
+			'category_base' => 'category_base',
+			'tag_base'      => 'tag_base',
+		) as $key => $option ) {
+			if ( array_key_exists( $key, $input ) ) {
+				$ops[] = self::option_op( $option, sanitize_title( (string) $input[ $key ] ) );
+			}
+		}
+		if ( ! $ops ) {
+			return Block_Edit::invalid( 'change', __( 'Name what to change: structure, category_base or tag_base.', 'leitvia-studio' ), $target );
+		}
+		return 1 === count( $ops ) ? $ops[0] : array( 'batch' => $ops );
 	}
 
 	/**
@@ -899,8 +1156,9 @@ final class Setup {
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	public static function describe_define_content_type( array $input ) {
-		$decl = (array) ( $input['declaration'] ?? array() );
-		if ( self::has_key( $decl, 'showInAbilities' ) ) {
+		$decl   = (array) ( $input['declaration'] ?? array() );
+		$opened = static fn( array $model ): array => array_map( static fn( $section ): array => array_filter( array_map( static fn( $entry ) => is_array( $entry ) ? ( $entry['showInAbilities'] ?? null ) : null, (array) $section ), static fn( $value ): bool => null !== $value ), array_intersect_key( $model, array_flip( Model::SECTIONS ) ) );
+		if ( self::has_key( $decl, 'showInAbilities' ) && ( null === self::$building_block || $opened( $decl ) != $opened( self::$building_block ) ) ) { // phpcs:ignore Universal.Operators.StrictComparisons.LooseNotEqual -- Same values per entry, order aside.
 			return Rejection::make( 'leitvia_forbidden_field', __( 'Agents may not set showInAbilities. Whether content is open to AI abilities is the decision of a person; remove the field and try again.', 'leitvia-studio' ), 403, 'show_in_abilities', array( 'option' => Pipeline::MODEL_OPTION ) );
 		}
 		return array(
@@ -1015,7 +1273,10 @@ final class Setup {
 						'severity' => 'error',
 						'block'    => '/' . $section . '/' . $key . '/slug',
 						'message'  => $message,
-						'fix'      => __( 'Choose another slug, or move or rename the page first.', 'leitvia-studio' ),
+						'fix'      => $page instanceof \WP_Post && 'publish' === $page->post_status
+							/* translators: %d: page ID */
+							? sprintf( __( 'Give page %d another slug with leitvia/update-content (slug) or move it under another parent, then repeat the call; the content type then takes the address. Or choose another slug for the content type.', 'leitvia-studio' ), $page->ID )
+							: __( 'Choose another slug, or move or rename the page first.', 'leitvia-studio' ),
 					);
 				}
 			}
@@ -1255,6 +1516,14 @@ final class Setup {
 				return Rejection::make( 'leitvia_unknown_pattern', __( 'There is no pattern with this name for this template part. List the patterns of its area and use one of them.', 'leitvia-studio' ), 404, 'pattern', array( 'pattern' => (string) $input['pattern'] ), 'leitvia/list-patterns' );
 			}
 			$content = (string) $pattern['content'];
+			if ( ! empty( $input['edits'] ) ) {
+				$content = Build::edit( $content, (array) $input['edits'], array( 'part' => $name ) );
+				if ( is_wp_error( $content ) ) {
+					return $content;
+				}
+			}
+		} elseif ( ! empty( $input['edits'] ) ) {
+			return Block_Edit::invalid( 'change', __( 'Edits change a pattern: send them with pattern, or send the changed markup as content.', 'leitvia-studio' ), array( 'part' => $name ) );
 		}
 		$template = get_block_template( get_stylesheet() . '//' . $name, 'wp_template_part' );
 		if ( isset( $input['content'] ) && $template ) {
@@ -1504,10 +1773,13 @@ final class Setup {
 			$inner    = self::links( (array) ( $item['items'] ?? array() ) );
 			$blocks[] = array(
 				'blockName'    => $inner ? 'core/navigation-submenu' : 'core/navigation-link',
-				'attrs'        => array(
-					'label' => (string) $item['label'],
-					'url'   => (string) $item['url'],
-					'kind'  => 'custom',
+				'attrs'        => array_filter(
+					array(
+						'label' => (string) $item['label'],
+						'url'   => (string) ( $item['url'] ?? '' ),
+						'kind'  => 'custom',
+					),
+					static fn( string $value ): bool => '' !== $value
 				),
 				'innerBlocks'  => $inner,
 				'innerHTML'    => '',
@@ -1539,8 +1811,9 @@ final class Setup {
 				$findings[] = self::finding( $id, __( 'A navigation holds only navigation links, submenus, page lists and mega menus.', 'leitvia-studio' ), __( 'Remove the block or turn it into a navigation link.', 'leitvia-studio' ) );
 				continue;
 			}
-			if ( in_array( $name, array( 'core/navigation-link', 'core/navigation-submenu' ), true ) ) {
-				$url = (string) ( $block['attrs']['url'] ?? '' );
+			$url = (string) ( $block['attrs']['url'] ?? '' );
+			// A submenu without an address is a button that opens its links, as for a group like Specialities.
+			if ( 'core/navigation-link' === $name || ( 'core/navigation-submenu' === $name && '' !== $url ) ) {
 				if ( ! self::link_target( $url ) ) {
 					$findings[] = self::finding( $id, __( 'The link goes to another site without https, or to no page.', 'leitvia-studio' ), __( 'Link to a page of this site, an https address, an email address (mailto:) or a phone number (tel:).', 'leitvia-studio' ) );
 				}

@@ -610,6 +610,7 @@ class Test_Gateway_Pipeline extends WP_UnitTestCase {
 				$finding + array(
 					'check'    => 'test/check',
 					'severity' => 'error',
+					'place'    => 'core/paragraph "New"',
 				),
 			),
 			$data['findings']

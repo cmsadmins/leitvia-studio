@@ -122,7 +122,11 @@ final class Registrar {
 			$public = $post_type['public'] ?? false;
 			// A public type without single pages lists its entries on pages (query loop, bindings) and has no address.
 			$single = $public && ( $post_type['singlePages'] ?? true );
-			$args   = array(
+			// A type without text of its own (supports without editor) still opens in the block editor, where the model
+			// panel lives, with no blocks to add: title and fields only. The classic screen has no panel.
+			$supports = (array) ( $post_type['supports'] ?? array( 'title', 'editor' ) );
+			$fields   = ! in_array( 'editor', $supports, true );
+			$args     = array(
 				'labels'            => self::post_type_labels( $post_type['label'], $post_type['singularLabel'] ),
 				'description'       => esc_html( $post_type['description'] ?? '' ),
 				'public'            => $public,
@@ -131,10 +135,14 @@ final class Registrar {
 				'hierarchical'      => $post_type['hierarchical'] ?? false,
 				'has_archive'       => $single && ( $post_type['hasArchive'] ?? false ),
 				'rewrite'           => $single ? self::rewrite( $post_type, (string) $key ) : false,
-				'supports'          => array_merge( $post_type['supports'] ?? array( 'title', 'editor' ), array( 'custom-fields' ) ),
+				'supports'          => array_merge( $supports, $fields ? array( 'editor', 'custom-fields' ) : array( 'custom-fields' ) ),
 				'menu_icon'         => $post_type['icon'] ?? 'dashicons-admin-post',
 				'show_in_abilities' => $post_type['showInAbilities'] ?? false,
 			);
+			if ( $fields ) {
+				$args['template']      = array();
+				$args['template_lock'] = 'all';
+			}
 			// Without a public flag only users who may edit the type read it over REST.
 			if ( ! $public ) {
 				$args['rest_controller_class'] = Posts_Controller::class;

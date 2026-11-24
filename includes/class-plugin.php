@@ -112,6 +112,7 @@ final class Plugin {
 		add_action( 'init', array( Model\Registrar::class, 'register' ), 9 );
 		add_action( 'init', array( Model\Registrar::class, 'maybe_flush' ), 999 );
 		add_filter( 'wp_insert_post_data', array( Model\Registrar::class, 'force_inherit' ) );
+		Model\Entries::register();
 		add_action( 'enqueue_block_editor_assets', array( Model\Registrar::class, 'enqueue_editor' ) );
 		add_filter( 'render_block_context', array( Model\Registrar::class, 'query_namespace' ), 10, 3 );
 		add_filter( 'query_loop_block_query_vars', array( Model\Registrar::class, 'listed_query_vars' ), 9, 2 );
@@ -144,13 +145,20 @@ final class Plugin {
 		add_action( 'init', array( Admin\Admin::class, 'register_status_column' ), 20 );
 		add_action( 'after_setup_theme', array( News\Image_Sizes::class, 'register' ) );
 		add_action( 'wp_head', array( News\Schema::class, 'print' ) );
+		add_filter( 'block_core_breadcrumbs_items', array( Seo\Cluster::class, 'breadcrumbs' ) );
 		add_filter( 'block_core_breadcrumbs_items', array( News\Schema::class, 'remember_breadcrumbs' ), PHP_INT_MAX );
+		// llms.txt and the AI crawlers in robots.txt, redirects of moved addresses before canonical redirects.
+		add_action( 'template_redirect', array( Seo\Llms::class, 'maybe_render' ), 0 );
+		add_filter( 'robots_txt', array( Seo\Llms::class, 'robots' ), 30, 2 );
+		add_action( 'template_redirect', array( Seo\Redirects::class, 'maybe_redirect' ), 0 );
 		add_action( 'wp', array( News\Schema::class, 'forget_breadcrumbs' ) );
 		add_action( 'wp_head', array( News\Head::class, 'print' ), 5 );
 		add_filter( 'pre_get_document_title', array( News\Head::class, 'title' ) );
 		add_filter( 'wp_robots', array( News\Head::class, 'robots' ) );
 		add_action( 'wp_head', array( Blocks\Schema_Nodes::class, 'print' ) );
 		add_action( 'wp_head', array( self::class, 'defer_modules' ), 1 );
+		// Start year and holder of the copyright line of the theme Leitvia, from the organization details.
+		add_filter( 'leitvia_copyright', array( Organization\Organization::class, 'copyright' ) );
 		add_filter( 'leitvia_editorial_url', static fn( $url ): string => '' !== (string) $url ? (string) $url : News\Schema::editorial_url() );
 		add_action( 'init', array( News\Sitemap::class, 'register' ) );
 		add_filter( 'query_vars', array( News\Sitemap::class, 'query_vars' ) );
@@ -173,6 +181,19 @@ final class Plugin {
 		add_filter( 'render_block_leitvia/pricing', array( Blocks\Blocks::class, 'unique_pricing_group' ) );
 		add_filter( 'render_block_leitvia/spotlight', array( Blocks\Blocks::class, 'spotlight_group' ) );
 		add_filter( 'render_block_leitvia/faq', array( Blocks\Faq::class, 'render' ), 10, 2 );
+		add_filter( 'render_block_core/group', array( Blocks\Faq::class, 'section' ), 10, 2 );
+		add_filter( 'get_the_author_display_name', array( News\Schema::class, 'author_name' ), 10, 2 );
+		add_filter( 'the_author', array( News\Schema::class, 'author_name' ) );
+		add_filter( 'page_template_hierarchy', array( News\Schema::class, 'article_page_template' ) );
+		// leitvia/set-permalinks writes the options; the rewrite rules follow on the next request, as after the screen.
+		foreach ( array( 'permalink_structure', 'category_base', 'tag_base' ) as $option ) {
+			add_action(
+				'update_option_' . $option,
+				static function (): void {
+					delete_option( 'rewrite_rules' );
+				}
+			);
+		}
 		add_filter( 'leitvia_studio_schema_nodes', array( Blocks\Faq::class, 'merge' ) );
 		add_filter( 'render_block_core/image', array( Blocks\Blocks::class, 'pattern_image_size' ) );
 		add_filter( 'render_block_leitvia/announcement-bar', array( Blocks\Announcement_Bar::class, 'render' ) );
@@ -200,6 +221,7 @@ final class Plugin {
 		add_filter( 'render_block_core/image', array( Blocks\Lightbox_Focus::class, 'render' ), 20 );
 		add_action( 'init', array( Blocks\Sticky_Header::class, 'register_module' ) );
 		add_filter( 'render_block_core/group', array( Blocks\Sticky_Header::class, 'render' ), 10, 2 );
+		add_filter( 'render_block_core/template-part', array( Blocks\Sticky_Header::class, 'render_part' ), 10, 2 );
 		add_filter( 'default_wp_template_part_areas', array( Blocks\Mega_Menu::class, 'areas' ) );
 		add_filter( 'register_block_type_args', array( Blocks\Mega_Menu::class, 'block_args' ), 10, 2 );
 		add_filter( 'register_block_type_args', array( Blocks\Blocks::class, 'render_callbacks' ), 10, 2 );

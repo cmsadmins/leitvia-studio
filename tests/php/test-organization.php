@@ -97,19 +97,23 @@ class Test_Organization extends WP_UnitTestCase {
 	public function test_details_default(): void {
 		$this->assertSame(
 			array(
-				'type'          => 'Organization',
-				'name'          => 'Example Joinery',
-				'url'           => home_url( '/' ),
-				'street'        => '',
-				'postal_code'   => '',
-				'city'          => '',
-				'country'       => '',
-				'phone'         => '',
-				'email'         => '',
-				'founding_date' => '',
-				'area_served'   => array(),
-				'opening_hours' => array(),
-				'same_as'       => array(),
+				'type'             => 'Organization',
+				'name'             => 'Example Joinery',
+				'url'              => home_url( '/' ),
+				'street'           => '',
+				'postal_code'      => '',
+				'city'             => '',
+				'country'          => '',
+				'phone'            => '',
+				'email'            => '',
+				'founding_date'    => '',
+				'founder'          => '',
+				'copyright_since'  => '',
+				'copyright_holder' => '',
+				'area_served'      => array(),
+				'opening_hours'    => array(),
+				'same_as'          => array(),
+				'aggregate_rating' => null,
 			),
 			Organization::details()
 		);
@@ -275,5 +279,55 @@ class Test_Organization extends WP_UnitTestCase {
 		// The schema the end-to-end tests check the node against lists the same kinds of business.
 		$fixture = wp_json_file_decode( dirname( __DIR__ ) . '/fixtures/news/organization.schema.json', array( 'associative' => true ) );
 		$this->assertSame( Organization::TYPES, $fixture['properties']['@type']['enum'] );
+	}
+
+	/**
+	 * The founder is a Person in the node; the copyright line of the theme takes the start year and the holder from the
+	 * settings where its binding names none, and a year that is no YYYY is dropped.
+	 */
+	public function test_founder_and_copyright_line(): void {
+		self::save(
+			array(
+				'organization_founder'          => 'Ada Example',
+				'organization_copyright_since'  => '2009',
+				'organization_copyright_holder' => 'Example & Sons',
+			)
+		);
+		$this->assertSame(
+			array(
+				'@type' => 'Person',
+				'name'  => 'Ada Example',
+			),
+			Organization::node()['founder']
+		);
+		$this->assertSame(
+			array(
+				'since'  => '2009',
+				'holder' => 'Example & Sons',
+			),
+			apply_filters(
+				'leitvia_copyright',
+				array(
+					'since'  => '',
+					'holder' => '',
+				)
+			)
+		);
+		$this->assertSame(
+			'Own',
+			apply_filters(
+				'leitvia_copyright',
+				array(
+					'since'  => '',
+					'holder' => 'Own',
+				)
+			)['holder']
+		);
+		// The theme of the test stack is Leitvia; its binding prints the line.
+		if ( function_exists( 'Leitvia\site_meta_value' ) ) {
+			$this->assertSame( '© 2009–' . wp_date( 'Y' ) . ' Example &amp; Sons', \Leitvia\site_meta_value( array( 'key' => 'copyright' ) ) );
+		}
+		self::save( array( 'organization_copyright_since' => '09' ) );
+		$this->assertSame( '', Organization::details()['copyright_since'] );
 	}
 }

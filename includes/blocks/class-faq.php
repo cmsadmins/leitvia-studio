@@ -92,6 +92,30 @@ final class Faq {
 	}
 
 	/**
+	 * A section of a pattern that provides the section kind faq of the contract (such as leitvia/content-faq of the theme,
+	 * built of core/details without this block) gives the same FAQPage data from its visible questions: the theme runs
+	 * without Studio and prints none itself. Sections with the FAQ block leave it to the block. Runs on
+	 * render_block_core/group; the markup stays as it is.
+	 *
+	 * @param string               $content Rendered block HTML.
+	 * @param array<string, mixed> $block   Parsed block.
+	 */
+	public static function section( string $content, array $block ): string {
+		$name = (string) ( $block['attrs']['metadata']['patternName'] ?? '' );
+		if ( '' === $name || ! str_contains( $content, '<details' ) || str_contains( $content, 'wp-block-leitvia-faq' ) ) {
+			return $content;
+		}
+		$data = leitvia_studio_contract()->data();
+		foreach ( array_merge( (array) ( $data['patterns'] ?? array() ), (array) ( $data['studioPatterns'] ?? array() ), (array) ( $data['addonPatterns'] ?? array() ) ) as $pattern ) {
+			if ( ( $pattern['slug'] ?? null ) === $name && in_array( 'faq', (array) ( $pattern['provides'] ?? array() ), true ) ) {
+				self::render( $content, array( 'attrs' => array() ) );
+				break;
+			}
+		}
+		return $content;
+	}
+
+	/**
 	 * Question nodes; entries without question or answer text are left out.
 	 *
 	 * @param list<array{0: string, 1: string}> $entries Question text and answer HTML.

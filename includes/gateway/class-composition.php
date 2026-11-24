@@ -27,12 +27,28 @@ defined( 'ABSPATH' ) || exit;
  * a break, stands outside the density run and repeats no neighbor that is none: the video or the wide image is the
  * change of pace, whatever its padding, layout and ground.
  *
+ * A pattern may name in continues the patterns it continues as one section (price cards after the row of their parts):
+ * next to one of them it repeats nothing. With a frame (type of a page frame) the page also needs a section for every
+ * kind of its requires (missingSection) and gets a finding without points for every kind of its recommends it lacks
+ * (recommendedSection); a section fills the kinds of provides of its pattern and the kind that is its role. Both carry
+ * the index count( $slugs ), the end of the page, and the kind. A saved page names its frame in FRAME_META.
+ *
  * Check leitvia/composition (scope page) warns when an agent write leaves a page below the minimum score of the
  * gateway settings and below the score it had before; a warning turns "autonomous" into a change package.
  */
 final class Composition {
 
 	public const CHECK = 'leitvia/composition';
+
+	/**
+	 * Post meta with the type of the page frame of a page, set by compose-page and set-page-structure.
+	 */
+	public const FRAME_META = '_leitvia_page_frame';
+
+	/**
+	 * Findings about the sections a page frame needs or recommends; they name no section of the page.
+	 */
+	public const FRAME_RULES = array( 'missingSection', 'recommendedSection' );
 
 	/**
 	 * Replacement candidates named per finding.
@@ -80,9 +96,10 @@ final class Composition {
 	 * @param string               $template Template slug, '' to skip the hero template rule.
 	 * @param array<int, string>   $tones    Tone per index in slugs from the blocks, see tones().
 	 * @param int[]                $mirrored Indexes in slugs of the sections with the media on the other side.
-	 * @return list<array{rule: string, index: int, message: string}>
+	 * @param string               $frame    Type of a page frame whose required and recommended kinds count, '' for none.
+	 * @return list<array{rule: string, index: int, message: string, kind?: string}>
 	 */
-	public static function check( array $slugs, array $contract, string $template = '', array $tones = array(), array $mirrored = array() ): array {
+	public static function check( array $slugs, array $contract, string $template = '', array $tones = array(), array $mirrored = array(), string $frame = '' ): array {
 		$rules   = (array) ( $contract['compositionRules'] ?? array() );
 		$by_slug = array();
 		foreach ( array_merge( (array) ( $contract['patterns'] ?? array() ), (array) ( $contract['studioPatterns'] ?? array() ), (array) ( $contract['addonPatterns'] ?? array() ), (array) ( $contract['labPatterns'] ?? array() ) ) as $pattern ) {
@@ -98,10 +115,10 @@ final class Composition {
 		};
 
 		$hero_templates = array();
-		foreach ( (array) ( $contract['pageFrames'] ?? array() ) as $frame ) {
-			foreach ( $frame['slots'] as $slot ) {
+		foreach ( (array) ( $contract['pageFrames'] ?? array() ) as $candidate ) {
+			foreach ( $candidate['slots'] as $slot ) {
 				if ( 'intro' === $slot['name'] && in_array( 'hook', $slot['roles'], true ) ) {
-					$hero_templates[] = $frame['template'];
+					$hero_templates[] = $candidate['template'];
 				}
 			}
 		}
@@ -183,7 +200,8 @@ final class Composition {
 				$add( 'heroFirstOnly', $s['index'], sprintf( __( 'Section %d is a hero; only the first section may be a hero.', 'leitvia-studio' ), $s['n'] ) );
 			}
 
-			if ( $prev && $prev['media'] === $s['media'] && $repeat && array_filter( $repeat, static fn( string $key ): bool => ( $prev['composition'][ $key ] ?? null ) !== ( $c[ $key ] ?? null ) ) === array() ) {
+			$continued = $prev && in_array( $prev['slug'], (array) ( $s['continues'] ?? array() ), true );
+			if ( $prev && ! $continued && $prev['media'] === $s['media'] && $repeat && array_filter( $repeat, static fn( string $key ): bool => ( $prev['composition'][ $key ] ?? null ) !== ( $c[ $key ] ?? null ) ) === array() ) {
 				$what = implode( '/', array_map( static fn( string $key ): string => (string) $c[ $key ], $repeat ) );
 				/* translators: 1: section number, 2: next section number, 3: layout/tone. */
 				$add( 'noAdjacentRepeat', $s['index'], sprintf( __( 'Sections %1$d and %2$d are both %3$s; give one of them another ground (backgroundColor surface or surface-alt on its outer block, or the block style Inverse), put its media on the other side (block style Media right), or move another section between them.', 'leitvia-studio' ), $prev['n'], $s['n'], $what ) );
@@ -227,7 +245,43 @@ final class Composition {
 			$add( 'maxSections', $sections[ $max ]['index'], sprintf( __( 'The page has %1$d sections; keep it at %2$d or fewer.', 'leitvia-studio' ), count( $sections ), $max ) );
 		}
 
+		$page_frame = self::frame( $frame, $contract );
+		$filled     = array();
+		foreach ( $sections as $s ) {
+			$filled = array_merge( $filled, array_filter( (array) ( $s['provides'] ?? array() ), 'is_string' ), array( (string) ( $s['composition']['role'] ?? '' ) ) );
+		}
+		foreach ( array_combine( self::FRAME_RULES, array( 'requires', 'recommends' ) ) as $rule => $key ) {
+			foreach ( array_values( array_diff( (array) ( $page_frame[ $key ] ?? array() ), $filled ) ) as $kind ) {
+				$issues[] = array(
+					'rule'    => $rule,
+					'index'   => count( $slugs ),
+					'message' => 'missingSection' === $rule
+						/* translators: 1: page frame type, 2: section kind. */
+						? sprintf( __( 'Page frame %1$s needs a section of kind %2$s; add a pattern that provides it (leitvia/list-patterns with provides %2$s).', 'leitvia-studio' ), $frame, $kind )
+						/* translators: 1: page frame type, 2: section kind. */
+						: sprintf( __( 'Page frame %1$s recommends a section of kind %2$s; add a pattern that provides it (leitvia/list-patterns with provides %2$s).', 'leitvia-studio' ), $frame, $kind ),
+					'kind'    => (string) $kind,
+				);
+			}
+		}
+
 		return $issues;
+	}
+
+	/**
+	 * The page frame of a type, null for '' or a type the contract does not list.
+	 *
+	 * @param string               $type     Page frame type.
+	 * @param array<string, mixed> $contract Contract data.
+	 * @return array<string, mixed>|null
+	 */
+	public static function frame( string $type, array $contract ): ?array {
+		foreach ( '' === $type ? array() : (array) ( $contract['pageFrames'] ?? array() ) as $frame ) {
+			if ( ( $frame['type'] ?? null ) === $type ) {
+				return $frame;
+			}
+		}
+		return null;
 	}
 
 	/**
@@ -238,10 +292,11 @@ final class Composition {
 	 * @param string               $template Template slug or ''.
 	 * @param array<int, string>   $tones    Tone per index in slugs, see tones().
 	 * @param int[]                $mirrored Indexes in slugs of the sections with the media on the other side.
-	 * @return array{issues: list<array{rule: string, index: int, message: string}>, score: int}
+	 * @param string               $frame    Type of a page frame, '' for none, see check().
+	 * @return array{issues: list<array{rule: string, index: int, message: string, kind?: string}>, score: int}
 	 */
-	public static function score( array $slugs, array $contract, string $template = '', array $tones = array(), array $mirrored = array() ): array {
-		$issues  = self::check( $slugs, $contract, $template, $tones, $mirrored );
+	public static function score( array $slugs, array $contract, string $template = '', array $tones = array(), array $mirrored = array(), string $frame = '' ): array {
+		$issues  = self::check( $slugs, $contract, $template, $tones, $mirrored, $frame );
 		$scoring = (array) ( $contract['compositionRules']['scoring'] ?? array() );
 		$score   = 100;
 		foreach ( $issues as $issue ) {
@@ -255,23 +310,38 @@ final class Composition {
 
 	/**
 	 * Score with concrete suggestions: per finding at a pattern section, up to three patterns of the same role, none
-	 * deprecated, that remove the finding and raise the score when they replace that section.
+	 * deprecated, that remove the finding and raise the score when they replace that section; per kind a page frame
+	 * needs or recommends, up to three patterns that provide it, to add (add).
 	 *
 	 * @param string[]             $slugs    Pattern slugs in page order.
 	 * @param array<string, mixed> $contract Contract data.
 	 * @param string               $template Template slug or ''.
 	 * @param array<int, string>   $tones    Tone per index in slugs, see tones(); a replaced section loses its own.
 	 * @param int[]                $mirrored Indexes of the mirrored sections; a replaced section is not mirrored.
+	 * @param string               $frame    Type of a page frame, '' for none, see check().
 	 * @return array{issues: list<array<string, mixed>>, score: int, suggestions: list<array<string, mixed>>}
 	 */
-	public static function report( array $slugs, array $contract, string $template = '', array $tones = array(), array $mirrored = array() ): array {
+	public static function report( array $slugs, array $contract, string $template = '', array $tones = array(), array $mirrored = array(), string $frame = '' ): array {
 		$slugs                 = array_values( $slugs );
-		$result                = self::score( $slugs, $contract, $template, $tones, $mirrored );
+		$result                = self::score( $slugs, $contract, $template, $tones, $mirrored, $frame );
 		$patterns              = array_merge( (array) ( $contract['patterns'] ?? array() ), (array) ( $contract['studioPatterns'] ?? array() ), (array) ( $contract['addonPatterns'] ?? array() ) );
 		$roles                 = array_combine( array_column( $patterns, 'slug' ), array_column( array_column( $patterns, 'composition' ), 'role' ) );
 		$replaced              = array_filter( array_combine( array_column( $patterns, 'slug' ), array_map( static fn( array $pattern ): bool => ! empty( $pattern['docs']['replacedBy'] ), $patterns ) ) );
 		$result['suggestions'] = array();
 		foreach ( $result['issues'] as $issue ) {
+			if ( isset( $issue['kind'] ) ) {
+				$kind                    = $issue['kind'];
+				$add                     = array_slice( array_column( array_filter( $patterns, static fn( array $pattern ): bool => empty( $pattern['docs']['replacedBy'] ) && ( in_array( $kind, (array) ( $pattern['provides'] ?? array() ), true ) || ( $pattern['composition']['role'] ?? '' ) === $kind ) ), 'slug' ), 0, self::MAX_SUGGESTIONS );
+				$result['suggestions'][] = array(
+					'rule'         => $issue['rule'],
+					'index'        => $issue['index'],
+					'replace_with' => array(),
+					'add'          => $add,
+					/* translators: 1: finding, 2: pattern slugs. */
+					'message'      => $add ? sprintf( __( '%1$s For example %2$s.', 'leitvia-studio' ), $issue['message'], self::or_list( $add ) ) : $issue['message'],
+				);
+				continue;
+			}
 			$role       = $roles[ $slugs[ $issue['index'] ] ] ?? '';
 			$candidates = array();
 			// ponytail: tries every pattern of the role, about 60 checks of a short list per finding; fine for pages.
@@ -281,7 +351,7 @@ final class Composition {
 				}
 				$try                    = $slugs;
 				$try[ $issue['index'] ] = $slug;
-				$new                    = self::score( $try, $contract, $template, array_diff_key( $tones, array( $issue['index'] => true ) ), array_diff( $mirrored, array( $issue['index'] ) ) );
+				$new                    = self::score( $try, $contract, $template, array_diff_key( $tones, array( $issue['index'] => true ) ), array_diff( $mirrored, array( $issue['index'] ) ), $frame );
 				$same                   = array_filter( $new['issues'], static fn( array $found ): bool => $found['rule'] === $issue['rule'] && $found['index'] === $issue['index'] );
 				if ( ! $same && $new['score'] > $result['score'] ) {
 					$candidates[ $slug ] = $new['score'];
@@ -500,7 +570,7 @@ final class Composition {
 	 * post, below the score of the saved page. Pages without patterns and post types without a front end are skipped.
 	 *
 	 * @param string               $content Block markup.
-	 * @param array<string, mixed> $context post, post_type, ability, template.
+	 * @param array<string, mixed> $context post, post_type, ability, template, frame (else the frame of the saved page).
 	 * @return list<array<string, mixed>>
 	 */
 	public static function page( string $content, array $context ): array {
@@ -511,14 +581,15 @@ final class Composition {
 		}
 		$post     = (int) ( $context['post'] ?? 0 );
 		$template = (string) ( $context['template'] ?? ( $post ? get_page_template_slug( $post ) : '' ) );
+		$frame    = (string) ( $context['frame'] ?? ( $post ? get_post_meta( $post, self::FRAME_META, true ) : '' ) );
 		// A write is measured against the saved page too; the audit reports the saved page as it is.
 		$compare = $post && 'leitvia/audit-site' !== ( $context['ability'] ?? '' );
 		$saved   = $compare ? self::sections( (string) get_post_field( 'post_content', $post, 'raw' ) ) : array();
 		$data    = self::lab( array_merge( $slugs, $saved ), $contract->data() );
-		$report  = self::report( $slugs, $data, $template, self::tones( $content ), self::mirrored( $content ) );
+		$report  = self::report( $slugs, $data, $template, self::tones( $content ), self::mirrored( $content ), $frame );
 		$min     = (int) Gateway::settings()['min_composition_score'];
 		$raw     = $compare ? (string) get_post_field( 'post_content', $post, 'raw' ) : '';
-		$before  = $compare ? self::score( $saved, $data, $template, self::tones( $raw ), self::mirrored( $raw ) )['score'] : 101;
+		$before  = $compare ? self::score( $saved, $data, $template, self::tones( $raw ), self::mirrored( $raw ), $frame )['score'] : 101;
 		if ( $report['score'] >= $min || $report['score'] >= $before ) {
 			return array();
 		}

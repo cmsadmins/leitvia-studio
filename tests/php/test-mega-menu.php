@@ -119,13 +119,12 @@ class Test_Mega_Menu extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Nested submenus or more than 12 submenu links mark the navigation; the seed's flat menu with 10 links stays as
-	 * core renders it.
+	 * Every navigation with a submenu is marked, a navigation without one or without an overlay is not.
 	 */
 	public function test_long_or_nested_navigation_is_collapsible(): void {
 		$marked = static fn( string $markup ): bool => str_contains( do_blocks( $markup ), 'data-leitvia-collapsible' );
-		$this->assertFalse( $marked( self::navigation( array( 3, 7 ) ) ) );
-		$this->assertTrue( $marked( self::navigation( array( 6, 7 ) ) ) );
+		$this->assertTrue( $marked( self::navigation( array( 2 ) ) ) );
+		$this->assertFalse( $marked( get_comment_delimited_block_content( 'core/navigation', array(), '<!-- wp:navigation-link {"label":"Link","url":"/link/"} /-->' ) ) );
 		$this->assertTrue( $marked( self::navigation( array( 2, 2 ), true ) ) );
 		$this->assertFalse( $marked( self::navigation( array( 2, 2 ), true, array( 'overlayMenu' => 'never' ) ) ) );
 	}
@@ -135,7 +134,7 @@ class Test_Mega_Menu extends WP_UnitTestCase {
 	 */
 	public function test_filter_decides(): void {
 		add_filter( 'leitvia_studio_collapsible_overlay', '__return_true' );
-		$this->assertStringContainsString( 'data-leitvia-collapsible', do_blocks( self::navigation( array( 1 ) ) ) );
+		$this->assertStringContainsString( 'data-leitvia-collapsible', do_blocks( get_comment_delimited_block_content( 'core/navigation', array(), '<!-- wp:navigation-link {"label":"Link","url":"/link/"} /-->' ) ) );
 		remove_filter( 'leitvia_studio_collapsible_overlay', '__return_true' );
 		add_filter( 'leitvia_studio_collapsible_overlay', '__return_false' );
 		$this->assertStringNotContainsString( 'data-leitvia-collapsible', do_blocks( self::navigation( array( 2, 2 ), true ) ) );

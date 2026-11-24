@@ -1,0 +1,25 @@
+{
+	"name": "continued-section",
+	"template": "page-landing",
+	"addonPatterns": [
+		{
+			"slug": "x/parts-row",
+			"area": "content",
+			"composition": { "tone": "surface", "density": "regular", "layout": "grid", "weight": "light", "role": "detail", "width": "wide" }
+		},
+		{
+			"slug": "x/price-cards",
+			"area": "offer",
+			"composition": { "tone": "surface", "density": "regular", "layout": "grid", "weight": "heavy", "role": "offer", "width": "wide" },
+			"continues": [ "x/parts-row" ]
+		}
+	],
+	"sections": [
+		"leitvia/hero-centered",
+		"x/parts-row",
+		"x/price-cards",
+		"leitvia/cta-banner"
+	],
+	"issues": [],
+	"score": 100
+}

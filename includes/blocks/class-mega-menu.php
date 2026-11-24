@@ -98,8 +98,8 @@ final class Mega_Menu {
 
 	/**
 	 * Marks a navigation whose overlay gets collapsible submenus and loads the view module and style for it. On by
-	 * default for a navigation with a mega menu, a submenu inside a submenu or more than 12 links in submenus; the
-	 * filter leitvia_studio_collapsible_overlay decides last. Without JavaScript nothing changes. Runs on
+	 * default for every navigation with a submenu or a mega menu: core keeps submenus open in the overlay while their
+	 * chevron still turns, which reads as broken. The filter leitvia_studio_collapsible_overlay decides last. Without JavaScript nothing changes. Runs on
 	 * render_block_core/navigation.
 	 *
 	 * @param string               $content Rendered navigation.
@@ -120,10 +120,10 @@ final class Mega_Menu {
 		/**
 		 * Filters whether the overlay of this navigation gets collapsible submenus.
 		 *
-		 * @param bool                 $collapsible Default: a mega menu, nested submenus or more than 12 submenu links.
+		 * @param bool                 $collapsible Default: a submenu or a mega menu.
 		 * @param array<string, mixed> $block       Parsed navigation block.
 		 */
-		if ( ! apply_filters( 'leitvia_studio_collapsible_overlay', $count['mega'] || $count['nested'] || $count['links'] > 12, $block ) ) {
+		if ( ! apply_filters( 'leitvia_studio_collapsible_overlay', $count['mega'] || $count['links'] > 0, $block ) ) {
 			return $content;
 		}
 		$tags = new \WP_HTML_Tag_Processor( $content );

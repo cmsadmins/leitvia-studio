@@ -37,9 +37,24 @@ final class Organization {
 	public const DATE = '^(\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\d|3[01]))?)?)?$';
 
 	/**
+	 * The first year of the copyright line, YYYY or empty, as JSON Schema pattern (no delimiters).
+	 */
+	public const YEAR = '^(\d{4})?$';
+
+	/**
 	 * Fields of leitvia/set-organization, each stored as the setting organization_<field>.
 	 */
-	public const FIELDS = array( 'type', 'street', 'postal_code', 'city', 'country', 'phone', 'email', 'founding_date', 'area_served', 'opening_hours', 'same_as' );
+	public const FIELDS = array( 'type', 'street', 'postal_code', 'city', 'country', 'phone', 'email', 'founding_date', 'founder', 'copyright_since', 'copyright_holder', 'area_served', 'opening_hours', 'same_as' );
+
+	/**
+	 * Settings of the rating of the organization (field aggregate_rating of set-organization), by key of the field.
+	 */
+	public const RATING_FIELDS = array(
+		'value'      => 'organization_rating_value',
+		'count'      => 'organization_rating_count',
+		'source_url' => 'organization_rating_source',
+		'confirmed'  => 'organization_rating_confirmed',
+	);
 
 	/**
 	 * Most rows of opening hours kept.
@@ -48,31 +63,81 @@ final class Organization {
 
 	/**
 	 * The organization from the settings: kind of business (Organization unless the setting names one of TYPES), name
-	 * and address of the site, address, phone, email, founding date, area served, opening hours and profiles. Empty
-	 * strings and lists where nothing is set.
+	 * and address of the site, address, phone, email, founding date, founder or owner, the start year and holder of the
+	 * copyright line, area served, opening hours, profiles and the rating (rating()). Empty strings and lists where
+	 * nothing is set.
 	 *
-	 * @return array{type: string, name: string, url: string, street: string, postal_code: string, city: string, country: string, phone: string, email: string, founding_date: string, area_served: list<string>, opening_hours: list<array{days: list<string>, opens: string, closes: string}>, same_as: list<string>}
+	 * @return array{type: string, name: string, url: string, street: string, postal_code: string, city: string, country: string, phone: string, email: string, founding_date: string, founder: string, copyright_since: string, copyright_holder: string, area_served: list<string>, opening_hours: list<array{days: list<string>, opens: string, closes: string}>, same_as: list<string>, aggregate_rating: array{value: string, count: int, source_url: string, confirmed: bool}|null}
 	 */
 	public static function details(): array {
 		$type    = leitvia_studio_setting( 'organization_type' );
 		$text    = static fn( string $field ): string => (string) leitvia_studio_setting( 'organization_' . $field );
 		$list    = static fn( string $field ): array => array_values( array_filter( (array) leitvia_studio_setting( 'organization_' . $field ), 'is_string' ) );
 		$details = array(
-			'type'          => is_string( $type ) && in_array( $type, self::TYPES, true ) ? $type : 'Organization',
-			'name'          => \LeitviaStudio\News\Schema::text( get_bloginfo( 'name' ) ),
-			'url'           => home_url( '/' ),
-			'street'        => $text( 'street' ),
-			'postal_code'   => $text( 'postal_code' ),
-			'city'          => $text( 'city' ),
-			'country'       => $text( 'country' ),
-			'phone'         => $text( 'phone' ),
-			'email'         => $text( 'email' ),
-			'founding_date' => $text( 'founding_date' ),
-			'area_served'   => $list( 'area_served' ),
-			'opening_hours' => self::hours( leitvia_studio_setting( 'organization_opening_hours' ) ),
-			'same_as'       => $list( 'same_as' ),
+			'type'             => is_string( $type ) && in_array( $type, self::TYPES, true ) ? $type : 'Organization',
+			'name'             => \LeitviaStudio\News\Schema::text( get_bloginfo( 'name' ) ),
+			'url'              => home_url( '/' ),
+			'street'           => $text( 'street' ),
+			'postal_code'      => $text( 'postal_code' ),
+			'city'             => $text( 'city' ),
+			'country'          => $text( 'country' ),
+			'phone'            => $text( 'phone' ),
+			'email'            => $text( 'email' ),
+			'founding_date'    => $text( 'founding_date' ),
+			'founder'          => $text( 'founder' ),
+			'copyright_since'  => $text( 'copyright_since' ),
+			'copyright_holder' => $text( 'copyright_holder' ),
+			'area_served'      => $list( 'area_served' ),
+			'opening_hours'    => self::hours( leitvia_studio_setting( 'organization_opening_hours' ) ),
+			'same_as'          => $list( 'same_as' ),
+			'aggregate_rating' => self::rating(),
 		);
 		return $details;
+	}
+
+	/**
+	 * The rating of the organization on another site as set with set-organization: value (1 to 5), count of reviews,
+	 * the https address where it is shown and whether a person confirmed it; null without a value. Structured data and
+	 * the star in an SEO title use it only when confirmed, with a count and a source.
+	 *
+	 * @return array{value: string, count: int, source_url: string, confirmed: bool}|null
+	 */
+	public static function rating(): ?array {
+		$value = (string) leitvia_studio_setting( self::RATING_FIELDS['value'] );
+		return '' === $value ? null : array(
+			'value'      => $value,
+			'count'      => (int) leitvia_studio_setting( self::RATING_FIELDS['count'] ),
+			'source_url' => (string) leitvia_studio_setting( self::RATING_FIELDS['source_url'] ),
+			'confirmed'  => (bool) leitvia_studio_setting( self::RATING_FIELDS['confirmed'] ),
+		);
+	}
+
+	/**
+	 * The rating when it may be shown: confirmed, with a count and a source; else null.
+	 *
+	 * @return array{value: string, count: int, source_url: string, confirmed: bool}|null
+	 */
+	public static function confirmed_rating(): ?array {
+		$rating = self::rating();
+		return $rating && $rating['confirmed'] && $rating['count'] > 0 && '' !== $rating['source_url'] ? $rating : null;
+	}
+
+	/**
+	 * Start year and holder of the copyright line of the theme Leitvia (filter leitvia_copyright of its binding
+	 * leitvia/site-meta): the settings copyright_since and copyright_holder fill what the binding of the line leaves
+	 * empty, so every footer shows the years and the holder without markup of its own.
+	 *
+	 * @param mixed $copyright since and holder from the binding arguments.
+	 * @return array{since: string, holder: string}
+	 */
+	public static function copyright( $copyright ): array {
+		$copyright = is_array( $copyright ) ? $copyright : array();
+		$details   = self::details();
+		$pick      = static fn( string $key, string $saved ): string => '' !== (string) ( $copyright[ $key ] ?? '' ) ? (string) $copyright[ $key ] : $saved;
+		return array(
+			'since'  => $pick( 'since', $details['copyright_since'] ),
+			'holder' => $pick( 'holder', $details['copyright_holder'] ),
+		);
 	}
 
 	/**
@@ -84,7 +149,8 @@ final class Organization {
 
 	/**
 	 * The organization as schema.org node with @id: type, name, address of the site, postal address, phone, email,
-	 * founding date, area served and profiles where they are set, the logo (logo()), and for a local business the
+	 * founding date, area served and profiles where they are set, a confirmed rating (confirmed_rating()) as
+	 * aggregateRating, the logo (logo()), and for a local business the
 	 * opening hours and the logo as image. Opening hours stay out of an Organization, which schema.org does not give
 	 * them.
 	 *
@@ -118,6 +184,12 @@ final class Organization {
 				'sameAs'       => $details['same_as'],
 			)
 		);
+		if ( '' !== $details['founder'] ) {
+			$node['founder'] = array(
+				'@type' => 'Person',
+				'name'  => $details['founder'],
+			);
+		}
 		$local = 'Organization' !== $details['type'];
 		if ( $local && $details['opening_hours'] ) {
 			$node['openingHoursSpecification'] = array_map(
@@ -128,6 +200,16 @@ final class Organization {
 					'closes'    => $row['closes'],
 				),
 				$details['opening_hours']
+			);
+		}
+		$rating = self::confirmed_rating();
+		if ( $rating ) {
+			$node['aggregateRating'] = array(
+				'@type'       => 'AggregateRating',
+				'ratingValue' => (float) $rating['value'],
+				'bestRating'  => 5,
+				'reviewCount' => $rating['count'],
+				'url'         => $rating['source_url'],
 			);
 		}
 		$logo = self::logo();

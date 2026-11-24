@@ -1,0 +1,30 @@
+{
+	"name": "frame-service",
+	"template": "page-landing",
+	"frame": "service",
+	"sections": [
+		"leitvia/hero-centered",
+		"leitvia/proof-trust-strip",
+		"leitvia/content-text-media",
+		"leitvia/content-steps",
+		"leitvia/content-quote",
+		"leitvia/offer-pricing-3",
+		"leitvia/content-faq",
+		"leitvia/cta-contact"
+	],
+	"issues": [
+		[
+			"recommendedSection",
+			8
+		],
+		[
+			"recommendedSection",
+			8
+		],
+		[
+			"recommendedSection",
+			8
+		]
+	],
+	"score": 100
+}

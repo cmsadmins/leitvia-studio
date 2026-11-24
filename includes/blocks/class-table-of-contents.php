@@ -12,7 +12,8 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Builds the list from the parsed blocks of the post, headings inside theme patterns and synced patterns included.
  * Headings without an id get one while the post content renders (render_block_core/heading), only on posts with a
- * table of contents; ids an author set stay. The id comes from the heading text and gets a number when it repeats,
+ * table of contents: in the content, or in the template before the content (a column beside it), whose levels then
+ * count; ids an author set stay. The id comes from the heading text and gets a number when it repeats,
  * so the same content gives the same ids on every request.
  *
  * In a post split into parts (core/nextpage) every entry knows its part: entries of another part link to the address
@@ -45,6 +46,13 @@ final class Table_Of_Contents {
 	private static array $cache = array();
 
 	/**
+	 * Levels of a table of contents rendered outside the content of its post (a template), per post ID.
+	 *
+	 * @var array<int, array<int>>
+	 */
+	private static array $outside = array();
+
+	/**
 	 * Renders the block. Fewer than two entries render nothing. Display companion adds the chapter button, see companion().
 	 *
 	 * @param array<string, mixed> $attributes Block attributes.
@@ -55,7 +63,11 @@ final class Table_Of_Contents {
 		if ( ! $post ) {
 			return '';
 		}
-		$entries = self::entries( $post->ID, self::levels( $attributes['levels'] ?? array( 2, 3 ) ) );
+		$levels  = self::levels( $attributes['levels'] ?? array( 2, 3 ) );
+		$entries = self::entries( $post->ID, $levels );
+		if ( self::$rendering !== $post->ID ) {
+			self::$outside[ $post->ID ] = $levels;
+		}
 		$parts   = count( self::pages( $post ) );
 		$current = self::current_part( $post );
 		$grouped = $parts > 1 && 'part' !== ( $attributes['scope'] ?? 'all' );
@@ -293,8 +305,9 @@ final class Table_Of_Contents {
 	 * @param array<string, mixed> $block   Parsed block.
 	 */
 	public static function add_id( string $content, array $block ): string {
-		$post = 0 === self::$rendering ? null : get_post( self::$rendering );
-		if ( ! $post || ! has_block( self::BLOCK, $post ) ) {
+		$post   = 0 === self::$rendering ? null : get_post( self::$rendering );
+		$levels = $post ? ( self::$outside[ $post->ID ] ?? null ) : null;
+		if ( ! $post || ( null === $levels && ! has_block( self::BLOCK, $post ) ) ) {
 			return $content;
 		}
 		$tags = new \WP_HTML_Tag_Processor( $content );
@@ -304,7 +317,7 @@ final class Table_Of_Contents {
 		$text = self::text( (string) ( $block['innerHTML'] ?? '' ) );
 		$seen = self::$handed[ $text ] ?? 0;
 		$part = self::rendered_part( self::pages( $post ) );
-		foreach ( self::entries( $post->ID, self::post_levels( $post ) ) as $entry ) {
+		foreach ( self::entries( $post->ID, $levels ?? self::post_levels( $post ) ) as $entry ) {
 			if ( $entry['part'] === $part && ! $entry['own'] && $entry['text'] === $text && 0 === $seen-- ) {
 				self::$handed[ $text ] = ( self::$handed[ $text ] ?? 0 ) + 1;
 				$tags->set_attribute( 'id', $entry['id'] );
@@ -366,7 +379,8 @@ final class Table_Of_Contents {
 	 * Forgets the computed entries, for tests and after a post changes within one request.
 	 */
 	public static function forget(): void {
-		self::$cache = array();
+		self::$cache   = array();
+		self::$outside = array();
 	}
 
 	/**

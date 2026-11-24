@@ -186,7 +186,8 @@ final class Read_Plan {
 			$max = (int) ( $contract['compositionRules']['maxSections'] ?? 12 );
 			foreach ( $frame['slots'] as $slot ) {
 				$roles = array_values( (array) $slot['roles'] );
-				$count = 'content' === $slot['name'] && $roles ? max( count( $roles ), count( $points ) ) : count( $roles );
+				// A frame that names its sections (requires) gets them below; it does not grow with the points.
+				$count = 'content' === $slot['name'] && $roles && empty( $frame['requires'] ) ? max( count( $roles ), count( $points ) ) : count( $roles );
 				$count = min( $count, $max - count( $slugs ) );
 				for ( $i = 0; $i < $count; $i++ ) {
 					$best = self::best( $slugs, $roles[ $i % count( $roles ) ], $patterns, $contract, (string) $frame['template'] );
@@ -195,8 +196,53 @@ final class Read_Plan {
 					}
 				}
 			}
+			// A kind the frame requires may need a proof or offer pattern; its facts stay for the person to give.
+			$needed = array_filter( self::patterns(), static fn( array $pattern ): bool => self::fits( $pattern, $images, $posts, (bool) $shop ) || ( in_array( $pattern['composition']['role'] ?? '', array( 'proof', 'offer' ), true ) && ! in_array( $pattern['slug'], self::OWN_DATA, true ) && ( empty( $pattern['images'] ) || $images ) && ! in_array( 'woocommerce', (array) ( $pattern['requires'] ?? array() ), true ) ) );
+			$slugs  = self::required( $slugs, $frame, $needed, $contract );
 		}
 		return self::result( $frame, $slugs, $points, 'rules' );
+	}
+
+	/**
+	 * Sections with a usable pattern for every kind the frame requires and the plan lacks, the pattern and the place
+	 * before the closing sections that score best; within maxSections. Here a proof or offer pattern may fill a kind
+	 * (packages of a hub): the frame needs it, and its prices and quotes stay open for the person. Kinds no pattern
+	 * provides stay missing, and the plan names them as missingSection.
+	 *
+	 * @param string[]                            $slugs    Sections so far.
+	 * @param array<string, mixed>                $frame    Page frame.
+	 * @param array<string, array<string, mixed>> $patterns Usable patterns.
+	 * @param array<string, mixed>                $contract Contract data.
+	 * @return string[]
+	 */
+	private static function required( array $slugs, array $frame, array $patterns, array $contract ): array {
+		$max = (int) ( $contract['compositionRules']['maxSections'] ?? 12 );
+		foreach ( Gateway\Composition::check( $slugs, $contract, (string) $frame['template'], array(), array(), (string) $frame['type'] ) as $issue ) {
+			if ( 'missingSection' !== $issue['rule'] || count( $slugs ) >= $max ) {
+				continue;
+			}
+			$close = array_search( 'close', array_map( static fn( string $slug ): string => (string) ( $patterns[ $slug ]['composition']['role'] ?? '' ), $slugs ), true );
+			$last  = false === $close ? count( $slugs ) : (int) $close;
+			$best  = null;
+			$score = -1;
+			// ponytail: every pattern of the kind at every place after the hero; a frame has a dozen sections at most.
+			foreach ( $patterns as $slug => $pattern ) {
+				if ( in_array( $slug, $slugs, true ) || ! in_array( $issue['kind'] ?? '', array_merge( (array) ( $pattern['provides'] ?? array() ), array( (string) ( $pattern['composition']['role'] ?? '' ) ) ), true ) ) {
+					continue;
+				}
+				for ( $at = min( 1, $last ); $at <= $last; $at++ ) {
+					$try = $slugs;
+					array_splice( $try, $at, 0, array( $slug ) );
+					$new = Gateway\Composition::score( $try, $contract, (string) $frame['template'] )['score'];
+					if ( $new > $score ) {
+						$best  = $try;
+						$score = $new;
+					}
+				}
+			}
+			$slugs = $best ?? $slugs;
+		}
+		return $slugs;
 	}
 
 	/**
@@ -327,7 +373,7 @@ final class Read_Plan {
 				$sections[ $at ]['points'][] = $point;
 			}
 		}
-		$score = Gateway\Composition::score( $slugs, $contract, (string) $frame['template'] );
+		$score = Gateway\Composition::score( $slugs, $contract, (string) $frame['template'], array(), array(), (string) $frame['type'] );
 		return array(
 			'frame'    => (string) $frame['type'],
 			'template' => (string) $frame['template'],

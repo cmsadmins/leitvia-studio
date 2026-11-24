@@ -12,12 +12,15 @@ use LeitviaStudio\Gateway\Block_Edit;
 use LeitviaStudio\Gateway\Hashes;
 use LeitviaStudio\Gateway\Rejection;
 use LeitviaStudio\Gateway\Scope;
+use LeitviaStudio\Gateway\Composition;
 use LeitviaStudio\Organization\Organization;
+use LeitviaStudio\Seo\Cluster;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Abilities leitvia/get-seo and leitvia/update-seo. A small adapter maps title, description, robots and the social
+ * Abilities leitvia/get-seo, leitvia/update-seo and leitvia/set-page-structure (page frame, hub and service of a page,
+ * see Seo\Cluster). A small adapter maps title, description, robots and the social
  * fields to the post meta of Yoast SEO, Rank Math, SEOPress or The SEO Framework. The meta keys that update-seo writes
  * belong to the state of a content type (Content::state()), so they are hashed, packaged and rolled back like a title.
  */
@@ -141,7 +144,7 @@ final class Seo {
 		Abilities::read(
 			'leitvia/get-seo',
 			__( 'Get SEO data', 'leitvia-studio' ),
-			__( 'Returns the SEO data of posts, pages and entries from the active SEO plugin. Supported are Yoast SEO, Rank Math, SEOPress and The SEO Framework. Per item: title, meta description, canonical, noindex, nofollow, Open Graph title, description and image, focus keyword and schema type. schema_type is the article type Leitvia Studio prints for a post (NewsArticle or BlogPosting), null where it prints none. indexable says whether the site is open to search engines, news_sitemap is the address of the news sitemap of Leitvia Studio or null, organization holds the details of leitvia/set-organization: type, name, url, address, phone, email, founding date, area served, opening hours and profiles. An empty value means the plugin falls back to its template. defaults holds what WordPress itself would print and a description suggested from the excerpt; without an SEO plugin plugin names Leitvia Studio, with an unsupported one seo is null, and notice says why. hash is the base_hash of leitvia/update-seo. IDs that are no readable content come back under skipped.', 'leitvia-studio' ),
+			__( 'Returns the SEO data of posts, pages and entries from the active SEO plugin. Supported are Yoast SEO, Rank Math, SEOPress and The SEO Framework. Per item: title, meta description, canonical, noindex, nofollow, Open Graph title, description and image, focus keyword and schema type. schema_type is the article type Leitvia Studio prints for a post (NewsArticle or BlogPosting), null where it prints none; structure holds the page frame, hub and service of a page (leitvia/set-page-structure). indexable says whether the site is open to search engines, news_sitemap is the address of the news sitemap of Leitvia Studio or null, organization holds the details of leitvia/set-organization: type, name, url, address, phone, email, founding date, founder, start year and holder of the copyright line, area served, opening hours, profiles and aggregate_rating. redirects lists the rows of leitvia/set-redirects, llms whether llms.txt was asked for (requested) and is served (enabled), held_back why a requested file is not served (site closed to search engines, SEO plugin), its address, summary, extra pages and whether AI crawlers may crawl (leitvia/set-llms). An empty value means the plugin falls back to its template. defaults holds what WordPress itself would print and a description suggested from the excerpt; without an SEO plugin plugin names Leitvia Studio, with an unsupported one seo is null, and notice says why. hash is the base_hash of leitvia/update-seo. IDs that are no readable content come back under skipped.', 'leitvia-studio' ),
 			array(
 				'type'                 => 'object',
 				'properties'           => array(
@@ -188,6 +191,7 @@ final class Seo {
 									'type' => array( 'string', 'null' ),
 									'enum' => array( 'NewsArticle', 'BlogPosting', null ),
 								),
+								'structure'   => array( 'type' => 'object' ),
 							),
 						),
 					),
@@ -197,27 +201,35 @@ final class Seo {
 					),
 					'indexable'    => $bool,
 					'news_sitemap' => array( 'type' => array( 'string', 'null' ) ),
+					'redirects'    => array(
+						'type'  => 'array',
+						'items' => array( 'type' => 'object' ),
+					),
+					'llms'         => array( 'type' => 'object' ),
 					'organization' => array(
 						'type'       => 'object',
 						'properties' => array(
-							'type'          => array(
+							'type'             => array(
 								'type' => 'string',
 								'enum' => Organization::TYPES,
 							),
-							'name'          => $string,
-							'url'           => $string,
-							'street'        => $string,
-							'postal_code'   => $string,
-							'city'          => $string,
-							'country'       => $string,
-							'phone'         => $string,
-							'email'         => $string,
-							'founding_date' => $string,
-							'area_served'   => array(
+							'name'             => $string,
+							'url'              => $string,
+							'street'           => $string,
+							'postal_code'      => $string,
+							'city'             => $string,
+							'country'          => $string,
+							'phone'            => $string,
+							'email'            => $string,
+							'founding_date'    => $string,
+							'founder'          => $string,
+							'copyright_since'  => $string,
+							'copyright_holder' => $string,
+							'area_served'      => array(
 								'type'  => 'array',
 								'items' => $string,
 							),
-							'opening_hours' => array(
+							'opening_hours'    => array(
 								'type'  => 'array',
 								'items' => array(
 									'type'       => 'object',
@@ -234,10 +246,11 @@ final class Seo {
 									),
 								),
 							),
-							'same_as'       => array(
+							'same_as'          => array(
 								'type'  => 'array',
 								'items' => $string,
 							),
+							'aggregate_rating' => array( 'type' => array( 'object', 'null' ) ),
 						),
 					),
 				),
@@ -248,7 +261,7 @@ final class Seo {
 			'leitvia/update-seo',
 			__( 'Update SEO data', 'leitvia-studio' ),
 			/* translators: 1: most characters of a title, 2: fewest characters of a description, 3: most characters of a description */
-			sprintf( __( 'Writes SEO title, meta description and robots of one post through the active SEO plugin. The heading of the page stays. It covers posts, pages and entries in Yoast SEO, Rank Math, SEOPress or The SEO Framework; without an SEO plugin Leitvia Studio stores them and prints them in the head, the title as written, without the site name; with another SEO plugin it is rejected with leitvia_no_seo_plugin. Read the post with leitvia/get-seo first and send its hash as base_hash. A title has at most %1$d characters, a description %2$d to %3$d; an empty string hands the field back to the template of the plugin, without a plugin to what WordPress prints. Say only what the page says: every number in title or description must appear in the title, excerpt or content of the post. Autonomy and change packages work as for leitvia/update-content; a live write gets a change package for leitvia/rollback.', 'leitvia-studio' ), self::TITLE_MAX, self::DESCRIPTION_MIN, self::DESCRIPTION_MAX ),
+			sprintf( __( 'Writes SEO title, meta description and robots of one post through the active SEO plugin. The heading of the page stays. It covers posts, pages and entries in Yoast SEO, Rank Math, SEOPress or The SEO Framework; without an SEO plugin Leitvia Studio stores them and prints them in the head, the title as written, without the site name; with another SEO plugin it is rejected with leitvia_no_seo_plugin. Read the post with leitvia/get-seo first and send its hash as base_hash. A title has at most %1$d characters, a description %2$d to %3$d; an empty string hands the field back to the template of the plugin, without a plugin to what WordPress prints. Say only what the page says: every number in title or description must appear in the title, excerpt or content of the post. A star rating (a number beside a star sign or written as 4.8/5) needs the confirmed aggregate_rating of leitvia/set-organization and must equal its value; its count of reviews counts as said. Autonomy and change packages work as for leitvia/update-content; a live write gets a change package for leitvia/rollback.', 'leitvia-studio' ), self::TITLE_MAX, self::DESCRIPTION_MIN, self::DESCRIPTION_MAX ),
 			'maintain',
 			array(
 				'destructive' => true,
@@ -282,6 +295,198 @@ final class Seo {
 				'additionalProperties' => false,
 			),
 			array( self::class, 'describe_update' )
+		);
+		Abilities::write(
+			'leitvia/set-page-structure',
+			__( 'Set page structure', 'leitvia-studio' ),
+			__( 'Sets what a page is within the site, for breadcrumbs, structured data, llms.txt and the composition check. frame is the type of a page frame of the contract (hub for the overview of a topic, audience, service), so check-composition counts the sections that frame requires or recommends; compose-page sets it too. hub is the ID of the overview page the page belongs to: pages keep flat addresses, and the breadcrumbs (block and BreadcrumbList) show Home, the hub of the hub, the hub and the page; the hub wins over a parent page, and a page without a hub keeps the trail of its parents. service is what the page offers: name, description, price as a number, currency (EUR), vat_included (false for a net price) and unit (per month); with a price Leitvia Studio prints a Service with an Offer and a UnitPriceSpecification, without an SEO plugin. max_price makes the price a range (from price up to max_price, an AggregateOffer); offers lists the packages of the service, each with name, price and optional max_price (its price is a range), description and unit (up to 10), printed as one Offer per package in an AggregateOffer with the lowest price and the highest of all prices and ranges, and price may then stay empty. Use only what the page itself says. An empty string, 0 or null clears a field. Read the page with leitvia/get-page-outline first and send its hash as base_hash; autonomy and change packages work as for leitvia/update-content.', 'leitvia-studio' ),
+			'maintain',
+			array(
+				'destructive' => false,
+				'idempotent'  => true,
+			),
+			array(
+				'properties'           => array(
+					'post'    => array(
+						'type'        => 'integer',
+						'minimum'     => 1,
+						'description' => __( 'ID of a page from leitvia/list-content.', 'leitvia-studio' ),
+					),
+					'frame'   => array(
+						'type'        => 'string',
+						'maxLength'   => 40,
+						'description' => __( 'Type of a page frame of the contract, for example hub; empty clears it.', 'leitvia-studio' ),
+					),
+					'hub'     => array(
+						'type'        => 'integer',
+						'minimum'     => 0,
+						'description' => __( 'ID of the published overview page above this page; 0 clears it.', 'leitvia-studio' ),
+					),
+					'service' => array(
+						'type'                 => array( 'object', 'null' ),
+						'properties'           => array(
+							'name'         => array(
+								'type'        => 'string',
+								'minLength'   => 1,
+								'maxLength'   => 200,
+								'description' => __( 'Name of the service as the page names it.', 'leitvia-studio' ),
+							),
+							'description'  => array(
+								'type'      => 'string',
+								'maxLength' => 500,
+							),
+							'price'        => array(
+								'type'    => array( 'number', 'null' ),
+								'minimum' => 0,
+							),
+							'currency'     => array(
+								'type'    => 'string',
+								'pattern' => '^[A-Z]{3}$',
+								'default' => 'EUR',
+							),
+							'vat_included' => array(
+								'type'        => 'boolean',
+								'default'     => false,
+								'description' => __( 'Whether the price includes VAT; false for a net price.', 'leitvia-studio' ),
+							),
+							'unit'         => array(
+								'type'        => 'string',
+								'maxLength'   => 40,
+								'description' => __( 'What the price is for, as the page says it, for example per month.', 'leitvia-studio' ),
+							),
+							'max_price'    => array(
+								'type'        => array( 'number', 'null' ),
+								'minimum'     => 0,
+								'description' => __( 'Highest price of a range that starts at price, as the page says it.', 'leitvia-studio' ),
+							),
+							'offers'       => array(
+								'type'        => 'array',
+								'maxItems'    => Cluster::MAX_OFFERS,
+								'description' => __( 'The packages of the service as the page lists them, each with its own price.', 'leitvia-studio' ),
+								'items'       => array(
+									'type'                 => 'object',
+									'properties'           => array(
+										'name'        => array(
+											'type'        => 'string',
+											'minLength'   => 1,
+											'maxLength'   => 120,
+											'description' => __( 'Name of the package as the page names it.', 'leitvia-studio' ),
+										),
+										'price'       => array(
+											'type'        => 'number',
+											'minimum'     => 0,
+											'description' => __( 'Price of the package as a number, in the currency of the service.', 'leitvia-studio' ),
+										),
+										'max_price'   => array(
+											'type'        => 'number',
+											'minimum'     => 0,
+											'description' => __( 'Highest price of the package when its price is a range that starts at price, as the page says it.', 'leitvia-studio' ),
+										),
+										'description' => array(
+											'type'      => 'string',
+											'maxLength' => 300,
+										),
+										'unit'        => array(
+											'type'      => 'string',
+											'maxLength' => 40,
+										),
+									),
+									'required'             => array( 'name', 'price' ),
+									'additionalProperties' => false,
+								),
+							),
+						),
+						'required'             => array( 'name' ),
+						'additionalProperties' => false,
+					),
+				),
+				'required'             => array( 'post' ),
+				'additionalProperties' => false,
+			),
+			array( self::class, 'describe_structure' )
+		);
+	}
+
+	/**
+	 * Operation of set-page-structure: the meta Composition::FRAME_META, Cluster::HUB_META and Cluster::SERVICE_META
+	 * of a page, checked before anything changes.
+	 *
+	 * @param array<string, mixed> $input Input.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public static function describe_structure( array $input ) {
+		$post   = (int) ( $input['post'] ?? 0 );
+		$target = array( 'post' => $post );
+		if ( 'page' !== get_post_type( $post ) || ! Scope::readable( $post ) ) {
+			return Block_Edit::invalid( 'post', __( 'Set the structure of a page agents can read.', 'leitvia-studio' ), $target, 'leitvia/list-content' );
+		}
+		$meta = array();
+		if ( array_key_exists( 'frame', $input ) ) {
+			$frame = (string) $input['frame'];
+			if ( '' !== $frame && ! Composition::frame( $frame, leitvia_studio_contract()->data() ) ) {
+				return Block_Edit::invalid( 'frame', __( 'The contract has no page frame of this type.', 'leitvia-studio' ), $target, 'leitvia/get-contract' );
+			}
+			$meta[ Composition::FRAME_META ] = $frame;
+		}
+		if ( array_key_exists( 'hub', $input ) ) {
+			$hub = (int) $input['hub'];
+			if ( $hub && ( 'page' !== get_post_type( $hub ) || 'publish' !== get_post_status( $hub ) || (int) get_option( 'page_on_front' ) === $hub ) ) {
+				return Block_Edit::invalid( 'hub', __( 'The hub is a published page other than the front page.', 'leitvia-studio' ), $target + array( 'hub' => $hub ), 'leitvia/list-content' );
+			}
+			if ( $hub && Cluster::loops( $post, $hub ) ) {
+				return Block_Edit::invalid( 'hub', __( 'This hub would lead back to the page itself; a page cannot be above its own hub.', 'leitvia-studio' ), $target + array( 'hub' => $hub ) );
+			}
+			$meta[ Cluster::HUB_META ] = $hub ? $hub : '';
+		}
+		if ( array_key_exists( 'service', $input ) ) {
+			$service = is_array( $input['service'] ) ? $input['service'] : array();
+			$price   = isset( $service['price'] ) && is_numeric( $service['price'] ) ? (float) $service['price'] : null;
+			$max     = isset( $service['max_price'] ) && is_numeric( $service['max_price'] ) ? (float) $service['max_price'] : null;
+			$prices  = array_map( static fn( $offer ): float => (float) ( $offer['price'] ?? 0 ), (array) ( $service['offers'] ?? array() ) );
+			$low     = $price ?? ( $prices ? min( $prices ) : null );
+			if ( null !== $max && ( null === $low || $max < $low ) ) {
+				return Block_Edit::invalid( 'service', __( 'max_price is the top of a range: send price as its start, not higher than max_price.', 'leitvia-studio' ), $target );
+			}
+			$offers = array();
+			foreach ( array_slice( (array) ( $service['offers'] ?? array() ), 0, Cluster::MAX_OFFERS ) as $offer ) {
+				$cost = (float) ( $offer['price'] ?? 0 );
+				$top  = isset( $offer['max_price'] ) && is_numeric( $offer['max_price'] ) ? (float) $offer['max_price'] : null;
+				if ( null !== $top && $top < $cost ) {
+					return Block_Edit::invalid( 'service', __( 'max_price of a package is the top of its range: send price as its start, not higher than max_price.', 'leitvia-studio' ), $target );
+				}
+				$offers[] = array_filter(
+					array(
+						'name'        => sanitize_text_field( (string) ( $offer['name'] ?? '' ) ),
+						'price'       => $cost,
+						'max_price'   => $top,
+						'description' => sanitize_text_field( (string) ( $offer['description'] ?? '' ) ),
+						'unit'        => sanitize_text_field( (string) ( $offer['unit'] ?? '' ) ),
+					),
+					static fn( $value ): bool => '' !== $value && null !== $value
+				);
+			}
+			$meta[ Cluster::SERVICE_META ] = $service ? array_filter(
+				array(
+					'name'         => sanitize_text_field( (string) $service['name'] ),
+					'description'  => sanitize_text_field( (string) ( $service['description'] ?? '' ) ),
+					'price'        => $price,
+					'max_price'    => $max,
+					'currency'     => (string) ( $service['currency'] ?? 'EUR' ),
+					'vat_included' => ! empty( $service['vat_included'] ),
+					'unit'         => sanitize_text_field( (string) ( $service['unit'] ?? '' ) ),
+					'offers'       => $offers,
+				),
+				static fn( $value ): bool => null !== $value && '' !== $value && array() !== $value
+			) : '';
+		}
+		if ( ! $meta ) {
+			return Block_Edit::invalid( 'change', __( 'Name what to change: frame, hub or service.', 'leitvia-studio' ), $target );
+		}
+		return array(
+			'area'   => 'content',
+			'target' => $target,
+			'record' => true,
+			'change' => static fn( array $state ): array => array( 'meta_input' => $meta + (array) ( $state['meta_input'] ?? array() ) ) + $state,
 		);
 	}
 
@@ -356,7 +561,13 @@ final class Seo {
 				'seo'         => $writable ? self::values( $id, $key ) : null,
 				'defaults'    => self::defaults( $post ),
 				'schema_type' => self::schema_type( $post ),
-			);
+			) + ( 'page' === $post->post_type ? array(
+				'structure' => array(
+					'frame'   => (string) get_post_meta( $id, Composition::FRAME_META, true ),
+					'hub'     => (int) get_post_meta( $id, Cluster::HUB_META, true ),
+					'service' => Cluster::service( $id ),
+				),
+			) : array() );
 		}
 		$notice = match ( true ) {
 			'' === $key => __( 'The active SEO plugin is not supported. defaults shows what WordPress prints; the description is only a suggestion from the excerpt. leitvia/update-seo needs Yoast SEO, Rank Math, SEOPress or The SEO Framework.', 'leitvia-studio' ),
@@ -376,6 +587,16 @@ final class Seo {
 			'indexable'    => (bool) get_option( 'blog_public' ),
 			'news_sitemap' => \LeitviaStudio\News\Sitemap::enabled() ? \LeitviaStudio\News\Sitemap::url() : null,
 			'organization' => Organization::details(),
+			'redirects'    => array_values( (array) leitvia_studio_setting( 'redirects' ) ),
+			'llms'         => array(
+				'requested'   => (bool) leitvia_studio_setting( 'llms_txt' ),
+				'enabled'     => \LeitviaStudio\Seo\Llms::enabled(),
+				'held_back'   => leitvia_studio_setting( 'llms_txt' ) ? \LeitviaStudio\Seo\Llms::held_back() : '',
+				'url'         => \LeitviaStudio\Seo\Llms::url(),
+				'summary'     => (string) leitvia_studio_setting( 'llms_summary' ),
+				'pages'       => array_map( 'intval', (array) leitvia_studio_setting( 'llms_pages' ) ),
+				'ai_crawlers' => (bool) leitvia_studio_setting( 'ai_crawlers' ),
+			),
 		);
 	}
 
@@ -514,43 +735,67 @@ final class Seo {
 	 * SEO title and description of an input with whitespace collapsed, checked for length; shared by update-seo and
 	 * the seo field of create-content.
 	 *
-	 * @param array<string, mixed> $input  Input with title and description.
-	 * @param array<string, mixed> $target Target for rejections.
+	 * @param array<string, mixed> $input    Input with title and description.
+	 * @param array<string, mixed> $target   Target for rejections.
+	 * @param list<string>|null    $warnings With an array, lengths that are off are added there instead of refusing.
 	 * @return array<string, string>|\WP_Error
 	 */
-	public static function texts( array $input, array $target ) {
+	public static function texts( array $input, array $target, ?array &$warnings = null ) {
 		$texts = array_filter( array_intersect_key( $input, array_flip( array( 'title', 'description' ) ) ), 'is_string' );
 		$texts = array_map( static fn( string $text ): string => trim( (string) preg_replace( '/\s+/u', ' ', $text ) ), $texts );
+		$found = array();
 		if ( isset( $texts['title'] ) && mb_strlen( $texts['title'] ) > self::TITLE_MAX ) {
 			/* translators: %d: most characters */
-			return Block_Edit::invalid( 'length', sprintf( __( 'The title is too long; search results cut it after about %d characters. Shorten it.', 'leitvia-studio' ), self::TITLE_MAX ), $target );
+			$found[] = sprintf( __( 'The title is too long; search results cut it after about %d characters. Shorten it.', 'leitvia-studio' ), self::TITLE_MAX );
 		}
 		$length = isset( $texts['description'] ) ? mb_strlen( $texts['description'] ) : 0;
 		if ( $length && ( $length < self::DESCRIPTION_MIN || $length > self::DESCRIPTION_MAX ) ) {
 			/* translators: 1: fewest characters, 2: most characters */
-			return Block_Edit::invalid( 'length', sprintf( __( 'A description has %1$d to %2$d characters. Summarize what the page offers in one or two sentences.', 'leitvia-studio' ), self::DESCRIPTION_MIN, self::DESCRIPTION_MAX ), $target );
+			$found[] = sprintf( __( 'A description has %1$d to %2$d characters. Summarize what the page offers in one or two sentences.', 'leitvia-studio' ), self::DESCRIPTION_MIN, self::DESCRIPTION_MAX );
 		}
+		// A migration takes the texts of the live site as they are and only reports what is off (warnings given).
+		if ( $found && null === $warnings ) {
+			return Block_Edit::invalid( 'length', $found[0], $target );
+		}
+		$warnings = array_merge( (array) $warnings, $found );
 		return $texts;
 	}
 
 	/**
 	 * State with SEO title and description in the meta of the active plugin, after the fact check against the title,
-	 * excerpt and content of the state. A state without a writable plugin comes back unchanged.
+	 * excerpt and content of the state. A state without a writable plugin comes back unchanged. With warnings given (a
+	 * migration takes the texts of the live site), a fact the page does not say is a warning and the texts are written;
+	 * a text with a star rating that is not the confirmed one stays out, as a rating nobody checked is never shown.
 	 *
-	 * @param array<string, mixed>  $state  State of a post.
-	 * @param array<string, string> $texts  Texts from texts().
-	 * @param array<string, mixed>  $target Target for rejections.
+	 * @param array<string, mixed>  $state    State of a post.
+	 * @param array<string, string> $texts    Texts from texts().
+	 * @param array<string, mixed>  $target   Target for rejections.
+	 * @param list<string>|null     $warnings Warnings instead of rejections, null to reject.
 	 * @return array<string, mixed>|\WP_Error
 	 */
-	public static function write_texts( array $state, array $texts, array $target ) {
+	public static function write_texts( array $state, array $texts, array $target, ?array &$warnings = null ) {
 		if ( ! $texts || ! self::writable() ) {
 			return $state;
 		}
-		$meta        = self::PLUGINS[ self::plugin() ]['meta'];
+		$meta  = self::PLUGINS[ self::plugin() ]['meta'];
+		$stars = self::stars( implode( ' ', $texts ) );
+		if ( $stars ) {
+			/* translators: %s: numbers */
+			$message = sprintf( __( 'The star rating %s is not the confirmed rating of the organization. Set it with aggregate_rating in leitvia/set-organization after a person checked it at its source, or leave the star out.', 'leitvia-studio' ), implode( ', ', $stars ) );
+			if ( null === $warnings ) {
+				return Block_Edit::invalid( 'unsupported_fact', $message, $target, 'leitvia/set-organization' );
+			}
+			$warnings[] = $message;
+			$texts      = array_filter( $texts, static fn( string $text ): bool => ! self::stars( $text ) );
+		}
 		$unsupported = self::unsupported( implode( ' ', $texts ), $state, $target );
 		if ( $unsupported ) {
 			/* translators: %s: numbers */
-			return Block_Edit::invalid( 'unsupported_fact', sprintf( __( 'The page does not say %s. Use only facts from the title, excerpt or content of the post.', 'leitvia-studio' ), implode( ', ', $unsupported ) ), $target, 'leitvia/get-page-outline' );
+			$message = sprintf( __( 'The page does not say %s. Use only facts from the title, excerpt or content of the post.', 'leitvia-studio' ), implode( ', ', $unsupported ) );
+			if ( null === $warnings ) {
+				return Block_Edit::invalid( 'unsupported_fact', $message, $target, 'leitvia/get-page-outline' );
+			}
+			$warnings[] = $message;
 		}
 		foreach ( $texts as $field => $text ) {
 			if ( isset( $meta[ $field ] ) ) {
@@ -561,9 +806,30 @@ final class Seo {
 	}
 
 	/**
+	 * Star ratings of a text (a number beside ★ or written as n/5) that differ from the confirmed rating of the
+	 * organization; every one of them while no rating is confirmed.
+	 *
+	 * @param string $text New title and description.
+	 * @return list<string>
+	 */
+	private static function stars( string $text ): array {
+		preg_match_all( '#★\s*(\d+(?:[.,]\d+)?)|(\d+(?:[.,]\d+)?)\s*(?:★|/\s*5(?![\d.,]))#u', $text, $matches, PREG_SET_ORDER );
+		$rating = Organization::confirmed_rating();
+		$wrong  = array();
+		foreach ( $matches as $match ) {
+			$number = '' !== ( $match[1] ?? '' ) ? $match[1] : (string) ( $match[2] ?? '' );
+			if ( ! $rating || abs( (float) str_replace( ',', '.', $number ) - (float) $rating['value'] ) > 0.001 ) {
+				$wrong[] = $number;
+			}
+		}
+		return array_values( array_unique( $wrong ) );
+	}
+
+	/**
 	 * Numbers of a text that the title, excerpt and content of the post do not contain. A number is the commonest fact
 	 * a summary invents (prices, years, counts). The year the post appears in and the year of its last change count as
 	 * said: the page shows its date, and a new post without a date appears now.
+	 * A confirmed rating of the organization counts as said, see stars() for the star itself.
 	 * ponytail: numbers only; names and claims without digits pass, the skill asks agents to keep to the page.
 	 *
 	 * @param string               $text   New title and description.
@@ -576,6 +842,11 @@ final class Seo {
 		$date   = (string) ( $state['post_date'] ?? '' );
 		$years  = substr( '' !== $date ? $date : current_time( 'mysql' ), 0, 4 ) . ' ' . ( $post ? substr( (string) get_post_field( 'post_modified', $post, 'raw' ), 0, 4 ) : '' );
 		$source = (string) preg_replace( '/\s+/u', ' ', html_entity_decode( wp_strip_all_tags( ( $state['post_title'] ?? '' ) . ' ' . ( $state['post_excerpt'] ?? '' ) . ' ' . ( $state['post_content'] ?? '' ) . ' ' . get_bloginfo( 'name' ) ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) ) . ' ' . $years;
+		// A confirmed rating is a fact of the site: its value (also with a comma, and the 5 of n/5) and its count.
+		$rating = Organization::confirmed_rating();
+		if ( $rating ) {
+			$source .= ' ' . $rating['value'] . ' ' . str_replace( '.', ',', $rating['value'] ) . ' 5 ' . $rating['count'];
+		}
 		preg_match_all( '/\d+(?:[.,:]\d+)*/u', $text, $numbers );
 		return array_values( array_unique( array_filter( $numbers[0], static fn( string $number ): bool => ! str_contains( $source, $number ) ) ) );
 	}

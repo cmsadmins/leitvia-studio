@@ -1,6 +1,23 @@
-== Changelog of Leitvia Studio, versions 1.0.0 to 1.3.46 ==
+== Changelog of Leitvia Studio, versions 1.0.0 to 1.3.47 ==
 
 Newer versions are listed in readme.txt.
+
+= 1.3.47 =
+* New block Embed behind consent: any iframe of another provider, such as a configurator or a booking tool, waits behind the consent placeholder until the visitor loads it. Providers are listed under Leitvia Studio, Settings, Privacy with up to ten host names, a purpose and the address of their privacy policy; the placeholder names the provider, says where the data goes and shows a preview image from the media library. The iframe loads sandboxed and without a referrer. Addresses with a backslash or quotes are refused and international host names are stored as ASCII, in the editor the same way as on the server.
+* Organization data: Settings take the kind of business, founding date, area served, opening hours and profiles, and the front page describes the organization as Organization or local business in JSON-LD. Posts name the same organization as publisher. The ability leitvia/set-organization writes these values, leitvia/get-seo returns them.
+* The site audit leitvia/audit-site warns when Gravity Forms uses a captcha add-on, a reCAPTCHA field or Simple Cloudflare Turnstile, because the captcha sends the IP address of the visitor to its provider before any consent, and names other captcha plugins that may do the same.
+* leitvia/update-block sets block styles on every core block with registered styles, such as Media right on media and text.
+* update-block and insert set the Map block: coordinates, zoom, markers, height, heading and link text, and the list of places is built again. A button whose link a binding fills drops its saved link with url "", and leitvia/audit-site checks such links with the bound value. The zoom and close buttons of the map are translatable.
+* Settings show the cleaned lists after saving and name the providers they dropped.
+* New abilities leitvia/set-site-identity (site title, tagline, logo and site icon), leitvia/set-front-page (a page as the static front page, 0 for the latest posts) and leitvia/get-consent-providers and leitvia/set-consent-providers for the providers of the block Embed behind consent. Like every setting they wait in a change package.
+* New abilities leitvia/trash-content and leitvia/delete-media. A post goes to the trash and stays restorable; the front page, the posts page, the privacy policy page and pages with subpages are refused. A file is deleted only while no published content and no site setting uses it, or with force. A person always decides.
+* New ability leitvia/set-motion sets the motion of the whole site to off, subtle or bold. leitvia/audit-site reports uneven motion as leitvia/motion: a strength of its own on a block, fade next to rise, more than one kind of striking effect, more than 3 striking or 6 animated blocks on a page.
+* leitvia/add-media takes local videos, MP4 with H.264 or WebM up to 50 MB (filter leitvia_studio_max_video_bytes), with a poster from the media library and a caption. leitvia/update-block sets align on video, audio and embed blocks.
+* compose-page and update-block take the edits anchor (an HTML anchor, unique on the page), columns (the column count of a grid) and insert (a block of the catalog after another block, never as markup); compose-page also takes catalog attributes, and timeline entries take date, dateLabel and heading.
+* leitvia/replace-pattern swaps any top-level section for an approved pattern, with edits as in compose-page; texts and button links of the old section move over unless carry is false. leitvia/update-content moves a page below another page with parent. leitvia/define-content-type refuses an address that a published page or another public type already has.
+* leitvia/list-blocks names the registered block styles of every block, core blocks included. List abilities return the notices of their entries. update-block and update-content change the text of an icon list item like a list item, and null for an attribute the block lacks changes nothing.
+* Checks: content contrast measures a text on its own ground or the ground around it, Inverse included; the composition check takes the tone of a section from its outer block; hidden headings do not count in the heading check; font_not_bundled suggests the bundled family with the closest name; broken block comments are refused with leitvia_unsafe_content.
+* The filter leitvia_studio_heading_blocks tells the heading check the level of blocks that render on the server. The patterns of Studio fade in like all others.
 
 = 1.3.46 =
 * The readme spells out the labels of the consent placeholder ("Load content from YouTube") instead of a placeholder in angle brackets, which the readme parser of WordPress.org removed.

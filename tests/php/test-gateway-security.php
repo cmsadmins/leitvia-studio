@@ -390,6 +390,12 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 				'content' => '<!-- wp:paragraph --><p>A note</p><!-- /wp:paragraph -->',
 			),
 			'leitvia/vary-pattern'          => static fn(): array => array( 'original' => 'leitvia/content-quote' ),
+			'leitvia/import-post'           => static fn(): array => array(
+				'source'    => 'https://old.example/security/',
+				'post_type' => 'post',
+				'title'     => 'Imported',
+				'content'   => '<p>Moved over.</p>',
+			),
 			'leitvia/add-media'             => static fn(): array => array(
 				'data'     => base64_encode( (string) file_get_contents( dirname( __DIR__ ) . '/fixtures/avatar.png' ) ), // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents, WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Test fixture.
 				'filename' => 'portrait.png',
@@ -416,11 +422,25 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 				)['target']['post'],
 			),
 			'leitvia/set-variation'         => static fn(): array => array( 'variation' => 'corporate-light' ),
+			'leitvia/set-permalinks'        => static fn(): array => array( 'structure' => '/news/%postname%/' ),
 			'leitvia/set-posts-page'        => static fn(): array => array( 'page' => self::factory()->post->create( array( 'post_type' => 'page' ) ) ),
 			'leitvia/set-privacy-page'      => static fn(): array => array( 'page' => self::factory()->post->create( array( 'post_type' => 'page' ) ) ),
 			'leitvia/set-organization'      => static fn(): array => array( 'city' => 'Berlin' ),
 			'leitvia/set-site-identity'     => static fn(): array => array( 'tagline' => 'Made to measure' ),
 			'leitvia/set-motion'            => static fn(): array => array( 'motion' => 'bold' ),
+			'leitvia/set-redirects'         => static fn(): array => array(
+				'redirects' => array(
+					array(
+						'from' => '/old-page/',
+						'to'   => '/new-page/',
+					),
+				),
+			),
+			'leitvia/set-llms'              => static fn(): array => array( 'summary' => 'Bikes repaired in town.' ),
+			'leitvia/set-page-structure'    => fn(): array => array(
+				'post'  => $this->page(),
+				'frame' => 'service',
+			),
 			'leitvia/set-front-page'        => static fn(): array => array( 'page' => self::factory()->post->create( array( 'post_type' => 'page' ) ) ),
 			'leitvia/set-consent-providers' => static fn(): array => array(
 				'providers' => array(
@@ -725,7 +745,7 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 	/**
 	 * Agents plan by annotations and schemas (lints of WordPress/agent-skills): every ability states readonly,
 	 * destructive, idempotent and openWorldHint as booleans, a read is never destructive, and only plan-page (AI
-	 * connector) and lookups of add-ons reach the open world. Every required field has a description, no enum is
+	 * connector), import-post (images of the old site) and lookups of add-ons reach the open world. Every required field has a description, no enum is
 	 * empty, and a default at the root is an empty object, so a call without input passes the validation of core.
 	 */
 	public function test_annotations_and_schemas_are_complete(): void {
@@ -744,7 +764,7 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 				$this->assertFalse( $notes['destructive'], $name );
 				$this->assertTrue( $notes['idempotent'], $name );
 			}
-			$this->assertSame( 'leitvia/plan-page' === $name, $notes['openWorldHint'], $name );
+			$this->assertSame( in_array( $name, array( 'leitvia/plan-page', 'leitvia/import-post' ), true ), $notes['openWorldHint'], $name );
 			$schema = $ability->get_input_schema();
 			if ( array_key_exists( 'default', $schema ) ) {
 				$this->assertEquals( new stdClass(), $schema['default'], $name );
@@ -1702,6 +1722,26 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 			$this->assertWPError( $denied, $url );
 			$this->assertContains( 'leitvia/navigation', array_column( (array) ( $denied->get_error_data()['findings'] ?? array() ), 'check' ), $url );
 		}
+		// A group with sub items needs no address of its own; a link without sub items does.
+		$group = self::call(
+			'leitvia/update-navigation',
+			array(
+				'items' => array(
+					array(
+						'label' => 'Specialities',
+						'items' => array(
+							array(
+								'label' => 'Sausages',
+								'url'   => '/sausages/',
+							),
+						),
+					),
+				),
+			)
+		);
+		$this->assertSame( 'live', $group['mode'] ?? '', self::describe( $group ) );
+		$this->assertStringContainsString( '<!-- wp:navigation-submenu {"label":"Specialities","kind":"custom","metadata"', get_post_field( 'post_content', $group['target']['post'] ) );
+		$this->assertWPError( self::call( 'leitvia/update-navigation', array( 'items' => array( array( 'label' => 'Visit the page' ) ) ) ) );
 	}
 
 	/**

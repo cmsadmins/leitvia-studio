@@ -613,6 +613,33 @@ const FIELDS = [
 		type: 'text',
 	},
 	{
+		id: 'organization_founder',
+		label: __( 'Founder or owner', 'leitvia-studio' ),
+		description: __(
+			'The person who founded or owns the business, as search engines show it.',
+			'leitvia-studio'
+		),
+		type: 'text',
+	},
+	{
+		id: 'organization_copyright_since',
+		label: __( 'Copyright since', 'leitvia-studio' ),
+		description: __(
+			'First year of the copyright line in the footer, such as 2009. Leave it empty for the current year only.',
+			'leitvia-studio'
+		),
+		type: 'text',
+	},
+	{
+		id: 'organization_copyright_holder',
+		label: __( 'Copyright holder', 'leitvia-studio' ),
+		description: __(
+			'Name after the years in the copyright line of the footer.',
+			'leitvia-studio'
+		),
+		type: 'text',
+	},
+	{
 		id: 'organization_area_served',
 		label: __( 'Area served', 'leitvia-studio' ),
 		description: __( 'One town or region per line.', 'leitvia-studio' ),
@@ -919,6 +946,9 @@ function DesignAndSearch( { form } ) {
 				'organization_email',
 				'organization_type',
 				'organization_founding_date',
+				'organization_founder',
+				'organization_copyright_since',
+				'organization_copyright_holder',
 				'organization_area_served',
 				'organization_opening_hours',
 				'organization_same_as',

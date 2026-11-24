@@ -53,6 +53,12 @@
 							"type": "boolean",
 							"description": "Only with public; false gives entries no address of their own, pages list them."
 						},
+						"copyShiftDays": {
+							"type": "integer",
+							"minimum": 1,
+							"maximum": 366,
+							"description": "Duplicate in the admin list moves every date field of the copy by this many days, 7 for a weekly menu."
+						},
 						"withFront": {
 							"type": "boolean",
 							"description": "Only with public: addresses start with the prefix of the post permalinks, such as /blog/. Off by default."
@@ -185,6 +191,13 @@
 											"maxLength": 100,
 											"pattern": "^[^<>]*$"
 										},
+										"titleLabel": {
+											"type": "string",
+											"minLength": 1,
+											"maxLength": 100,
+											"pattern": "^[^<>]*$",
+											"description": "Label of the row title in the editor, such as Dish; Title without it."
+										},
 										"fields": {
 											"type": "object",
 											"additionalProperties": false,
@@ -227,6 +240,10 @@
 														},
 														"required": {
 															"type": "boolean"
+														},
+														"unique": {
+															"type": "boolean",
+															"description": "No two rows of an entry may share the value, such as the weekday of a lunch menu."
 														},
 														"maxLength": {
 															"type": "integer",

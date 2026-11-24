@@ -103,7 +103,7 @@ final class Maintain {
 									'type'        => 'string',
 									'minLength'   => 1,
 									'maxLength'   => 500,
-									'description' => __( 'Part of text that stays linked when the text holds a link, such as the mail address in a contact line. Without it the link stays around its old text, and a text without that is refused unless the link only points to #.', 'leitvia-studio' ),
+									'description' => __( 'Part of text that stays linked when the text holds a link, such as the mail address in a contact line; with url it links that part of a text without a link. Without it the link stays around its old text, and a text without that is refused unless the link only points to #.', 'leitvia-studio' ),
 								),
 								'url'       => array(
 									'type'        => 'string',
@@ -129,6 +129,7 @@ final class Maintain {
 						'description' => __( 'New status of the post; future needs a date in the future.', 'leitvia-studio' ),
 					),
 					'author'         => Content::author_schema(),
+					'author_name'    => Content::author_name_schema(),
 					'terms'          => Content::terms_schema(),
 					'fields'         => Content::fields_schema(),
 					'rows'           => Content::rows_schema(),
@@ -388,7 +389,7 @@ final class Maintain {
 			),
 			'is_string'
 		);
-		$extra    = array_intersect_key( $input, array_flip( array( 'date', 'author', 'terms', 'fields', 'rows', 'featured_image' ) ) );
+		$extra    = array_intersect_key( $input, array_flip( array( 'date', 'author', 'author_name', 'terms', 'fields', 'rows', 'featured_image' ) ) );
 		$status   = isset( $input['status'] ) ? (string) $input['status'] : null;
 		$template = isset( $input['template'] ) ? (string) $input['template'] : null;
 		$parent   = isset( $input['parent'] ) ? (int) $input['parent'] : null;

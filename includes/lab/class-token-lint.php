@@ -31,6 +31,13 @@ final class Token_Lint {
 	);
 
 	/**
+	 * Readable text is no style context: text nodes and the values of alt, title, aria-label and placeholder are blanked
+	 * before the rules run, so an address like "Suite #5000" or "#343" in a paragraph stays as written. <style>
+	 * elements, style attributes and block attributes stay. Same expression as PROSE in lintMarkup().
+	 */
+	public const PROSE = '/(<style\b[^>]*>[\s\S]*?<\/style>)|(>)([^<]+)|(\s(?:alt|title|aria-label|placeholder)=")([^"]*)/i';
+
+	/**
 	 * A preset reference in block attributes or CSS, and the slug attributes of blocks, as PRESET in lintMarkup(). The
 	 * attribute slug starts with a letter, so a custom size in style.typography ("fontSize":"2rem") is no preset.
 	 */
@@ -54,6 +61,7 @@ final class Token_Lint {
 	 * @return list<array{rule: string, match: string}>
 	 */
 	public static function lint_markup( string $content ): array {
+		$content  = self::without_prose( $content );
 		$findings = array();
 		foreach ( self::RULES as $rule => $regex ) {
 			preg_match_all( $regex, $content, $matches );
@@ -71,6 +79,28 @@ final class Token_Lint {
 			);
 		}
 		return $findings;
+	}
+
+	/**
+	 * Blanks readable text (see PROSE) with spaces of the same length.
+	 *
+	 * @param string $content Block markup.
+	 */
+	public static function without_prose( string $content ): string {
+		return (string) preg_replace_callback(
+			self::PROSE,
+			// Match groups: 1 a style element (kept whole), 2 and 3 a text node, 4 and 5 a readable attribute.
+			static function ( array $m ): string {
+				if ( isset( $m[5] ) ) {
+					return $m[4] . str_repeat( ' ', strlen( $m[5] ) );
+				}
+				if ( isset( $m[3] ) ) {
+					return '>' . str_repeat( ' ', strlen( $m[3] ) );
+				}
+				return $m[0];
+			},
+			$content
+		);
 	}
 
 	/**

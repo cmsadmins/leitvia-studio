@@ -45,7 +45,7 @@ final class Compiler {
 		$findings = array();
 		foreach ( array_keys( $doc ) as $group ) {
 			$group = (string) $group;
-			if ( str_starts_with( $group, '$' ) || isset( Dtcg::GROUPS[ $group ] ) || 'size' === $group ) {
+			if ( str_starts_with( $group, '$' ) || isset( Dtcg::GROUPS[ $group ] ) || in_array( $group, array( 'size', 'fontWeight' ), true ) ) {
 				continue;
 			}
 			$findings[] = array(
@@ -297,6 +297,37 @@ final class Compiler {
 		if ( isset( $data['settings']['layout'] ) && ! $data['settings']['layout'] ) {
 			unset( $data['settings']['layout'] );
 		}
+		return self::weights( $data, (array) ( $settings['custom']['fontWeight'] ?? array() ) );
+	}
+
+	/**
+	 * User global styles data with the weights of the group fontWeight as settings.custom.fontWeight. The theme reads them
+	 * in its headings and eyebrow with the weight of the theme or of its style variation as fallback, so a set without
+	 * them gives that weight back.
+	 *
+	 * @param array<string, mixed>  $data    User global styles data.
+	 * @param array<string, string> $weights Weights by key of settings.custom.fontWeight.
+	 * @return array<string, mixed>
+	 */
+	private static function weights( array $data, array $weights ): array {
+		unset( $data['settings']['custom']['fontWeight'] );
+		if ( $weights ) {
+			$data['settings']['custom']['fontWeight'] = $weights;
+		}
+		if ( isset( $data['settings']['custom'] ) && ! $data['settings']['custom'] ) {
+			unset( $data['settings']['custom'] );
+		}
+		// Global styles saved before the headings read the weights of a set (a style variation applied with an older
+		// theme) hold a plain weight such as 500 per heading element, which beats the set. The plain weight stays as
+		// the fallback of the variable, so an activation writes the element rules anew and a set without weights keeps
+		// the look the site had.
+		foreach ( array( 'heading', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6' ) as $element ) {
+			$weight = $data['styles']['elements'][ $element ]['typography']['fontWeight'] ?? null;
+			if ( ( is_string( $weight ) || is_int( $weight ) ) && '' !== (string) $weight && ! str_contains( (string) $weight, 'var(' ) ) {
+				$value = 'var(--wp--custom--font-weight--heading, ' . $weight . ')';
+				$data['styles']['elements'][ $element ]['typography']['fontWeight'] = 'h3' === $element ? 'var(--wp--custom--font-weight--heading-s, ' . $value . ')' : $value;
+			}
+		}
 		return $data;
 	}
 
@@ -366,6 +397,18 @@ final class Compiler {
 			);
 		foreach ( array( 'core/cover', 'core/group' ) as $block ) {
 			$data['styles']['blocks'][ $block ]['variations']['inverse'] = $style;
+		}
+		// Text on dark stages, such as the theme header over a cover: ink in a dark set; a light set leaves it to the
+		// theme, which takes white as core covers do.
+		// Inverse of a dark set lies on surface-alt, where accent and ink-muted pass by contract: the theme keeps them
+		// there (prices, check marks, eyebrows) through these two, as the dark style variations name them.
+		unset( $data['settings']['custom']['onStage'], $data['settings']['custom']['inverseAccent'], $data['settings']['custom']['inverseMuted'] );
+		if ( $surface < $ink ) {
+			$data['settings']['custom']['onStage']       = 'var(--wp--preset--color--ink)';
+			$data['settings']['custom']['inverseAccent'] = 'var(--wp--preset--color--accent)';
+			$data['settings']['custom']['inverseMuted']  = 'var(--wp--preset--color--ink-muted)';
+		} elseif ( isset( $data['settings']['custom'] ) && ! $data['settings']['custom'] ) {
+			unset( $data['settings']['custom'] );
 		}
 		return $data;
 	}

@@ -200,6 +200,16 @@ class Test_Gateway_Block_Fields extends WP_UnitTestCase {
 			$this->assert_rejected( 'leitvia_invalid_input', self::call( 'leitvia/add-media', self::file( $bytes, $name ) ) );
 		}
 
+		// An SVG, also under another name, is refused with the way to a raster logo.
+		foreach ( array(
+			'logo.svg' => '<svg xmlns="http://www.w3.org/2000/svg"/>',
+			'logo.png' => '<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg"/>',
+		) as $name => $bytes ) {
+			$svg = self::call( 'leitvia/add-media', self::file( $bytes, $name ) );
+			$this->assert_rejected( 'leitvia_invalid_input', $svg );
+			$this->assertStringContainsString( 'PNG or WebP', $svg->get_error_message(), $name );
+		}
+
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'subscriber' ) ) );
 		$this->assertWPError( self::call( 'leitvia/add-media', self::file( self::VTT, 'denied.vtt' ) ), 'no upload without the right to upload files' );
 	}
@@ -826,6 +836,21 @@ trailer
 		$this->assert_rejected( 'leitvia_invalid_input', self::edit( $page, array( 'attributes' => array( 'className' => 'is-style-unbekannt' ) ) ) );
 		$this->assert_rejected( 'leitvia_invalid_input', self::edit( $page, array( 'attributes' => array( 'className' => 'beliebig' ) ) ) );
 
+		// Styles that combine, such as a sticky and an overlay header, go space separated; each must be a style.
+		register_block_style(
+			'core/group',
+			array(
+				'name'  => 'test-pair',
+				'label' => 'Pair',
+			)
+		);
+		$pair = self::edit( $page, array( 'attributes' => array( 'className' => 'is-style-inverse is-style-test-pair' ) ) );
+		$this->assertIsString( $pair, is_wp_error( $pair ) ? $pair->get_error_message() : '' );
+		$this->assertSame( 'band is-style-inverse is-style-test-pair', parse_blocks( $pair )[0]['attrs']['className'] );
+		$this->assertStringContainsString( '<div class="wp-block-group band is-style-inverse is-style-test-pair">', $pair );
+		$this->assert_rejected( 'leitvia_invalid_input', self::edit( $page, array( 'attributes' => array( 'className' => 'is-style-inverse is-style-unbekannt' ) ) ) );
+		unregister_block_style( 'core/group', 'test-pair' );
+
 		// A new className goes before layout, where the editor saves it.
 		$plain = self::page( '<!-- wp:group {"layout":{"type":"constrained"}} --><div class="wp-block-group"><!-- wp:paragraph --><p>Hello</p><!-- /wp:paragraph --></div><!-- /wp:group -->' );
 		$saved = self::edit( $plain, array( 'attributes' => array( 'className' => 'is-style-inverse' ) ) );
@@ -1142,5 +1167,44 @@ trailer
 		$this->assertIsString( $content, is_wp_error( $content ) ? $content->get_error_message() : '' );
 		$this->assertStringContainsString( 'aria-label="Hinweis"', $content );
 		$this->assertStringContainsString( '>New prices</p>', $content );
+	}
+
+	/**
+	 * Text color and size where the supports allow them: a heading takes a text role, the icon (no markup of its own)
+	 * a color role and a font size in its comment, the icon list both as classes of its list; a cover its height in vh.
+	 */
+	public function test_update_block_text_colors_icon_presets_and_cover_height(): void {
+		$heading = self::page( '<!-- wp:heading {"textColor":"ink-muted"} --><h2 class="wp-block-heading has-ink-muted-color has-text-color">Title</h2><!-- /wp:heading -->' );
+		$content = self::edit( $heading, array( 'attributes' => array( 'textColor' => 'accent' ) ) );
+		$this->assertIsString( $content, is_wp_error( $content ) ? $content->get_error_message() : '' );
+		$this->assertMatchesRegularExpression( '/<h2 class="(?=[^"]*has-accent-color)(?=[^"]*has-text-color)(?![^"]*has-ink-muted-color)[^"]*">Title<\/h2>/', $content );
+		$this->assert_rejected( 'leitvia_invalid_input', self::edit( $heading, array( 'attributes' => array( 'textColor' => 'surface' ) ) ) );
+
+		$icon    = self::page( '<!-- wp:leitvia/icon {"icon":"gauge"} /-->' );
+		$content = self::edit(
+			$icon,
+			array(
+				'attributes' => array(
+					'textColor' => 'accent',
+					'fontSize'  => 'heading-m',
+				),
+			)
+		);
+		$this->assertIsString( $content, is_wp_error( $content ) ? $content->get_error_message() : '' );
+		$attrs = parse_blocks( $content )[0]['attrs'];
+		$this->assertSame( array( 'accent', 'heading-m' ), array( $attrs['textColor'], $attrs['fontSize'] ) );
+		$this->assertStringContainsString( 'has-accent-color', do_blocks( $content ) );
+
+		$list    = self::page( '<!-- wp:leitvia/icon-list --><ul role="list" class="wp-block-leitvia-icon-list"><!-- wp:leitvia/icon-list-item --><li class="wp-block-leitvia-icon-list-item"><span class="wp-block-leitvia-icon-list-item__text">A</span></li><!-- /wp:leitvia/icon-list-item --></ul><!-- /wp:leitvia/icon-list -->' );
+		$content = self::edit( $list, array( 'attributes' => array( 'textColor' => 'ink-muted' ) ) );
+		$this->assertIsString( $content, is_wp_error( $content ) ? $content->get_error_message() : '' );
+		$this->assertStringContainsString( 'class="wp-block-leitvia-icon-list has-ink-muted-color has-text-color"', $content );
+
+		$cover   = self::page( '<!-- wp:cover {"dimRatio":80,"isDark":true} --><div class="wp-block-cover is-dark"><span aria-hidden="true" class="wp-block-cover__background has-background-dim-80 has-background-dim"></span><div class="wp-block-cover__inner-container"><!-- wp:paragraph --><p>Hi</p><!-- /wp:paragraph --></div></div><!-- /wp:cover -->' );
+		$content = self::edit( $cover, array( 'attributes' => array( 'minHeight' => 90 ) ) );
+		$this->assertIsString( $content, is_wp_error( $content ) ? $content->get_error_message() : '' );
+		$this->assertStringContainsString( 'style="min-height:90vh"', $content );
+		$this->assertSame( array( 90, 'vh' ), array( parse_blocks( $content )[0]['attrs']['minHeight'], parse_blocks( $content )[0]['attrs']['minHeightUnit'] ) );
+		$this->assert_rejected( 'leitvia_invalid_input', self::edit( $cover, array( 'attributes' => array( 'minHeight' => 120 ) ) ) );
 	}
 }

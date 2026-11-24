@@ -3,7 +3,7 @@
  * Plugin Name:       Leitvia Studio: AI Agents, MCP and Design Tokens for Block Themes
  * Plugin URI:        https://leitvia.com/features/
  * Description:       AI agents such as Claude Code build and maintain block theme sites over MCP or REST. Every change is checked, reviewable and can be rolled back.
- * Version:           1.3.51
+ * Version:           1.3.52
  * Requires at least: 7.1
  * Requires PHP:      8.2
  * Author:            CMS ADMINS
@@ -18,7 +18,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-const LEITVIA_STUDIO_VERSION = '1.3.51';
+const LEITVIA_STUDIO_VERSION = '1.3.52';
 const LEITVIA_STUDIO_API     = 1;
 // Oldest Extension API version add-ons may still declare; raised two major Studio versions after a breaking change.
 const LEITVIA_STUDIO_API_MIN = 1;

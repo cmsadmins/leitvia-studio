@@ -1,0 +1,24 @@
+{
+	"name": "frame-hub",
+	"template": "page-landing",
+	"frame": "hub",
+	"sections": [
+		"leitvia/hero-centered",
+		"leitvia/content-answer-facts",
+		"leitvia/teaser-services",
+		"leitvia/content-quote",
+		"leitvia/content-faq",
+		"leitvia/cta-contact"
+	],
+	"issues": [
+		[
+			"missingSection",
+			6
+		],
+		[
+			"missingSection",
+			6
+		]
+	],
+	"score": 80
+}

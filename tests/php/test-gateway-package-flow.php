@@ -217,6 +217,22 @@ class Test_Gateway_Package_Flow extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A queued change returns the hash its target keeps; the next change of the package on that target sends it as
+	 * base_hash and is accepted (no 409 for a hash the result named).
+	 */
+	public function test_queued_result_names_the_next_base_hash(): void {
+		$post  = $this->post( 'Old' );
+		$write = fn( string $hash, string $title ) => Pipeline::run( new Operation( 'leitvia/test-write', 'content', array( 'post' => $post ), $hash, static fn( array $state ): array => array( 'post_title' => $title ) + $state, array(), 'task' ) );
+		$first = $write( Hashes::document( $post ), 'First' );
+		$this->assertSame( 'package', $first['mode'] );
+		$this->assertSame( Hashes::document( $post ), $first['hash'] );
+		$second = $write( $first['hash'], 'Second' );
+		$this->assertIsArray( $second, is_wp_error( $second ) ? wp_json_encode( $second->get_error_data() ) : '' );
+		$this->assertSame( $first['package'], $second['package'] );
+		$this->assertSame( 'Second', Packages::operations( $second['package'] )[1]['state']['post_title'] );
+	}
+
+	/**
 	 * Two writes to one post in one package: the second builds on the state of the first, shows only its own change,
 	 * applies on the hash the first left (alone it conflicts) and rolls back with it, newest first. Repeating it adds
 	 * nothing.

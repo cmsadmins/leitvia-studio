@@ -985,7 +985,14 @@ final class Recipes {
 	 */
 	public static function result( string $step, string $ability, $result, array $target ): array {
 		if ( is_wp_error( $result ) ) {
-			return self::step( $step, $ability, 'rejected', $target, (string) $result->get_error_code() ) + array( 'message' => $result->get_error_message() );
+			// The findings and the next ability of the rejection stay with the step, so the caller sees what to fix.
+			$data = (array) $result->get_error_data();
+			return self::step( $step, $ability, 'rejected', $target, (string) $result->get_error_code() ) + array( 'message' => $result->get_error_message() ) + array_filter(
+				array(
+					'findings'     => array_values( (array) ( $data['findings'] ?? array() ) ),
+					'next_ability' => (string) ( $data['next_ability'] ?? '' ),
+				)
+			);
 		}
 		$result = (array) $result;
 		return array( 'package' => (int) ( $result['package'] ?? 0 ) ) + self::step( $step, $ability, (string) ( $result['mode'] ?? 'live' ), (array) ( $result['target'] ?? array() ) + $target ) + array_intersect_key( $result, array( 'slug_changed' => true ) );

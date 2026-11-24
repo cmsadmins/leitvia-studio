@@ -49,7 +49,7 @@ final class Studio {
 		'patterns'        => array(
 			'title'       => 'string',
 			'description' => 'string',
-			'area'        => array( 'hero', 'content', 'teaser', 'proof', 'cta', 'offer' ),
+			'area'        => array( 'hero', 'content', 'teaser', 'proof', 'cta', 'offer', 'header', 'footer' ),
 			'composition' => 'array',
 		),
 		'building_blocks' => array(

@@ -139,6 +139,64 @@ class Test_Compiler extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The group fontWeight writes settings.custom.fontWeight, which the headings of the theme and its style variations
+	 * read with their own weight as fallback; the export carries it, and a set without it removes it again.
+	 */
+	public function test_weight_tokens_set_the_headings(): void {
+		self::apply_variation( 'corporate-light' );
+		$plain             = self::set_with_accent( '#654321' );
+		$light             = self::set_with_accent( '#123456' );
+		$doc               = json_decode( get_post_meta( $light, Token_Sets::META, true ), true );
+		$weight            = static fn( int $value ): array => array(
+			'$type'  => 'fontWeight',
+			'$value' => $value,
+		);
+		$doc['fontWeight'] = array(
+			'heading'   => $weight( 300 ),
+			'heading-s' => $weight( 600 ),
+			'eyebrow'   => $weight( 700 ),
+		);
+		update_post_meta( $light, Token_Sets::META, wp_slash( wp_json_encode( $doc ) ) );
+
+		$this->assertTrue( Compiler::activate( $light ) );
+		WP_Theme_JSON_Resolver::clean_cached_data();
+		$css = wp_get_global_stylesheet();
+		$this->assertStringContainsString( '--wp--custom--font-weight--heading: 300', $css );
+		$this->assertStringContainsString( '--wp--custom--font-weight--heading-s: 600', $css );
+		$this->assertStringContainsString( '--wp--custom--font-weight--eyebrow: 700', $css );
+		// The variation reads the property and keeps its own weight as fallback.
+		$this->assertSame( 'var(--wp--custom--font-weight--heading, 500)', wp_get_global_styles( array( 'elements', 'heading', 'typography', 'fontWeight' ) ) );
+		$this->assertSame( $weight( 300 ), Dtcg::from_settings( wp_get_global_settings(), leitvia_studio_contract() )['fontWeight']['heading'] );
+
+		$this->assertTrue( Compiler::activate( $plain ) );
+		WP_Theme_JSON_Resolver::clean_cached_data();
+		$this->assertStringNotContainsString( '--wp--custom--font-weight--heading:', wp_get_global_stylesheet() );
+		$this->assertSame( 'var(--wp--custom--font-weight--heading, 500)', wp_get_global_styles( array( 'elements', 'heading', 'typography', 'fontWeight' ) ), 'the weight of the variation' );
+
+		// Global styles of an older variation hold plain weights per heading; an activation turns them into the
+		// properties of the set with the plain weight as fallback, and a second run changes nothing.
+		$old  = array(
+			'styles' => array(
+				'elements' => array(
+					'h1' => array( 'typography' => array( 'fontWeight' => '500' ) ),
+					'h3' => array( 'typography' => array( 'fontWeight' => '500' ) ),
+					'h6' => array( 'typography' => array( 'fontWeight' => 'var(--wp--custom--font-weight--heading, 500)' ) ),
+				),
+			),
+		);
+		$laid = Compiler::lay_over( $old, array( 'custom' => array( 'fontWeight' => array( 'heading' => '300' ) ) ) );
+		$this->assertSame( 'var(--wp--custom--font-weight--heading, 500)', $laid['styles']['elements']['h1']['typography']['fontWeight'] );
+		$this->assertSame( 'var(--wp--custom--font-weight--heading-s, var(--wp--custom--font-weight--heading, 500))', $laid['styles']['elements']['h3']['typography']['fontWeight'] );
+		$this->assertSame( $old['styles']['elements']['h6'], $laid['styles']['elements']['h6'] );
+		$this->assertSame( $laid, Compiler::lay_over( $laid, array( 'custom' => array( 'fontWeight' => array( 'heading' => '300' ) ) ) ) );
+
+		$doc['fontWeight'] = array( 'heading' => $weight( 950 ) );
+		$this->assertSame( 'leitvia_studio_dtcg_weight_range', Dtcg::to_settings( $doc, leitvia_studio_contract() )->get_error_code() );
+		$doc['fontWeight'] = array( 'body' => $weight( 400 ) );
+		$this->assertSame( 'leitvia_studio_dtcg_unknown_role', Dtcg::to_settings( $doc, leitvia_studio_contract() )->get_error_code() );
+	}
+
+	/**
 	 * Drift is detected after the active set is saved again and after the palette changes outside Studio.
 	 */
 	public function test_drift(): void {
@@ -256,6 +314,12 @@ class Test_Compiler extends WP_UnitTestCase {
 		$light = Compiler::inverse( $data, Compiler::document( $id ) );
 		$this->assertSame( 'var:preset|color|ink', $light['styles']['blocks']['core/group']['variations']['inverse']['color']['background'] );
 		$this->assertArrayNotHasKey( 'border', $light['styles']['blocks']['core/group']['variations']['inverse'] );
+		// Text on dark stages: ink in the dark set, the theme default again in the light one.
+		$this->assertSame( 'var(--wp--preset--color--ink)', $data['settings']['custom']['onStage'] );
+		// Inverse on surface-alt keeps accent and ink-muted (contract pairs), so prices and marks stay accent.
+		$this->assertSame( 'var(--wp--preset--color--accent)', $data['settings']['custom']['inverseAccent'] );
+		$this->assertSame( 'var(--wp--preset--color--ink-muted)', $data['settings']['custom']['inverseMuted'] );
+		$this->assertArrayNotHasKey( 'custom', $light['settings'] ?? array() );
 	}
 
 	/**

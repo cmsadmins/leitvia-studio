@@ -59,7 +59,7 @@ final class Read_Design {
 		Gateway\Abilities::read(
 			'leitvia/get-contract',
 			__( 'Get contract', 'leitvia-studio' ),
-			__( 'Returns the site this connection works on (address, REST base, name, language, whether it is part of a multisite network) and the design contract of the active theme: version, rules, color roles, contrast pairs, composition rules, page frames, template parts, templates, block styles and style variations, plus the base hashes of template parts, templates and navigation menus. Compare site.url with the address of your task before the first write. Patterns come from list-patterns, blocks from list-blocks.', 'leitvia-studio' ),
+			__( 'Returns the site this connection works on (address, REST base, name, language, whether it is part of a multisite network) and the design contract of the active theme: version, rules, color roles, contrast pairs, composition rules, page frames (with the section kinds a frame requires or recommends, sectionKinds), template parts, templates, block styles and style variations, plus the base hashes of template parts, templates and navigation menus. Compare site.url with the address of your task before the first write. Patterns come from list-patterns, blocks from list-blocks.', 'leitvia-studio' ),
 			$none,
 			array(
 				'type'       => 'object',
@@ -87,6 +87,7 @@ final class Read_Design {
 							'optionalPairs'    => $objects,
 							'compositionRules' => array( 'type' => 'object' ),
 							'pageFrames'       => $objects,
+							'sectionKinds'     => $objects,
 							'templateParts'    => $objects,
 							'templates'        => $objects,
 							'blockStyles'      => $objects,
@@ -193,13 +194,18 @@ final class Read_Design {
 			'leitvia/list-patterns',
 			__( 'List patterns', 'leitvia-studio' ),
 			/* translators: %s: product name */
-			sprintf( __( 'Lists the patterns of the theme, of %s and of its add-ons (source addon) with composition metadata, image slots, when to use and avoid them, lab status and the replacement of deprecated ones, followed by the Lab patterns (slug block:<ID>, source lab) with their lab status, version and document hash, and the composition of the theme pattern they vary. Only approved Lab patterns count as known in check-composition. Filter by role, tone, layout or category; at most 50 per page. Markup and usage come from get-pattern.', 'leitvia-studio' ), leitvia_studio_brand()['name'] ),
+			sprintf( __( 'Lists the patterns of the theme, of %s and of its add-ons (source addon) with composition metadata, image slots, when to use and avoid them, lab status and the replacement of deprecated ones, followed by the Lab patterns (slug block:<ID>, source lab) with their lab status, version and document hash, and the composition of the theme pattern they vary. Only approved Lab patterns count as known in check-composition. provides names the section kinds of the contract a pattern fills (sectionKinds, as page frames require them), continues the patterns it continues as one section. Filter by role, tone, layout, provides or category; at most 50 per page. Markup and usage come from get-pattern.', 'leitvia-studio' ), leitvia_studio_brand()['name'] ),
 			array(
 				'type'                 => 'object',
 				'properties'           => array(
 					'role'     => $slug,
 					'tone'     => $slug,
 					'layout'   => $slug,
+					'provides' => array(
+						'type'        => 'string',
+						'maxLength'   => 40,
+						'description' => __( 'Filter by a section kind of the contract (sectionKinds), for example faq or answer.', 'leitvia-studio' ),
+					),
 					'category' => array(
 						'type'        => 'string',
 						'maxLength'   => 100,
@@ -546,6 +552,9 @@ final class Read_Design {
 			// Same slug rule as set-variation.
 			$slug = $variation['slug'] ?? sanitize_title( (string) ( $variation['title'] ?? '' ) );
 			$data = array_intersect_key( $variation, array_flip( array( 'settings', 'styles' ) ) );
+			// A user without unfiltered_html saves the variation without what KSES drops (settings.custom, such as the
+			// inverse colors of a dark variation), so only the part that survives it has to be there.
+			$data = array_intersect_key( \WP_Theme_JSON::remove_insecure_properties( array( 'version' => \WP_Theme_JSON::LATEST_SCHEMA ) + $data ), $data );
 			if ( $data && in_array( $slug, $known, true ) && self::contains( $user, $data ) ) {
 				$active[] = (string) $slug;
 			}
@@ -607,6 +616,8 @@ final class Read_Design {
 					'images'      => array_values( (array) ( $meta['images'] ?? array() ) ),
 					'useWhen'     => (string) ( $meta['useWhen'] ?? '' ),
 					'avoidWhen'   => (string) ( $meta['docs']['avoidWhen'] ?? '' ),
+					'provides'    => array_values( array_filter( (array) ( $meta['provides'] ?? array() ), 'is_string' ) ),
+					'continues'   => array_values( array_filter( (array) ( $meta['continues'] ?? array() ), 'is_string' ) ),
 					'status'      => Status::effective( $ref ),
 					'replacedBy'  => '' === $replaced ? null : $replaced,
 				);
@@ -639,6 +650,8 @@ final class Read_Design {
 				'images'      => array(),
 				'useWhen'     => '',
 				'avoidWhen'   => '',
+				'provides'    => array(),
+				'continues'   => array(),
 				'status'      => Status::effective( $ref ),
 				'replacedBy'  => '' === $replaced ? null : (string) preg_replace( '/^pattern:/', '', $replaced ),
 				'version'     => (string) get_post_meta( $post->ID, '_leitvia_lab_version', true ),
@@ -663,6 +676,9 @@ final class Read_Design {
 						if ( '' !== (string) ( $input[ $key ] ?? '' ) && ( $item['composition'][ $key ] ?? null ) !== $input[ $key ] ) {
 							return false;
 						}
+					}
+					if ( '' !== (string) ( $input['provides'] ?? '' ) && ! in_array( $input['provides'], $item['provides'], true ) ) {
+						return false;
 					}
 					return '' === (string) ( $input['category'] ?? '' ) || in_array( $input['category'], $item['categories'], true );
 				}

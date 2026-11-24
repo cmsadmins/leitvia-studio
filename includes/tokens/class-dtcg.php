@@ -38,6 +38,18 @@ final class Dtcg {
 		'wide'    => array( 'wideSize', 60, 100 ),
 	);
 
+	/**
+	 * Optional roles of the group fontWeight: token => key of settings.custom.fontWeight, which core prints as
+	 * --wp--custom--font-weight--<key>. heading sets every heading, heading-s h3 and card titles, eyebrow the block
+	 * style Eyebrow of the theme, which reads them with its own weights as fallback. Without them the weights of the
+	 * theme or the style variation stay.
+	 */
+	public const WEIGHTS = array(
+		'heading'   => 'heading',
+		'heading-s' => 'headingS',
+		'eyebrow'   => 'eyebrow',
+	);
+
 	public const MAX_BYTES     = 512 * 1024;
 	public const MAX_DEPTH     = 32;
 	private const ALIAS_DEPTH  = 10;
@@ -106,6 +118,16 @@ final class Dtcg {
 						'$extensions' => array( self::EXT => array( 'name' => (string) ( $preset['name'] ?? $slug ) ) ),
 					);
 				}
+			}
+		}
+		// The weights a set wrote (the theme sets none), so a copy of the active set keeps them.
+		foreach ( self::WEIGHTS as $slug => $key ) {
+			$weight = $settings['custom']['fontWeight'][ $key ] ?? null;
+			if ( is_numeric( $weight ) && (int) $weight >= 100 && (int) $weight <= 900 ) {
+				$doc['fontWeight'][ $slug ] = array(
+					'$type'  => 'fontWeight',
+					'$value' => (int) $weight,
+				);
 			}
 		}
 		// The widths only when they differ from theme.json, so an export of the theme keeps following the theme.
@@ -243,7 +265,43 @@ final class Dtcg {
 		if ( is_wp_error( $layout ) ) {
 			return $layout;
 		}
-		return $settings + ( $layout ? array( 'layout' => $layout ) : array() );
+		$weights = self::weights( $doc['fontWeight'] ?? null, array_key_exists( 'fontWeight', $doc ) );
+		if ( is_wp_error( $weights ) ) {
+			return $weights;
+		}
+		return $settings + ( $layout ? array( 'layout' => $layout ) : array() ) + ( $weights ? array( 'custom' => array( 'fontWeight' => $weights ) ) : array() );
+	}
+
+	/**
+	 * Font weights of the group fontWeight (WEIGHTS) by key of settings.custom.fontWeight, empty without it. A weight is
+	 * a number from 100 to 900, as DTCG writes it.
+	 *
+	 * @param mixed $group Resolved node fontWeight.
+	 * @param bool  $given Whether the document has the node.
+	 * @return array<string, string>|WP_Error
+	 */
+	private static function weights( $group, bool $given ) {
+		if ( ! $given ) {
+			return array();
+		}
+		if ( ! is_array( $group ) || array_key_exists( '$value', $group ) ) {
+			/* translators: %s: token group, fontWeight. */
+			return self::error( 'weight_group', __( '%s must be a group of fontWeight tokens, not a single token.', 'leitvia-studio' ), 'fontWeight' );
+		}
+		$weights = array();
+		foreach ( self::tokens( $group ) as $slug => $token ) {
+			if ( ! isset( self::WEIGHTS[ $slug ] ) ) {
+				/* translators: %s: token path, for example color.brand. */
+				return self::error( 'unknown_role', __( 'The token %s is not a role of the theme contract.', 'leitvia-studio' ), "fontWeight.$slug" );
+			}
+			$value = $token['$value'] ?? null;
+			if ( ( isset( $token['$type'] ) && 'fontWeight' !== $token['$type'] ) || ! is_int( $value ) || $value < 100 || $value > 900 ) {
+				/* translators: %s: token path, for example fontWeight.heading. */
+				return self::error( 'weight_range', __( 'The token %s must be a fontWeight, a whole number from 100 to 900.', 'leitvia-studio' ), "fontWeight.$slug" );
+			}
+			$weights[ self::WEIGHTS[ $slug ] ] = (string) $value;
+		}
+		return $weights;
 	}
 
 	/**

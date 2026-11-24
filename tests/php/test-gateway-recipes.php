@@ -155,6 +155,24 @@ class Test_Gateway_Recipes extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A rejected step keeps the findings and the next ability of its rejection, so add-building-block and apply-recipe
+	 * name what to fix (an address a page holds, for example) instead of a bare leitvia_check_failed.
+	 */
+	public function test_rejected_step_keeps_findings(): void {
+		$finding = array(
+			'check'   => 'leitvia/content-model',
+			'message' => 'The address /docs/ belongs to the published page Docs (ID 19).',
+			'fix'     => 'Give page 19 another slug.',
+		);
+		$step    = Recipes::result( 'contentModel', 'leitvia/define-content-type', \LeitviaStudio\Gateway\Rejection::make( 'leitvia_check_failed', 'Checks found problems.', 422, 'checks', array(), 'leitvia/list-content', 'once', array( 'findings' => array( $finding ) ) ), array() );
+		$this->assertSame( array( 'rejected', 'leitvia_check_failed' ), array( $step['status'], $step['code'] ) );
+		$this->assertSame( array( $finding ), $step['findings'] );
+		$this->assertSame( 'leitvia/list-content', $step['next_ability'] );
+		$plain = Recipes::result( 'contentModel', 'leitvia/define-content-type', new WP_Error( 'leitvia_locked', 'Locked.' ), array() );
+		$this->assertArrayNotHasKey( 'findings', $plain );
+	}
+
+	/**
 	 * Every base recipe validates, and each section is a registered pattern (the patterns of a recipe that requires a
 	 * plugin are checked where the plugin runs, see Test_Recipe_Shop).
 	 */

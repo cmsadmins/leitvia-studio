@@ -58,7 +58,7 @@ add_action(
 | `sync_targets` | `label` (string), `export` (callable) | Sync |
 | `checks` | `label` (string), `scope` (`token_set`, `pattern`, `content` or `page`), `callback` (callable) | Studio checks, Gateway pipeline |
 | `recipes` | `label` (string), `path` (string, absolute path to a `recipe.json`) | Gateway abilities `leitvia/list-recipes` and `leitvia/apply-recipe` |
-| `patterns` | `title` (string), `description` (string), `area` (`hero`, `content`, `teaser`, `proof`, `cta` or `offer`), `composition` (array) | Contract data (`addonPatterns`), composition checks, `leitvia/list-patterns` |
+| `patterns` | `title` (string), `description` (string), `area` (`hero`, `content`, `teaser`, `proof`, `cta`, `offer`, or `header` and `footer` for a pattern of a template part with the role `frame`, which `leitvia/update-template-part` takes and composition checks ignore), `composition` (array) | Contract data (`addonPatterns`), composition checks, `leitvia/list-patterns` |
 | `building_blocks` | `title` (string), `description` (string), `model` (array, content model entries) | `leitvia/add-building-block`, recipes with `buildingBlocks`, `GET /leitvia-studio/v1/building-blocks` |
 
 A `token_sources` callback takes no arguments and returns a list of `array( 'title' => string, 'document' => array )`, each document a DTCG token document. `POST /leitvia-studio/v1/token-sets` with `source`, `index` and an optional `title` creates a set from one of them; it passes the same checks as an import (size, depth, contract roles, CSS allowlist, contrast). Studio registers `leitvia/active-theme` and `leitvia/style-variations`.
@@ -296,6 +296,7 @@ Add-ons dock onto the gateway through hooks, for example to run one workflow on 
 | `leitvia_studio_recipe_plan_steps` | filter | Same as `leitvia_studio_recipe_steps` | After the steps of a dry run. An add-on adds what its steps would do with the dry run statuses and writes nothing; `leitvia_studio_recipe_steps` does not run in a dry run. |
 | `leitvia_studio_recipe_document` | filter | `array $recipe`, `string $name` | Right after a recipe file is read, for runs, dry runs, the plan and the list. Return the recipe in the shape of `schemas/recipe.schema.json`, for example with localised page titles; keep the page slugs. |
 | `leitvia_studio_recipe_model` | filter | `array $declaration`, `string $name` | The content model declaration of a recipe (`contentModel`) before `leitvia/define-content-type` writes it, and in the plan and dry run. Localise labels here; keep the keys. |
+| `leitvia_studio_import_content` | filter | `string\|null $markup` (null), `string $html`, `array $input` | Before `leitvia/import-post` turns the HTML of the source into core blocks. Return block markup to convert it yourself, for example with a reader of a page builder; `null` lets Studio convert. The markup still runs through the checks of `leitvia/create-content` or `leitvia/update-content`. |
 | `leitvia_studio_recipe_step_labels` | filter | `array $labels` (`steps` and `codes`, each name or code to a translated label) | When a Studio screen shows recipe steps. An add-on names its own steps and codes, for example `'steps' => array( 'myImport' => __( 'Sample images', 'my-addon' ) )`. |
 
 A change package is a private post of the type `leitvia_package` whose author is the user who caused it. Meta `_leitvia_package_state` holds `open`, `applied`, `partial`, `rejected` or `rolled_back`, meta `_leitvia_package_key` the package key. `post_content` holds the operations as a JSON list, each with `id` (from 1), `ability`, `area`, `target` (`post` and `post_type`, or `option`; `media` names the file of an image of `leitvia/add-media` in the same package that becomes the featured image when applied), `base_hash` (the hash the change was based on, empty for a new object), `level`, `kinds`, `state` (the complete new state: the post fields `post_title`, `post_content`, `post_excerpt`, `post_status`, `post_name`, `post_parent`, `menu_order`; for posts, pages and entries of the content model also `post_date`, `terms` (term IDs by taxonomy) and under `meta_input` the featured image and the fields of the content model; for new posts any `meta_input`; or `value` for an option) and `findings`. Because every operation carries its base hash and full new state, a package can move between sites, for example from a staging copy to the live site, and be applied there only where the base hash still matches.
@@ -388,9 +389,27 @@ While the filter has entries, every page loads the script module `@leitvia/conse
 
 ## Organization
 
-`leitvia_studio_organization_details()` returns the organization behind the site from the Studio settings: `type` (`Organization` or a type of `LocalBusiness` from `LeitviaStudio\Organization\Organization::TYPES`), `name` and `url` of the site, `street`, `postal_code`, `city`, `country`, `phone`, `email`, `founding_date` (YYYY, YYYY-MM or YYYY-MM-DD), `area_served` (list of places), `opening_hours` (list of `days`, `opens`, `closes` as HH:MM) and `same_as` (list of https addresses). Empty strings and lists where nothing is set.
+`leitvia_studio_organization_details()` returns the organization behind the site from the Studio settings: `type` (`Organization` or a type of `LocalBusiness` from `LeitviaStudio\Organization\Organization::TYPES`), `name` and `url` of the site, `street`, `postal_code`, `city`, `country`, `phone`, `email`, `founding_date` (YYYY, YYYY-MM or YYYY-MM-DD), `founder`, `copyright_since` (YYYY or empty) and `copyright_holder`, `area_served` (list of places), `opening_hours` (list of `days`, `opens`, `closes` as HH:MM) and `same_as` (list of https addresses). Empty strings and lists where nothing is set.
 
 `leitvia_studio_organization_schema()` returns the schema.org node with `@id` (`home_url( '/#organization' )`) that Studio prints on the front page and as publisher of posts. An add-on refers to it by `array( '@id' => … )` or uses the node whole, for example as `hiringOrganization` of a job posting. Neither function checks for an SEO plugin; call `leitvia_studio_seo_plugin_active()` before printing JSON-LD.
+
+## llms.txt
+
+`leitvia_studio_llms_sections` holds the sections of `/llms.txt` below the summary: the heading of each section as key, its posts (`WP_Post`) as value, by default Topics, Services and prices and Pages. Studio writes each post as a Markdown link with its excerpt, leaves out posts that are not published or have a password, lists a post only in the first section that has it and at most 50 per section. An add-on with its own type of content adds a section:
+
+```php
+add_filter(
+	'leitvia_studio_llms_sections',
+	static function ( array $sections ): array {
+		$sections[ __( 'Guides', 'my-addon' ) ] = get_posts( array( 'post_type' => 'my_guide', 'post_parent' => 0, 'numberposts' => 50 ) );
+		return $sections;
+	}
+);
+```
+
+## Table of contents in a template
+
+The block `leitvia/table-of-contents` also works in a template, for example in a column beside `core/post-content`: placed before the content in the markup, it lists the headings of the post on screen at its own levels, and those headings get the ids it links to, as when the block sits in the post. Placed after the content, it lists the headings, but they keep their saved ids only.
 
 ## Contact form
 

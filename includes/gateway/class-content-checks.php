@@ -1404,6 +1404,32 @@ final class Content_Checks {
 	}
 
 	/**
+	 * Findings with place, a readable name of their block beside its ID: the block type and the start of its text, or
+	 * the file of its image, so a finding at p:9 says which block that is.
+	 *
+	 * @param list<array<string, mixed>> $findings Findings.
+	 * @param string                     $content  Block markup the IDs belong to.
+	 * @return list<array<string, mixed>>
+	 */
+	public static function places( array $findings, string $content ): array {
+		$labels = array();
+		foreach ( '' === $content ? array() : self::walk( $content ) as [ $block, $id ] ) {
+			$html          = self::html( $block );
+			$text          = trim( (string) preg_replace( '/\s+/u', ' ', wp_strip_all_tags( $html ) ) );
+			$file          = preg_match( '/<img[^>]+src="([^"]+)"/', $html, $m ) ? wp_basename( (string) wp_parse_url( $m[1], PHP_URL_PATH ) ) : '';
+			$what          = '' !== $text ? '"' . mb_substr( $text, 0, 60 ) . ( mb_strlen( $text ) > 60 ? '…' : '' ) . '"' : $file;
+			$labels[ $id ] = trim( (string) $block['blockName'] . ' ' . $what );
+		}
+		foreach ( $findings as &$finding ) {
+			if ( isset( $labels[ (string) ( $finding['block'] ?? '' ) ] ) ) {
+				$finding['place'] = $labels[ (string) $finding['block'] ];
+			}
+		}
+		unset( $finding );
+		return $findings;
+	}
+
+	/**
 	 * One finding.
 	 *
 	 * @param string $check    Check name.

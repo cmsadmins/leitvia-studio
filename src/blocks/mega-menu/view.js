@@ -3,8 +3,8 @@
 // panel: Escape closes it and returns focus to the button, focus leaving the item closes it, only one panel is open.
 // Hover opens after 150 ms and closes 300 ms after the pointer left, so the pointer may cross the gap to the panel.
 //
-// In the overlay of a navigation the server marked with data-leitvia-collapsible (a mega menu, nested submenus or many
-// links, Mega_Menu::collapsible_overlay()), the core submenus become collapsible the same way. Core keeps
+// In the overlay of a navigation the server marked with data-leitvia-collapsible (a submenu or a mega menu,
+// Mega_Menu::collapsible_overlay()), the core submenus become collapsible the same way. Core keeps
 // them open there (state.isSubmenuOpen is true while the overlay is open), so this module takes over their toggles
 // while the overlay is open and leaves the desktop menu to core.
 const hover = window.matchMedia( '(hover: hover) and (pointer: fine)' );
@@ -145,9 +145,16 @@ for ( const container of document.querySelectorAll(
 	container.addEventListener(
 		'click',
 		( event ) => {
-			const button = event.target.closest(
-				'.wp-block-navigation-submenu__toggle'
-			);
+			// The label of a group without an address (a link without href) toggles like the chevron beside it.
+			const button =
+				event.target.closest(
+					'.wp-block-navigation-submenu__toggle'
+				) ??
+				event.target
+					.closest( '.has-child > a:not([href])' )
+					?.parentElement.querySelector(
+						':scope > .wp-block-navigation-submenu__toggle'
+					);
 			if ( ! button || ! isOpen() ) {
 				return;
 			}

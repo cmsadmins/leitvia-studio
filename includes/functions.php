@@ -54,7 +54,7 @@ function leitvia_studio_seo_plugin_active(): bool {
  * site, postal address, phone, email, founding date, area served, opening hours and profiles. Empty strings and lists
  * where nothing is set.
  *
- * @return array{type: string, name: string, url: string, street: string, postal_code: string, city: string, country: string, phone: string, email: string, founding_date: string, area_served: list<string>, opening_hours: list<array{days: list<string>, opens: string, closes: string}>, same_as: list<string>}
+ * @return array{type: string, name: string, url: string, street: string, postal_code: string, city: string, country: string, phone: string, email: string, founding_date: string, founder: string, copyright_since: string, copyright_holder: string, area_served: list<string>, opening_hours: list<array{days: list<string>, opens: string, closes: string}>, same_as: list<string>}
  */
 function leitvia_studio_organization_details(): array {
 	return \LeitviaStudio\Organization\Organization::details();

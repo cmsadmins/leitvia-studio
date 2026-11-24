@@ -1,5 +1,5 @@
 // Document settings panel of a content model post type: the declared fields on DataForm, stored as post meta with
-// the post, then one list per repeater. Saving stays locked while a field is invalid, a required one empty.
+// the post, then one list per repeater, saved with the post too (REST field leitvia_rows). Saving stays locked while a field is invalid, a required one empty.
 import { __, sprintf } from '@wordpress/i18n';
 import { Suspense, lazy, useEffect, useMemo } from '@wordpress/element';
 import { useDispatch, useSelect } from '@wordpress/data';
@@ -11,6 +11,7 @@ import { Notice, Spinner } from '@wordpress/components';
 import { DataForm, useFormValidity } from '@wordpress/dataviews/wp';
 import { toFields, toForm } from './fields.mjs';
 import ImageField from './image-field';
+import { DateEdit, DecimalEdit, DecimalView } from './inputs';
 import relationField, { relationTitles } from './relation-field';
 
 // The repeater list loads only for types that declare repeaters.
@@ -29,6 +30,12 @@ function fieldsFor( declaration, postType ) {
 	return toFields( declaration, postType ).map( ( field ) => {
 		if ( 'image' === field.Edit ) {
 			return { ...field, Edit: ImageField };
+		}
+		if ( 'date' === field.Edit ) {
+			return { ...field, Edit: DateEdit };
+		}
+		if ( 'number' === field.Edit ) {
+			return { ...field, Edit: DecimalEdit, render: DecimalView };
 		}
 		if ( 'relation' === field.Edit ) {
 			return {
@@ -66,11 +73,13 @@ export default function modelPanel( declaration ) {
 	);
 
 	return function ModelPanel() {
-		const meta = useSelect(
-			( select ) =>
-				select( editorStore ).getEditedPostAttribute( 'meta' ),
-			[]
-		);
+		const { meta, rows } = useSelect( ( select ) => {
+			const editor = select( editorStore );
+			return {
+				meta: editor.getEditedPostAttribute( 'meta' ),
+				rows: editor.getEditedPostAttribute( 'leitvia_rows' ),
+			};
+		}, [] );
 		const { editPost, lockPostSaving, unlockPostSaving } =
 			useDispatch( editorStore );
 		const data = useMemo( () => ( { meta: meta ?? {} } ), [ meta ] );
@@ -129,6 +138,15 @@ export default function modelPanel( declaration ) {
 								repeater={ item.repeater }
 								fields={ item.fields }
 								entryLabel={ type.singularLabel }
+								rows={ rows?.[ item.key ] ?? [] }
+								onChange={ ( list ) =>
+									editPost( {
+										leitvia_rows: {
+											...rows,
+											[ item.key ]: list,
+										},
+									} )
+								}
 							/>
 						) ) }
 					</Suspense>

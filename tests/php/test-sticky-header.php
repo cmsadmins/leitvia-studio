@@ -49,4 +49,51 @@ class Test_Sticky_Header extends WP_UnitTestCase {
 			$this->assertFalse( self::queued(), $class );
 		}
 	}
+
+	/**
+	 * In a theme whose header sticks by default every header part loads it, except one that scrolls with the page;
+	 * a footer part and a theme without the support never do.
+	 */
+	public function test_header_parts_of_a_theme_with_default_sticky(): void {
+		$part = static fn( string $tag, string $html ) => apply_filters(
+			'render_block_core/template-part', // phpcs:ignore WordPress.NamingConventions.ValidHookName.UseUnderscores -- The filter of core for this block.
+			$html,
+			array(
+				'blockName' => 'core/template-part',
+				'attrs'     => array( 'tagName' => $tag ),
+			)
+		);
+		add_theme_support( 'leitvia-sticky-header' );
+		$part( 'header', '<div class="wp-block-group"></div>' );
+		$this->assertTrue( self::queued(), 'header' );
+		wp_dequeue_script_module( Sticky_Header::MODULE );
+		$part( 'header', '<div class="wp-block-group is-style-scrolling-header"></div>' );
+		$this->assertFalse( self::queued(), 'scrolling header' );
+		$part( 'footer', '<div class="wp-block-group"></div>' );
+		$this->assertFalse( self::queued(), 'footer' );
+		remove_theme_support( 'leitvia-sticky-header' );
+		$part( 'header', '<div class="wp-block-group"></div>' );
+		$this->assertFalse( self::queued(), 'theme without the support' );
+		add_theme_support( 'leitvia-sticky-header' );
+	}
+
+	/**
+	 * A header over the stage gets the inline measurement right after it, so the page does not jump once it is
+	 * measured; other headers and footers do not.
+	 */
+	public function test_overlay_header_is_measured_inline(): void {
+		$part = static fn( string $tag, string $html ) => apply_filters(
+			'render_block_core/template-part', // phpcs:ignore WordPress.NamingConventions.ValidHookName.UseUnderscores -- The filter of core for this block.
+			$html,
+			array(
+				'blockName' => 'core/template-part',
+				'attrs'     => array( 'tagName' => $tag ),
+			)
+		);
+		$html = $part( 'header', '<header class="wp-block-template-part"><div class="wp-block-group is-style-overlay-header"></div></header>' );
+		$this->assertStringStartsWith( '<header class="wp-block-template-part"><div class="wp-block-group is-style-overlay-header"></div></header><script', $html );
+		$this->assertStringContainsString( '--leitvia-sticky-header-height', $html );
+		$this->assertStringNotContainsString( '<script', $part( 'header', '<header class="wp-block-template-part"><div class="wp-block-group is-style-overlay-header-x"></div></header>' ) );
+		$this->assertStringNotContainsString( '<script', $part( 'footer', '<footer class="wp-block-template-part"><div class="wp-block-group is-style-overlay-header"></div></footer>' ) );
+	}
 }

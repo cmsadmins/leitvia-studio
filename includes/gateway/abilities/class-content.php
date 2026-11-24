@@ -16,6 +16,7 @@ use LeitviaStudio\Gateway\Packages;
 use LeitviaStudio\Gateway\Recipes;
 use LeitviaStudio\Gateway\Rejection;
 use LeitviaStudio\Gateway\Scope;
+use LeitviaStudio\Model\Entries;
 use LeitviaStudio\Model\Model;
 use LeitviaStudio\Model\Registrar;
 
@@ -49,6 +50,12 @@ final class Content {
 	 * Meta with the source URLs of a text.
 	 */
 	public const SOURCES_META = '_leitvia_sources';
+
+	/**
+	 * Meta of a page in its state: the page frame it was composed for, the hub page it belongs to and the service it
+	 * offers with its price (set-page-structure), so a change of them is hashed, packaged and rolled back like a title.
+	 */
+	public const PAGE_META = array( '_leitvia_page_frame', '_leitvia_hub', '_leitvia_service' );
 
 	/**
 	 * Most items per page of list-content and list-media.
@@ -136,6 +143,7 @@ final class Content {
 						'description' => __( 'Kind of a page.', 'leitvia-studio' ),
 					),
 					'author'         => self::author_schema(),
+					'author_name'    => self::author_name_schema(),
 					'terms'          => self::terms_schema(),
 					'fields'         => self::fields_schema(),
 					'rows'           => self::rows_schema(),
@@ -240,7 +248,7 @@ final class Content {
 		Abilities::read(
 			'leitvia/get-site-health',
 			__( 'Get site health', 'leitvia-studio' ),
-			__( 'Returns the versions of WordPress, PHP, the theme and the plugins and the updates WordPress knows of, read from its last update check; nothing is requested. Needs a user who may view the Site Health checks, usually an administrator, or the agent role.', 'leitvia-studio' ),
+			__( 'Returns the versions of WordPress, PHP, the theme and the plugins and the updates WordPress knows of, read from its last update check; nothing is requested. mcp says whether MCP clients reach the server of Leitvia Studio (ready), its address (url) and, when not, why (reason, such as the plugin MCP Adapter missing): report that to the person and go on over the REST API. Needs a user who may view the Site Health checks, usually an administrator, or the agent role.', 'leitvia-studio' ),
 			array(),
 			array( 'type' => 'object' ),
 			static fn() => self::health(),
@@ -285,6 +293,19 @@ final class Content {
 			'type'        => 'integer',
 			'minimum'     => 1,
 			'description' => __( 'User ID of the author, as author in leitvia/list-content shows it; the user must be able to edit this post type. Without it a new post belongs to the user who writes it. An author without a display name of their own shows as the name of the site, never as the login.', 'leitvia-studio' ),
+		);
+	}
+
+	/**
+	 * Schema of the name of an author without an account.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function author_name_schema(): array {
+		return array(
+			'type'        => 'string',
+			'maxLength'   => 100,
+			'description' => __( 'Name of an author without an account here, for example from a migration: the post shows it as its author name and in its structured data (Person), and no user is created. Empty removes it, then the post shows its user again.', 'leitvia-studio' ),
 		);
 	}
 
@@ -564,13 +585,27 @@ final class Content {
 			}
 			$out[] = $values;
 		}
+		// The same checks as rows saved in the editor (Entries::invalid()), such as a weekday declared unique.
+		$error = Entries::invalid(
+			array_map(
+				static fn( array $row ): array => array(
+					'title' => $row['title'],
+					'meta'  => $row,
+				),
+				$out
+			),
+			$repeater
+		);
+		if ( '' !== $error ) {
+			return Block_Edit::invalid( 'rows', $error, $target + array( 'repeater' => $key ), 'leitvia/get-content-model' );
+		}
 		return $out;
 	}
 
 	/**
 	 * Part of the state of a post of a content type: post_date, post_author, terms by taxonomy (IDs), under meta_input
-	 * the featured image, the template, the fields of the content model and the SEO meta update-seo writes (Seo::keys()),
-	 * and the rows of its repeaters under rows. Empty for other post types.
+	 * the featured image, the template, the fields of the content model, the SEO meta update-seo writes (Seo::keys()),
+	 * for a page PAGE_META, and the rows of its repeaters under rows. Empty for other post types.
 	 *
 	 * @param int    $id   Post ID.
 	 * @param string $type Post type.
@@ -594,7 +629,10 @@ final class Content {
 			$state['meta_input']['_thumbnail_id'] = (int) get_post_thumbnail_id( $id );
 		}
 		$state['meta_input']['_wp_page_template'] = (string) get_post_meta( $id, '_wp_page_template', true );
-		foreach ( array_merge( array_keys( self::fields( $type ) ), Seo::keys() ) as $key ) {
+		// The name of an author without an account; Hashes leaves it out while it is empty, so the hash of every other
+		// post stays as it was.
+		$state['meta_input'][ \LeitviaStudio\News\Schema::AUTHOR_NAME_META ] = (string) get_post_meta( $id, \LeitviaStudio\News\Schema::AUTHOR_NAME_META, true );
+		foreach ( array_merge( array_keys( self::fields( $type ) ), Seo::keys(), 'page' === $type ? self::PAGE_META : array() ) as $key ) {
 			$state['meta_input'][ $key ] = get_post_meta( $id, $key, true );
 		}
 		foreach ( self::repeaters( $type ) as $key => $repeater ) {
@@ -696,6 +734,9 @@ final class Content {
 				return $author;
 			}
 			$state['post_author'] = $author;
+		}
+		if ( isset( $input['author_name'] ) ) {
+			$state['meta_input'][ \LeitviaStudio\News\Schema::AUTHOR_NAME_META ] = sanitize_text_field( (string) $input['author_name'] );
 		}
 		foreach ( (array) ( $input['terms'] ?? array() ) as $taxonomy => $values ) {
 			$terms = self::terms( (string) $taxonomy, (array) $values, $state, $target );
@@ -1299,6 +1340,9 @@ final class Content {
 			),
 			'plugins'   => $plugins,
 			'checked'   => is_object( $plugins_update ) && isset( $plugins_update->last_checked ) ? gmdate( 'Y-m-d H:i:s', (int) $plugins_update->last_checked ) : null,
+			// Whether MCP clients reach the server leitvia, why not, and its address: an agent that came in over REST
+			// reports a missing adapter to the person instead of trying the endpoint.
+			'mcp'       => \LeitviaStudio\Gateway\Mcp::status(),
 		);
 	}
 

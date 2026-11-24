@@ -103,8 +103,9 @@ class Test_Gateway_Composition extends WP_UnitTestCase {
 			'labPatterns'   => $fixture['labPatterns'] ?? array(),
 			'mediaPatterns' => $fixture['mediaPatterns'] ?? array(),
 			'proseBlocks'   => $fixture['proseBlocks'] ?? array(),
+			'addonPatterns' => $fixture['addonPatterns'] ?? array(),
 		) + self::contract();
-		$result   = Composition::score( $fixture['sections'], $contract, (string) ( $fixture['template'] ?? '' ), (array) ( $fixture['tones'] ?? array() ), (array) ( $fixture['mirrored'] ?? array() ) );
+		$result   = Composition::score( $fixture['sections'], $contract, (string) ( $fixture['template'] ?? '' ), (array) ( $fixture['tones'] ?? array() ), (array) ( $fixture['mirrored'] ?? array() ), (string) ( $fixture['frame'] ?? '' ) );
 		$this->assertSame( $fixture['issues'], array_map( static fn( array $issue ): array => array( $issue['rule'], $issue['index'] ), $result['issues'] ) );
 		$this->assertSame( $fixture['score'], $result['score'] );
 	}
@@ -331,7 +332,7 @@ class Test_Gateway_Composition extends WP_UnitTestCase {
 
 	/**
 	 * Section patterns of an add-on (registry patterns) join the contract data as addonPatterns, so composition knows
-	 * them; an entry outside the areas of the contract is refused.
+	 * them, and so do its header and footer patterns; an entry outside these areas is refused.
 	 */
 	public function test_addon_patterns(): void {
 		$this->setExpectedIncorrectUsage( 'LeitviaStudio\Extension\Registry::register' );
@@ -373,12 +374,23 @@ class Test_Gateway_Composition extends WP_UnitTestCase {
 				),
 				'test-addon'
 			);
+			$studio->registry( 'patterns' )->register(
+				'test-addon/sidebar',
+				array(
+					'title'       => 'Sidebar',
+					'description' => 'A sidebar.',
+					'area'        => 'sidebar',
+					'composition' => $composition,
+				),
+				'test-addon'
+			);
 		};
 		add_action( 'leitvia_studio_init', $register, 20 );
 		leitvia_studio()->reset_for_tests();
 		remove_action( 'leitvia_studio_init', $register, 20 );
 		$addon = leitvia_studio_contract()->data()['addonPatterns'];
-		$this->assertSame( array( 'test-addon/events' ), array_column( $addon, 'slug' ) );
+		// A header or footer of an add-on (the area of a template part) joins as well, for update-template-part.
+		$this->assertSame( array( 'test-addon/events', 'test-addon/header' ), array_column( $addon, 'slug' ) );
 		$this->assertSame( $composition, $addon[0]['composition'] );
 		$this->assertArrayNotHasKey( 'owner', $addon[0] );
 		$slugs = array( 'leitvia/hero-centered', 'test-addon/events', 'leitvia/cta-contact' );

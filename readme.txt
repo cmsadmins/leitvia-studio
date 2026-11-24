@@ -4,7 +4,7 @@ Tags: ai agent, mcp, abilities api, design tokens, block theme
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.51
+Stable tag: 1.3.52
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -12,7 +12,7 @@ AI agents such as Claude Code build and maintain block theme sites over MCP or R
 
 == Description ==
 
-Leitvia Studio lets AI agents such as Claude Code, Codex or Cursor build and maintain WordPress sites with block themes through 68 abilities, and every change passes checks for design, accessibility and content before it goes live. It is free and made for developers, agencies and site owners who want an AI agent to do the work without administrator rights.
+Leitvia Studio lets AI agents such as Claude Code, Codex or Cursor build and maintain WordPress sites with block themes through 73 abilities, and every change passes checks for design, accessibility and content before it goes live. It is free and made for developers, agencies and site owners who want an AI agent to do the work without administrator rights.
 
 The abilities belong to the WordPress [Abilities API](https://developer.wordpress.org/apis/abilities-api/) and run over MCP or the REST API. Everything Studio creates is stored in WordPress core structures (patterns, global styles, post types, block bindings), so the site keeps working when you deactivate the plugin. It works with any block theme and fits best with the free theme [Leitvia](https://github.com/cmsadmins/leitvia).
 
@@ -62,6 +62,8 @@ The Contact form block sends the name, email address and message a visitor enter
 
 This plugin does not connect to any external service by default. The check after an AI agent changed a page live loads that page from your own site (a loopback request, see the question on requests from your server); it contacts no other host.
 
+Migration: the ability "Import post" (leitvia/import-post), called with the address of a page on another site, downloads its images from their host into the media library. That host sees your server's IP address.
+
 AI provider of the site owner: only when an agent or a user calls the ability "Plan page" (leitvia/plan-page) with ai set to true, Leitvia Studio sends one request through the AI client of WordPress to the AI connector an administrator set up under Settings, Connectors (for example OpenAI, Anthropic or Google). Leitvia Studio has no provider of its own and stores no keys. The request holds the goal and the content points given in that call, the page frame and composition rules of the contract, and the names and metadata of the patterns; no posts, no user data and no other content of the database. Without that call, nothing is sent. The terms and privacy policy of the provider the administrator chose apply.
 
 Embedded content: when a visitor clicks "Load content from" with the name of the provider in the placeholder of an embed, or has chosen to always allow that provider, the visitor's browser loads the embedded content from the provider. The provider receives the visitor's IP address, browser details and the page address, and may set cookies. Nothing is loaded before that action. The providers Leitvia Studio names, with their privacy policies (other embed providers are named after their host):
@@ -97,7 +99,7 @@ Token sets can name [Libre Franklin](https://github.com/googlefonts/Libre-Frankl
 
 The Map block bundles [Leaflet](https://leafletjs.com/) 1.9.4 by Volodymyr Agafonkin and contributors into `build/blocks/map/leaflet.js`, loaded only after the visitor agrees to load the map, and ships its stylesheet as `build/blocks/map/leaflet.css`. Leaflet is licensed under the BSD 2-Clause License, which is compatible with the GPL; the license text is in `licenses/LEAFLET.txt`.
 
-Icons: 116 icons of [Lucide](https://lucide.dev/) 1.60.0, ISC License (some from Feather, MIT), in `assets/icons/lucide.json`, license in `licenses/LUCIDE.txt`.
+Icons: 118 icons of [Lucide](https://lucide.dev/) 1.60.0, ISC License (some from Feather, MIT), in `assets/icons/lucide.json`, license in `licenses/LUCIDE.txt`.
 
 The pattern illustration `assets/images/landscape.webp` was drawn for Leitvia by CMS ADMINS and is licensed under the GPL, version 2 or later, like the plugin.
 
@@ -117,7 +119,7 @@ The `src/` folder contains the source code of the files in `build/`, and `webpac
 
 = What is Leitvia Studio? =
 
-Leitvia Studio is a free WordPress plugin that lets AI agents build and maintain sites with block themes through 68 abilities of the WordPress Abilities API, with checks, an autonomy level per area, a review inbox and rollback. It also adds a Pattern Lab, design tokens in the DTCG format, a content model with block bindings, site recipes and blocks for privacy, accessibility and offers. It needs WordPress 7.1 and PHP 8.2 or later.
+Leitvia Studio is a free WordPress plugin that lets AI agents build and maintain sites with block themes through 73 abilities of the WordPress Abilities API, with checks, an autonomy level per area, a review inbox and rollback. It also adds a Pattern Lab, design tokens in the DTCG format, a content model with block bindings, site recipes and blocks for privacy, accessibility and offers. It needs WordPress 7.1 and PHP 8.2 or later.
 
 = Does Leitvia Studio work with Claude, ChatGPT or Cursor? =
 
@@ -162,7 +164,7 @@ Pages in easy language (Leichte Sprache), which public bodies in Germany offer u
 
 = Does the plugin work without the Leitvia theme? =
 
-Yes. It works with any block theme. The theme Leitvia adds a design contract with fixed roles for colors, spacing and font sizes, 70 patterns and shop templates, which AI agents and the Pattern Lab read.
+Yes. It works with any block theme. The theme Leitvia adds a design contract with fixed roles for colors, spacing and font sizes, 82 patterns and shop templates, which AI agents and the Pattern Lab read.
 
 = What happens when I deactivate Leitvia Studio? =
 
@@ -275,6 +277,51 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 
 == Changelog ==
 
+= 1.3.52 =
+* New: leitvia/import-post imports a post, page or entry of another site for a migration: its HTML and the shortcodes of WPBakery and Impreza become core blocks, images of the old host come into the media library once, links become paths, a second call with the same source updates the post, and dry_run shows the result first. Filter leitvia_studio_import_content for readers of add-ons.
+* New: leitvia/compose-page rebuilds an existing page with post: all its sections are replaced in one step, and the checks see only the finished page. The page remembers its page frame.
+* New: Page frames may require or recommend kinds of sections (answer, facts, packages, tiles, steps, faq, related); leitvia/check-composition counts them for a page that names its frame (missingSection, recommendedSection) and suggests patterns to add, leitvia/plan-page plans them. Patterns may continue a neighbor as one section (continues). leitvia/list-patterns filters by provides.
+* New: leitvia/set-page-structure sets the page frame, the hub page (breadcrumbs and BreadcrumbList show Home, hub and page while addresses stay flat) and the service of a page with its price, printed as Service with Offer and UnitPriceSpecification (net or gross).
+* New: Pages get a BreadcrumbList through their parents or hubs.
+* New: llms.txt at the root of the site, built from the site name, the summary or tagline, the hubs and the pages with a price; robots.txt keeps AI crawlers allowed and disallows them on request (leitvia/set-llms).
+* New: leitvia/set-redirects keeps permanent redirects (301) of moved addresses and refuses loops.
+* New: leitvia/set-organization takes aggregate_rating (value, count, source_url, confirmed); a confirmed rating is printed as aggregateRating, and leitvia/update-seo accepts a star rating in a title only when it equals that value.
+* New: The width of a site logo changes through block edits, also in the edits of a template part.
+* New: Block edits move a block next to a sibling (move with position before or after) and insert a new block before one (position before); insert also builds an empty paragraph, heading, separator or site logo with its text and block style, such as an eyebrow above a heading. A section takes up to 250 edits instead of 50.
+* New: leitvia/update-template-part takes edits with a pattern, as the sections of compose-page do, so a header or footer needs no markup of its own.
+* New: leitvia/update-block sets the text color (ink, ink-muted, accent) of a heading or paragraph, the size of a quote, the color and size of the icon and the icon list, and the height of a cover in vh (minHeight).
+* New: Token sets take the optional group fontWeight (heading, heading-s, eyebrow), also over a style variation, and the optional color roles button-hover and on-button-hover with their pair.
+* New: leitvia/set-organization takes the founder (schema.org founder) and the first year and the holder of the copyright line, which the footers of the theme Leitvia show.
+* New: leitvia/get-site-health says whether MCP clients reach the server of Leitvia Studio, its address and why not. leitvia/add-media refuses an SVG with the way to a raster logo.
+* New: Icons Gauge and Refresh (118 icons).
+* Change: Add-on patterns may name the area header or footer, for a pattern of a template part.
+* Change: In a theme that declares leitvia-sticky-header the header is measured without a block style, since it sticks by default.
+* New: Rows of a repeater are a list of small forms in the entry panel and are saved with the entry (REST field leitvia_rows), also for a new entry. Saving waits while a row lacks a required value or repeats a value of a field declared unique, such as a weekday.
+* New: Duplicate in the list of a content type copies an entry with its fields, terms, image and rows as a draft; a type that declares copyShiftDays moves the dates of the copy, so last week becomes next week. The list shows the first date, choice and number fields as columns.
+* New: A content type without text of its own opens in the block editor with title and fields only. A repeater can name its row title (titleLabel). Dates use the date picker of the browser, numbers take the decimal comma of the site language.
+* New: leitvia/update-navigation takes an item with sub items and no address: a group that opens its submenu.
+* Change: In the mobile menu every submenu collapses and expands, not only in menus with a mega menu or more than 12 links; the label of a group without an address toggles it too.
+
+* New: leitvia/set-permalinks sets the permalink structure of posts and the bases of categories and tags for a migration, in a change package; notice warns when published posts move.
+* New: Block edits fill the cells of a core/table or comparison table with table (head, rows, foot), accessibly with scope and caption; a new text gets its first link with link_text and url, also in insert; className takes block styles that combine, such as a sticky and an overlay header.
+* New: set-page-structure takes a price range (max_price) and the packages of a service (offers), printed as an AggregateOffer with one Offer per package.
+* New: import-post keeps the author name of an author without an account (author_name), removes scripts, styles and forms of rendered HTML, and keeps the SEO texts of the live site and linked images without alt text with notes in the report instead of failing.
+* New: compose-page builds the frame article as a page (type page) for guides under a page address; findings name the block they mean in plain words (place).
+* Fixed: A pattern that provides FAQ gives FAQPage data from its visible questions; the hub of a page wins over its parent page in the breadcrumbs, also for the hub of a hub.
+* Fixed: The check of design tokens no longer takes a house number such as #343 in a text for a color; a queued change returns the hash the next change of its package sends; get-seo and set-llms say why a requested llms.txt is not served yet.
+* Fixed: Activating a token set again writes the heading weights of global styles saved with an older theme; dark sets keep accent prices and marks on inverse bands; a building block may open its own content to abilities.
+* Fixed: import-post writes author_name on every import, so a second import adds or corrects it; update-content and create-content take author_name too.
+* Fixed: import-post removes only shortcodes (registered, of core, of known page builders and form plugins, or with a closing tag or quoted attribute) and nothing inside pre or code, so [R=301,L], [web_root] or [a-z0-9_-] stay.
+* Fixed: import-post finds a parent of parent_source that waits in the same open package; the child gets it as parent when the package is applied, also with the same slug in two branches. A parent nobody imported rejects the call instead of a page at the top level, and a second import moves a post under its parent.
+* Fixed: import-post keeps an SEO description of the live site with a figure the page does not say and warns in report.seo instead of failing the import.
+* Fixed: A rejected step of add-building-block or apply-recipe names its findings and the next ability, for example the page that holds the address of an archive and how to free it.
+* Fixed: set-page-structure takes max_price per package; highPrice of the AggregateOffer is the top of every price and range, also with one package and the max_price of the service.
+* New: A page with the frame article gets the template page-article of the theme (title, byline with author and dates, author box) and an Article with author and dates in its structured data, also when set-page-structure sets the frame.
+* Fixed: A comparison table inserted without a caption has none, instead of the English sample caption of the block example; its source line takes the labels of the site language.
+* New: The filter leitvia_studio_llms_sections lets an add-on add a section of its own to llms.txt; drafts, pages with a password and repeats stay out.
+* Change: The table of contents works in a template too: placed before the content, as in a column beside it, it gives the headings of the post the ids it links to.
+* Fixed: A link with an anchor from another page stops its target right below the sticky header: once the header is measured, the target scrolls into view again, since the browser jumped before the height was known.
+* Fixed: A header over the stage (overlay-header) is measured right after it is parsed, so the page no longer jumps by the height of the header when it moves over the first cover.
 = 1.3.51 =
 * New: leitvia/update-block sets the ground of a light section (backgroundColor surface or surface-alt on a group), the font size of a heading or paragraph, the number of columns of a gallery and the name for screen readers (aria-label) of a slider, an announcement bar or the accessibility bar, each in the block comment and in the saved markup.
 * New: leitvia/check-composition takes tones for an outline: the tone a section gets through an edit, such as the block style Inverse, counts in the score before the page is built.
@@ -309,20 +356,3 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * Change: The link of each place on a map opens the OpenStreetMap route planner with the place as destination.
 * Fix: update-block and insert set align on every block with supports.align, using the values it supports (for example leitvia/consent-embed).
 * Fix: update-block with image { id } keeps the alt text from the media library when alt is left out.
-
-= 1.3.47 =
-* New block Embed behind consent: any iframe of another provider, such as a configurator or a booking tool, waits behind the consent placeholder until the visitor loads it. Providers are listed under Leitvia Studio, Settings, Privacy with up to ten host names, a purpose and the address of their privacy policy; the placeholder names the provider, says where the data goes and shows a preview image from the media library. The iframe loads sandboxed and without a referrer. Addresses with a backslash or quotes are refused and international host names are stored as ASCII, in the editor the same way as on the server.
-* Organization data: Settings take the kind of business, founding date, area served, opening hours and profiles, and the front page describes the organization as Organization or local business in JSON-LD. Posts name the same organization as publisher. The ability leitvia/set-organization writes these values, leitvia/get-seo returns them.
-* The site audit leitvia/audit-site warns when Gravity Forms uses a captcha add-on, a reCAPTCHA field or Simple Cloudflare Turnstile, because the captcha sends the IP address of the visitor to its provider before any consent, and names other captcha plugins that may do the same.
-* leitvia/update-block sets block styles on every core block with registered styles, such as Media right on media and text.
-* update-block and insert set the Map block: coordinates, zoom, markers, height, heading and link text, and the list of places is built again. A button whose link a binding fills drops its saved link with url "", and leitvia/audit-site checks such links with the bound value. The zoom and close buttons of the map are translatable.
-* Settings show the cleaned lists after saving and name the providers they dropped.
-* New abilities leitvia/set-site-identity (site title, tagline, logo and site icon), leitvia/set-front-page (a page as the static front page, 0 for the latest posts) and leitvia/get-consent-providers and leitvia/set-consent-providers for the providers of the block Embed behind consent. Like every setting they wait in a change package.
-* New abilities leitvia/trash-content and leitvia/delete-media. A post goes to the trash and stays restorable; the front page, the posts page, the privacy policy page and pages with subpages are refused. A file is deleted only while no published content and no site setting uses it, or with force. A person always decides.
-* New ability leitvia/set-motion sets the motion of the whole site to off, subtle or bold. leitvia/audit-site reports uneven motion as leitvia/motion: a strength of its own on a block, fade next to rise, more than one kind of striking effect, more than 3 striking or 6 animated blocks on a page.
-* leitvia/add-media takes local videos, MP4 with H.264 or WebM up to 50 MB (filter leitvia_studio_max_video_bytes), with a poster from the media library and a caption. leitvia/update-block sets align on video, audio and embed blocks.
-* compose-page and update-block take the edits anchor (an HTML anchor, unique on the page), columns (the column count of a grid) and insert (a block of the catalog after another block, never as markup); compose-page also takes catalog attributes, and timeline entries take date, dateLabel and heading.
-* leitvia/replace-pattern swaps any top-level section for an approved pattern, with edits as in compose-page; texts and button links of the old section move over unless carry is false. leitvia/update-content moves a page below another page with parent. leitvia/define-content-type refuses an address that a published page or another public type already has.
-* leitvia/list-blocks names the registered block styles of every block, core blocks included. List abilities return the notices of their entries. update-block and update-content change the text of an icon list item like a list item, and null for an attribute the block lacks changes nothing.
-* Checks: content contrast measures a text on its own ground or the ground around it, Inverse included; the composition check takes the tone of a section from its outer block; hidden headings do not count in the heading check; font_not_bundled suggests the bundled family with the closest name; broken block comments are refused with leitvia_unsafe_content.
-* The filter leitvia_studio_heading_blocks tells the heading check the level of blocks that render on the server. The patterns of Studio fade in like all others.

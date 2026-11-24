@@ -57,7 +57,7 @@ final class Pipeline {
 	 * organization data. The site settings of the content model are open as well, see model_setting(), and the options
 	 * of add-ons, see addon_options().
 	 */
-	public const OPTIONS = array( 'blogname', 'blogdescription', 'site_logo', 'site_icon', 'show_on_front', 'page_on_front', 'page_for_posts', 'leitvia_studio_settings', 'default_pingback_flag', 'default_ping_status', 'default_comment_status', 'show_avatars', 'wp_page_for_privacy_policy', 'woocommerce_terms_page_id', 'woocommerce_feature_order_attribution_enabled', 'woocommerce_allow_tracking', 'woocommerce_show_marketplace_suggestions', 'woocommerce_feature_remote_logging_enabled' );
+	public const OPTIONS = array( 'blogname', 'blogdescription', 'site_logo', 'site_icon', 'show_on_front', 'page_on_front', 'page_for_posts', 'leitvia_studio_settings', 'default_pingback_flag', 'default_ping_status', 'default_comment_status', 'show_avatars', 'wp_page_for_privacy_policy', 'permalink_structure', 'category_base', 'tag_base', 'woocommerce_terms_page_id', 'woocommerce_feature_order_attribution_enabled', 'woocommerce_allow_tracking', 'woocommerce_show_marketplace_suggestions', 'woocommerce_feature_remote_logging_enabled' );
 
 	/**
 	 * Core options that stay closed to add-ons, see protected_option().
@@ -342,6 +342,7 @@ final class Pipeline {
 		// 6. Checks, counting only what this write brings: findings the target had before are not its business.
 		$findings = $rollback ? array() : self::check( $op, $after );
 		$findings = $findings && ! $op->creates() ? self::introduced( $findings, self::check( $op, $before ) ) : $findings;
+		$findings = $findings ? Content_Checks::places( $findings, (string) ( $after['post_content'] ?? '' ) ) : $findings;
 		$errors   = array_values( array_filter( $findings, static fn( array $finding ): bool => 'warning' !== ( $finding['severity'] ?? 'error' ) ) );
 		if ( $errors ) {
 			return Rejection::make( 'leitvia_check_failed', __( 'Checks found problems. Fix them as each finding suggests and try again.', 'leitvia-studio' ), 422, 'checks', $target, Content_Checks::NEXT_ABILITY[ $errors[0]['check'] ?? '' ] ?? '', 'once', array( 'findings' => $findings ) );
@@ -371,7 +372,10 @@ final class Pipeline {
 			'findings' => $findings,
 		) + self::slug_change( $op, $after );
 		if ( 'package' === $mode ) {
-			$queued = self::queued( $op, $after );
+			// Nothing is written, so the target keeps its hash: the base_hash of the next change on it, also of one in
+			// the same package (that one builds on the state this change leaves, see Packages::follows()).
+			$result['hash'] = $op->creates() ? '' : self::hash( $op );
+			$queued         = self::queued( $op, $after );
 			if ( $queued ) {
 				$result['package'] = $queued;
 				return $result;
@@ -418,7 +422,8 @@ final class Pipeline {
 	private static function slug_change( Operation $op, array $after ): array {
 		$wanted = (string) ( $after['post_name'] ?? '' );
 		$type   = (string) ( $after['post_type'] ?? '' );
-		if ( '' === $wanted || 'attachment' === $type || ! is_post_type_viewable( $type ) ) {
+		// A post whose parent waits in its package gets its address under that parent only when it is applied.
+		if ( '' === $wanted || 'attachment' === $type || ! is_post_type_viewable( $type ) || isset( $op->target['parent_source'] ) ) {
 			return array();
 		}
 		$slug = wp_unique_post_slug( $wanted, $op->post_id(), 'publish', $type, (int) ( $after['post_parent'] ?? 0 ) );
@@ -1068,7 +1073,7 @@ final class Pipeline {
 
 	/**
 	 * Findings of the registry checks with scope content and page, see Content_Checks::run(). The context has post,
-	 * post_type, ability and, for a new post, the template it will use.
+	 * post_type, ability and, for a new post, the template it will use; frame when the state names a page frame.
 	 *
 	 * @param Operation            $op    Operation.
 	 * @param array<string, mixed> $after State after.
@@ -1087,6 +1092,10 @@ final class Pipeline {
 		);
 		if ( isset( $after['meta_input']['_wp_page_template'] ) ) {
 			$context['template'] = (string) $after['meta_input']['_wp_page_template'];
+		}
+		// The page frame the write gives the page counts, as the composition check reads it from the saved page later.
+		if ( isset( $after['meta_input'][ Composition::FRAME_META ] ) ) {
+			$context['frame'] = (string) $after['meta_input'][ Composition::FRAME_META ];
 		}
 		return Content_Checks::run( (string) $after['post_content'], $context );
 	}

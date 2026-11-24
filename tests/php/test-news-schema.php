@@ -338,7 +338,8 @@ class Test_News_Schema extends WP_UnitTestCase {
 
 	/**
 	 * The breadcrumbs a page shows are its BreadcrumbList: the same items in the same order, the current page with its
-	 * own address, no soft hyphens. On a post they replace the computed trail, and the next request starts without them.
+	 * own address, no soft hyphens. Without them a page has the trail of its parents (Seo\Cluster). On a post they
+	 * replace the computed trail, and the next request starts without them.
 	 */
 	public function test_visible_breadcrumbs_are_the_breadcrumb_list(): void {
 		$parent = self::factory()->post->create(
@@ -355,7 +356,7 @@ class Test_News_Schema extends WP_UnitTestCase {
 			)
 		);
 		$this->go_to( get_permalink( $child ) );
-		$this->assertNull( Schema::current(), 'no breadcrumbs on the page, no node' );
+		$this->assertSame( array( home_url( '/' ), get_permalink( $parent ), get_permalink( $child ) ), array_column( $this->node( 'BreadcrumbList' )['itemListElement'], 'item' ), 'without the block the trail of the parents' );
 		do_blocks( '<!-- wp:breadcrumbs /-->' );
 		$items = $this->node( 'BreadcrumbList' )['itemListElement'];
 		$this->assertSame( array( 1, 2, 3 ), array_column( $items, 'position' ) );
@@ -472,7 +473,7 @@ class Test_News_Schema extends WP_UnitTestCase {
 	}
 
 	/**
-	 * 19: nothing with an SEO plugin, with the setting off or on other views.
+	 * 19: nothing with an SEO plugin, with the setting off or on other views; a page has its BreadcrumbList only.
 	 */
 	public function test_no_output_with_seo_plugin_setting_off_or_elsewhere(): void {
 		$this->assertFalse( leitvia_studio_seo_plugin_active() );
@@ -489,7 +490,7 @@ class Test_News_Schema extends WP_UnitTestCase {
 		delete_option( 'leitvia_studio_settings' );
 
 		$this->go_to( get_permalink( self::factory()->post->create( array( 'post_type' => 'page' ) ) ) );
-		$this->assertNull( Schema::current() );
+		$this->assertSame( array( 'BreadcrumbList' ), array_column( Schema::current()['@graph'], '@type' ) );
 		$this->go_to( get_year_link( 2026 ) );
 		$this->assertNull( Schema::current() );
 	}

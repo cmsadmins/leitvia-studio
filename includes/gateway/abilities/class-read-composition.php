@@ -29,12 +29,13 @@ final class Read_Composition {
 				'index'   => array( 'type' => 'integer' ),
 				'block'   => array( 'type' => 'string' ),
 				'message' => array( 'type' => 'string' ),
+				'kind'    => array( 'type' => 'string' ),
 			),
 		);
 		Gateway\Abilities::read(
 			'leitvia/check-composition',
 			__( 'Check composition', 'leitvia-studio' ),
-			__( 'Scores a page against the composition rules of the contract: pass pattern slugs in page order (block:<ID> for a Lab pattern; only approved ones count as known), or a post ID to read the sections of a saved page from metadata.patternName. A saved page counts as built: the ground each section sets (backgroundColor, block style Inverse) instead of the tone of its pattern, and the side of its media (block style Media right). With slugs, name both yourself: tones for the sections an edit will give another ground, mirrored for those it will give the block style Media right, each by 0-based index. Text, lists, images, galleries and accordions between the sections are running text and no finding. A section with a video, a gallery or a wide image is a break and stands outside the density run. Returns the findings (rule, 0-based section index, for a post the block ID, and what to do), the score from 100 down, the minimum score for autonomous writes and per finding up to three patterns that would fix it. For a post also unregistered: block types that render nothing.', 'leitvia-studio' ),
+			__( 'Scores a page against the composition rules of the contract: pass pattern slugs in page order (block:<ID> for a Lab pattern; only approved ones count as known), or a post ID to read the sections of a saved page from metadata.patternName. A saved page counts as built: the ground each section sets (backgroundColor, block style Inverse) instead of the tone of its pattern, and the side of its media (block style Media right). With slugs, name both yourself: tones for the sections an edit will give another ground, mirrored for those it will give the block style Media right, each by 0-based index. Text, lists, images, galleries and accordions between the sections are running text and no finding. A section with a video, a gallery or a wide image is a break and stands outside the density run. With frame (or the frame a saved page was composed for) the page also needs a section of every kind the page frame requires (missingSection, 10 points) and is told about the kinds it recommends (recommendedSection, no points); both carry the kind and the index after the last section, and their suggestions name patterns to add. Returns the findings (rule, 0-based section index, for a post the block ID, and what to do), the score from 100 down, the minimum score for autonomous writes and per finding up to three patterns that would fix it. For a post also unregistered: block types that render nothing.', 'leitvia-studio' ),
 			array(
 				'type'                 => 'object',
 				'properties'           => array(
@@ -72,6 +73,11 @@ final class Read_Composition {
 						'maxLength'   => 100,
 						'description' => __( 'Template slug, for example page-landing; for a post its saved template is used.', 'leitvia-studio' ),
 					),
+					'frame'    => array(
+						'type'        => 'string',
+						'maxLength'   => 40,
+						'description' => __( 'Type of a page frame of the contract, for example hub or service, whose required and recommended sections count; for a post the frame it was composed for.', 'leitvia-studio' ),
+					),
 				),
 				'additionalProperties' => false,
 			),
@@ -87,6 +93,7 @@ final class Read_Composition {
 						'items' => $finding,
 					),
 					'score'        => array( 'type' => 'integer' ),
+					'frame'        => array( 'type' => 'string' ),
 					'min_score'    => array( 'type' => 'integer' ),
 					'suggestions'  => array(
 						'type'  => 'array',
@@ -109,6 +116,7 @@ final class Read_Composition {
 		$input    = is_array( $input ) ? $input : array();
 		$post     = (int) ( $input['post'] ?? 0 );
 		$template = sanitize_key( (string) ( $input['template'] ?? '' ) );
+		$frame    = sanitize_key( (string) ( $input['frame'] ?? '' ) );
 		$unknown  = array();
 		$tones    = array();
 		$mirrored = array();
@@ -123,6 +131,7 @@ final class Read_Composition {
 			$mirrored = Gateway\Composition::mirrored( $content );
 			$ids      = Gateway\Composition::ids( $content );
 			$template = '' !== $template ? $template : (string) get_page_template_slug( $post );
+			$frame    = '' !== $frame ? $frame : (string) get_post_meta( $post, Gateway\Composition::FRAME_META, true );
 			$unknown  = Gateway\Content_Checks::unregistered_types( $content );
 		} else {
 			$slugs = array_slice( array_map( 'strval', (array) ( $input['slugs'] ?? array() ) ), 0, self::MAX_SLUGS );
@@ -136,7 +145,11 @@ final class Read_Composition {
 		if ( ! $slugs ) {
 			return Gateway\Rejection::make( 'leitvia_invalid_input', __( 'Pass pattern slugs, or a post whose sections come from patterns.', 'leitvia-studio' ), 400, 'input', $post ? array( 'post' => $post ) : array(), 'leitvia/list-patterns', 'once', $unknown ? array( 'unregistered' => $unknown ) : array() );
 		}
-		$report = Gateway\Composition::report( $slugs, Gateway\Composition::lab( $slugs, leitvia_studio_contract()->data() ), $template, $tones, $mirrored );
+		$data = leitvia_studio_contract()->data();
+		if ( '' !== $frame && ! Gateway\Composition::frame( $frame, $data ) ) {
+			return Gateway\Rejection::make( 'leitvia_invalid_input', __( 'The contract has no page frame of this type.', 'leitvia-studio' ), 400, 'frame', $post ? array( 'post' => $post ) : array(), 'leitvia/get-contract', 'once' );
+		}
+		$report = Gateway\Composition::report( $slugs, Gateway\Composition::lab( $slugs, $data ), $template, $tones, $mirrored, $frame );
 		foreach ( array( 'issues', 'suggestions' ) as $key ) {
 			foreach ( $report[ $key ] as $at => $item ) {
 				if ( '' !== ( $ids[ $item['index'] ] ?? '' ) ) {
@@ -144,6 +157,6 @@ final class Read_Composition {
 				}
 			}
 		}
-		return ( $unknown ? array( 'unregistered' => $unknown ) : array() ) + array( 'sections' => $slugs ) + $report + array( 'min_score' => (int) Gateway\Gateway::settings()['min_composition_score'] );
+		return ( $unknown ? array( 'unregistered' => $unknown ) : array() ) + array( 'sections' => $slugs ) + ( '' !== $frame ? array( 'frame' => $frame ) : array() ) + $report + array( 'min_score' => (int) Gateway\Gateway::settings()['min_composition_score'] );
 	}
 }

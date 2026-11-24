@@ -340,7 +340,13 @@ final class Building_Blocks {
 		if ( $dry ) {
 			return Recipes::step( 'contentModel', $ability, 'new', $target );
 		}
-		$step           = Recipes::call( 'contentModel', $ability, array( 'declaration' => $model ) + ( '' !== $key ? array( 'package' => $key ) : array() ) );
+		// The block declares its own showInAbilities, which agents may not set otherwise.
+		Abilities\Setup::$building_block = $model;
+		try {
+			$step = Recipes::call( 'contentModel', $ability, array( 'declaration' => $model ) + ( '' !== $key ? array( 'package' => $key ) : array() ) );
+		} finally {
+			Abilities\Setup::$building_block = null;
+		}
 		$step['target'] = (array) $step['target'] + $target;
 		return $step;
 	}
@@ -459,7 +465,7 @@ final class Building_Blocks {
 					$tax[ $taxonomy ] = array_values( array_filter( array_map( static fn( $term ): int => $terms[ $taxonomy ][ $term ] ?? 0, (array) $slugs ) ) );
 				}
 				// Samples are drafts: a person checks and publishes them, whatever the autonomy would allow.
-				$state   = array(
+				$state = array(
 					'post_title'   => (string) ( $entry['title'] ?? $slug ),
 					'post_name'    => $slug,
 					'post_excerpt' => (string) ( $entry['excerpt'] ?? '' ),
@@ -468,7 +474,9 @@ final class Building_Blocks {
 					'menu_order'   => $order,
 					'meta_input'   => $meta,
 					'terms'        => array_filter( $tax ),
-				) + ( isset( $entry['date'] ) ? array( 'post_date' => (string) $entry['date'] ) : array() );
+				) + ( isset( $entry['date'] ) ? array( 'post_date' => (string) $entry['date'] ) : array() )
+					// Rows of repeaters as create-content takes them: title and field keys per row, by repeater key.
+					+ ( is_array( $entry['rows'] ?? null ) ? array( 'rows' => $entry['rows'] ) : array() );
 				$op      = new Operation(
 					self::ABILITY,
 					'content',

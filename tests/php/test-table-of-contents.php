@@ -104,6 +104,19 @@ class Test_Table_Of_Contents extends WP_UnitTestCase {
 	}
 
 	/**
+	 * (2) A table of contents in the template before the content, as a column beside it, lists the headings of a post
+	 * without one, at its own levels, and the headings get the ids it links to.
+	 */
+	public function test_table_of_contents_in_the_template(): void {
+		$this->render_post( self::heading( 2, 'Usage' ) . self::heading( 3, 'Setup' ) . self::heading( 4, 'Deep' ) );
+		Table_Of_Contents::forget();
+		$html = do_blocks( '<!-- wp:leitvia/table-of-contents {"levels":[2,3,4]} /--><!-- wp:post-content /-->' );
+		$this->assertStringContainsString( '<a href="#deep">Deep</a>', $html );
+		$this->assertStringContainsString( '<h2 id="usage" class="wp-block-heading">Usage</h2>', $html );
+		$this->assertStringContainsString( '<h4 id="deep" class="wp-block-heading">Deep</h4>', $html );
+	}
+
+	/**
 	 * (3) Fewer than two entries render nothing.
 	 */
 	public function test_fewer_than_two_entries_render_nothing(): void {

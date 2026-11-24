@@ -276,7 +276,37 @@ class Test_Gateway_Build extends WP_UnitTestCase {
 		$this->assertSame( $group( "\n" . $para( 'a' ) . "\n" ), Block_Edit::structure( $both, 'p:0.1', array( 'remove' => true ) ) );
 		$this->assertSame( $group( "\n" . $para( 'a' ) . "\n\n" . $para( 'b' ) . "\n\n" . $para( 'b' ) . "\n" ), Block_Edit::structure( $both, 'p:0.1', array( 'repeat' => 1 ) ) );
 
+		// move swaps the order among siblings, insert with position before puts the new block ahead.
+		$this->assertSame(
+			'<!-- wp:list --><ul class="wp-block-list">' . $item( 'c' ) . $item( 'a' ) . $item( 'b' ) . '</ul><!-- /wp:list -->',
+			Block_Edit::structure(
+				$list,
+				'p:0.2',
+				array(
+					'move'     => 'p:0.0',
+					'position' => 'before',
+				)
+			)
+		);
+		$this->assertSame( '<!-- wp:list --><ul class="wp-block-list">' . $item( 'b' ) . $item( 'c' ) . $item( 'a' ) . '</ul><!-- /wp:list -->', Block_Edit::structure( $list, 'p:0.0', array( 'move' => 'p:0.2' ) ) );
+		$this->assertSame(
+			$group( "\n" . $para( 'new' ) . "\n\n" . $para( 'a' ) . "\n\n" . $para( 'b' ) . "\n" ),
+			Block_Edit::structure(
+				$group( "\n" . $para( 'a' ) . "\n\n" . $para( 'b' ) . "\n" ),
+				'p:0.0',
+				array(
+					'insert'   => array(
+						'block' => 'core/paragraph',
+						'text'  => 'new',
+					),
+					'position' => 'before',
+				)
+			)
+		);
+
 		$refused = array(
+			'move away' => array( $group( $para( 'a' ) . $group( $para( 'b' ) ) ), 'p:0.0', array( 'move' => 'p:0.1.0' ) ),
+			'move lock' => array( $group( $para( 'a', '{"lock":{"move":true}} ' ) . $para( 'b' ) ), 'p:0.0', array( 'move' => 'p:0.1' ) ),
 			'root'      => array( $list, 'p:0', array( 'remove' => true ) ),
 			'only one'  => array( $group( $para( 'a' ) ), 'p:0.0', array( 'remove' => true ) ),
 			'template'  => array( $group( $para( 'a' ) . $para( 'b' ), '{"templateLock":"all"} ' ), 'p:0.0', array( 'remove' => true ) ),
@@ -308,6 +338,131 @@ class Test_Gateway_Build extends WP_UnitTestCase {
 		);
 		$this->assertWPError( $mixed );
 		$this->assertSame( 'structure', $mixed->get_error_data()['reason'] );
+	}
+
+	/**
+	 * Structured inserts and edits without markup: an icon list with any number of items, a paragraph with a link in
+	 * its text, a comparison table from columns and rows, and the cells of a core/table, accessible (scope, caption).
+	 */
+	public function test_inserts_lists_links_and_tables(): void {
+		$group = static fn( string $inner ): string => '<!-- wp:group --><div class="wp-block-group">' . $inner . '</div><!-- /wp:group -->';
+		$para  = '<!-- wp:paragraph --><p>a</p><!-- /wp:paragraph -->';
+		$items = array_map(
+			static fn( string $text ): array => array(
+				'block' => 'leitvia/icon-list-item',
+				'text'  => $text,
+			),
+			array( 'One', 'Two', 'Three', 'Four' )
+		);
+		$list  = Block_Edit::structure(
+			$group( $para ),
+			'p:0.0',
+			array(
+				'insert' => array(
+					'block' => 'leitvia/icon-list',
+					'inner' => $items,
+				),
+			)
+		);
+		$this->assertIsString( $list, is_wp_error( $list ) ? $list->get_error_message() : '' );
+		$this->assertSame( 4, substr_count( $list, '<!-- wp:leitvia/icon-list-item' ) );
+		$this->assertStringContainsString( '<span class="wp-block-leitvia-icon-list-item__text">Four</span>', $list );
+
+		$linked = Block_Edit::structure(
+			$group( $para ),
+			'p:0.0',
+			array(
+				'insert' => array(
+					'block'     => 'core/paragraph',
+					'text'      => 'Write to hello@example.org today.',
+					'link_text' => 'hello@example.org',
+					'url'       => 'mailto:hello@example.org',
+				),
+			)
+		);
+		$this->assertIsString( $linked, is_wp_error( $linked ) ? $linked->get_error_message() : '' );
+		$this->assertStringContainsString( '<p>Write to <a href="mailto:hello@example.org">hello@example.org</a> today.</p>', $linked );
+		$this->assertWPError(
+			Block_Edit::apply(
+				$para,
+				'p:0',
+				array(
+					'text'      => 'No address',
+					'link_text' => 'hello@example.org',
+					'url'       => 'mailto:hello@example.org',
+				)
+			)
+		);
+
+		$compare = Block_Edit::structure(
+			$group( $para ),
+			'p:0.0',
+			array(
+				'insert' => array(
+					'block'      => 'leitvia/comparison-table',
+					'attributes' => array(
+						'caption' => 'Care plans',
+						'columns' => array( 'Plan', 'Price', 'Hours' ),
+						'rows'    => array( array( 'Small', '29 €', '1' ), array( 'Large', '149 €', '6' ) ),
+					),
+				),
+			)
+		);
+		$this->assertIsString( $compare, is_wp_error( $compare ) ? $compare->get_error_message() : '' );
+		$this->assertStringContainsString( 'role="region" aria-label="Care plans"', $compare );
+		$this->assertStringContainsString( '<caption>Care plans</caption><thead><tr><th scope="col">Plan</th><th scope="col">Price</th><th scope="col">Hours</th></tr></thead>', $compare );
+		$this->assertStringContainsString( '<tr><th scope="row" data-label="Plan"><span class="wp-block-leitvia-comparison-table__label">Plan: </span>Large</th><td data-label="Price"><span class="wp-block-leitvia-comparison-table__label">Price: </span>149 €</td>', $compare );
+		$block = parse_blocks( $compare )[0]['innerBlocks'][1];
+		$this->assertSame( array( 'Plan', 'Price', 'Hours' ), $block['attrs']['columns'] );
+		// Without a caption of its own a new table keeps none of the English sample text of the catalog example.
+		$plain = Block_Edit::structure(
+			$group( $para ),
+			'p:0.0',
+			array(
+				'insert' => array(
+					'block' => 'leitvia/comparison-table',
+					'table' => array(
+						'head' => array( 'Paket', 'Preis' ),
+						'rows' => array( array( 'Start', '29 €' ) ),
+					),
+				),
+			)
+		);
+		$this->assertIsString( $plain, is_wp_error( $plain ) ? $plain->get_error_message() : '' );
+		$this->assertStringNotContainsString( 'Plans compared', $plain );
+		$this->assertStringNotContainsString( '<caption>', $plain );
+		$this->assertStringNotContainsString( 'role="region"', $plain );
+		$this->assertWPError(
+			Block_Edit::apply(
+				serialize_block( $block ),
+				'p:0',
+				array(
+					'table' => array(
+						'head' => array( 'A', 'B' ),
+						'rows' => array( array( 'only one' ) ),
+					),
+				)
+			),
+			'rows as long as head'
+		);
+
+		$table   = '<!-- wp:table {"className":"is-style-comparison"} --><figure class="wp-block-table is-style-comparison"><table class="has-fixed-layout"><thead><tr><th>Old</th></tr></thead><tbody><tr><td>x</td></tr></tbody></table></figure><!-- /wp:table -->';
+		$changed = Block_Edit::apply(
+			$table,
+			'p:0',
+			array(
+				'table'   => array(
+					'head' => array( 'Sites', 'Price per year' ),
+					'rows' => array( array( '1', '89 €' ), array( '5', '349 €' ) ),
+					'foot' => array( array( 'Total', '438 €' ) ),
+				),
+				'caption' => 'Prices per year',
+			)
+		);
+		$this->assertIsString( $changed, is_wp_error( $changed ) ? $changed->get_error_message() : '' );
+		$this->assertStringContainsString( '<table class="has-fixed-layout"><thead><tr><th scope="col">Sites</th><th scope="col">Price per year</th></tr></thead><tbody><tr><th scope="row">1</th><td>89 €</td></tr><tr><th scope="row">5</th><td>349 €</td></tr></tbody><tfoot><tr><th scope="row">Total</th><td>438 €</td></tr></tfoot></table><figcaption class="wp-element-caption">Prices per year</figcaption></figure>', $changed );
+		$parsed = parse_blocks( $changed )[0];
+		$this->assertSame( 'is-style-comparison', $parsed['attrs']['className'] );
 	}
 
 	/**

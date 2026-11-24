@@ -318,7 +318,7 @@ final class Abilities {
 				'target'       => array( 'type' => 'object' ),
 				'hash'         => array(
 					'type'        => 'string',
-					'description' => __( 'Hash of the target after the write, the base_hash of the next change; empty when the change waits in a package.', 'leitvia-studio' ),
+					'description' => __( 'Hash of the target after the call, the base_hash of the next change on it. A change that waits in a package writes nothing, so the hash is the one the target already had, and the next change of the same package sends it too; empty only for a new post that waits in a package.', 'leitvia-studio' ),
 				),
 				'package'      => array(
 					'type'        => 'integer',

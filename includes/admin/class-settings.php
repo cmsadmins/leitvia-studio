@@ -23,31 +23,53 @@ final class Settings {
 	 * Every setting with its default.
 	 */
 	public const DEFAULTS = array(
-		'hide_product_notes'         => false,
-		'delete_data_on_uninstall'   => false,
-		'guard_site_editor_contrast' => true,
-		'allow_gravatar'             => false,
-		'news_schema'                => true,
-		'consent_embeds'             => true,
-		'emoji_script'               => false,
-		'map_tile_url'               => 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-		'news_categories'            => array(),
-		'news_sitemap'               => true,
-		'editorial_page'             => 0,
-		'motion'                     => 'subtle',
-		'organization_street'        => '',
-		'organization_postal_code'   => '',
-		'organization_city'          => '',
-		'organization_country'       => '',
-		'organization_phone'         => '',
-		'organization_email'         => '',
-		'consent_providers'          => array(),
-		'organization_type'          => 'Organization',
-		'organization_founding_date' => '',
-		'organization_area_served'   => array(),
-		'organization_opening_hours' => array(),
-		'organization_same_as'       => array(),
+		'hide_product_notes'            => false,
+		'delete_data_on_uninstall'      => false,
+		'guard_site_editor_contrast'    => true,
+		'allow_gravatar'                => false,
+		'news_schema'                   => true,
+		'consent_embeds'                => true,
+		'emoji_script'                  => false,
+		'map_tile_url'                  => 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+		'news_categories'               => array(),
+		'news_sitemap'                  => true,
+		'editorial_page'                => 0,
+		'motion'                        => 'subtle',
+		'organization_street'           => '',
+		'organization_postal_code'      => '',
+		'organization_city'             => '',
+		'organization_country'          => '',
+		'organization_phone'            => '',
+		'organization_email'            => '',
+		'consent_providers'             => array(),
+		'organization_type'             => 'Organization',
+		'organization_founding_date'    => '',
+		'organization_founder'          => '',
+		'organization_copyright_since'  => '',
+		'organization_copyright_holder' => '',
+		'organization_area_served'      => array(),
+		'organization_opening_hours'    => array(),
+		'organization_same_as'          => array(),
+		'organization_rating_value'     => '',
+		'organization_rating_count'     => 0,
+		'organization_rating_source'    => '',
+		'organization_rating_confirmed' => false,
+		'ai_crawlers'                   => true,
+		'llms_txt'                      => true,
+		'llms_summary'                  => '',
+		'llms_pages'                    => array(),
+		'redirects'                     => array(),
 	);
+
+	/**
+	 * A rating value from 1 to 5 with at most one decimal (4.8), or empty, as JSON Schema pattern (no delimiters).
+	 */
+	public const RATING = '^([1-4](\.\d)?|5(\.0)?)?$';
+
+	/**
+	 * Most characters of the summary of llms.txt.
+	 */
+	public const SUMMARY_MAX = 500;
 
 	/**
 	 * A tile URL: https, with the placeholders {z}, {x} and {y}, no spaces, quotes or angle brackets.
@@ -95,6 +117,14 @@ final class Settings {
 			'additionalProperties' => false,
 		),
 		'organization_same_as'       => array( 'type' => 'string' ),
+		'redirects'                  => array(
+			'type'                 => 'object',
+			'properties'           => array(
+				'from' => array( 'type' => 'string' ),
+				'to'   => array( 'type' => 'string' ),
+			),
+			'additionalProperties' => false,
+		),
 	);
 
 	/**
@@ -145,6 +175,21 @@ final class Settings {
 										'type'    => 'string',
 										'default' => $fallback,
 										'pattern' => Organization::DATE,
+									),
+									'organization_copyright_since' === $key => array(
+										'type'    => 'string',
+										'default' => $fallback,
+										'pattern' => Organization::YEAR,
+									),
+									'organization_rating_value' === $key => array(
+										'type'    => 'string',
+										'default' => $fallback,
+										'pattern' => self::RATING,
+									),
+									'llms_summary' === $key => array(
+										'type'      => 'string',
+										'default'   => $fallback,
+										'maxLength' => self::SUMMARY_MAX,
 									),
 									is_array( $fallback ) => array(
 										'type'    => 'array',
@@ -205,6 +250,11 @@ final class Settings {
 				'organization_same_as' === $key => self::https_urls( $given ),
 				'organization_type' === $key => is_string( $given ) && in_array( $given, Organization::TYPES, true ) ? $given : self::DEFAULTS['organization_type'],
 				'organization_founding_date' === $key => self::founding_date( $given ),
+				'organization_copyright_since' === $key => is_string( $given ) && preg_match( '#' . Organization::YEAR . '#', $given ) ? $given : '',
+				'organization_rating_value' === $key => self::rating_value( $given ),
+				'organization_rating_source' === $key => self::https_url( $given ),
+				'llms_summary' === $key => mb_substr( sanitize_textarea_field( (string) $given ), 0, self::SUMMARY_MAX ),
+				'redirects' === $key  => \LeitviaStudio\Seo\Redirects::sanitize( $given ),
 				is_array( $fallback ) => array_values( array_unique( array_filter( array_map( 'absint', (array) $given ) ) ) ),
 				'motion' === $key     => in_array( $given, \LeitviaStudio\Blocks\Animation::SITE, true ) ? $given : self::motion(),
 				'organization_email' === $key => sanitize_email( (string) $given ),
@@ -226,6 +276,25 @@ final class Settings {
 		}
 		// The pattern keeps the month between 1 and 12 and the day up to 31; checkdate() drops 2025-02-30.
 		return 10 !== strlen( $date ) || checkdate( (int) substr( $date, 5, 2 ), (int) substr( $date, 8, 2 ), (int) substr( $date, 0, 4 ) ) ? $date : '';
+	}
+
+	/**
+	 * A rating value from 1 to 5 as RATING allows it, else ''.
+	 *
+	 * @param mixed $value Submitted value.
+	 */
+	private static function rating_value( $value ): string {
+		return is_string( $value ) && preg_match( '#' . self::RATING . '#', $value ) ? $value : '';
+	}
+
+	/**
+	 * One address that starts with https://, else ''.
+	 *
+	 * @param mixed $value Submitted address.
+	 */
+	private static function https_url( $value ): string {
+		$url = is_string( $value ) && str_starts_with( $value, 'https://' ) ? esc_url_raw( $value, array( 'https' ) ) : '';
+		return (string) $url;
 	}
 
 	/**

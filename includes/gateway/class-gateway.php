@@ -115,6 +115,7 @@ final class Gateway {
 		add_action( 'leitvia_studio_init', array( Abilities\Read_Plan::class, 'register' ) );
 		add_action( 'leitvia_studio_init', array( Abilities\Seo::class, 'register' ) );
 		add_action( 'leitvia_studio_init', array( Abilities\Export::class, 'register' ) );
+		add_action( 'leitvia_studio_init', array( Abilities\Import::class, 'register' ) );
 		// Products area, content kinds tax and shipping and the five commerce abilities, all only with WooCommerce.
 		add_action( 'leitvia_studio_init', array( Abilities\Commerce::class, 'register' ) );
 		add_filter( 'leitvia_studio_gateway_areas', array( Abilities\Commerce::class, 'areas' ), 10, 2 );

@@ -149,6 +149,10 @@ for ( const block of document.querySelectorAll( `.${ B }` ) ) {
 		'submit',
 		( event ) => {
 			const form = event.target;
+			// A button with formnovalidate (Back, a step to change) sends the form as the browser would, unchecked.
+			if ( event.submitter?.formNoValidate ) {
+				return;
+			}
 			const invalid = new Set(
 				[ ...form.elements ]
 					.filter(

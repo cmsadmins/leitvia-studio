@@ -118,6 +118,28 @@ class Test_Faq extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A section of a pattern that provides faq (leitvia/content-faq, plain core/details) gives FAQPage from its visible
+	 * questions; a section of another pattern with details gives none, one with the FAQ block only the block's.
+	 */
+	public function test_faq_section_of_a_pattern(): void {
+		switch_theme( 'leitvia' );
+		$section = static fn( string $pattern, string $inner ): string => '<!-- wp:group {"metadata":{"patternName":"' . $pattern . '"},"layout":{"type":"constrained"}} -->' . "\n<div class=\"wp-block-group\">" . $inner . "</div>\n<!-- /wp:group -->";
+		$items   = self::details( 'How soon will I hear back?', self::paragraph( 'Within one working day.' ) ) . self::details( 'What does it cost?', self::paragraph( 'Every price is listed.' ) );
+		$html    = $this->render( $section( 'leitvia/content-faq', $items ) );
+		$nodes   = self::nodes();
+		$this->assertCount( 1, $nodes );
+		$this->assertSame( 'FAQPage', $nodes[0]['@type'] );
+		$this->assertSame( array( 'How soon will I hear back?', 'What does it cost?' ), array_column( $nodes[0]['mainEntity'], 'name' ) );
+		$this->assertStringContainsString( '<summary>How soon will I hear back?</summary>', $html, 'the markup stays' );
+
+		$this->render( $section( 'leitvia/content-video', $items ) );
+		$this->assertSame( array(), self::nodes(), 'a transcript in details is no FAQ' );
+
+		$this->render( $section( 'leitvia-studio/content-faq-schema', self::faq( array( self::details( 'Only once?', self::paragraph( 'Yes.' ) ) ) ) ) );
+		$this->assertCount( 1, self::nodes()[0]['mainEntity'] );
+	}
+
+	/**
 	 * Schema off, a block without answers and an archive page add no node.
 	 */
 	public function test_no_node(): void {

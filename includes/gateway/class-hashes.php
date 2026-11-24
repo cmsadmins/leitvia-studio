@@ -87,6 +87,10 @@ final class Hashes {
 			$parts[] = Abilities\Commerce::props( $post->ID );
 		}
 		$content = Abilities\Content::state( $post->ID, $post->post_type );
+		// An author name that is not set does not count, as before Studio 1.3.52, so hashes read before stay valid.
+		if ( '' === ( $content['meta_input'][ \LeitviaStudio\News\Schema::AUTHOR_NAME_META ] ?? null ) ) {
+			unset( $content['meta_input'][ \LeitviaStudio\News\Schema::AUTHOR_NAME_META ] );
+		}
 		if ( $legacy && isset( $content['meta_input'] ) ) {
 			unset( $content['meta_input']['_wp_page_template'] );
 			if ( ! $content['meta_input'] ) {

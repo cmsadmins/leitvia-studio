@@ -22,10 +22,32 @@
 
 .leitvia-studio-repeater {
 	margin-top: 24px;
+}
 
-	.dataviews-wrapper {
-		margin: 8px 0 16px;
+// Each row a small form under its name, separated by a rule, its buttons below.
+.leitvia-studio-repeater__rows {
+	margin: 8px 0 16px;
+	padding: 0;
+	list-style: none;
+}
+
+.leitvia-studio-repeater__row {
+	margin: 0;
+	padding: 12px 0;
+	border-top: 1px solid #ddd;
+
+	fieldset {
+		display: grid;
+		gap: 12px;
+		margin: 0;
+		padding: 0;
+		border: 0;
 	}
+}
+
+.leitvia-studio-repeater__legend {
+	padding: 0;
+	font-weight: 600;
 }
 
 .leitvia-studio-repeater__title {
