@@ -331,31 +331,46 @@ class Test_Gateway_Composition extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The finding firstScreen (no points): a stage whose heading or text before the first button is longer than the contentLength of
-	 * its pattern, so the button may fall below the first screen; buttons before the text and stages without a button
-	 * pass, and pattern slugs alone are not read.
+	 * The finding firstScreen (no points): with the measured model of its pattern (docs.firstScreen of hero-centered) a
+	 * stage is judged by the lines of its heading and text before the first button at 1440 x 900 and 390 x 844, a
+	 * service bar in the header counts, the front page has no breadcrumbs; a stage without a model is held to the
+	 * lengths of its pattern. Buttons before the text and stages without a button pass, pattern slugs alone are not read.
 	 */
 	public function test_first_screen(): void {
-		$stage = static fn( string $heading, string $text, bool $buttons_first = false ): string => '<!-- wp:group {"metadata":{"patternName":"leitvia/hero-centered"}} --><div class="wp-block-group">'
+		$stage = static fn( string $heading, string $text, bool $buttons_first = false, string $pattern = 'leitvia/hero-centered' ): string => '<!-- wp:group {"metadata":{"patternName":"' . $pattern . '"}} --><div class="wp-block-group">'
 			. ( $buttons_first ? '<!-- wp:buttons --><div class="wp-block-buttons"><!-- wp:button --><div class="wp-block-button"><a class="wp-block-button__link wp-element-button" href="/contact/">Contact</a></div><!-- /wp:button --></div><!-- /wp:buttons -->' : '' )
 			. '<!-- wp:heading {"level":1} --><h1 class="wp-block-heading">' . $heading . '</h1><!-- /wp:heading --><!-- wp:paragraph --><p>' . $text . '</p><!-- /wp:paragraph -->'
 			. ( $buttons_first ? '' : '<!-- wp:buttons --><div class="wp-block-buttons"><!-- wp:button --><div class="wp-block-button"><a class="wp-block-button__link wp-element-button" href="/contact/">Contact</a></div><!-- /wp:button --></div><!-- /wp:buttons -->' )
 			. '</div><!-- /wp:group -->';
 		$rest  = "\n\n" . '<!-- wp:group {"metadata":{"patternName":"leitvia/content-quote"}} --><div class="wp-block-group"><!-- wp:paragraph --><p>Text</p><!-- /wp:paragraph --></div><!-- /wp:group -->';
 		$long  = str_repeat( 'A heading that goes on ', 5 );
+		$model = self::contract()['patterns'][ array_search( 'leitvia/hero-centered', array_column( self::contract()['patterns'], 'slug' ), true ) ]['docs']['firstScreen']['390x844'];
+		$this->assertCount( 5, $model, 'hero-centered has a measured model' );
 		$this->assertNull( Composition::first_screen( $stage( 'Care for your bike', 'Short text.' ) . $rest, self::contract() ) );
 		$this->assertNull( Composition::first_screen( $stage( $long, str_repeat( 'Text. ', 80 ), true ) . $rest, self::contract() ) );
 		$this->assertNull( Composition::first_screen( self::page_markup( array( 'leitvia/hero-centered' ) ), self::contract() ), 'no button' );
-		$finding = Composition::first_screen( $stage( $long, 'Short text.' ) . $rest, self::contract() );
+		$this->assertNull( Composition::first_screen( $stage( $long, 'Short text.' ) . $rest, self::contract() ), 'a long heading alone fits by the model' );
+		$finding = Composition::first_screen( $stage( $long, str_repeat( 'Text. ', 80 ) ) . $rest, self::contract() );
 		$this->assertSame( array( 'firstScreen', 0 ), array( $finding['rule'], $finding['index'] ) );
+		$this->assertStringContainsString( '390 x 844', $finding['message'] );
 		$this->assertStringContainsString( mb_strlen( trim( $long ) ) . ' characters', $finding['message'] );
-		$this->assertNotNull( Composition::first_screen( $stage( 'Care for your bike', str_repeat( 'Text. ', 80 ) ) . $rest, self::contract() ), 'text too long' );
+
+		// As many lines as the room at 390 x 844 takes: a service bar pushes the button out, the front page has room.
+		$lines = intdiv( $model[4], $model[3] ) + 1;
+		$fits  = $stage( 'Care for your bike', str_repeat( 'x', $model[2] * $lines ) ) . $rest;
+		$this->assertNull( Composition::first_screen( $fits, self::contract() ) );
+		$bar = Composition::first_screen( $fits, self::contract(), array( 'service_bar' => true ) );
+		$this->assertStringContainsString( '390 x 844', $bar['message'] );
+		$this->assertStringNotContainsString( '1440 x 900', $bar['message'] );
+		$this->assertNull( Composition::first_screen( $fits, self::contract(), array( 'front' => true ) ) );
+
+		$this->assertStringContainsString( 'at most 70', Composition::first_screen( $stage( $long, 'Short text.', false, 'leitvia/no-model' ) . $rest, self::contract() )['message'], 'without a model the lengths count' );
 
 		$page   = self::factory()->post->create(
 			array(
 				'post_type'    => 'page',
 				'post_status'  => 'publish',
-				'post_content' => $stage( $long, 'Short text.' ) . $rest,
+				'post_content' => $stage( $long, str_repeat( 'Text. ', 80 ) ) . $rest,
 				'meta_input'   => array( '_wp_page_template' => 'page-landing' ),
 			)
 		);

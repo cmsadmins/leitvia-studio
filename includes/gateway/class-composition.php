@@ -529,26 +529,48 @@ final class Composition {
 	}
 
 	/**
-	 * Finding firstScreen (no points) for a saved page whose first section holds the h1 and a button: the button may
-	 * fall below the first screen when the heading or the text before the button is longer than the pattern of the
-	 * section allows in docs.contentLength. The hero patterns keep their first button in view at 1440 x 900 and
-	 * 390 x 844 within those lengths, below breadcrumbs too (tests/e2e/first-screen.spec.mjs); without lengths the
-	 * section is held to those of the stages, heading 70 and text 220 characters.
-	 * ponytail: counts characters, not pixels; a person checks the page at both sizes when a stage bends the rule.
+	 * Height in pixels at 1440 x 900 and 390 x 844 of what the measured models of docs.firstScreen leave out: the
+	 * service bar of the header pattern header-utility (class leitvia-service-bar, above the stage) and the breadcrumbs
+	 * of the test pages (below the header, missing on the front page).
+	 * ponytail: measured once on the theme with the stages of tests/e2e/first-screen.spec.mjs; a header of its own
+	 * build is not known.
+	 */
+	public const FIRST_SCREEN_EXTRA = array(
+		'service_bar' => array(
+			'1440x900' => 38,
+			'390x844'  => 65,
+		),
+		'breadcrumbs' => array(
+			'1440x900' => 56,
+			'390x844'  => 48,
+		),
+	);
+
+	/**
+	 * Finding firstScreen (no points) for a saved page whose first section holds the h1 and a button: the first button
+	 * ends below the first screen at 1440 x 900 or 390 x 844. A stage with a measured model (docs.firstScreen per size:
+	 * characters per line and line height of the h1 and of the text, and the room, the growth in pixels the stage takes
+	 * before the button leaves the window, below the breadcrumbs of a landing page) is judged by the lines its texts
+	 * take: each line beyond the first of the heading and of each paragraph or list item before the button counts its
+	 * line height, a service bar in the header counts too, and the front page gets the room of the breadcrumbs back
+	 * (tests/e2e/first-screen.spec.mjs keeps the models true). Without a model the section is held to the lengths of
+	 * docs.contentLength, else heading 70 and text 220 characters, and the finding only says the button may fall below.
+	 * ponytail: lines from the average characters per line of a sample text; long words and other fonts shift them.
 	 *
 	 * @param string               $content  Block markup of the page.
 	 * @param array<string, mixed> $contract Contract data.
+	 * @param array<string, bool>  $page     service_bar (the header has one) and front (the page is the front page).
 	 * @return array{rule: string, index: int, message: string}|null
 	 */
-	public static function first_screen( string $content, array $contract ): ?array {
+	public static function first_screen( string $content, array $contract, array $page = array() ): ?array {
 		$first = self::roots( $content )[0] ?? null;
 		if ( ! $first || ! self::find( array( $first ), static fn( array $block ): bool => 'core/heading' === ( $block['blockName'] ?? '' ) && 1 === (int) ( $block['attrs']['level'] ?? 2 ) ) ) {
 			return null;
 		}
 		$heading = 0;
-		$text    = 0;
+		$texts   = array();
 		$button  = false;
-		$walk    = static function ( array $blocks ) use ( &$walk, &$heading, &$text, &$button ): void {
+		$walk    = static function ( array $blocks ) use ( &$walk, &$heading, &$texts, &$button ): void {
 			foreach ( $blocks as $block ) {
 				$name = (string) ( $block['blockName'] ?? '' );
 				if ( $button || 'core/buttons' === $name || 'core/button' === $name ) {
@@ -558,25 +580,53 @@ final class Composition {
 				$length = mb_strlen( trim( wp_strip_all_tags( (string) ( $block['innerHTML'] ?? '' ) ) ) );
 				if ( 'core/heading' === $name && 1 === (int) ( $block['attrs']['level'] ?? 2 ) ) {
 					$heading = $length;
-				} elseif ( in_array( $name, array( 'core/paragraph', 'core/list-item' ), true ) ) {
-					$text += $length;
+				} elseif ( in_array( $name, array( 'core/paragraph', 'core/list-item' ), true ) && $length > 0 ) {
+					$texts[] = $length;
 				}
 				$walk( (array) ( $block['innerBlocks'] ?? array() ) );
 			}
 		};
 		$walk( array( $first ) );
-		$slug   = (string) ( $first['attrs']['metadata']['patternName'] ?? '' );
-		$length = array();
+		if ( ! $button ) {
+			return null;
+		}
+		$slug = (string) ( $first['attrs']['metadata']['patternName'] ?? '' );
+		$docs = array();
 		foreach ( array( 'patterns', 'studioPatterns', 'addonPatterns' ) as $list ) {
 			foreach ( (array) ( $contract[ $list ] ?? array() ) as $pattern ) {
 				if ( '' !== $slug && ( $pattern['slug'] ?? '' ) === $slug ) {
-					$length = (array) ( $pattern['docs']['contentLength'] ?? array() );
+					$docs = (array) ( $pattern['docs'] ?? array() );
 				}
 			}
 		}
+		$models = array_filter( (array) ( $docs['firstScreen'] ?? array() ), static fn( $model ): bool => is_array( $model ) && 5 === count( $model ) && min( $model ) > 0 );
+		if ( $models ) {
+			$over = array();
+			foreach ( $models as $size => $model ) {
+				[ $h_cpl, $h_line, $t_cpl, $t_line, $room ] = array_map( 'intval', array_values( $model ) );
+				$grow                                       = ( max( 1, (int) ceil( $heading / $h_cpl ) ) - 1 ) * $h_line;
+				foreach ( $texts as $text ) {
+					$grow += ( (int) ceil( $text / $t_cpl ) - 1 ) * $t_line;
+				}
+				$grow += ! empty( $page['service_bar'] ) ? (int) ( self::FIRST_SCREEN_EXTRA['service_bar'][ $size ] ?? 0 ) : 0;
+				$room += ! empty( $page['front'] ) ? (int) ( self::FIRST_SCREEN_EXTRA['breadcrumbs'][ $size ] ?? 0 ) : 0;
+				if ( $grow > $room ) {
+					/* translators: 1: window size such as 390 x 844, 2: pixels */
+					$over[] = sprintf( __( 'at %1$s by about %2$d px', 'leitvia-studio' ), str_replace( 'x', ' x ', (string) $size ), $grow - $room );
+				}
+			}
+			return $over ? array(
+				'rule'    => 'firstScreen',
+				'index'   => 0,
+				/* translators: 1: list such as at 390 x 844 by about 120 px, 2: characters of the heading, 3: characters of the text before the button. */
+				'message' => sprintf( __( 'The first button of the stage ends below the first screen %1$s (estimated from the lines of the heading, %2$d characters, and of the text before the button, %3$d characters). Shorten the heading or the text, or move the buttons above the text.', 'leitvia-studio' ), implode( ', ', $over ), $heading, array_sum( $texts ) ),
+			) : null;
+		}
+		$length      = (array) ( $docs['contentLength'] ?? array() );
+		$text        = array_sum( $texts );
 		$max_heading = (int) ( $length['heading'][1] ?? 70 );
 		$max_text    = (int) ( $length['text'][1] ?? 220 );
-		if ( ! $button || ( $heading <= $max_heading && $text <= $max_text ) ) {
+		if ( $heading <= $max_heading && $text <= $max_text ) {
 			return null;
 		}
 		return array(

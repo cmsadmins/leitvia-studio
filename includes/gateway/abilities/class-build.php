@@ -54,7 +54,7 @@ final class Build {
 	/**
 	 * Keys of a block edit that Block_Edit::apply() takes.
 	 */
-	private const CHANGES = array( 'attributes', 'text', 'link_text', 'url', 'add_link', 'caption', 'anchor', 'columns', 'image', 'video', 'table' );
+	private const CHANGES = array( 'attributes', 'text', 'link_text', 'url', 'add_link', 'caption', 'anchor', 'columns', 'image', 'video', 'table', 'bind' );
 
 	/**
 	 * Registers the abilities. Runs on leitvia_studio_init.
@@ -337,7 +337,7 @@ final class Build {
 				'block'      => array(
 					'type'        => 'string',
 					'pattern'     => '^[a-z0-9-]+/[a-z0-9-]+$',
-					'description' => __( 'Name of a block from leitvia/list-blocks, such as leitvia/consent-embed, or core/paragraph, core/heading, core/separator or core/site-logo. Inner blocks may also be other blocks that render on the server, such as gravityforms/form.', 'leitvia-studio' ),
+					'description' => __( 'Name of a block from leitvia/list-blocks, such as leitvia/consent-embed, or core/paragraph, core/heading, core/separator, core/site-logo, core/buttons (inner: one or two core/button) or core/button (text and url; className is-style-outline for the second one). Inner blocks may also be other blocks that render on the server, such as gravityforms/form.', 'leitvia-studio' ),
 				),
 				'text'       => array(
 					'type'        => 'string',
@@ -361,6 +361,7 @@ final class Build {
 					'description' => __( 'Attributes from leitvia/list-blocks, checked as in leitvia/update-block.', 'leitvia-studio' ),
 				),
 				'anchor'     => self::anchor_schema(),
+				'bind'       => self::bind_schema(),
 			),
 			'required'             => array( 'block' ),
 			'additionalProperties' => false,
@@ -375,6 +376,36 @@ final class Build {
 			);
 		}
 		return $schema;
+	}
+
+	/**
+	 * Schema of block bindings, shared by the block edits and the blocks of insert.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private static function bind_schema(): array {
+		return array(
+			'type'                 => 'object',
+			'maxProperties'        => 5,
+			'description'          => __( 'Block bindings per attribute, written to metadata.bindings: {"content": {"source": …, "args": {…}}} shows a value of the source in place of the saved text, such as a field, a site setting or, with an add-on, a price; null removes the binding of that attribute. Sources and bindable attributes come from leitvia/get-content-model (bindings). The text of the same edit stays as the saved fallback.', 'leitvia-studio' ),
+			'additionalProperties' => array(
+				'type'                 => array( 'object', 'null' ),
+				'properties'           => array(
+					'source' => array(
+						'type'        => 'string',
+						'minLength'   => 1,
+						'maxLength'   => 100,
+						'description' => __( 'Name of a registered binding source.', 'leitvia-studio' ),
+					),
+					'args'   => array(
+						'type'        => 'object',
+						'description' => __( 'Arguments of the source, such as key.', 'leitvia-studio' ),
+					),
+				),
+				'required'             => array( 'source' ),
+				'additionalProperties' => false,
+			),
+		);
 	}
 
 	/**
@@ -425,6 +456,7 @@ final class Build {
 				'add_link'  => self::add_link_schema(),
 				'caption'   => self::caption_schema(),
 				'anchor'    => self::anchor_schema(),
+				'bind'      => self::bind_schema(),
 				'table'     => self::table_schema(),
 				'columns'   => array(
 					'type'        => 'integer',

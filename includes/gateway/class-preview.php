@@ -12,13 +12,20 @@ use LeitviaStudio\Tokens\Set_Preview;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * ?leitvia_package=<id>&_wpnonce=… shows the target pages with the open operations of the package applied in memory
- * (filter the_posts), only for a user who may edit the target and with a valid nonce; anyone else sees the normal
- * page. Nothing is saved, the page carries noindex and is not cached.
+ * ?leitvia_package=<id>&leitvia_sign=… shows the target pages with the open operations of the package applied in memory
+ * (filter the_posts), only for a logged-in user who may edit the target and with the signature of the package; anyone
+ * else sees the normal page. The signature belongs to the package, not to a user: the agent asks for the link, a
+ * person opens it (a nonce of the agent user failed for every other user, and the page showed its old state). Nothing
+ * is saved, the page carries noindex and is not cached.
  */
 final class Preview {
 
 	public const ARG = 'leitvia_package';
+
+	/**
+	 * Query argument with the signature of the package, see sign().
+	 */
+	public const SIGN = 'leitvia_sign';
 
 	/**
 	 * Hooks of the preview. Runs from Gateway::boot().
@@ -52,7 +59,7 @@ final class Preview {
 				return add_query_arg(
 					array(
 						self::ARG  => $id,
-						'_wpnonce' => wp_create_nonce( self::ARG . '_' . $id ),
+						self::SIGN => self::sign( $id ),
 					),
 					$link
 				);
@@ -128,14 +135,24 @@ final class Preview {
 	}
 
 	/**
-	 * ID of the package in the request when its nonce is valid for the current user, else 0.
+	 * Signature of a package for its preview link, the same for every user.
+	 *
+	 * @param int $id Package ID.
+	 */
+	public static function sign( int $id ): string {
+		return substr( wp_hash( self::ARG . '|' . $id, 'nonce' ), 0, 20 );
+	}
+
+	/**
+	 * ID of the package in the request when a user is logged in and the signature fits, else 0. Whether the user may
+	 * see the changes decides posts() per post (edit_post).
 	 */
 	public static function requested(): int {
-		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- The nonce is verified here.
-		$id    = absint( $_GET[ self::ARG ] ?? 0 );
-		$nonce = sanitize_text_field( wp_unslash( (string) ( $_GET['_wpnonce'] ?? '' ) ) );
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- The signature is verified here; the view changes nothing.
+		$id   = absint( $_GET[ self::ARG ] ?? 0 );
+		$sign = sanitize_text_field( wp_unslash( (string) ( $_GET[ self::SIGN ] ?? '' ) ) );
 		// phpcs:enable
-		if ( ! $id || ! get_current_user_id() || ! wp_verify_nonce( $nonce, self::ARG . '_' . $id ) ) {
+		if ( ! $id || ! get_current_user_id() || ! hash_equals( self::sign( $id ), $sign ) ) {
 			return 0;
 		}
 		return Packages::POST_TYPE === get_post_type( $id ) ? $id : 0;

@@ -677,7 +677,7 @@ final class Setup {
 		Abilities::write(
 			'leitvia/update-template-part',
 			__( 'Update template part', 'leitvia-studio' ),
-			__( 'Replaces a template part of the contract, such as header, footer or sidebar, with a pattern made for its area or with changed block markup. Part names come from leitvia/get-contract; with Polylang <part>-<language> (header-de) is the part the theme shows for that language and is created in the area of its part. A panel of a mega menu is a part named mega-menu-<name> (or one listed under megaMenu.panels of leitvia/get-contract), created in the area Mega menu on the first write; fill it with a pattern of megaMenu.patterns and edits, then link it with leitvia/update-navigation (type mega, panel). Patterns come from leitvia/list-patterns; edits change the pattern at block IDs of leitvia/get-pattern first, as the sections of leitvia/compose-page do, so a footer or header needs no markup of its own. The change publishes the part, a draft one too: core shows no draft part, so where the area level is draft it waits in a change package. The base hash is the hash of the template part. leitvia/get-contract returns it per part under hashes.templateParts.', 'leitvia-studio' ),
+			__( 'Replaces a template part of the contract, such as header, footer or sidebar, with a pattern made for its area or with changed block markup. Part names come from leitvia/get-contract; with Polylang <part>-<language> (header-de) is the part the theme shows for that language and is created in the area of its part. A panel of a mega menu is a part named mega-menu-<name> (or one listed under megaMenu.panels of leitvia/get-contract), created in the area Mega menu on the first write; fill it with a pattern of megaMenu.patterns and edits, then link it with leitvia/update-navigation (type mega, panel); delete true moves a panel no mega menu item opens to the trash. Patterns come from leitvia/list-patterns; edits change the pattern at block IDs of leitvia/get-pattern first, as the sections of leitvia/compose-page do, so a footer or header needs no markup of its own. The change publishes the part, a draft one too: core shows no draft part, so where the area level is draft it waits in a change package. The base hash is the hash of the template part. leitvia/get-contract returns it per part under hashes.templateParts.', 'leitvia-studio' ),
 			'setup',
 			$replace,
 			array(
@@ -692,6 +692,10 @@ final class Setup {
 					'content' => array(
 						'type'      => 'string',
 						'minLength' => 1,
+					),
+					'delete'  => array(
+						'type'        => 'boolean',
+						'description' => __( 'Only for a saved panel of a mega menu (mega-menu-<name>) and without pattern, edits or content: moves the panel to the trash, refused while a mega menu item of a menu, template or template part opens it. A rollback brings it back.', 'leitvia-studio' ),
 					),
 				),
 				'required'   => array( 'part' ),
@@ -1555,6 +1559,9 @@ final class Setup {
 		if ( null === $area ) {
 			return Block_Edit::invalid( 'part', __( 'The contract has no template part with this name. Panels of mega menus are named mega-menu-<name>.', 'leitvia-studio' ), array( 'part' => $name ), 'leitvia/get-contract' );
 		}
+		if ( ! empty( $input['delete'] ) ) {
+			return self::delete_panel( $name, $area, $input );
+		}
 		if ( isset( $input['pattern'] ) === isset( $input['content'] ) ) {
 			return Block_Edit::invalid( 'change', __( 'Send either a pattern or content.', 'leitvia-studio' ), array( 'part' => $name ) );
 		}
@@ -1604,6 +1611,52 @@ final class Setup {
 				'post_content' => $content,
 				'post_status'  => 'publish',
 			) + $new + $state,
+		);
+	}
+
+	/**
+	 * Operation of update-template-part with delete: the saved panel with the status trash, which the pipeline writes
+	 * through wp_trash_post() and a rollback through wp_untrash_post() (target remove), as trash-content does. Only
+	 * panels of mega menus go: header, footer and the other parts of the contract are part of every page.
+	 *
+	 * @param string               $name  Part name.
+	 * @param string               $area  Area of the part.
+	 * @param array<string, mixed> $input Input.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private static function delete_panel( string $name, string $area, array $input ) {
+		$target = array( 'part' => $name );
+		if ( 'mega-menu' !== $area ) {
+			return Block_Edit::invalid( 'delete', __( 'Only a panel of a mega menu can be deleted; the other template parts belong to every page. Replace the part with a pattern instead.', 'leitvia-studio' ), $target );
+		}
+		if ( isset( $input['pattern'] ) || isset( $input['content'] ) || ! empty( $input['edits'] ) ) {
+			return Block_Edit::invalid( 'delete', __( 'delete goes alone, without pattern, edits or content.', 'leitvia-studio' ), $target );
+		}
+		$template = get_block_template( get_stylesheet() . '//' . $name, 'wp_template_part' );
+		if ( ! $template || ! $template->wp_id ) {
+			return Rejection::make( 'leitvia_not_found', __( 'There is no saved panel with this name. leitvia/get-contract lists the panels under megaMenu.panels.', 'leitvia-studio' ), 404, 'part', $target, 'leitvia/get-contract' );
+		}
+		if ( ! EMPTY_TRASH_DAYS ) {
+			return Block_Edit::invalid( 'trash', __( 'This site keeps no trash, so WordPress would delete the panel for good. A person can delete it in the Site Editor.', 'leitvia-studio' ), $target );
+		}
+		$places = Mega_Menu::used_by( $name );
+		if ( $places ) {
+			return Block_Edit::invalid(
+				'in_use',
+				/* translators: %s: list of navigation menu IDs and template IDs */
+				sprintf( __( 'A mega menu item still opens this panel: %s. Point the item to another panel or make it a link with leitvia/update-navigation first.', 'leitvia-studio' ), implode( ', ', $places ) ),
+				$target + array( 'used_by' => $places ),
+				'leitvia/update-navigation'
+			);
+		}
+		return array(
+			'area'   => 'structure',
+			'target' => array(
+				'post'   => (int) $template->wp_id,
+				'remove' => 'trash',
+			),
+			'record' => true,
+			'change' => static fn( array $state ): array => array( 'post_status' => 'trash' ) + $state,
 		);
 	}
 

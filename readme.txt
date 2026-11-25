@@ -4,7 +4,7 @@ Tags: ai agent, mcp, abilities api, design tokens, block theme
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.58
+Stable tag: 1.3.59
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -277,6 +277,12 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 
 == Changelog ==
 
+= 1.3.59 =
+* New: Pattern mega-menu-overview, the standard panel of a mega menu: four columns headed by an icon and a linked title in capitals above a fine line, one-line entries, a link to all of each topic, a card of 300 px and a footer row. Wide panels line up with the header row, keep their type small and fit 1440 x 900 without scrolling; below 1200 px the columns go two by two.
+* New: Block edits and insert take bind (metadata.bindings of a registered source), insert builds core/buttons and core/button, leitvia/get-pattern returns the panel patterns of a mega menu, and leitvia/update-template-part with delete moves a panel nobody uses to the trash.
+* New: leitvia/check-composition judges firstScreen by the measured model of the stage, the service bar of the header and the front page; leitvia/get-page-outline marks cut texts with text_truncated and text_length.
+* Change: The icons of top-level menu items show from 1280 px in the header row. The preview link of a change package is signed for the package, so a person opens what the agent asked for. A form field with an address in the wrong form gets its own message.
+
 = 1.3.58 =
 * New: Mega menus for agents. leitvia/update-template-part creates a panel as mega-menu-<name> from a panel pattern with edits, leitvia/get-contract lists panels and panel patterns under megaMenu, leitvia/update-navigation adds the item with type mega, panel and the overview page as url.
 * New: Patterns mega-menu-columns and mega-menu-columns-card: two to four columns, each headed by an icon and a title linked to its overview, entries with one sentence, a line of links and an optional card in an accent frame. In the mobile overlay the column heads are a second level of the accordion; without JavaScript the panel links stay in the page and open with the focus.
@@ -299,9 +305,3 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * New: leitvia/set-page-structure accepts package for posts with hub, so many posts fit in one package.
 * New: leitvia/update-seo takes archive (post type key) to set title and description of an archive without an SEO plugin; the change waits as a setting in a package.
 * Change: New fields a building block declares after an update join the stored content model on the next request; add-building-block need not run again.
-
-= 1.3.54 =
-* Change: Recipes recognize the sample links of the theme footers by their missing address (Leitvia 1.2.59 and later) as well as by "#", and put the pages of footerNavigation in their place.
-* Change: The link text check reports a link without an address, such as a sample link or button of a pattern, as it reports a link to "#".
-* New: Formal address setting (formal_address); set it with the new field "address" (informal or formal) of leitvia/set-organization. A site language such as de_DE_formal counts as formal.
-* Fix: A number field of the content model now keeps the value 0 when it comes from a change package.

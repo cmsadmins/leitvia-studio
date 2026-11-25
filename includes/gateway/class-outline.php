@@ -167,9 +167,12 @@ final class Outline {
 				'hash'      => Hashes::of( $serialized ),
 				'children'  => self::tree( Block_Ids::blocks( (array) $block['innerBlocks'] ), $here . '.' ),
 			);
-			// A text cut at TEXT_LENGTH carries the hash of the whole text, so an agent can tell which block holds it.
+			// A text cut at TEXT_LENGTH says so, with its length and the hash of the whole text, so an agent neither
+			// copies the cut text as the whole nor loses track of which block holds it.
 			if ( mb_strlen( $text ) > self::TEXT_LENGTH ) {
-				$node['text_hash'] = Hashes::of( $text );
+				$node['text_truncated'] = true;
+				$node['text_length']    = mb_strlen( $text );
+				$node['text_hash']      = Hashes::of( $text );
 			}
 			$links = self::links( $block );
 			if ( $links ) {

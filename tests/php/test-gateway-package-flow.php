@@ -57,7 +57,7 @@ class Test_Gateway_Package_Flow extends WP_UnitTestCase {
 	 */
 	public function tear_down(): void {
 		self::unregister();
-		unset( $_GET[ Preview::ARG ], $_GET['_wpnonce'] );
+		unset( $_GET[ Preview::ARG ], $_GET[ Preview::SIGN ] );
 		wp_clean_theme_json_cache();
 		parent::tear_down();
 		leitvia_studio()->reset_for_tests();
@@ -422,24 +422,28 @@ class Test_Gateway_Package_Flow extends WP_UnitTestCase {
 		$package = $this->queue( $post, array( 'post_content' => self::paragraph( 'Preview text' ) ) );
 		$stored  = get_post( $post )->post_content;
 
-		wp_set_current_user( $this->admin );
+		// The agent asks for the link, a person opens it.
+		wp_set_current_user( $this->agent );
 		$url = Preview::url( $package );
+		wp_set_current_user( $this->admin );
 		$this->assertStringContainsString( Preview::ARG . '=' . $package, $url );
 		wp_parse_str( (string) wp_parse_url( $url, PHP_URL_QUERY ), $query );
 
 		$_GET[ Preview::ARG ] = (string) $package;
-		$this->assertSame( $stored, Preview::posts( array( get_post( $post ) ) )[0]->post_content, 'no nonce, no preview' );
+		$this->assertSame( $stored, Preview::posts( array( get_post( $post ) ) )[0]->post_content, 'no signature, no preview' );
+		$_GET[ Preview::SIGN ] = 'wrong';
+		$this->assertSame( $stored, Preview::posts( array( get_post( $post ) ) )[0]->post_content, 'a wrong signature, no preview' );
 		$this->assertSame( array(), Preview::robots( array() ) );
 
-		$_GET['_wpnonce'] = $query['_wpnonce'];
-		$shown            = Preview::posts( array( get_post( $post ) ) );
+		$_GET[ Preview::SIGN ] = $query[ Preview::SIGN ];
+		$shown                 = Preview::posts( array( get_post( $post ) ) );
 		$this->assertStringContainsString( 'Preview text', $shown[0]->post_content );
 		$this->assertTrue( Preview::robots( array() )['noindex'] );
 		$this->assertSame( $stored, get_post( $post )->post_content, 'nothing saved' );
 		$this->assertSame( $stored, get_post_field( 'post_content', $post, 'raw' ) );
 
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'author' ) ) );
-		$this->assertSame( $stored, Preview::posts( array( get_post( $post ) ) )[0]->post_content, 'nonce of another user' );
+		$this->assertSame( $stored, Preview::posts( array( get_post( $post ) ) )[0]->post_content, 'a user who may not edit the post' );
 		wp_set_current_user( $this->admin );
 		$styles = self::factory()->post->create(
 			array(

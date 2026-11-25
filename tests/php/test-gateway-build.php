@@ -394,6 +394,61 @@ class Test_Gateway_Build extends WP_UnitTestCase {
 			)
 		);
 
+		// A row of buttons from its buttons, each with text and url; a button alone needs both.
+		$buttons = Block_Edit::structure(
+			$group( $para ),
+			'p:0.0',
+			array(
+				'insert' => array(
+					'block' => 'core/buttons',
+					'inner' => array(
+						array(
+							'block' => 'core/button',
+							'text'  => 'Ask for a server',
+							'url'   => '/contact/',
+						),
+						array(
+							'block'      => 'core/button',
+							'text'       => 'All plans',
+							'url'        => '/hosting/',
+							'attributes' => array( 'className' => 'is-style-outline' ),
+						),
+					),
+				),
+			)
+		);
+		$this->assertIsString( $buttons, is_wp_error( $buttons ) ? $buttons->get_error_message() : '' );
+		$this->assertStringContainsString( '<a href="/contact/" class="wp-block-button__link wp-element-button">Ask for a server</a>', $buttons );
+		$this->assertSame( 2, substr_count( $buttons, '<!-- /wp:button -->' ) );
+		$this->assertStringContainsString( 'is-style-outline', $buttons );
+		$this->assertWPError( Block_Edit::structure( $group( $para ), 'p:0.0', array( 'insert' => array( 'block' => 'core/buttons' ) ) ) );
+		$this->assertWPError( Block_Edit::structure( $group( $para ), 'p:0.0', array( 'insert' => array( 'block' => 'core/button', 'text' => 'No link' ) ) ) ); // phpcs:ignore WordPress.Arrays.ArrayDeclarationSpacing.AssociativeArrayFound -- One block.
+
+		// bind: a binding of a registered source on an attribute WordPress binds, in insert and in an edit; null removes it.
+		$bound = Block_Edit::structure(
+			$group( $para ),
+			'p:0.0',
+			array(
+				'insert' => array(
+					'block' => 'core/paragraph',
+					'text'  => 'Site title',
+					'bind'  => array(
+						'content' => array(
+							'source' => 'core/post-data',
+							'args'   => array( 'field' => 'date' ),
+						),
+					),
+				),
+			)
+		);
+		$this->assertIsString( $bound, is_wp_error( $bound ) ? $bound->get_error_message() : '' );
+		$this->assertSame( array( 'source' => 'core/post-data', 'args' => array( 'field' => 'date' ) ), parse_blocks( $bound )[0]['innerBlocks'][1]['attrs']['metadata']['bindings']['content'] ); // phpcs:ignore WordPress.Arrays.ArrayDeclarationSpacing.AssociativeArrayFound -- One binding.
+		$this->assertStringContainsString( '>Site title</p>', $bound );
+		$unbound = Block_Edit::apply( $bound, 'p:0.1', array( 'bind' => array( 'content' => null ) ) );
+		$this->assertArrayNotHasKey( 'metadata', parse_blocks( $unbound )[0]['innerBlocks'][1]['attrs'] );
+		$this->assertSame( 'bind', Block_Edit::apply( $para, 'p:0', array( 'bind' => array( 'url' => array( 'source' => 'core/post-data' ) ) ) )->get_error_data()['reason'] ); // phpcs:ignore WordPress.Arrays.ArrayDeclarationSpacing.AssociativeArrayFound -- One binding.
+		$this->assertSame( 'bind', Block_Edit::apply( $para, 'p:0', array( 'bind' => array( 'content' => array( 'source' => 'core/pattern-overrides' ) ) ) )->get_error_data()['reason'] ); // phpcs:ignore WordPress.Arrays.ArrayDeclarationSpacing.AssociativeArrayFound -- One binding.
+
 		$compare = Block_Edit::structure(
 			$group( $para ),
 			'p:0.0',

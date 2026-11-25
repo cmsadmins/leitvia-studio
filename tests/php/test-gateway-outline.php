@@ -99,6 +99,8 @@ class Test_Gateway_Outline extends WP_UnitTestCase {
 		$this->assertSame( 'core/paragraph', $paragraph['name'] );
 		$this->assertSame( mb_substr( 'Bold & ' . trim( $long ), 0, 80 ), $paragraph['text'] );
 		$this->assertSame( substr( hash( 'sha256', 'Bold & ' . trim( $long ) ), 0, 16 ), $paragraph['text_hash'], 'a cut text carries the hash of the whole text' );
+		$this->assertTrue( $paragraph['text_truncated'], 'a cut text says so' );
+		$this->assertSame( mb_strlen( 'Bold & ' . trim( $long ) ), $paragraph['text_length'] );
 		$this->assertSame( strlen( serialize_block( $block ) ), $paragraph['bytes'] );
 		$this->assertSame( Hashes::block( $block ), $paragraph['hash'] );
 		$this->assertSame( array(), $paragraph['children'] );
@@ -119,6 +121,7 @@ class Test_Gateway_Outline extends WP_UnitTestCase {
 		$this->assertSame( array( 'mailto:hello@example.org', '/contact/' ), $outline['blocks'][1]['links'] );
 		$this->assertArrayNotHasKey( 'links', $outline['blocks'][2] );
 		$this->assertArrayNotHasKey( 'text_hash', $outline['blocks'][2], 'a text that is not cut has no hash' );
+		$this->assertArrayNotHasKey( 'text_truncated', $outline['blocks'][2] );
 	}
 
 	/**

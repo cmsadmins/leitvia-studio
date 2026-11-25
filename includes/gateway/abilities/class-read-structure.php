@@ -31,11 +31,16 @@ final class Read_Structure {
 			'items' => array(
 				'type'       => 'object',
 				'properties' => array(
-					'text_hash' => array(
+					'text_truncated' => array(
+						'type'        => 'boolean',
+						'description' => __( 'Only when text was cut: true, and text_length counts the characters of the whole text. Read the whole text with leitvia/get-block before reusing it.', 'leitvia-studio' ),
+					),
+					'text_length'    => array( 'type' => 'integer' ),
+					'text_hash'      => array(
 						'type'        => 'string',
 						'description' => __( 'Only when text was cut: the first 16 hex characters of the SHA-256 of the whole text, tags stripped, entities decoded, white space collapsed to single spaces and trimmed.', 'leitvia-studio' ),
 					),
-					'image'     => array(
+					'image'          => array(
 						'type'        => 'object',
 						'description' => __( 'Image of an image or cover block: attachment ID (0 outside the media library), alt text (null without alt attribute) and the decorative mark.', 'leitvia-studio' ),
 						'properties'  => array(
@@ -51,7 +56,7 @@ final class Read_Structure {
 		Gateway\Abilities::read(
 			'leitvia/get-page-outline',
 			__( 'Get page outline', 'leitvia-studio' ),
-			__( 'Returns a post as a compact block tree: per block the ID, name, pattern, the first 80 characters of text (with text_hash of the whole text when it is longer), the link targets of the block itself (links, only when it has any), for image and cover blocks the image with attachment ID, alt text and decorative mark, size, hash and children. shortcodes: unhandled shortcodes per block. Blocks without a stable ID have a path ID such as p:0.2.1 until the next save. Use the document hash as base_hash for changes and get-block for full attributes.', 'leitvia-studio' ),
+			__( 'Returns a post as a compact block tree: per block the ID, name, pattern, the first 80 characters of text (when it is longer with text_truncated true, text_length and text_hash of the whole text, which leitvia/get-block returns), the link targets of the block itself (links, only when it has any), for image and cover blocks the image with attachment ID, alt text and decorative mark, size, hash and children. shortcodes: unhandled shortcodes per block. Blocks without a stable ID have a path ID such as p:0.2.1 until the next save. Use the document hash as base_hash for changes and get-block for full attributes.', 'leitvia-studio' ),
 			array(
 				'type'                 => 'object',
 				'properties'           => array( 'post' => $post ),

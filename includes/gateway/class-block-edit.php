@@ -172,6 +172,9 @@ final class Block_Edit {
 		'core/heading'   => '<!-- wp:heading --><h2 class="wp-block-heading"></h2><!-- /wp:heading -->',
 		'core/separator' => '<!-- wp:separator --><hr class="wp-block-separator has-alpha-channel-opacity"/><!-- /wp:separator -->',
 		'core/site-logo' => '',
+		// A row of buttons takes its buttons as inner blocks, each with text and url (BUTTON_FIELDS).
+		'core/buttons'   => '<!-- wp:buttons --><div class="wp-block-buttons"><!-- wp:button --><div class="wp-block-button"><a class="wp-block-button__link wp-element-button"></a></div><!-- /wp:button --></div><!-- /wp:buttons -->',
+		'core/button'    => '<!-- wp:button --><div class="wp-block-button"><a class="wp-block-button__link wp-element-button"></a></div><!-- /wp:button -->',
 	);
 
 	/**
@@ -377,6 +380,16 @@ final class Block_Edit {
 			$block['attrs'] = $attrs + (array) $block['attrs'];
 		} elseif ( $attrs ) {
 			$change['attributes'] = $attrs;
+		}
+		// A new button without text or link would be an empty control; a new row of buttons needs its buttons.
+		if ( 'core/button' === $name && ( '' === trim( (string) ( $spec['text'] ?? '' ) ) || '' === trim( (string) ( $spec['url'] ?? '' ) ) ) ) {
+			return self::invalid( 'insert', __( 'A new button needs text and url.', 'leitvia-studio' ), $target );
+		}
+		if ( 'core/buttons' === $name && empty( $spec['inner'] ) ) {
+			return self::invalid( 'insert', __( 'A new core/buttons needs inner: one or two core/button, each with text and url.', 'leitvia-studio' ), $target );
+		}
+		if ( isset( $spec['bind'] ) ) {
+			$change['bind'] = $spec['bind'];
 		}
 		$block['innerHTML'] = implode( '', array_filter( (array) $block['innerContent'], 'is_string' ) );
 		return $change ? self::change( $block, $change, $target ) : $block;
@@ -777,6 +790,53 @@ final class Block_Edit {
 			$block['innerContent'][0] = $html;
 		}
 		$block['innerHTML'] = implode( '', array_filter( (array) $block['innerContent'], 'is_string' ) );
+		// The binding comes last: text and url of the same edit are the saved fallback a binding without value shows.
+		return isset( $change['bind'] ) ? self::bind( $block, (array) $change['bind'], $target ) : $block;
+	}
+
+	/**
+	 * Block with new block bindings in metadata.bindings: per attribute a registered source with its args, or null to
+	 * remove the binding of that attribute. Only attributes WordPress binds for the block (Bindings::attributes()) and
+	 * no pattern overrides, which belong to synced patterns. What a source needs in args, and whether the key exists,
+	 * the check leitvia/bindings of the write tells, as for bindings in markup.
+	 *
+	 * @param array<string, mixed> $block  Parsed block.
+	 * @param array<string, mixed> $bind   Attribute => array( source, args ) or null.
+	 * @param array<string, mixed> $target Target.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private static function bind( array $block, array $bind, array $target ) {
+		$name      = (string) $block['blockName'];
+		$supported = \LeitviaStudio\Model\Bindings::attributes( $name );
+		$bindings  = (array) ( $block['attrs']['metadata']['bindings'] ?? array() );
+		foreach ( $bind as $attribute => $binding ) {
+			$attribute = (string) $attribute;
+			if ( ! in_array( $attribute, $supported, true ) ) {
+				/* translators: 1: attribute, 2: block name, 3: list of attributes */
+				return self::invalid( 'bind', sprintf( __( 'WordPress binds no attribute %1$s on %2$s. Bindable: %3$s.', 'leitvia-studio' ), $attribute, $name, $supported ? implode( ', ', $supported ) : '-' ), $target, 'leitvia/get-content-model' );
+			}
+			if ( null === $binding ) {
+				unset( $bindings[ $attribute ] );
+				continue;
+			}
+			$source = (string) ( $binding['source'] ?? '' );
+			if ( 'core/pattern-overrides' === $source || ! get_block_bindings_source( $source ) ) {
+				/* translators: %s: list of binding sources */
+				return self::invalid( 'bind', sprintf( __( 'Bind to a registered source: %s.', 'leitvia-studio' ), implode( ', ', array_diff( array_keys( get_all_registered_block_bindings_sources() ), array( 'core/pattern-overrides' ) ) ) ), $target, 'leitvia/get-content-model' );
+			}
+			$bindings[ $attribute ] = array( 'source' => $source ) + ( empty( $binding['args'] ) ? array() : array( 'args' => (array) $binding['args'] ) );
+		}
+		$meta = (array) ( $block['attrs']['metadata'] ?? array() );
+		if ( $bindings ) {
+			$meta['bindings'] = $bindings;
+		} else {
+			unset( $meta['bindings'] );
+		}
+		if ( $meta ) {
+			$block['attrs']['metadata'] = $meta;
+		} else {
+			unset( $block['attrs']['metadata'] );
+		}
 		return $block;
 	}
 

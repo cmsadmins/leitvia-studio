@@ -35,7 +35,7 @@ final class Read_Composition {
 		Gateway\Abilities::read(
 			'leitvia/check-composition',
 			__( 'Check composition', 'leitvia-studio' ),
-			__( 'Scores a page against the composition rules of the contract: pass pattern slugs in page order (block:<ID> for a Lab pattern; only approved ones count as known), or a post ID to read the sections of a saved page from metadata.patternName. A saved page counts as built: the ground each section sets (backgroundColor, block style Inverse) instead of the tone of its pattern, and the side of its media (block style Media right). With slugs, name both yourself: tones for the sections an edit will give another ground, mirrored for those it will give the block style Media right, each by 0-based index. Text, lists, images, galleries and accordions between the sections are running text and no finding. A section with a video, a gallery or a wide image is a break and stands outside the density run. With frame (or the frame a saved page was composed for) the page also needs a section of every kind the page frame requires (missingSection, 10 points) and is told about the kinds it recommends (recommendedSection, no points); both carry the kind and the index after the last section, and their suggestions name patterns to add. Returns the findings (rule, 0-based section index, for a post the block ID, and what to do), the score from 100 down, the minimum score for autonomous writes and per finding up to three patterns that would fix it. For a post also unregistered: block types that render nothing, the finding newsTopic (no points) when the page has the pattern Related news without a topic of its news, and the finding firstScreen (no points) when the heading or the text before the first button of the stage is longer than its pattern allows, so the button may fall below the first screen.', 'leitvia-studio' ),
+			__( 'Scores a page against the composition rules of the contract: pass pattern slugs in page order (block:<ID> for a Lab pattern; only approved ones count as known), or a post ID to read the sections of a saved page from metadata.patternName. A saved page counts as built: the ground each section sets (backgroundColor, block style Inverse) instead of the tone of its pattern, and the side of its media (block style Media right). With slugs, name both yourself: tones for the sections an edit will give another ground, mirrored for those it will give the block style Media right, each by 0-based index. Text, lists, images, galleries and accordions between the sections are running text and no finding. A section with a video, a gallery or a wide image is a break and stands outside the density run. With frame (or the frame a saved page was composed for) the page also needs a section of every kind the page frame requires (missingSection, 10 points) and is told about the kinds it recommends (recommendedSection, no points); both carry the kind and the index after the last section, and their suggestions name patterns to add. Returns the findings (rule, 0-based section index, for a post the block ID, and what to do), the score from 100 down, the minimum score for autonomous writes and per finding up to three patterns that would fix it. For a post also unregistered: block types that render nothing, the finding newsTopic (no points) when the page has the pattern Related news without a topic of its news, and the finding firstScreen (no points) when the first button of the stage ends below the first screen at 1440 x 900 or 390 x 844: estimated from the lines of the heading and the text before it with the measured model of the stage pattern and the service bar of the header, or for a stage without a model from the lengths its pattern allows.', 'leitvia-studio' ),
 			array(
 				'type'                 => 'object',
 				'properties'           => array(
@@ -168,7 +168,15 @@ final class Read_Composition {
 			) + ( '' !== ( $ids[ $index ] ?? '' ) ? array( 'block' => $ids[ $index ] ) : array() );
 		}
 		// The first button of the stage out of the first screen costs no points either; the finding says what to shorten.
-		$screen = $post ? Gateway\Composition::first_screen( (string) get_post_field( 'post_content', $post, 'raw' ), $data ) : null;
+		$header = $post ? get_block_template( get_stylesheet() . '//header', 'wp_template_part' ) : null;
+		$screen = $post ? Gateway\Composition::first_screen(
+			(string) get_post_field( 'post_content', $post, 'raw' ),
+			$data,
+			array(
+				'service_bar' => $header && str_contains( (string) $header->content, 'leitvia-service-bar' ),
+				'front'       => (int) get_option( 'page_on_front' ) === $post,
+			)
+		) : null;
 		if ( $screen ) {
 			$report['issues'][] = $screen + ( '' !== ( $ids[0] ?? '' ) ? array( 'block' => $ids[0] ) : array() );
 		}

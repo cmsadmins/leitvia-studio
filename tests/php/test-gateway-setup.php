@@ -860,7 +860,7 @@ class Test_Gateway_Setup extends WP_UnitTestCase {
 		$this->assertSame( Hashes::document( $panel->wp_id ), $panels['mega-menu-services'] );
 		$this->assertSame( $panels['mega-menu-services'], $contract['hashes']['templateParts']['mega-menu-services'] );
 		$names = array_column( $contract['megaMenu']['patterns'], 'name' );
-		foreach ( array( 'leitvia-studio/mega-menu-panel', 'leitvia-studio/mega-menu-columns', 'leitvia-studio/mega-menu-columns-card' ) as $name ) {
+		foreach ( array( 'leitvia-studio/mega-menu-panel', 'leitvia-studio/mega-menu-columns', 'leitvia-studio/mega-menu-columns-card', 'leitvia-studio/mega-menu-overview' ) as $name ) {
 			$this->assertContains( $name, $names );
 		}
 
@@ -925,6 +925,26 @@ class Test_Gateway_Setup extends WP_UnitTestCase {
 			)
 		);
 		$this->assertSame( array( 'leitvia/navigation' ), array_column( $data['findings'], 'check' ) );
+
+		// get-pattern knows the panel patterns, with their blockTypes.
+		$pattern = wp_get_ability( 'leitvia/get-pattern' )->execute( array( 'slug' => 'leitvia-studio/mega-menu-overview' ) );
+		$this->assertSame( array( 'template-part', array( 'core/template-part/mega-menu' ) ), array( $pattern['source'], $pattern['blockTypes'] ) );
+		$this->assertStringContainsString( 'leitvia-mega-menu-entry', $pattern['content'] );
+
+		// delete: refused while an item opens the panel; an unused panel goes to the trash, a rollback brings it back.
+		$this->assertSame( 'in_use', $this->assert_rejected( 'leitvia_invalid_input', self::call( 'leitvia/update-template-part', array( 'part' => 'mega-menu-services', 'delete' => true, 'base_hash' => Hashes::document( $panel->wp_id ) ) ) )['reason'] ); // phpcs:ignore WordPress.Arrays.ArrayDeclarationSpacing.AssociativeArrayFound -- One input.
+		$this->assertSame( 'delete', $this->assert_rejected( 'leitvia_invalid_input', self::call( 'leitvia/update-template-part', array( 'part' => 'header', 'delete' => true ) ) )['reason'] ); // phpcs:ignore WordPress.Arrays.ArrayDeclarationSpacing.AssociativeArrayFound -- One input.
+		$probe = $this->assert_mode( 'live', self::call( 'leitvia/update-template-part', array( 'part' => 'mega-menu-probe', 'pattern' => 'leitvia-studio/mega-menu-overview' ) ) )['target']['post']; // phpcs:ignore WordPress.Arrays.ArrayDeclarationSpacing.AssociativeArrayFound -- One input.
+		// Removing is destructive: it waits for a person in a package, as trash-content does.
+		$gone = $this->assert_mode( 'package', self::call( 'leitvia/update-template-part', array( 'part' => 'mega-menu-probe', 'delete' => true, 'base_hash' => Hashes::document( $probe ) ) ) ); // phpcs:ignore WordPress.Arrays.ArrayDeclarationSpacing.AssociativeArrayFound -- One input.
+		$this->assertSame( 'publish', get_post_status( $probe ) );
+		$this->sign_in( 'standard', 'administrator' );
+		$this->assertSame( 'applied', Packages::apply( $gone['package'] )['state'] );
+		$this->assertSame( 'trash', get_post_status( $probe ) );
+		$this->assertArrayNotHasKey( 'mega-menu-probe', \LeitviaStudio\Blocks\Mega_Menu::panels() );
+		Packages::rollback( $gone['package'] );
+		$this->assertSame( 'publish', get_post_status( $probe ), 'a rollback brings the panel back' );
+		$this->sign_in( 'full' );
 
 		// An empty panel and an item whose panel is gone.
 		$this->assert_mode(

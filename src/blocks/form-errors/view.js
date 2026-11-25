@@ -16,6 +16,13 @@ const keyOf = ( field ) =>
 			) ?? field )
 		: field;
 
+// data-error says what is missing. A field with a value in the wrong form (an email without @) gets data-error-invalid,
+// else the message of the browser, never the one for an empty field.
+const messageOf = ( field ) =>
+	field.validity && ! field.validity.valid && ! field.validity.valueMissing
+		? field.dataset.errorInvalid || field.validationMessage
+		: field.dataset.error || field.validationMessage;
+
 // The visible name of the field without required markers.
 function nameOf( field ) {
 	const label =
@@ -177,9 +184,7 @@ for ( const block of document.querySelectorAll( `.${ B }` ) ) {
 					clear( field );
 				}
 			}
-			invalid.forEach( ( field ) =>
-				mark( field, field.dataset.error || field.validationMessage )
-			);
+			invalid.forEach( ( field ) => mark( field, messageOf( field ) ) );
 			show();
 		},
 		true

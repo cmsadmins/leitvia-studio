@@ -251,7 +251,7 @@ final class Read_Design {
 			'leitvia/get-pattern',
 			__( 'Get pattern', 'leitvia-studio' ),
 			/* translators: %s: product name */
-			sprintf( __( 'Returns one pattern of the theme or of %s with its markup, metadata and the first 20 posts and templates that use it (more is true when there are further ones). Template patterns come with their templateTypes.', 'leitvia-studio' ), leitvia_studio_brand()['name'] ),
+			sprintf( __( 'Returns one pattern of the theme or of %s with its markup, metadata and the first 20 posts and templates that use it (more is true when there are further ones). Template patterns come with their templateTypes, patterns for a template part area that the list leaves out (such as the panels of a mega menu, megaMenu.patterns of leitvia/get-contract) with their blockTypes; the path IDs of their blocks (p:0.1.2) are those of the edits of leitvia/update-template-part.', 'leitvia-studio' ), leitvia_studio_brand()['name'] ),
 			array(
 				'type'                 => 'object',
 				'properties'           => array(
@@ -751,24 +751,34 @@ final class Read_Design {
 	}
 
 	/**
-	 * A registered template pattern (one with templateTypes, the source of leitvia/update-template) that the pattern list
-	 * leaves out, with title, description and templateTypes; null for any other slug.
+	 * A registered pattern that the pattern list leaves out: a template pattern (templateTypes, the source of
+	 * leitvia/update-template) with its templateTypes, or one for a template part area (blockTypes
+	 * core/template-part/<area>, such as the panels of a mega menu, the source of leitvia/update-template-part) with
+	 * its blockTypes; null for any other slug.
 	 *
 	 * @param string $slug Pattern slug.
 	 * @return array<string, mixed>|null
 	 */
 	private static function template_pattern( string $slug ): ?array {
 		$pattern = \WP_Block_Patterns_Registry::get_instance()->get_registered( $slug );
-		if ( ! $pattern || empty( $pattern['templateTypes'] ) ) {
+		$parts   = $pattern ? array_values( array_filter( array_map( 'strval', (array) ( $pattern['blockTypes'] ?? array() ) ), static fn( string $type ): bool => str_starts_with( $type, 'core/template-part/' ) ) ) : array();
+		if ( ! $pattern || ( empty( $pattern['templateTypes'] ) && ! $parts ) ) {
 			return null;
 		}
-		return array(
-			'slug'          => $slug,
-			'title'         => (string) ( $pattern['title'] ?? '' ),
-			'description'   => (string) ( $pattern['description'] ?? '' ),
-			'source'        => 'template',
-			'templateTypes' => array_values( array_map( 'strval', (array) $pattern['templateTypes'] ) ),
+		$item = array(
+			'slug'        => $slug,
+			'title'       => (string) ( $pattern['title'] ?? '' ),
+			'description' => (string) ( $pattern['description'] ?? '' ),
 		);
+		return empty( $pattern['templateTypes'] )
+			? $item + array(
+				'source'     => 'template-part',
+				'blockTypes' => $parts,
+			)
+			: $item + array(
+				'source'        => 'template',
+				'templateTypes' => array_values( array_map( 'strval', (array) $pattern['templateTypes'] ) ),
+			);
 	}
 
 	/**

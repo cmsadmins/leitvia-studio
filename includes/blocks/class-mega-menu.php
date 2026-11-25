@@ -203,6 +203,48 @@ final class Mega_Menu {
 	}
 
 	/**
+	 * Places whose mega menu items open a panel: the IDs of navigation menus and the IDs of templates and template parts
+	 * (the file ones of the theme included) with a leitvia/mega-menu whose slug is the panel. Drafts count, since a
+	 * person may publish them.
+	 *
+	 * @param string $slug Panel slug.
+	 * @return list<string>
+	 */
+	public static function used_by( string $slug ): array {
+		$has    = static function ( array $blocks ) use ( &$has, $slug ): bool {
+			foreach ( $blocks as $block ) {
+				if ( ( 'leitvia/mega-menu' === ( $block['blockName'] ?? '' ) && sanitize_title( (string) ( $block['attrs']['slug'] ?? '' ) ) === $slug ) || $has( (array) ( $block['innerBlocks'] ?? array() ) ) ) {
+					return true;
+				}
+			}
+			return false;
+		};
+		$places = array();
+		$menus  = get_posts(
+			array(
+				'post_type'      => 'wp_navigation',
+				'post_status'    => array( 'publish', 'draft', 'pending', 'future', 'private' ),
+				'posts_per_page' => 100,
+				'no_found_rows'  => true,
+			)
+		);
+		foreach ( $menus as $menu ) {
+			if ( str_contains( $menu->post_content, 'wp:leitvia/mega-menu' ) && $has( parse_blocks( $menu->post_content ) ) ) {
+				$places[] = (string) $menu->ID;
+			}
+		}
+		foreach ( array( 'wp_template_part', 'wp_template' ) as $type ) {
+			foreach ( get_block_templates( array(), $type ) as $template ) {
+				$content = (string) $template->content;
+				if ( str_contains( $content, 'wp:leitvia/mega-menu' ) && $has( parse_blocks( $content ) ) ) {
+					$places[] = (string) $template->id;
+				}
+			}
+		}
+		return $places;
+	}
+
+	/**
 	 * Marks a navigation whose overlay gets collapsible submenus and loads the view module and style for it. On by
 	 * default for every navigation with a submenu or a mega menu: core keeps submenus open in the overlay while their
 	 * chevron still turns, which reads as broken. The filter leitvia_studio_collapsible_overlay decides last. Without JavaScript nothing changes. Runs on

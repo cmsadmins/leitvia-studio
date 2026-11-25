@@ -46,11 +46,13 @@
 	z-index: 2;
 	inset-block-start: 100%;
 	inset-inline-start: 0;
-	inline-size: min(56rem, calc(100vw - 2 * var(--wp--preset--spacing--s, 1rem)));
+	inline-size: var(--leitvia-mega-width, min(56rem, calc(100vw - 2 * var(--wp--preset--spacing--s, 1rem))));
 	// view.js moves a panel that would leave the window back inside it.
 	translate: var(--leitvia-mega-shift, 0) 0;
 	margin-block-start: var(--wp--preset--spacing--xs, 0.5rem);
-	padding: var(--wp--preset--spacing--m, 1.5rem);
+	// A panel is a list to scan: a small padding, so four columns of five entries and a card fit 1440 x 900 without
+	// scrolling (tests/e2e/blocks/mega-menu.spec.mjs).
+	padding: var(--wp--preset--spacing--s, 1rem);
 	border: 1px solid var(--wp--preset--color--stroke, currentcolor);
 	border-radius: var(--wp--preset--border-radius--m, 0);
 	background-color: var(--wp--preset--color--surface, #fff);
@@ -76,9 +78,110 @@
 		inset-inline: auto 0;
 	}
 
-	// Four columns or a column with a card need more room than three; :where() keeps the weight low for the overlay.
+	// Four columns or a column with a card need more room than three, four columns and a card more still; :where()
+	// keeps the weight low for the overlay.
+	// view.js gives a wide panel the width of the header row (--leitvia-mega-width) and lines it up with it.
 	&:has(:where(.wp-block-column:nth-child(4))) {
-		inline-size: min(72rem, calc(100vw - 2 * var(--wp--preset--spacing--s, 1rem)));
+		inline-size: var(--leitvia-mega-width, min(72rem, calc(100vw - 2 * var(--wp--preset--spacing--s, 1rem))));
+	}
+
+	&:has(:where(.wp-block-column:nth-child(5))) {
+		inline-size: var(--leitvia-mega-width, min(80rem, calc(100vw - 2 * var(--wp--preset--spacing--s, 1rem))));
+	}
+
+}
+
+// The type of a panel stays small whatever sizes its content sets: every size above lead is lead (the preset classes of
+// core are important); card text and the footer row take meta below. Presets keep their values, Studio redefines none.
+.wp-block-leitvia-mega-menu__panel :is(.has-display-font-size, .has-heading-l-font-size, .has-heading-m-font-size, .has-heading-s-font-size) {
+	font-size: var(--wp--preset--font-size--lead, 1.25rem) !important;
+}
+
+// Card and footer row of a panel: the sentence of the card and the footer in meta, the title of the card strong.
+.wp-block-leitvia-mega-menu__panel {
+	.is-style-card-accent {
+		p:not(.is-style-eyebrow, .wp-block-button) {
+			font-size: var(--wp--preset--font-size--meta, 0.875rem);
+		}
+
+		:is(h2, h3, h4) {
+			font-size: var(--wp--preset--font-size--lead, 1.25rem);
+			font-weight: 700;
+		}
+	}
+
+	:is(.leitvia-mega-menu-footer, .wp-block-template-part > .wp-block-group > .wp-block-group:last-child:not(:first-child)) {
+		font-size: var(--wp--preset--font-size--meta, 0.875rem);
+
+		p {
+			font-size: inherit;
+		}
+	}
+
+	// A link inside a sentence of the footer and the link to all of a topic read as links by their underline, not by
+	// colour alone (WCAG 1.4.1); the navigation around them takes it off.
+	:is(.leitvia-mega-menu-footer, .leitvia-mega-menu-all) a {
+		text-decoration: underline;
+	}
+}
+
+// The card keeps a width of its own beside the columns (300 px), so its text and button never break word by word; the
+// other columns share the rest. Below 1200 px four columns and a card leave too little room for one-line entries:
+// the columns go two by two and the card takes a row of its own below them.
+@media (min-width: 782px) {
+	.wp-block-leitvia-mega-menu__panel .wp-block-columns > .wp-block-column:has(> .is-style-card-accent):not(:only-child) {
+		flex: 0 0 18.75rem;
+	}
+}
+
+@media (min-width: 782px) and (max-width: 74.99rem) {
+	.wp-block-leitvia-mega-menu__panel .wp-block-columns:has(> .wp-block-column:nth-child(5)) {
+		flex-wrap: wrap !important; // Core sets nowrap with !important from 782 px.
+
+		> .wp-block-column {
+			flex: 1 1 calc(50% - var(--wp--preset--spacing--l, 2rem));
+		}
+
+		> .wp-block-column:has(> .is-style-card-accent) {
+			flex: 1 1 100%;
+		}
+	}
+}
+
+// Column heads in capitals (class leitvia-mega-menu-head--eyebrow, pattern mega-menu-overview): stronger than the
+// entries through the accent, the ui font and the line below; the link keeps its underline on hover and focus.
+.leitvia-mega-menu-head--eyebrow :is(h2, h3) {
+	font-family: var(--wp--preset--font-family--ui, inherit);
+	font-size: 0.75rem;
+	font-weight: 600;
+	letter-spacing: 0.1em;
+	line-height: 1.4;
+	text-transform: uppercase;
+
+	a:where(:not(:hover, :focus-visible)) {
+		color: var(--wp--preset--color--accent, currentcolor);
+		text-decoration: none;
+	}
+}
+
+// Entries on one line each: the link on the left, a price an agent puts beside it on the right (below it when the
+// column is too narrow); links in the panel
+// rows are underlined on hover and focus, the link to all of a topic stays underlined.
+.leitvia-mega-menu-entry {
+	align-items: baseline;
+
+	> * {
+		margin: 0;
+	}
+
+	> :not(:first-child) {
+		flex: none;
+		white-space: nowrap;
+	}
+
+	a:where(:not(:hover, :focus-visible)) {
+		color: inherit;
+		text-decoration: none;
 	}
 }
 
@@ -117,6 +220,14 @@
 .wp-block-navigation-item__content:has(> .leitvia-icon) {
 	display: inline-flex;
 	align-items: center;
+}
+
+// In the row of the header the icons of the top-level items wait for a wide window: below 1280 px five items with
+// icons and a button no longer fit one row at 1024 px. Submenus, panels and the overlay keep their icons.
+@media (max-width: 79.99rem) {
+	.wp-block-navigation__container:not(.is-menu-open *) > .wp-block-navigation-item > .wp-block-navigation-item__content > .leitvia-icon {
+		display: none;
+	}
 }
 
 // Column heads of the panel patterns (class leitvia-mega-menu-head): icon and linked title on one line.

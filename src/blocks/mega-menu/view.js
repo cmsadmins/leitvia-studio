@@ -58,13 +58,25 @@ function toggle( menu, open, byHover = false ) {
 	}
 }
 
-// A wide panel (four columns, a card) moves sideways until it stays 16 px inside the window, and a tall one scrolls
-// inside itself from 16 px above the bottom of the window, so no link ends up below it (WCAG 2.4.11).
+// A wide panel (four columns or more) lines up with the row of the header around the menu, or stands in the middle of
+// the window; another one moves sideways until it stays 16 px inside the window. A tall one scrolls inside itself from
+// 16 px above the bottom of the window, so no link ends up below it (WCAG 2.4.11).
 function fit( panel ) {
 	panel.style.removeProperty( '--leitvia-mega-shift' );
 	panel.style.removeProperty( '--leitvia-mega-max' );
+	panel.style.removeProperty( '--leitvia-mega-width' );
 	if ( inOverlay( panel ) ) {
 		return;
+	}
+	// A wide panel (four columns or more) takes the width of the row of the header around the menu and lines up with it.
+	const row =
+		panel.querySelector( '.wp-block-column:nth-child(4)' ) &&
+		panel.closest( '.alignwide' );
+	if ( row ) {
+		panel.style.setProperty(
+			'--leitvia-mega-width',
+			`${ row.getBoundingClientRect().width }px`
+		);
 	}
 	const box = panel.getBoundingClientRect();
 	panel.style.setProperty(
@@ -72,8 +84,16 @@ function fit( panel ) {
 		`${ Math.max( 160, window.innerHeight - box.top - 16 ) }px`
 	);
 	const room = document.documentElement.clientWidth;
-	const shift =
+	// A wide panel without a header row around it stands in the middle of the window, as the wide content does; a
+	// narrower one only moves until it stays 16 px inside the window.
+	const wide = panel.querySelector( '.wp-block-column:nth-child(4)' );
+	let shift =
 		Math.min( 0, room - 16 - box.right ) || Math.max( 0, 16 - box.left );
+	if ( row ) {
+		shift = row.getBoundingClientRect().left - box.left;
+	} else if ( wide ) {
+		shift = ( room - box.width ) / 2 - box.left;
+	}
 	if ( shift ) {
 		panel.style.setProperty( '--leitvia-mega-shift', `${ shift }px` );
 	}
