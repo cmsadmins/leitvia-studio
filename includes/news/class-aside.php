@@ -18,7 +18,9 @@ defined( 'ABSPATH' ) || exit;
  * it renders before the content and so gives the headings their ids (Blocks\Table_Of_Contents), and a card for the
  * service the post is about: the hub of the post (leitvia/set-page-structure hub), in the sidebar on large screens and
  * at the end of the post on small ones (classes leitvia-wide-only, leitvia-narrow-only of the theme). Without a hub
- * there is no card.
+ * there is no card. Entries with a page of their own and a hub, such as documentation pages, show the same card at the
+ * end on every screen: their templates (single-entry.html of the content model, the documentation of an add-on) have no
+ * such sidebar and place the theme pattern hidden-page-post-end, which asks leitvia_post_end.
  */
 final class Aside {
 
@@ -46,18 +48,18 @@ final class Aside {
 	 * @param mixed $blocks Block markup of earlier filters.
 	 */
 	public static function post_end( $blocks ): string {
-		return (string) $blocks . self::card( 'leitvia-narrow-only' );
+		return (string) $blocks . self::card( 'post' === get_post_type() ? 'leitvia-narrow-only' : '' );
 	}
 
 	/**
-	 * Card for the hub of the current post: eyebrow, its title, the description of its service or its excerpt and a
-	 * button to it; '' without a published hub.
+	 * Card for the hub of the current post or entry: eyebrow, its title, the description of its service or its excerpt
+	 * and a button to it; '' without a published hub.
 	 *
-	 * @param string $visibility Class that shows the card on large or small screens.
+	 * @param string $visibility Class that shows the card on large or small screens, '' for every screen.
 	 */
 	public static function card( string $visibility ): string {
 		$post = get_post();
-		$hub  = $post && 'post' === $post->post_type ? (int) get_post_meta( $post->ID, Cluster::HUB_META, true ) : 0;
+		$hub  = $post && 'page' !== $post->post_type ? (int) get_post_meta( $post->ID, Cluster::HUB_META, true ) : 0;
 		if ( ! $hub || 'page' !== get_post_type( $hub ) || 'publish' !== get_post_status( $hub ) ) {
 			return '';
 		}
@@ -65,7 +67,7 @@ final class Aside {
 		$text    = Schema::text( (string) ( $service['description'] ?? '' ) );
 		$text    = '' !== $text ? $text : Schema::text( get_the_excerpt( $hub ) );
 		$name    = Schema::text( (string) ( $service['name'] ?? get_the_title( $hub ) ) );
-		$class   = 'is-style-card ' . $visibility;
+		$class   = trim( 'is-style-card ' . $visibility );
 		return '<!-- wp:group {"className":"' . esc_attr( $class ) . '","layout":{"type":"default"}} -->'
 			. '<div class="wp-block-group ' . esc_attr( $class ) . '">'
 			. '<!-- wp:paragraph {"className":"is-style-eyebrow"} --><p class="is-style-eyebrow">' . esc_html__( 'Related service', 'leitvia-studio' ) . '</p><!-- /wp:paragraph -->'

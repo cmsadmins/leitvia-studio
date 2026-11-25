@@ -647,11 +647,11 @@ final class Content {
 		// post stays as it was.
 		$state['meta_input'][ \LeitviaStudio\News\Schema::AUTHOR_NAME_META ] = (string) get_post_meta( $id, \LeitviaStudio\News\Schema::AUTHOR_NAME_META, true );
 		$state['meta_input'][ \LeitviaStudio\News\Schema::AUTHOR_PAGE_META ] = (string) get_post_meta( $id, \LeitviaStudio\News\Schema::AUTHOR_PAGE_META, true );
-		// The lead symbol of a page and the hub of a post (set-page-structure icon and hub); Hashes leaves them out while
-		// they are empty, so the hash of every other page and post stays as it was.
+		// The lead symbol of a page and the hub of a post or entry (set-page-structure icon and hub); Hashes leaves them
+		// out while they are empty, so the hash of every other page, post and entry stays as it was.
 		if ( 'page' === $type ) {
 			$state['meta_input'][ \LeitviaStudio\Seo\Cluster::ICON_META ] = (string) get_post_meta( $id, \LeitviaStudio\Seo\Cluster::ICON_META, true );
-		} elseif ( 'post' === $type ) {
+		} elseif ( is_post_type_viewable( $type ) ) {
 			$state['meta_input'][ \LeitviaStudio\Seo\Cluster::HUB_META ] = (string) get_post_meta( $id, \LeitviaStudio\Seo\Cluster::HUB_META, true );
 		}
 		foreach ( array_merge( array_keys( self::fields( $type ) ), Seo::keys(), 'page' === $type ? self::PAGE_META : array() ) as $key ) {

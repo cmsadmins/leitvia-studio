@@ -35,7 +35,7 @@ final class Read_Composition {
 		Gateway\Abilities::read(
 			'leitvia/check-composition',
 			__( 'Check composition', 'leitvia-studio' ),
-			__( 'Scores a page against the composition rules of the contract: pass pattern slugs in page order (block:<ID> for a Lab pattern; only approved ones count as known), or a post ID to read the sections of a saved page from metadata.patternName. A saved page counts as built: the ground each section sets (backgroundColor, block style Inverse) instead of the tone of its pattern, and the side of its media (block style Media right). With slugs, name both yourself: tones for the sections an edit will give another ground, mirrored for those it will give the block style Media right, each by 0-based index. Text, lists, images, galleries and accordions between the sections are running text and no finding. A section with a video, a gallery or a wide image is a break and stands outside the density run. With frame (or the frame a saved page was composed for) the page also needs a section of every kind the page frame requires (missingSection, 10 points) and is told about the kinds it recommends (recommendedSection, no points); both carry the kind and the index after the last section, and their suggestions name patterns to add. Returns the findings (rule, 0-based section index, for a post the block ID, and what to do), the score from 100 down, the minimum score for autonomous writes and per finding up to three patterns that would fix it. For a post also unregistered: block types that render nothing.', 'leitvia-studio' ),
+			__( 'Scores a page against the composition rules of the contract: pass pattern slugs in page order (block:<ID> for a Lab pattern; only approved ones count as known), or a post ID to read the sections of a saved page from metadata.patternName. A saved page counts as built: the ground each section sets (backgroundColor, block style Inverse) instead of the tone of its pattern, and the side of its media (block style Media right). With slugs, name both yourself: tones for the sections an edit will give another ground, mirrored for those it will give the block style Media right, each by 0-based index. Text, lists, images, galleries and accordions between the sections are running text and no finding. A section with a video, a gallery or a wide image is a break and stands outside the density run. With frame (or the frame a saved page was composed for) the page also needs a section of every kind the page frame requires (missingSection, 10 points) and is told about the kinds it recommends (recommendedSection, no points); both carry the kind and the index after the last section, and their suggestions name patterns to add. Returns the findings (rule, 0-based section index, for a post the block ID, and what to do), the score from 100 down, the minimum score for autonomous writes and per finding up to three patterns that would fix it. For a post also unregistered: block types that render nothing, and the finding newsTopic (no points) when the page has the pattern Related news without a topic of its news.', 'leitvia-studio' ),
 			array(
 				'type'                 => 'object',
 				'properties'           => array(
@@ -156,6 +156,16 @@ final class Read_Composition {
 					$report[ $key ][ $at ]['block'] = $ids[ $item['index'] ];
 				}
 			}
+		}
+		// The section Related news without a topic costs no points; the finding says what it shows instead.
+		$news = $post ? \LeitviaStudio\Seo\Related_News::untopical( $post, (string) get_post_field( 'post_content', $post, 'raw' ) ) : null;
+		if ( $news ) {
+			$index              = (int) array_search( 'leitvia/teaser-related-news', $slugs, true );
+			$report['issues'][] = array(
+				'rule'    => 'newsTopic',
+				'index'   => $index,
+				'message' => $news['message'] . ' ' . $news['fix'],
+			) + ( '' !== ( $ids[ $index ] ?? '' ) ? array( 'block' => $ids[ $index ] ) : array() );
 		}
 		return ( $unknown ? array( 'unregistered' => $unknown ) : array() ) + array( 'sections' => $slugs ) + ( '' !== $frame ? array( 'frame' => $frame ) : array() ) + $report + array( 'min_score' => (int) Gateway\Gateway::settings()['min_composition_score'] );
 	}

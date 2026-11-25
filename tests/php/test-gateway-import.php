@@ -422,6 +422,47 @@ class Test_Gateway_Import extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The FAQ part of an old post becomes the block FAQ, with questions as h3 or bold paragraphs and answers of
+	 * paragraphs and lists; the text after it and a part without answers stay as they were; faq false keeps it all.
+	 */
+	public function test_faq_part_becomes_faq_block(): void {
+		$html   = '<p>Intro.</p><h2>Häufige Fragen zur Wartung</h2>'
+			. '<h3>How often are updates?</h3><p>Every week.</p><ul><li>Core</li><li>Plugins</li></ul>'
+			. '<p><strong>Who does the backup?</strong></p><p>We do, every night.</p>'
+			. '<p><b>Is there a contract?</b><br>No, it runs monthly.</p>'
+			. '<h2>Contact</h2><p>Write to us.</p>'
+			. '<h2>FAQ</h2><p>No questions yet.</p>';
+		$input  = array(
+			'source'    => self::SOURCE,
+			'post_type' => 'post',
+			'title'     => 'Care',
+			'content'   => $html,
+			'dry_run'   => true,
+		);
+		$result = wp_get_ability( Import::NAME )->execute( $input );
+		$this->assertIsArray( $result );
+		$markup = $result['report']['content'];
+		$this->assertSame( 3, $result['report']['faq'] );
+		$this->assertSame( 1, substr_count( $markup, '<!-- wp:leitvia/faq -->' ) );
+		$this->assertStringContainsString( '<h2 class="wp-block-heading">Häufige Fragen zur Wartung</h2><!-- /wp:heading -->', $markup );
+		$this->assertStringContainsString( '<summary>How often are updates?</summary><!-- wp:paragraph --><p>Every week.</p><!-- /wp:paragraph -->', $markup );
+		$this->assertStringContainsString( '<li>Plugins</li>', $markup );
+		$this->assertStringContainsString( '<summary>Who does the backup?</summary>', $markup );
+		$this->assertStringContainsString( '<summary>Is there a contract?</summary><!-- wp:paragraph --><p>No, it runs monthly.</p>', $markup );
+		$this->assertLessThan( strpos( $markup, '>Contact</h2>' ), strpos( $markup, '<!-- /wp:leitvia/faq -->' ), 'the next h2 ends the part' );
+		$this->assertStringContainsString( '<p>No questions yet.</p>', $markup, 'a part without questions stays' );
+		$this->assertStringNotContainsString( '<h3', $markup );
+		$blocks = array_values( array_filter( parse_blocks( $markup ), static fn( array $b ): bool => null !== $b['blockName'] ) );
+		$this->assertSame( 'leitvia/faq', $blocks[2]['blockName'] );
+		$this->assertSame( array( 'core/details', 'core/details', 'core/details' ), array_column( $blocks[2]['innerBlocks'], 'blockName' ) );
+		$this->assertSame( array( 'core/paragraph', 'core/list' ), array_column( $blocks[2]['innerBlocks'][0]['innerBlocks'], 'blockName' ) );
+
+		$kept = wp_get_ability( Import::NAME )->execute( array( 'faq' => false ) + $input );
+		$this->assertStringNotContainsString( 'wp:leitvia/faq', $kept['report']['content'] );
+		$this->assertArrayNotHasKey( 'faq', $kept['report'] );
+	}
+
+	/**
 	 * Images of other hosts are not loaded unless media_hosts names them.
 	 */
 	public function test_foreign_image_hosts(): void {

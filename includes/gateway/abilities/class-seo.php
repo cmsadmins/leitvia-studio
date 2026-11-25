@@ -356,7 +356,7 @@ final class Seo {
 					'hub'       => array(
 						'type'        => 'integer',
 						'minimum'     => 0,
-						'description' => __( 'ID of the published overview page above this page; 0 clears it. For a post: the page of the service the post is about, shown beside the post.', 'leitvia-studio' ),
+						'description' => __( 'ID of the published overview page above this page; 0 clears it. For a post or an entry with a page of its own (such as documentation): the page of the service it is about, shown as a card beside or below it.', 'leitvia-studio' ),
 					),
 					'icon'      => array(
 						'type'        => 'string',
@@ -519,10 +519,12 @@ final class Seo {
 		$post   = (int) ( $input['post'] ?? 0 );
 		$target = array( 'post' => $post );
 		$type   = get_post_type( $post );
-		if ( 'post' === $type && Scope::readable( $post ) && array_diff( array_keys( $input ), array( 'post', 'hub', 'base_hash', 'package' ) ) ) {
-			return Block_Edit::invalid( 'post', __( 'A post takes only hub, the page of the service it is about.', 'leitvia-studio' ), $target );
+		// Posts and entries with a page of their own (docs, a type of the content model) take only the hub.
+		$entry = is_string( $type ) && 'page' !== $type && in_array( $type, Content::types(), true ) && is_post_type_viewable( $type );
+		if ( $entry && Scope::readable( $post ) && array_diff( array_keys( $input ), array( 'post', 'hub', 'base_hash', 'package' ) ) ) {
+			return Block_Edit::invalid( 'post', __( 'A post or an entry takes only hub, the page of the service it is about.', 'leitvia-studio' ), $target );
 		}
-		if ( ! in_array( $type, array( 'page', 'post' ), true ) || ! Scope::readable( $post ) ) {
+		if ( ! ( 'page' === $type || $entry ) || ! Scope::readable( $post ) ) {
 			return Block_Edit::invalid( 'post', __( 'Set the structure of a page agents can read.', 'leitvia-studio' ), $target, 'leitvia/list-content' );
 		}
 		$meta = array();
@@ -711,7 +713,7 @@ final class Seo {
 					'offerings' => Cluster::offerings( $id ),
 					'news'      => Related_News::of( $id ),
 				),
-			) : array() ) + ( 'post' === $post->post_type ? array(
+			) : array() ) + ( 'page' !== $post->post_type && is_post_type_viewable( $post->post_type ) ? array(
 				'structure' => array(
 					'hub' => (int) get_post_meta( $id, Cluster::HUB_META, true ),
 				),

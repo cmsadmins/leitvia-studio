@@ -1430,6 +1430,111 @@ class Test_Gateway_Maintain extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A page with the template page gets a hero with its h1 and the template page-landing in one operation: alone each
+	 * would leave the page with two h1 or none. A shortcode block goes unchanged into a new section with wrap, on the
+	 * ground inverse and with an h2; wrap with a place or together with sections is refused.
+	 */
+	public function test_insert_section_with_template_and_wrap(): void {
+		update_option( Gateway::OPTION, array( 'profile' => 'full' ) + Gateway::DEFAULTS );
+		$shortcode = '<!-- wp:shortcode -->' . "\n" . '[my_booking id="1"]' . "\n" . '<!-- /wp:shortcode -->';
+		$page      = $this->page( self::paragraph( 'Intro' ) . "\n\n" . $shortcode );
+		$hero      = array(
+			array(
+				'pattern' => 'leitvia/hero-split-image',
+				'edits'   => array(
+					array(
+						'block' => 'p:0.0.0.3.0',
+						'url'   => '/work/',
+					),
+					array(
+						'block' => 'p:0.0.0.3.1',
+						'url'   => '/contact/',
+					),
+				),
+			),
+		);
+		$call      = static fn( array $input ) => self::call( 'leitvia/insert-section', $page, $input + array( 'post' => $page ) );
+		$roots     = static fn(): array => array_values( array_filter( parse_blocks( get_post_field( 'post_content', $page ) ), static fn( array $block ): bool => null !== $block['blockName'] ) );
+
+		$this->assertWPError(
+			$call(
+				array(
+					'sections' => $hero,
+					'position' => 'start',
+				)
+			),
+			'the template page prints the title as h1 already'
+		);
+		$this->assert_rejected(
+			'leitvia_invalid_input',
+			$call(
+				array(
+					'sections' => $hero,
+					'template' => 'page-nothing',
+				)
+			)
+		);
+		$this->assert_ok(
+			$call(
+				array(
+					'sections' => $hero,
+					'position' => 'start',
+					'template' => 'page-landing',
+				)
+			)
+		);
+		$this->assertSame( 'page-landing', get_page_template_slug( $page ) );
+		$this->assertSame( 'leitvia/hero-split-image', $roots()[0]['attrs']['metadata']['patternName'] );
+		$this->assertSame( 'core/shortcode', $roots()[2]['blockName'] );
+		$before = serialize_block( $roots()[2] );
+
+		$this->assert_rejected(
+			'leitvia_invalid_input',
+			$call(
+				array(
+					'wrap'     => array( 'block' => 'p:2' ),
+					'position' => 'end',
+				)
+			)
+		);
+		$this->assert_rejected(
+			'leitvia_invalid_input',
+			$call(
+				array(
+					'wrap'     => array( 'block' => 'p:2' ),
+					'sections' => $hero,
+				)
+			)
+		);
+		$this->assert_rejected( 'leitvia_not_found', $call( array( 'wrap' => array( 'block' => 'p:9' ) ) ) );
+		$this->assert_ok(
+			$call(
+				array(
+					'wrap' => array(
+						'block'   => 'p:2',
+						'ground'  => 'inverse',
+						'heading' => 'Book a <call>',
+					),
+				)
+			)
+		);
+		$section = $roots()[2];
+		$this->assertCount( 3, $roots() );
+		$this->assertSame( 'core/group', $section['blockName'] );
+		$this->assertSame( 'full', $section['attrs']['align'] );
+		$this->assertSame( 'is-style-inverse', $section['attrs']['className'] );
+		$this->assertSame( 'var:preset|spacing|xl', $section['attrs']['style']['spacing']['padding']['top'] );
+		$this->assertSame( 'core/heading', $section['innerBlocks'][0]['blockName'] );
+		$this->assertStringContainsString( '<h2 class="wp-block-heading has-heading-l-font-size">Book a &lt;call&gt;</h2>', $section['innerHTML'] . serialize_block( $section['innerBlocks'][0] ) );
+		$this->assertSame( $before, serialize_block( $section['innerBlocks'][1] ), 'the shortcode block stays as it was' );
+		$this->assertTrue( has_blocks( get_post_field( 'post_content', $page ) ) );
+
+		$this->assert_ok( $call( array( 'wrap' => array( 'block' => 'p:1' ) ) ) );
+		$this->assertSame( 'surface', $roots()[1]['attrs']['backgroundColor'] );
+		$this->assertArrayNotHasKey( 'className', $roots()[1]['attrs'] );
+	}
+
+	/**
 	 * Trash-content waits for a person even in the profile full; the agent cannot apply it. Applied by an
 	 * administrator the page is in the trash of core, and a rollback brings it back with its address. Links to it
 	 * are named. The front page, a page with subpages and a file are refused.

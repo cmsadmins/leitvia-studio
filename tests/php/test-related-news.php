@@ -10,8 +10,8 @@ use LeitviaStudio\Gateway\Hashes;
 use LeitviaStudio\Seo\Related_News;
 
 /**
- * A page names categories and tags by ID or slug; the theme lists the latest posts with any of them, the latest posts
- * when none has one, and never the current post.
+ * A page names categories and tags by ID or slug; the theme lists the latest posts with any of them, else the fallback
+ * of Related_News when none has one, and never the current post.
  */
 class Test_Related_News extends WP_UnitTestCase {
 
@@ -148,7 +148,7 @@ class Test_Related_News extends WP_UnitTestCase {
 
 		update_post_meta( $page, Related_News::META, array( 'categories' => array( self::factory()->category->create() ) ) );
 		$this->go_to( (string) get_permalink( $page ) );
-		$this->assertSame( array( 'Summer party', 'Backups explained', 'Server move' ), self::listed(), 'no post on the topic: the latest posts' );
+		$this->assertSame( array( 'Server move' ), self::listed(), 'no post on the topic: the posts in the category with the slug of the page (hosting)' );
 
 		$wrong = wp_get_ability( 'leitvia/set-page-structure' )->execute(
 			array(
@@ -167,6 +167,58 @@ class Test_Related_News extends WP_UnitTestCase {
 		);
 		$this->assertIsArray( $cleared, is_wp_error( $cleared ) ? $cleared->get_error_message() : '' );
 		$this->assertSame( '', get_post_meta( $page, Related_News::META, true ) );
+	}
+
+	/**
+	 * A page without a topic shows the posts with the page as hub, else the posts in a category or tag with the slug of
+	 * the page, else the latest posts; audit-site and check-composition say what it shows and how to name a topic.
+	 */
+	public function test_page_without_topic_falls_back(): void {
+		$cat   = self::factory()->category->create( array( 'slug' => 'drupal' ) );
+		$other = self::factory()->category->create( array( 'slug' => 'shop' ) );
+		$this->post( 'Drupal 11 is out', array( $cat ), array(), '2026-11-01 10:00:00' );
+		$this->post( 'Shop news', array( $other ), array(), '2026-11-04 10:00:00' );
+		$page = self::factory()->post->create(
+			array(
+				'post_type'    => 'page',
+				'post_status'  => 'publish',
+				'post_title'   => 'Drupal',
+				'post_name'    => 'drupal',
+				'post_content' => '<!-- wp:query {"queryId":1,"query":{"perPage":3,"postType":"post","inherit":false},"namespace":"leitvia/related-news"} --><div class="wp-block-query"></div><!-- /wp:query -->',
+			)
+		);
+		$this->go_to( (string) get_permalink( $page ) );
+		$this->assertSame( array( 'Drupal 11 is out' ), self::listed(), 'a category with the slug of the page' );
+		$this->assertSame( 'match', Related_News::source( $page ) );
+
+		$hub = $this->post( 'Care for Drupal sites', array( $other ), array(), '2026-11-02 10:00:00' );
+		update_post_meta( $hub, \LeitviaStudio\Seo\Cluster::HUB_META, (string) $page );
+		$this->go_to( (string) get_permalink( $page ) );
+		$this->assertSame( array( 'Care for Drupal sites' ), self::listed(), 'the posts with the page as hub come first' );
+		$this->assertSame( 'hub', Related_News::source( $page ) );
+
+		$audit = \LeitviaStudio\Gateway\Abilities\Read_Audit::audit( $page - 1, 1 )['items'][0];
+		$this->assertSame( $page, $audit['post'] );
+		$this->assertContains( 'leitvia/related-news', array_column( $audit['findings'], 'check' ) );
+
+		delete_post_meta( $hub, \LeitviaStudio\Seo\Cluster::HUB_META );
+		wp_update_post(
+			array(
+				'ID'        => $page,
+				'post_name' => 'hosting',
+			)
+		);
+		$this->go_to( (string) get_permalink( $page ) );
+		$this->assertSame( array( 'Shop news', 'Care for Drupal sites', 'Drupal 11 is out' ), self::listed(), 'nothing on the topic: the latest posts' );
+		$this->assertSame( 'latest', Related_News::source( $page ) );
+		$found = Related_News::untopical( $page, (string) get_post_field( 'post_content', $page ) );
+		$this->assertIsArray( $found );
+		$this->assertStringContainsString( 'latest posts', $found['message'] );
+		$this->assertStringContainsString( 'set-page-structure news', $found['fix'] );
+
+		update_post_meta( $page, Related_News::META, array( 'categories' => array( $cat ) ) );
+		$this->assertNull( Related_News::untopical( $page, (string) get_post_field( 'post_content', $page ) ), 'a page with a topic' );
+		$this->assertNull( Related_News::untopical( $page, '<!-- wp:paragraph --><p>No news.</p><!-- /wp:paragraph -->' ), 'a page without the pattern' );
 	}
 
 	/**

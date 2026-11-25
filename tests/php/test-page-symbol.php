@@ -7,6 +7,8 @@
 
 use LeitviaStudio\Gateway\Gateway;
 use LeitviaStudio\Gateway\Hashes;
+use LeitviaStudio\Model\Model;
+use LeitviaStudio\Model\Registrar;
 use LeitviaStudio\News\Aside;
 use LeitviaStudio\Seo\Cluster;
 use LeitviaStudio\Tokens\Dtcg;
@@ -111,6 +113,43 @@ class Test_Page_Symbol extends WP_UnitTestCase {
 
 		add_filter( 'leitvia_studio_page_symbol', static fn( string $icon, int $id ): string => $id === $page ? 'box' : $icon, 10, 2 );
 		$this->assertStringContainsString( 'leitvia-icon--box', do_blocks( $block ) );
+	}
+
+	/**
+	 * An entry with a page of its own (here a type of the content model, as documentation pages) takes only hub, like a
+	 * post; its template shows the card at the end on every screen, without the class for small screens.
+	 */
+	public function test_hub_of_an_entry_and_its_card(): void {
+		update_option( Model::OPTION, json_decode( (string) file_get_contents( dirname( __DIR__ ) . '/fixtures/model/events.json' ), true ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Test fixture.
+		Model::forget();
+		Registrar::register();
+		$hub   = self::factory()->post->create(
+			array(
+				'post_type'    => 'page',
+				'post_status'  => 'publish',
+				'post_title'   => 'Website care',
+				'post_excerpt' => 'Updates, backups and support for your site.',
+			)
+		);
+		$entry = self::factory()->post->create(
+			array(
+				'post_type'   => 'event',
+				'post_status' => 'publish',
+			)
+		);
+		$this->assertWPError( self::structure( $entry, array( 'icon' => 'server' ) ) );
+		$this->assertNotWPError( self::structure( $entry, array( 'hub' => $hub ) ) );
+		$this->assertSame( $hub, (int) get_post_meta( $entry, Cluster::HUB_META, true ) );
+		$this->assertSame( $hub, wp_get_ability( 'leitvia/get-seo' )->execute( array( 'posts' => array( $entry ) ) )['items'][0]['structure']['hub'] );
+
+		$GLOBALS['post'] = get_post( $entry ); // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- The entry being rendered.
+		$card            = do_blocks( Aside::post_end( '' ) );
+		$this->assertStringContainsString( 'Website care', $card );
+		$this->assertStringContainsString( 'is-style-card', $card );
+		$this->assertStringNotContainsString( 'leitvia-narrow-only', $card );
+		$this->assertStringContainsString( '<!-- wp:pattern {"slug":"leitvia/hidden-page-post-end"} /-->', \LeitviaStudio\Model\Entry_View::template( 'event', 'Events' ) );
+		delete_option( Model::OPTION );
+		Model::forget();
 	}
 
 	/**

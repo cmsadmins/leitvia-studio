@@ -48,6 +48,16 @@ final class Maintain {
 	private const PUBLIC_STATUSES = array( 'publish', 'future' );
 
 	/**
+	 * Grounds of the section that wrap of leitvia/insert-section gives a block: the attributes of its group, as the
+	 * patterns set them.
+	 */
+	private const GROUNDS = array(
+		'surface'     => array( 'backgroundColor' => 'surface' ),
+		'surface-alt' => array( 'backgroundColor' => 'surface-alt' ),
+		'inverse'     => array( 'className' => 'is-style-inverse' ),
+	);
+
+	/**
 	 * Registers the abilities. Runs on leitvia_studio_init.
 	 */
 	public static function register(): void {
@@ -289,7 +299,7 @@ final class Maintain {
 		Abilities::write(
 			'leitvia/insert-section',
 			__( 'Insert section', 'leitvia-studio' ),
-			__( 'Inserts sections into the content of an existing post, page or entry, or moves one of its top-level sections; the rest of the content stays as it is. sections takes patterns with edits as in leitvia/compose-page, with the same checks; move takes the ID of a top-level section of the post instead. The place is after or before a top-level section (block ID or path ID from the outline) or position start or end; without a place the sections go to the end. An anchor of a new section must be unique on the whole page. Read the post with leitvia/get-page-outline first and send its hash as base_hash. leitvia/remove-section takes a section out, leitvia/replace-pattern gives one another pattern.', 'leitvia-studio' ),
+			__( 'Inserts sections into the content of an existing post, page or entry, or moves one of its top-level sections; the rest of the content stays as it is. sections takes patterns with edits as in leitvia/compose-page, with the same checks; move takes the ID of a top-level section of the post instead. The place is after or before a top-level section (block ID or path ID from the outline) or position start or end; without a place the sections go to the end. wrap takes the ID of a top-level block instead, for example a shortcode or a block of another plugin, and puts it unchanged into a new section at its place: full width with the spacing of a section, the ground surface, surface-alt or inverse, and with heading an h2 above it. template switches the post to another template of the contract in the same operation, so a page with the template page gets a hero with its h1 and page-landing, which prints no title, at once and keeps its other blocks as they are. An anchor of a new section must be unique on the whole page. Read the post with leitvia/get-page-outline first and send its hash as base_hash. leitvia/remove-section takes a section out, leitvia/replace-pattern gives one another pattern.', 'leitvia-studio' ),
 			'maintain',
 			$insert,
 			array(
@@ -297,12 +307,36 @@ final class Maintain {
 					'post'     => $post,
 					'sections' => Build::sections_schema(),
 					'move'     => $place( __( 'Block ID or path ID of a top-level section of the post that moves to the place, instead of sections.', 'leitvia-studio' ) ),
+					'wrap'     => array(
+						'type'                 => 'object',
+						'description'          => __( 'A top-level block that goes unchanged into a new section at its place, instead of sections or move.', 'leitvia-studio' ),
+						'properties'           => array(
+							'block'   => $place( __( 'Block ID or path ID of the top-level block from the outline.', 'leitvia-studio' ) ),
+							'ground'  => array(
+								'type'        => 'string',
+								'enum'        => array_keys( self::GROUNDS ),
+								'description' => __( 'Ground of the section: surface (default), surface-alt or inverse, the dark band.', 'leitvia-studio' ),
+							),
+							'heading' => array(
+								'type'        => 'string',
+								'minLength'   => 1,
+								'maxLength'   => 200,
+								'description' => __( 'Text of an h2 above the block.', 'leitvia-studio' ),
+							),
+						),
+						'required'             => array( 'block' ),
+						'additionalProperties' => false,
+					),
 					'after'    => $place( __( 'Block ID or path ID of the top-level section the new sections follow.', 'leitvia-studio' ) ),
 					'before'   => $place( __( 'Block ID or path ID of the top-level section the new sections precede.', 'leitvia-studio' ) ),
 					'position' => array(
 						'type'        => 'string',
 						'enum'        => array( 'start', 'end' ),
 						'description' => __( 'Start or end of the content, instead of after or before.', 'leitvia-studio' ),
+					),
+					'template' => array(
+						'type'        => 'string',
+						'description' => __( 'Template of the contract the post switches to in the same operation, such as page-landing for a page that gets a hero. Empty or default: the standard template.', 'leitvia-studio' ),
 					),
 				),
 				'required'             => array( 'post' ),
@@ -412,23 +446,38 @@ final class Maintain {
 			'target' => array( 'post' => $post ) + ( null === $replace ? array() : array( 'replace' => true ) ),
 			'record' => true,
 			'change' => static function ( array $state ) use ( $post, $edits, $fields, $replace, $extra, $status, $template ) {
-				if ( null !== $template ) {
-					// The state of an earlier operation of the same package from before Studio 1.3.31 has no template either.
-					if ( ! array_key_exists( '_wp_page_template', (array) ( $state['meta_input'] ?? array() ) ) ) {
-						return Block_Edit::invalid( 'template', __( 'Agents cannot set a template on this post: its post type has none, or an earlier operation of the same change package was made by an older version. Apply or discard that package first.', 'leitvia-studio' ), array( 'post' => $post ) );
-					}
-					$reset   = in_array( $template, array( '', 'default' ), true );
-					$invalid = $reset ? null : Content::invalid_template( (string) $state['post_type'], $template, array( 'post' => $post ) );
-					if ( $invalid ) {
-						return $invalid;
-					}
-					$state['meta_input']['_wp_page_template'] = $reset ? '' : $template;
+				$state = null === $template ? $state : self::with_template( $state, $template, $post );
+				if ( is_wp_error( $state ) ) {
+					return $state;
 				}
 				$content = $replace ?? Build::edit( (string) $state['post_content'], $edits, array( 'post' => $post ) );
 				$state   = is_wp_error( $content ) ? $content : Content::change( array( 'post_content' => $content ) + $fields + $state, $extra, array( 'post' => $post ) );
 				return is_wp_error( $state ) || null === $status ? $state : Content::status( $state, $status, isset( $extra['date'] ), array( 'post' => $post ) );
 			},
 		);
+	}
+
+	/**
+	 * The state of a post with another template of the contract; '' or default is the standard template. Shared by
+	 * update-content and insert-section, so a new hero and the template without a printed title land in one operation.
+	 *
+	 * @param array<string, mixed> $state    State of the post.
+	 * @param string               $template Template slug.
+	 * @param int                  $post     Post ID.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private static function with_template( array $state, string $template, int $post ) {
+		// The state of an earlier operation of the same package from before Studio 1.3.31 has no template either.
+		if ( ! array_key_exists( '_wp_page_template', (array) ( $state['meta_input'] ?? array() ) ) ) {
+			return Block_Edit::invalid( 'template', __( 'Agents cannot set a template on this post: its post type has none, or an earlier operation of the same change package was made by an older version. Apply or discard that package first.', 'leitvia-studio' ), array( 'post' => $post ) );
+		}
+		$reset   = in_array( $template, array( '', 'default' ), true );
+		$invalid = $reset ? null : Content::invalid_template( (string) $state['post_type'], $template, array( 'post' => $post ) );
+		if ( $invalid ) {
+			return $invalid;
+		}
+		$state['meta_input']['_wp_page_template'] = $reset ? '' : $template;
+		return $state;
 	}
 
 	/**
@@ -724,17 +773,19 @@ final class Maintain {
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	public static function describe_insert_section( array $input ) {
-		$post   = (int) ( $input['post'] ?? 0 );
-		$target = array( 'post' => $post );
-		$move   = (string) ( $input['move'] ?? '' );
-		$place  = array_intersect_key( $input, array_flip( array( 'after', 'before', 'position' ) ) );
-		if ( isset( $input['sections'] ) === ( '' !== $move ) ) {
-			return Block_Edit::invalid( 'change', __( 'Send either sections or move.', 'leitvia-studio' ), $target );
+		$post     = (int) ( $input['post'] ?? 0 );
+		$target   = array( 'post' => $post );
+		$move     = (string) ( $input['move'] ?? '' );
+		$wrap     = isset( $input['wrap'] ) ? (array) $input['wrap'] : null;
+		$template = isset( $input['template'] ) ? (string) $input['template'] : null;
+		$place    = array_intersect_key( $input, array_flip( array( 'after', 'before', 'position' ) ) );
+		if ( 1 !== (int) isset( $input['sections'] ) + (int) ( '' !== $move ) + (int) ( null !== $wrap ) ) {
+			return Block_Edit::invalid( 'change', __( 'Send one of sections, move or wrap.', 'leitvia-studio' ), $target );
 		}
-		if ( count( $place ) > 1 ) {
-			return Block_Edit::invalid( 'place', __( 'Name one place: after, before or position.', 'leitvia-studio' ), $target, 'leitvia/get-page-outline' );
+		if ( count( $place ) > 1 || ( $wrap && $place ) ) {
+			return Block_Edit::invalid( 'place', __( 'Name one place: after, before or position. wrap takes none, the section stays where the block is.', 'leitvia-studio' ), $target, 'leitvia/get-page-outline' );
 		}
-		$sections = '' === $move ? Build::sections( (array) $input['sections'] ) : array();
+		$sections = isset( $input['sections'] ) ? Build::sections( (array) $input['sections'] ) : array();
 		if ( is_wp_error( $sections ) ) {
 			return $sections;
 		}
@@ -743,13 +794,25 @@ final class Maintain {
 			'area'   => 'content',
 			'target' => $target,
 			'record' => true,
-			'change' => static function ( array $state ) use ( $sections, $move, $place, $target ) {
+			'change' => static function ( array $state ) use ( $sections, $move, $wrap, $template, $place, $target, $post ) {
+				$state = null === $template ? $state : self::with_template( $state, $template, $post );
+				if ( is_wp_error( $state ) ) {
+					return $state;
+				}
+				[ $markup, $at ] = self::top_level( (string) $state['post_content'] );
+				if ( $wrap ) {
+					$id = (string) $wrap['block'];
+					if ( ! isset( $at[ $id ] ) ) {
+						return self::no_section( $target, $id );
+					}
+					$markup[ $at[ $id ] ] = self::wrapped( $markup[ $at[ $id ] ], (string) ( $wrap['ground'] ?? 'surface' ), (string) ( $wrap['heading'] ?? '' ) );
+					return array( 'post_content' => implode( "\n\n", $markup ) ) + $state;
+				}
 				$new = $sections ? Build::compose( $sections ) : '';
 				if ( is_wp_error( $new ) ) {
 					return $new;
 				}
-				[ $markup, $at ] = self::top_level( (string) $state['post_content'] );
-				$ref             = (string) current( $place );
+				$ref = (string) current( $place );
 				foreach ( array_filter( array( $move, isset( $place['position'] ) ? '' : $ref ) ) as $id ) {
 					if ( ! isset( $at[ $id ] ) ) {
 						return self::no_section( $target, $id );
@@ -776,6 +839,38 @@ final class Maintain {
 				return is_wp_error( $content ) ? $content : array( 'post_content' => $content ) + $state;
 			},
 		);
+	}
+
+	/**
+	 * A top-level block inside a new section as the text patterns build one (leitvia/content-text): a full-width
+	 * constrained group with the spacing xl of a section of regular density, its ground and an optional h2. The block
+	 * markup goes in as it is, so a shortcode or a block of another plugin stays byte for byte.
+	 *
+	 * @param string $block   Serialized top-level block.
+	 * @param string $ground  Key of GROUNDS.
+	 * @param string $heading Text of the h2, '' for none.
+	 */
+	private static function wrapped( string $block, string $ground, string $heading ): string {
+		$ground = self::GROUNDS[ $ground ] ?? self::GROUNDS['surface'];
+		// Attributes in the order of the serializer of the editor: metadata, align, className, style, backgroundColor.
+		$attrs = array(
+			'metadata' => array( 'name' => __( 'Section', 'leitvia-studio' ) ),
+			'align'    => 'full',
+		) + array_intersect_key( $ground, array( 'className' => true ) ) + array(
+			'style' => array(
+				'spacing' => array(
+					'padding' => array(
+						'top'    => 'var:preset|spacing|xl',
+						'bottom' => 'var:preset|spacing|xl',
+					),
+				),
+			),
+		) + array_intersect_key( $ground, array( 'backgroundColor' => true ) ) + array( 'layout' => array( 'type' => 'constrained' ) );
+		$class = 'wp-block-group alignfull' . ( isset( $attrs['className'] ) ? ' ' . $attrs['className'] : '' ) . ( isset( $attrs['backgroundColor'] ) ? ' has-' . $attrs['backgroundColor'] . '-background-color has-background' : '' );
+		$h2    = '' === $heading ? '' : "<!-- wp:heading {\"fontSize\":\"heading-l\"} -->\n<h2 class=\"wp-block-heading has-heading-l-font-size\">" . esc_html( $heading ) . "</h2>\n<!-- /wp:heading -->\n\n";
+		return '<!-- wp:group ' . wp_json_encode( $attrs, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) . " -->\n"
+			. '<div class="' . esc_attr( $class ) . '" style="padding-top:var(--wp--preset--spacing--xl);padding-bottom:var(--wp--preset--spacing--xl)">' . "\n"
+			. $h2 . $block . "\n</div>\n<!-- /wp:group -->";
 	}
 
 	/**

@@ -164,6 +164,7 @@ final class Plugin {
 		// Start year and holder of the copyright line of the theme Leitvia, from the organization details.
 		add_filter( 'leitvia_copyright', array( Organization\Organization::class, 'copyright' ) );
 		add_filter( 'leitvia_related_terms', array( Seo\Related_News::class, 'terms' ), 10, 2 );
+		add_filter( 'leitvia_related_fallback', array( Seo\Related_News::class, 'fallback' ), 10, 2 );
 		add_filter( 'leitvia_editorial_url', static fn( $url ): string => '' !== (string) $url ? (string) $url : News\Schema::editorial_url() );
 		add_action( 'init', array( News\Sitemap::class, 'register' ) );
 		add_filter( 'query_vars', array( News\Sitemap::class, 'query_vars' ) );

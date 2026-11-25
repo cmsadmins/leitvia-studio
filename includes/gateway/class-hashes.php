@@ -95,11 +95,11 @@ final class Hashes {
 		if ( '' === ( $content['meta_input'][ \LeitviaStudio\News\Schema::AUTHOR_PAGE_META ] ?? null ) ) {
 			unset( $content['meta_input'][ \LeitviaStudio\News\Schema::AUTHOR_PAGE_META ] );
 		}
-		// The same for the lead symbol of a page and the hub of a post (pages have always counted their hub).
+		// The same for the lead symbol of a page and the hub of a post or entry (pages have always counted their hub).
 		if ( '' === ( $content['meta_input'][ \LeitviaStudio\Seo\Cluster::ICON_META ] ?? null ) ) {
 			unset( $content['meta_input'][ \LeitviaStudio\Seo\Cluster::ICON_META ] );
 		}
-		if ( 'post' === $post->post_type && '' === ( $content['meta_input'][ \LeitviaStudio\Seo\Cluster::HUB_META ] ?? null ) ) {
+		if ( 'page' !== $post->post_type && '' === ( $content['meta_input'][ \LeitviaStudio\Seo\Cluster::HUB_META ] ?? null ) ) {
 			unset( $content['meta_input'][ \LeitviaStudio\Seo\Cluster::HUB_META ] );
 		}
 		// Offerings a page does not name do not count either.

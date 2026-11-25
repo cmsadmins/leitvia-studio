@@ -4,7 +4,7 @@ Tags: ai agent, mcp, abilities api, design tokens, block theme
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.55
+Stable tag: 1.3.56
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -277,6 +277,13 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 
 == Changelog ==
 
+= 1.3.56 =
+* New: leitvia/insert-section takes template: the post switches to another template of the contract in the same operation, so a page gets a hero with its h1 and the template page-landing at once while its other blocks stay as they are.
+* New: leitvia/insert-section takes wrap: a top-level block, such as a shortcode or a block of another plugin, goes unchanged into a new section at its place, full width with the spacing of a section, the ground surface, surface-alt or inverse and an optional h2 above it.
+* New: Related news of a page without a topic of its own lists the posts with the page as hub, then the posts in a category or tag with the slug of the page or of its product line, and only then the latest posts (theme filter leitvia_related_fallback). leitvia/audit-site reports such a page as leitvia/related-news, leitvia/check-composition as newsTopic without points.
+* New: leitvia/set-page-structure takes hub for entries with a page of their own, such as documentation, which show the card of the service below the text.
+* New: leitvia/import-post turns the FAQ part of a post into the block leitvia/faq with FAQPage data (faq, on by default) and counts the questions in report.faq.
+
 = 1.3.55 =
 * New: leitvia/set-page-structure accepts package for posts with hub, so many posts fit in one package.
 * New: leitvia/update-seo takes archive (post type key) to set title and description of an archive without an SEO plugin; the change waits as a setting in a package.
@@ -344,20 +351,3 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * Change: The table of contents works in a template too: placed before the content, as in a column beside it, it gives the headings of the post the ids it links to.
 * Fixed: A link with an anchor from another page stops its target right below the sticky header: once the header is measured, the target scrolls into view again, since the browser jumped before the height was known.
 * Fixed: A header over the stage (overlay-header) is measured right after it is parsed, so the page no longer jumps by the height of the header when it moves over the first cover.
-= 1.3.51 =
-* New: leitvia/update-block sets the ground of a light section (backgroundColor surface or surface-alt on a group), the font size of a heading or paragraph, the number of columns of a gallery and the name for screen readers (aria-label) of a slider, an announcement bar or the accessibility bar, each in the block comment and in the saved markup.
-* New: leitvia/check-composition takes tones for an outline: the tone a section gets through an edit, such as the block style Inverse, counts in the score before the page is built.
-* Change: The timeline pattern has an eyebrow line above its heading.
-* Fix: leitvia/apply-package takes the list operations its description names; the field stood on leitvia/reject-package instead.
-* Fix: The diff of a long value, such as a content model, shows the place of its first difference instead of its unchanged first 300 characters.
-* New: leitvia/insert-section and leitvia/remove-section insert, move and remove one top-level section of an existing post, page or entry; the rest of the content stays as it is.
-* New: leitvia/add-media takes PDF files, sets the poster of a video from the same package (poster_file) and replaces the file of a medium while ID and address stay (replace).
-* New: leitvia/update-block and the edits of a pattern set the video of a video block from the media library (field video).
-* New: Every page with visible breadcrumbs gets a BreadcrumbList in its structured data, built from the trail the page shows. The filter leitvia_studio_schema_nodes is described as the extension point for further types.
-* Change: leitvia/check-composition rates a page the way it is built: running text, images, galleries and accordions between sections are no finding, the ground and the media side of every section count (tones with every ground, new mirrored), and messages name the section, the block ID and the remedy.
-* Change: An article names the organization as its author when the account carries the name of the organization.
-* Change: New content is closed for comments and pingbacks unless an input opens it.
-* Fix: The single template of a custom content type lets full-width sections reach the edge of the window.
-* Fix: A link to the posts page no longer counts as broken in leitvia/audit-site and leitvia/repair-links.
-* Fix: The fact check of SEO texts knows the year of publication and of the last change.
-* Fix: The package diff of leitvia/delete-media names the final deletion, and leitvia/rollback-package no longer lists an input operations it never read.

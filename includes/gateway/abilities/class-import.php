@@ -104,6 +104,11 @@ final class Import {
 	private const BUILDER = '/^(?:(?:vc|us|et_pb|fusion|av|cs|themify|su|ux|fl_builder|mk|tatsu|qode|edgtf|mkdf)_[\w-]+|elementor-template|rev_slider|layerslider|contact-form-7|contact-form|gravityform|wpforms|ninja_form|fluentform|mc4wp_form)$/';
 
 	/**
+	 * Headings that open the questions of an FAQ part, at the start of the heading text, any case.
+	 */
+	public const FAQ_TITLES = '/^(?:faqs?|frequently asked questions|questions and answers|common questions|häufige fragen|häufig gestellte fragen|fragen und antworten|fragen & antworten)(?!\p{L})/iu';
+
+	/**
 	 * Report of the call.
 	 *
 	 * @var array<string, mixed>
@@ -251,6 +256,11 @@ final class Import {
 								'additionalProperties' => false,
 								'description'          => __( 'SEO title and meta description of the old site, written as by leitvia/update-seo.', 'leitvia-studio' ),
 							),
+							'faq'            => array(
+								'type'        => 'boolean',
+								'default'     => true,
+								'description' => __( 'Turns the FAQ part of the post into the block leitvia/faq with FAQPage structured data: after a heading such as FAQ or Frequently asked questions, each question as a heading one level below it or a paragraph in bold, its answer the paragraphs and lists up to the next question; report.faq counts the questions. false keeps headings and paragraphs.', 'leitvia-studio' ),
+							),
 							'dry_run'        => array( 'type' => 'boolean' ),
 							'package'        => array(
 								'type'        => 'string',
@@ -306,6 +316,7 @@ final class Import {
 		 */
 		$markup  = apply_filters( 'leitvia_studio_import_content', null, $html, $input );
 		$content = is_string( $markup ) ? $markup : $self->convert( $html );
+		$content = is_string( $markup ) || false === ( $input['faq'] ?? true ) ? $content : $self->faq( $content );
 		$found   = self::find( $source );
 		if ( $dry ) {
 			return Abilities::run(
@@ -537,6 +548,71 @@ final class Import {
 		libxml_use_internal_errors( $internal );
 		$body = $doc->getElementsByTagName( 'body' )->item( 0 );
 		return $body ? $this->children( $body ) : '';
+	}
+
+	/**
+	 * Block markup with each FAQ part as the block leitvia/faq: a heading whose text matches FAQ_TITLES stays, the
+	 * questions after it (a heading below its level, or a paragraph that is all bold, with an answer after a line break
+	 * in the same paragraph or in the paragraphs and lists that follow) become core/details in one leitvia/faq, up to a
+	 * heading of the same level or higher or another block. A part without a question with an answer stays as it was.
+	 * ponytail: only blocks at the top level, not FAQ parts inside columns; add a walk when old sites need it.
+	 *
+	 * @param string $markup Block markup.
+	 */
+	public function faq( string $markup ): string {
+		if ( ! preg_match( '/(?:faq|fragen|questions)/iu', wp_strip_all_tags( $markup ) ) ) {
+			return $markup;
+		}
+		$blocks = array_values( array_filter( parse_blocks( $markup ), static fn( array $b ): bool => null !== $b['blockName'] ) );
+		$text   = static fn( array $b ): string => trim( html_entity_decode( wp_strip_all_tags( (string) $b['innerHTML'] ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
+		$level  = static fn( array $b ): int => 'core/heading' === $b['blockName'] ? (int) ( $b['attrs']['level'] ?? 2 ) : 0;
+		$out    = array();
+		$count  = 0;
+		for ( $i = 0, $n = count( $blocks ); $i < $n; $i++ ) {
+			$out[] = serialize_block( $blocks[ $i ] );
+			$top   = $level( $blocks[ $i ] );
+			if ( ! $top || ! preg_match( self::FAQ_TITLES, $text( $blocks[ $i ] ) ) ) {
+				continue;
+			}
+			$questions = array();
+			$answers   = array();
+			$j         = $i + 1;
+			for ( ; $j < $n; $j++ ) {
+				$block = $blocks[ $j ];
+				$html  = trim( (string) $block['innerHTML'] );
+				if ( $level( $block ) ) {
+					if ( $level( $block ) <= $top ) {
+						break;
+					}
+					$questions[] = $text( $block );
+					$answers[]   = array();
+				} elseif ( 'core/paragraph' === $block['blockName'] && preg_match( '#^<p>\s*<(strong|b)>(.+?)</\1>\s*(?:<br\s*/?>(.*))?</p>$#is', $html, $m ) ) {
+					$rest        = trim( (string) ( $m[3] ?? '' ) );
+					$questions[] = trim( html_entity_decode( wp_strip_all_tags( $m[2] ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
+					$answers[]   = '' === $rest ? array() : array( '<!-- wp:paragraph --><p>' . $rest . '</p><!-- /wp:paragraph -->' );
+				} elseif ( $questions && in_array( $block['blockName'], array( 'core/paragraph', 'core/list' ), true ) ) {
+					$answers[ count( $answers ) - 1 ][] = serialize_block( $block );
+				} else {
+					break;
+				}
+			}
+			$details = array();
+			foreach ( $questions as $at => $question ) {
+				if ( '' !== $question && $answers[ $at ] ) {
+					$details[] = '<!-- wp:details --><details class="wp-block-details"><summary>' . esc_html( $question ) . '</summary>' . implode( "\n\n", $answers[ $at ] ) . '</details><!-- /wp:details -->';
+				}
+			}
+			if ( ! $details ) {
+				continue;
+			}
+			$out[]  = '<!-- wp:leitvia/faq --><div class="wp-block-leitvia-faq">' . implode( '', $details ) . '</div><!-- /wp:leitvia/faq -->';
+			$count += count( $details );
+			$i      = $j - 1;
+		}
+		if ( $count ) {
+			$this->report['faq'] = $count;
+		}
+		return $count ? implode( "\n\n", $out ) : $markup;
 	}
 
 	/**
