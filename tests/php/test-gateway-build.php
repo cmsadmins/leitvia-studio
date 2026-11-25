@@ -931,6 +931,67 @@ class Test_Gateway_Build extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The AI mark of media: add-media stores it, list-media returns it, set-alt-text changes it on the attachment only;
+	 * a captions file takes none. Below an image block the note shows only when the filter gives a text, and the hash
+	 * of a file without the mark stays as before.
+	 */
+	public function test_add_media_ai_generated(): void {
+		$png    = base64_encode( (string) file_get_contents( dirname( __DIR__ ) . '/fixtures/avatar.png' ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents, WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Test fixture.
+		$result = self::call(
+			'leitvia/add-media',
+			array(
+				'data'         => $png,
+				'filename'     => 'scene.png',
+				'alt'          => 'A server room in blue light',
+				'ai_generated' => true,
+			)
+		);
+		$this->assertIsArray( $result, is_wp_error( $result ) ? wp_json_encode( $result->get_error_data() ) : '' );
+		$id = (int) $result['target']['post'];
+		$this->assertSame( '1', get_post_meta( $id, 'leitvia_ai_generated', true ) );
+		$listed = wp_get_ability( 'leitvia/list-media' )->execute( array( 'include' => array( $id ) ) );
+		$this->assertTrue( $listed['items'][0]['ai'] );
+
+		$plain = self::library_image();
+		$hash  = Hashes::document( $plain );
+		update_post_meta( $plain, 'leitvia_ai_generated', '' );
+		$this->assertSame( $hash, Hashes::document( $plain ), 'an empty mark keeps the hash' );
+		$this->assertFalse( wp_get_ability( 'leitvia/list-media' )->execute( array( 'include' => array( $plain ) ) )['items'][0]['ai'] );
+		$set = self::call(
+			'leitvia/set-alt-text',
+			array(
+				'image'        => $plain,
+				'alt'          => 'Portrait of the author',
+				'ai_generated' => true,
+				'base_hash'    => $hash,
+			)
+		);
+		$this->assertIsArray( $set, is_wp_error( $set ) ? $set->get_error_message() : '' );
+		$this->assertSame( '1', get_post_meta( $plain, 'leitvia_ai_generated', true ) );
+		$this->assert_rejected(
+			'leitvia_invalid_input',
+			self::call(
+				'leitvia/set-alt-text',
+				array(
+					'image'        => $plain,
+					'alt'          => 'Portrait of the author',
+					'post'         => $plain,
+					'block'        => 'p:0',
+					'ai_generated' => false,
+				)
+			)
+		);
+
+		$block = '<!-- wp:image {"id":' . $id . '} --><figure class="wp-block-image"><img src="x.png" alt="A server room in blue light" class="wp-image-' . $id . '"/></figure><!-- /wp:image -->';
+		$this->assertStringNotContainsString( 'leitvia-ai-note', do_blocks( $block ) );
+		$note = static fn(): string => 'Image made with AI';
+		add_filter( 'leitvia_studio_ai_image_note', $note );
+		$html = do_blocks( $block );
+		remove_filter( 'leitvia_studio_ai_image_note', $note );
+		$this->assertMatchesRegularExpression( '#<small class="leitvia-ai-note">Image made with AI</small></figure>#', $html );
+	}
+
+	/**
 	 * An image of the media library with alt text: avatar.png, 200 by 200 pixels.
 	 */
 	private static function library_image(): int {

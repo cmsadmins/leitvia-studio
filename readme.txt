@@ -4,7 +4,7 @@ Tags: ai agent, mcp, abilities api, design tokens, block theme
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.57
+Stable tag: 1.3.58
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -277,6 +277,14 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 
 == Changelog ==
 
+= 1.3.58 =
+* New: Mega menus for agents. leitvia/update-template-part creates a panel as mega-menu-<name> from a panel pattern with edits, leitvia/get-contract lists panels and panel patterns under megaMenu, leitvia/update-navigation adds the item with type mega, panel and the overview page as url.
+* New: Patterns mega-menu-columns and mega-menu-columns-card: two to four columns, each headed by an icon and a title linked to its overview, entries with one sentence, a line of links and an optional card in an accent frame. In the mobile overlay the column heads are a second level of the accordion; without JavaScript the panel links stay in the page and open with the focus.
+* New: Icons in the menu: leitviaIcon on navigation links and submenus, icon on the mega menu, decorative, in the accent color and with the line width of iconStroke. leitvia/audit-site reports empty panels, panel links that lead nowhere and items without panel or overview link; filter leitvia_studio_mega_menu_findings for add-ons.
+* New: ai_generated on leitvia/add-media and leitvia/set-alt-text marks images and videos made with AI, leitvia/list-media returns it; the filter leitvia_studio_ai_image_note shows a short note at such images (off by default). focalPoint on a core/cover through block edits.
+* New: leitvia/check-composition reports firstScreen when the text of the stage is longer than its pattern allows, so the main button may fall below the first screen.
+* Change: A text edit at a block without text, such as a row of buttons, is refused with a message that explains how IDs move up after remove.
+
 = 1.3.57 =
 * Change: leitvia/insert-section with wrap sets the h2 of the new section at the wide edge, where the headings of the patterns start.
 
@@ -297,14 +305,3 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * Change: The link text check reports a link without an address, such as a sample link or button of a pattern, as it reports a link to "#".
 * New: Formal address setting (formal_address); set it with the new field "address" (informal or formal) of leitvia/set-organization. A site language such as de_DE_formal counts as formal.
 * Fix: A number field of the content model now keeps the value 0 when it comes from a change package.
-
-= 1.3.53 =
-* New: The Cookie settings link of the theme footers opens a dialog with the consent settings of the site, or a note when no service waits for consent; recipes keep the link at the end of the footer menu.
-* New: leitvia/set-redirects knows 302 and 410 (gone, without a target) besides 301, and old addresses with a query such as /?p=45 or /?attachment_id=123, in any order of the parameters; up to 1000 rows.
-* New: Filter leitvia_studio_contact_form_send hands a checked message of the contact form to an extension, such as a ticket system.
-* New: leitvia/set-page-structure sets the lead symbol of a hub (icon, shown by icon blocks bound to leitvia/page-symbol), a hub for posts, the topics of related news (news) and the products of an add-on (offerings); an empty call names all fields. Filters leitvia_studio_page_symbol, leitvia_studio_page_service, leitvia_studio_term_meta and leitvia_studio_gateway_taxonomies for add-ons.
-* New: Posts carry a table of contents and the card of their service in the sidebar of the theme. NewsArticle headlines stay within 110 characters, authors without an account get an author page (author_page) and a Person with sameAs, the news sitemap names the organization and the RSS feed carries the featured image as media:content.
-* New: Setting title_site_name and the ability leitvia/set-seo-titles: titles read "Title | Site name" when the whole stays within 60 characters and does not name the site already, for pages, posts, entries and archives, not the front page.
-* New: Token iconStroke sets the line width of the icon and icon list blocks; four more Lucide icons (box, layers, message-square, pen-tool), 122 in all.
-* New: Date and time formats follow the site language (filter leitvia_studio_date_formats); formats chosen by hand stay.
-* New: The packages of a service may carry price_from (the price specification gets minPrice) and addon (an Offer of its own that leaves lowPrice and highPrice to the others), for add-ons that keep prices.

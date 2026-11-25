@@ -27,6 +27,16 @@ defined( 'ABSPATH' ) || exit;
 final class Mega_Menu {
 
 	/**
+	 * Prefix of new panels: update-template-part creates a part named mega-menu-<name> in the area mega-menu.
+	 */
+	public const PANEL_PREFIX = 'mega-menu-';
+
+	/**
+	 * Core navigation blocks that get the attribute leitviaIcon.
+	 */
+	public const ICON_BLOCKS = array( 'core/navigation-link', 'core/navigation-submenu' );
+
+	/**
 	 * Adds the area mega-menu. Runs on default_wp_template_part_areas.
 	 *
 	 * @param array<int, array<string, string>> $areas Template part areas.
@@ -58,7 +68,11 @@ final class Mega_Menu {
 	}
 
 	/**
-	 * Without the template part the item is only the link; the panel and its button stay hidden until view.js runs.
+	 * Without the template part the item is only the link. With it, the panel follows in the HTML, so search engines,
+	 * crawlers and visitors without JavaScript reach every link: until view.js runs (it sets data-ready on the item),
+	 * the stylesheet shows the panel while the focus or the pointer is in the item, and Tab walks from the link into it.
+	 * The button stays hidden until view.js runs. An icon (attribute icon, a name of the icon set) stands before the
+	 * text, decorative and hidden from assistive technology.
 	 *
 	 * @param array<string, mixed> $attributes Block attributes.
 	 */
@@ -67,7 +81,8 @@ final class Mega_Menu {
 		$url         = (string) ( $attributes['url'] ?? '' );
 		$slug        = sanitize_title( (string) ( $attributes['slug'] ?? '' ) );
 		$description = (string) ( $attributes['description'] ?? '' );
-		$text        = '<span class="wp-block-navigation-item__label">' . esc_html( $label ) . '</span>'
+		$icon        = self::icon( (string) ( $attributes['icon'] ?? '' ) );
+		$text        = $icon . '<span class="wp-block-navigation-item__label">' . esc_html( $label ) . '</span>'
 			. ( '' === $description ? '' : '<span class="wp-block-navigation-item__description">' . esc_html( $description ) . '</span>' );
 		$html        = '' === $url
 			? '<span class="wp-block-navigation-item__content">' . $text . '</span>'
@@ -77,7 +92,7 @@ final class Mega_Menu {
 		if ( $part ) {
 			$id    = wp_unique_id( 'leitvia-mega-menu-' );
 			$html .= sprintf(
-				'<button type="button" class="wp-block-leitvia-mega-menu__toggle" aria-expanded="false" aria-controls="%1$s" aria-label="%2$s" hidden><svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M1.5 4L6 8l4.5-4" stroke-width="1.5"></path></svg></button><div id="%1$s" class="wp-block-leitvia-mega-menu__panel" hidden>%3$s</div>',
+				'<button type="button" class="wp-block-leitvia-mega-menu__toggle" aria-expanded="false" aria-controls="%1$s" aria-label="%2$s" hidden><svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M1.5 4L6 8l4.5-4" stroke-width="1.5"></path></svg></button><div id="%1$s" class="wp-block-leitvia-mega-menu__panel" data-column-label="%4$s">%3$s</div>',
 				esc_attr( $id ),
 				/* translators: %s: Menu item text. */
 				esc_attr( sprintf( __( '%s submenu', 'leitvia-studio' ), wp_strip_all_tags( $label ) ) ),
@@ -90,10 +105,101 @@ final class Mega_Menu {
 						),
 						''
 					)
-				)
+				),
+				/* translators: %s: Menu item text. */
+				esc_attr( __( '%s submenu', 'leitvia-studio' ) )
 			);
 		}
 		return '<li ' . get_block_wrapper_attributes( array( 'class' => 'wp-block-navigation-item' ) ) . '>' . $html . '</li>';
+	}
+
+	/**
+	 * Decorative SVG of an icon of the set (Icon::svg()) for a menu item, '' for none or an unknown name. Loads the
+	 * stylesheet of the block, which sizes it next to the text and colours it in the accent role.
+	 *
+	 * @param string $name Icon name.
+	 */
+	public static function icon( string $name ): string {
+		$svg = '' === $name ? '' : Icon::svg( $name );
+		if ( '' !== $svg ) {
+			wp_enqueue_style( 'leitvia-mega-menu-style' );
+		}
+		return $svg;
+	}
+
+	/**
+	 * Adds the attribute leitviaIcon to navigation links and submenus. Runs on register_block_type_args.
+	 *
+	 * @param array<string, mixed> $args Block type arguments.
+	 * @param string               $name Block name.
+	 * @return array<string, mixed>
+	 */
+	public static function link_args( array $args, string $name ): array {
+		if ( in_array( $name, self::ICON_BLOCKS, true ) ) {
+			$args['attributes']                = (array) ( $args['attributes'] ?? array() );
+			$args['attributes']['leitviaIcon'] = array(
+				'type'        => 'string',
+				'description' => 'Name of an icon of the set (enum of the attribute icon of leitvia/icon in leitvia/list-blocks) shown before the text, decorative; at most one per item.',
+			);
+		}
+		return $args;
+	}
+
+	/**
+	 * Puts the icon of the attribute leitviaIcon before the text of a navigation link or submenu, the first label of
+	 * the item (the labels of its children come later). Runs on render_block_core/navigation-link and
+	 * render_block_core/navigation-submenu.
+	 *
+	 * @param string               $content Rendered item.
+	 * @param array<string, mixed> $block   Parsed block.
+	 */
+	public static function link_icon( string $content, array $block ): string {
+		$svg   = self::icon( (string) ( $block['attrs']['leitviaIcon'] ?? '' ) );
+		$label = '<span class="wp-block-navigation-item__label">';
+		$at    = strpos( $content, $label );
+		return '' === $svg || false === $at ? $content : substr_replace( $content, $svg . $label, $at, strlen( $label ) );
+	}
+
+	/**
+	 * Template parts in the area mega-menu of the active theme, saved ones and those of the theme, by slug.
+	 *
+	 * @return array<string, \WP_Block_Template>
+	 */
+	public static function panels(): array {
+		$panels = array();
+		foreach ( get_block_templates( array( 'area' => 'mega-menu' ), 'wp_template_part' ) as $part ) {
+			$panels[ (string) $part->slug ] = $part;
+		}
+		return $panels;
+	}
+
+	/**
+	 * Registered patterns for panels (blockTypes core/template-part/mega-menu): name, title and description.
+	 *
+	 * @return list<array{name: string, title: string, description: string}>
+	 */
+	public static function panel_patterns(): array {
+		$out = array();
+		foreach ( \WP_Block_Patterns_Registry::get_instance()->get_all_registered() as $pattern ) {
+			if ( in_array( 'core/template-part/mega-menu', (array) ( $pattern['blockTypes'] ?? array() ), true ) ) {
+				$out[] = array(
+					'name'        => (string) $pattern['name'],
+					'title'       => (string) $pattern['title'],
+					'description' => (string) ( $pattern['description'] ?? '' ),
+				);
+			}
+		}
+		return $out;
+	}
+
+	/**
+	 * Whether a name may be a panel that update-template-part creates or fills: a saved part in the area mega-menu, or
+	 * a new name with the prefix PANEL_PREFIX.
+	 *
+	 * @param string $name Template part slug.
+	 */
+	public static function is_panel( string $name ): bool {
+		return isset( self::panels()[ $name ] ) || ( str_starts_with( $name, self::PANEL_PREFIX ) && strlen( $name ) > strlen( self::PANEL_PREFIX ) );
 	}
 
 	/**

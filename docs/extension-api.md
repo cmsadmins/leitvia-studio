@@ -289,6 +289,7 @@ Add-ons dock onto the gateway through hooks, for example to run one workflow on 
 | `leitvia_studio_heading_blocks` | filter | `array $blocks` (attribute by block name) | Blocks that render a heading on the server, with the attribute that holds its level (1 to 6, the default of the block type when it is missing). The check `leitvia/headings` counts that level before the headings of the inner blocks, for example `'my-addon/job' => 'level'`. |
 | `leitvia_studio_gateway_post_types` | filter | `list<string> $post_types` | Post types open to agents; blocked types are dropped whatever the filter returns. |
 | `leitvia_studio_ai_note` | filter | `string $note`, `int $post_id` | Text of the note shown before content that `leitvia/create-content` marked with `ai_generated` (meta `leitvia_ai_generated`); an empty string hides it. Deleting the meta in the custom fields of a post removes the note for that post. |
+| `leitvia_studio_ai_image_note` | filter | `string $note` (empty), `int $attachment_id` | Text of a short note at an image block whose file `leitvia/add-media` or `leitvia/set-alt-text` marked with `ai_generated`, printed as real text inside the figure (class `leitvia-ai-note`). Empty by default, so no note shows. |
 | `leitvia_studio_public_author_name` | filter | `string $name`, `int $user_id` | Name visitors see for an author whose display name is still the login, and for agent users: first and last name, else the name of the site. |
 | `leitvia_studio_gateway_content_kind` | filter | `string[] $kinds`, `Operation $op`, `array $before`, `array $after` | Content kinds of an operation; each caps the level at `suggest` unless unlocked. |
 | `leitvia_studio_recipe_unavailable` | filter | `string $reason`, `string $name`, `array $recipe` | Why a recipe cannot be applied on this site, `''` when it can. A non-empty reason lists the recipe with `available: false` and makes `leitvia/apply-recipe` refuse it with `leitvia_recipe_unavailable`. An add-on locks its own recipes here. |
@@ -337,6 +338,33 @@ add_filter(
 	static fn( string $icon, int $post_id ): string => '' !== $icon ? $icon : my_addon_icon_of_page( $post_id ),
 	10,
 	2
+);
+```
+
+## Mega menus
+
+The block `leitvia/mega-menu` links to the overview page of a topic and opens a panel beside it, a template part in the area `mega-menu`. Agents create a panel with `leitvia/update-template-part` (part `mega-menu-<name>`, a pattern whose `blockTypes` hold `core/template-part/mega-menu`) and add the item with `leitvia/update-navigation` (`type: "mega"`, `panel`). `leitvia/get-contract` lists the panels and the patterns made for them under `megaMenu`. An add-on registers a panel pattern of its own with `register_block_pattern()` and `'blockTypes' => array( 'core/template-part/mega-menu' )`; it appears in `megaMenu.patterns`. Column heads with the class `leitvia-mega-menu-head` become the second level of the accordion in the mobile overlay.
+
+Navigation links and submenus take the attribute `leitviaIcon` and the mega menu the attribute `icon`, a name of the icon set, drawn before the text in the accent role and hidden from assistive technology.
+
+`leitvia/audit-site` checks every panel for links and every mega menu item for its panel and overview link. The filter `leitvia_studio_mega_menu_findings` adds the findings of an add-on about one panel, for example a bound value whose data is gone:
+
+```php
+add_filter(
+	'leitvia_studio_mega_menu_findings',
+	static function ( array $found, WP_Block_Template $part, string $html ): array {
+		if ( str_contains( $html, 'my-addon-stale' ) ) {
+			$found[] = array(
+				'check'    => 'my-addon/stale-value',
+				'severity' => 'warning',
+				'message'  => sprintf( 'The panel %s shows a value without data.', $part->slug ),
+				'fix'      => 'Bind it to an entry that exists.',
+			);
+		}
+		return $found;
+	},
+	10,
+	3
 );
 ```
 

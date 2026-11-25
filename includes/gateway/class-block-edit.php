@@ -854,7 +854,13 @@ final class Block_Edit {
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	private static function text( array $block, array $change, array $target, \WP_Error $rebuild ) {
-		$found = self::element( $block, self::TEXT_BLOCKS[ (string) $block['blockName'] ] ?? null );
+		$name = (string) $block['blockName'];
+		if ( ! isset( self::TEXT_BLOCKS[ $name ] ) ) {
+			// Mostly an ID that moved: after a remove the blocks behind it move up one place (edits apply in order).
+			/* translators: %s: block name, such as core/buttons. */
+			return self::invalid( 'text', sprintf( __( 'The block %s has no text or link of its own to change. Edits apply in order: after a remove the blocks behind it move up one place, so a path ID such as p:0.0.1 then names the next block. Count from the new order, or edit the later blocks first.', 'leitvia-studio' ), $name ), $target );
+		}
+		$found = self::element( $block, self::TEXT_BLOCKS[ $name ] );
 		if ( ! $found ) {
 			return $rebuild;
 		}
@@ -1545,12 +1551,27 @@ final class Block_Edit {
 			),
 		);
 		if ( 'core/cover' === $name ) {
-			// The height of a cover in percent of the window, for a stage that fills most of the first screen.
+			// The height of a cover in percent of the window, for a stage that fills most of the first screen; the focal
+			// point of its photo (x and y from 0 to 1), the part that stays in view where the cover crops it.
+			$share = array(
+				'type'    => 'number',
+				'minimum' => 0,
+				'maximum' => 1,
+			);
 			return $schema + array(
-				'minHeight' => array(
+				'minHeight'  => array(
 					'type'    => array( 'integer', 'null' ),
 					'minimum' => 30,
 					'maximum' => 100,
+				),
+				'focalPoint' => array(
+					'type'                 => array( 'object', 'null' ),
+					'properties'           => array(
+						'x' => $share,
+						'y' => $share,
+					),
+					'required'             => array( 'x', 'y' ),
+					'additionalProperties' => false,
 				),
 			);
 		}
@@ -1649,6 +1670,39 @@ final class Block_Edit {
 			}
 			$new = self::place( $name, self::place( $name, $new, 'minHeight', $attrs['minHeight'] ), 'minHeightUnit', null === $attrs['minHeight'] ? null : 'vh' );
 		}
+		if ( array_key_exists( 'focalPoint', $attrs ) ) {
+			// The editor saves the point as object-position of the background image, in whole percent, in its style and
+			// in data-object-position; null puts the photo back in the middle.
+			$point    = null === $attrs['focalPoint'] ? null : array(
+				'x' => (float) $attrs['focalPoint']['x'],
+				'y' => (float) $attrs['focalPoint']['y'],
+			);
+			$position = null === $point ? '' : round( $point['x'] * 100 ) . '% ' . round( $point['y'] * 100 ) . '%';
+			if ( ! $tags->next_tag(
+				array(
+					'tag_name'   => 'img',
+					'class_name' => 'wp-block-cover__image-background',
+				)
+			) ) {
+				return $rebuild;
+			}
+			$rules = array_filter(
+				array_map( 'trim', explode( ';', (string) $tags->get_attribute( 'style' ) ) ),
+				static fn( string $rule ): bool => '' !== $rule && ! preg_match( '/^object-position\s*:/i', $rule )
+			);
+			if ( '' !== $position ) {
+				$rules[] = 'object-position:' . $position;
+				$tags->set_attribute( 'data-object-position', $position );
+			} elseif ( null !== $tags->get_attribute( 'data-object-position' ) ) {
+				$tags->remove_attribute( 'data-object-position' );
+			}
+			if ( $rules ) {
+				$tags->set_attribute( 'style', implode( ';', $rules ) );
+			} elseif ( null !== $tags->get_attribute( 'style' ) ) {
+				$tags->remove_attribute( 'style' );
+			}
+			$new = self::place( $name, $new, 'focalPoint', $point );
+		}
 		if ( isset( $attrs['sizeSlug'] ) ) {
 			foreach ( iterator_to_array( $tags->class_list(), false ) as $class ) {
 				if ( str_starts_with( (string) $class, 'size-' ) ) {
@@ -1698,8 +1752,8 @@ final class Block_Edit {
 				}
 			}
 		}
-		// remove_attribute() leaves the space before it (<img >), which KSES would close up.
-		$html = (string) preg_replace( '#<([a-z][^\s/>]*)\s+(/?)>#i', '<$1$2>', $tags->get_updated_html() );
+		// remove_attribute() leaves the space before it (<img >, <img   class>), which KSES would close up.
+		$html = (string) preg_replace( array( '#<([a-z][^\s/>]*)\s+(/?)>#i', '#<([a-z][^\s/>]*)\s{2,}#i' ), array( '<$1$2>', '<$1 ' ), $tags->get_updated_html() );
 		if ( array_key_exists( 'href', $attrs ) ) {
 			$url = null === $attrs['href'] ? '' : self::url( (string) $attrs['href'] );
 			if ( null !== $attrs['href'] && '' === $url ) {

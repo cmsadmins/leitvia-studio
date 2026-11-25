@@ -197,47 +197,51 @@ final class Build {
 			$create,
 			array(
 				'properties'           => array(
-					'url'         => array(
+					'url'          => array(
 						'type'   => 'string',
 						'format' => 'uri',
 					),
-					'data'        => array(
+					'data'         => array(
 						'type'      => 'string',
 						'maxLength' => (int) ceil( max( self::MAX_MEDIA_BYTES, self::max_video_bytes() ) / 3 ) * 4 + 4,
 					),
-					'filename'    => array(
+					'filename'     => array(
 						'type'      => 'string',
 						'maxLength' => 200,
 					),
-					'title'       => array(
+					'title'        => array(
 						'type'        => 'string',
 						'maxLength'   => 200,
 						'description' => __( 'Title in the media library, the file name without it. Give a PDF a title that says what the document is.', 'leitvia-studio' ),
 					),
-					'alt'         => array(
+					'alt'          => array(
 						'type'      => 'string',
 						'maxLength' => 500,
 					),
-					'decorative'  => array( 'type' => 'boolean' ),
-					'replace'     => array(
+					'decorative'   => array( 'type' => 'boolean' ),
+					'replace'      => array(
 						'type'        => 'integer',
 						'minimum'     => 1,
 						'description' => __( 'Attachment ID of a file of the media library whose file this one replaces: ID, address, title, alt text and every place that uses it stay, the metadata and the image sizes are made anew. The new file must have the same type. The old file is gone for good, so the change always waits in a change package for a person. Send only the file with it; base_hash may stay empty.', 'leitvia-studio' ),
 					),
-					'poster'      => array(
+					'poster'       => array(
 						'type'        => 'integer',
 						'minimum'     => 1,
 						'description' => __( 'Video only: attachment ID of an image of the media library that shows before the video plays, a still of it. Also set it as poster of the core/video.', 'leitvia-studio' ),
 					),
-					'poster_file' => array(
+					'poster_file'  => array(
 						'type'        => 'string',
 						'maxLength'   => 200,
 						'description' => __( 'Video only, instead of poster: file name of an image an earlier leitvia/add-media added under the same package key and that still waits there. Applying the package writes the image first and sets it as poster of the video, so image and video go into one package.', 'leitvia-studio' ),
 					),
-					'caption'     => array(
+					'caption'      => array(
 						'type'        => 'string',
 						'maxLength'   => 2000,
 						'description' => __( 'Video only: what the video shows, in plain text, as caption of the file in the media library. A video without speech needs this text on the page as well.', 'leitvia-studio' ),
+					),
+					'ai_generated' => array(
+						'type'        => 'boolean',
+						'description' => __( 'Image or video only: the file was made or changed with AI. Stored on the file (leitvia/list-media returns it, leitvia/set-alt-text changes it later); a site may show a short note at such images.', 'leitvia-studio' ),
 					),
 				),
 				'additionalProperties' => false,
@@ -494,7 +498,7 @@ final class Build {
 		}
 		$schema['properties']['attributes'] = array(
 			'type'        => 'object',
-			'description' => __( 'Attributes from leitvia/list-blocks; for a core/heading its level, 1 to 6; for a core/query query with perPage, pages, offset, postType, order, orderBy, sticky and inherit (perPage counts with inherit false); for a core/video tracks, each with id, kind, srclang and label (its file, poster, controls and preload come from the field video); for a leitvia/timeline-item date (YYYY, YYYY-MM or YYYY-MM-DD, empty for a free label), dateLabel and heading; leitviaAnimation and leitviaMotion on every block that lists them, also next to other attributes (null removes either); className (is-style-<name>, null removes the style and keeps other classes; up to three styles that combine space separated, such as is-style-sticky-header-desktop is-style-overlay-header) on every core block with registered block styles; textColor (ink, ink-muted or accent) and fontSize on a core/heading or core/paragraph; fontSize on a core/quote, so the quotes of a row match (null for the size of the theme); textColor with a color role and fontSize on a block of Studio or an add-on whose supports in leitvia/list-blocks name color.text or typography.fontSize, such as leitvia/icon and leitvia/icon-list (null removes either); on a core/cover minHeight in vh, 30 to 100; align on every block whose supports.align in leitvia/list-blocks names the value (null removes it); on core/image also width, height, aspectRatio, scale, sizeSlug, linkDestination, href, lightbox (null removes one). null for an attribute the block does not have changes nothing.', 'leitvia-studio' ),
+			'description' => __( 'Attributes from leitvia/list-blocks; for a core/heading its level, 1 to 6; for a core/query query with perPage, pages, offset, postType, order, orderBy, sticky and inherit (perPage counts with inherit false); for a core/video tracks, each with id, kind, srclang and label (its file, poster, controls and preload come from the field video); for a leitvia/timeline-item date (YYYY, YYYY-MM or YYYY-MM-DD, empty for a free label), dateLabel and heading; leitviaAnimation and leitviaMotion on every block that lists them, also next to other attributes (null removes either); className (is-style-<name>, null removes the style and keeps other classes; up to three styles that combine space separated, such as is-style-sticky-header-desktop is-style-overlay-header) on every core block with registered block styles; textColor (ink, ink-muted or accent) and fontSize on a core/heading or core/paragraph; fontSize on a core/quote, so the quotes of a row match (null for the size of the theme); textColor with a color role and fontSize on a block of Studio or an add-on whose supports in leitvia/list-blocks name color.text or typography.fontSize, such as leitvia/icon and leitvia/icon-list (null removes either); on a core/cover minHeight in vh, 30 to 100, and focalPoint, x and y from 0 to 1, the part of the photo that stays in view where the cover crops it, as on phones (null for the middle); align on every block whose supports.align in leitvia/list-blocks names the value (null removes it); on core/image also width, height, aspectRatio, scale, sizeSlug, linkDestination, href, lightbox (null removes one). null for an attribute the block does not have changes nothing.', 'leitvia-studio' ),
 		);
 		return $schema;
 	}
@@ -896,6 +900,12 @@ final class Build {
 		}
 		$alt   = $video || 'application/pdf' === $type['type'] ? '' : $alt;
 		$title = (string) ( $input['title'] ?? '' );
+		if ( ! empty( $input['ai_generated'] ) ) {
+			if ( $track ) {
+				return Block_Edit::invalid( 'ai_generated', __( 'Only an image or a video is marked as made with AI.', 'leitvia-studio' ) );
+			}
+			$extra['meta_input'] = array( Content::AI_META => '1' ) + (array) ( $extra['meta_input'] ?? array() );
+		}
 		return array(
 			'area'   => 'content',
 			// A poster that waits in the package (target media) becomes the featured image of the video when the package

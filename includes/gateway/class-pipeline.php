@@ -40,7 +40,7 @@ final class Pipeline {
 	 * written and rolled back like the post fields. The DTCG document is the content of a token set.
 	 */
 	public const META = array(
-		'attachment'     => array( '_wp_attachment_image_alt' ),
+		'attachment'     => array( '_wp_attachment_image_alt', Content::AI_META ),
 		'leitvia_tokens' => array( Token_Sets::META ),
 	);
 

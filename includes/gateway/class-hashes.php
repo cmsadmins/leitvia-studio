@@ -81,7 +81,11 @@ final class Hashes {
 			$post->comment_status,
 		);
 		foreach ( Pipeline::META[ $post->post_type ] ?? array() as $key ) {
-			$parts[] = (string) get_post_meta( $post->ID, $key, true );
+			$value = (string) get_post_meta( $post->ID, $key, true );
+			// An AI mark that is not set does not count, as before Studio 1.3.58, so hashes of media read before stay valid.
+			if ( '' !== $value || Abilities\Content::AI_META !== $key ) {
+				$parts[] = $value;
+			}
 		}
 		if ( Abilities\Commerce::handles( $post->post_type ) ) {
 			$parts[] = Abilities\Commerce::props( $post->ID );

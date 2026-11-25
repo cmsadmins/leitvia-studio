@@ -1,7 +1,10 @@
 // Mega menu (leitvia/mega-menu): APG disclosure navigation on top of the server markup (class-mega-menu.php).
-// Without this module the item is a plain link to its overview page. With it, a button next to the link opens the
+// Without this module the item is a link to its overview page and the panel shows while the focus is in the item
+// (style.scss). With it (data-ready on the item), a button next to the link opens the
 // panel: Escape closes it and returns focus to the button, focus leaving the item closes it, only one panel is open.
 // Hover opens after 150 ms and closes 300 ms after the pointer left, so the pointer may cross the gap to the panel.
+// In the overlay each column head of the panel (class leitvia-mega-menu-head) gets a button that shows its column,
+// a second level of the accordion; Escape inside an open column closes it first.
 //
 // In the overlay of a navigation the server marked with data-leitvia-collapsible (a submenu or a mega menu,
 // Mega_Menu::collapsible_overlay()), the core submenus become collapsible the same way. Core keeps
@@ -13,6 +16,35 @@ const FOCUSABLE =
 const menus = [];
 const inOverlay = ( el ) => !! el.closest( '.is-menu-open' );
 
+// A button in each column head that has more than its head, after the title; the label pattern comes from the server
+// (%s submenu, as on the button of the item). It only shows in the overlay (style.scss).
+function columns( panel, button ) {
+	const name = panel.dataset.columnLabel || '%s';
+	for ( const head of panel.querySelectorAll(
+		'.wp-block-column > .leitvia-mega-menu-head'
+	) ) {
+		const column = head.parentElement;
+		if ( column.children.length < 2 ) {
+			continue;
+		}
+		const toggler = document.createElement( 'button' );
+		toggler.type = 'button';
+		toggler.className = 'wp-block-leitvia-mega-menu__column-toggle';
+		toggler.setAttribute( 'aria-expanded', 'false' );
+		toggler.setAttribute(
+			'aria-label',
+			name.replace( '%s', head.textContent.trim() )
+		);
+		toggler.innerHTML = button.innerHTML;
+		toggler.addEventListener( 'click', () => {
+			const open = column.classList.toggle( 'is-collapsed' );
+			toggler.setAttribute( 'aria-expanded', String( ! open ) );
+		} );
+		column.classList.add( 'is-collapsed' );
+		head.append( toggler );
+	}
+}
+
 function toggle( menu, open, byHover = false ) {
 	clearTimeout( menu.timer );
 	if ( open ) {
@@ -21,6 +53,30 @@ function toggle( menu, open, byHover = false ) {
 	menu.byHover = open && byHover;
 	menu.button.setAttribute( 'aria-expanded', String( open ) );
 	menu.panel.hidden = ! open;
+	if ( open ) {
+		fit( menu.panel );
+	}
+}
+
+// A wide panel (four columns, a card) moves sideways until it stays 16 px inside the window, and a tall one scrolls
+// inside itself from 16 px above the bottom of the window, so no link ends up below it (WCAG 2.4.11).
+function fit( panel ) {
+	panel.style.removeProperty( '--leitvia-mega-shift' );
+	panel.style.removeProperty( '--leitvia-mega-max' );
+	if ( inOverlay( panel ) ) {
+		return;
+	}
+	const box = panel.getBoundingClientRect();
+	panel.style.setProperty(
+		'--leitvia-mega-max',
+		`${ Math.max( 160, window.innerHeight - box.top - 16 ) }px`
+	);
+	const room = document.documentElement.clientWidth;
+	const shift =
+		Math.min( 0, room - 16 - box.right ) || Math.max( 0, 16 - box.left );
+	if ( shift ) {
+		panel.style.setProperty( '--leitvia-mega-shift', `${ shift }px` );
+	}
 }
 
 for ( const item of document.querySelectorAll(
@@ -36,6 +92,9 @@ for ( const item of document.querySelectorAll(
 		continue;
 	}
 	const menu = { item, button, panel, timer: 0, byHover: false };
+	panel.hidden = true;
+	item.dataset.ready = '';
+	columns( panel, button );
 	const later = ( open, delay ) => {
 		clearTimeout( menu.timer );
 		menu.timer = setTimeout( () => toggle( menu, open, true ), delay );
@@ -50,7 +109,21 @@ for ( const item of document.querySelectorAll(
 		)
 	);
 	item.addEventListener( 'keydown', ( event ) => {
-		if ( 'Escape' === event.key && ! panel.hidden ) {
+		const column = event.target.closest( '.wp-block-column' );
+		const head = column?.querySelector(
+			':scope > .leitvia-mega-menu-head .wp-block-leitvia-mega-menu__column-toggle'
+		);
+		if (
+			'Escape' === event.key &&
+			inOverlay( item ) &&
+			head &&
+			head !== event.target &&
+			'true' === head.getAttribute( 'aria-expanded' )
+		) {
+			event.stopPropagation();
+			head.focus();
+			head.click();
+		} else if ( 'Escape' === event.key && ! panel.hidden ) {
 			event.stopPropagation();
 			// Focus first: hiding the focused element would move focus to the body and close the overlay.
 			button.focus();

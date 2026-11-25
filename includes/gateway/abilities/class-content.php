@@ -218,7 +218,7 @@ final class Content {
 		Abilities::read(
 			'leitvia/list-media',
 			__( 'List media', 'leitvia-studio' ),
-			__( 'Lists the media library, newest first: ID, URL, file name, MIME type, file size in bytes, alt text, width, height and hash (the base_hash for leitvia/set-alt-text). Filter by IDs (include, in their order, for example the images of a gallery), by search text in title, caption and file name, MIME type (image, image/png or application/pdf) and uploaded after a date.', 'leitvia-studio' ),
+			__( 'Lists the media library, newest first: ID, URL, file name, MIME type, file size in bytes, alt text, whether it was made with AI (ai, see ai_generated of leitvia/add-media), width, height and hash (the base_hash for leitvia/set-alt-text). Filter by IDs (include, in their order, for example the images of a gallery), by search text in title, caption and file name, MIME type (image, image/png or application/pdf) and uploaded after a date.', 'leitvia-studio' ),
 			array(
 				'type'                 => 'object',
 				'properties'           => array(
@@ -1254,6 +1254,7 @@ final class Content {
 				'mime'     => $post->post_mime_type,
 				'filesize' => (int) ( $meta['filesize'] ?? wp_filesize( (string) get_attached_file( $post->ID ) ) ),
 				'alt'      => (string) get_post_meta( $post->ID, '_wp_attachment_image_alt', true ),
+				'ai'       => (bool) get_post_meta( $post->ID, self::AI_META, true ),
 				'width'    => (int) ( $meta['width'] ?? 0 ),
 				'height'   => (int) ( $meta['height'] ?? 0 ),
 				'hash'     => Hashes::document( $post->ID ),
@@ -1409,5 +1410,33 @@ final class Content {
 		 */
 		$note = (string) apply_filters( 'leitvia_studio_ai_note', __( 'This text was written with the help of AI.', 'leitvia-studio' ), $id );
 		return ( '' === $note ? '' : '<p class="leitvia-ai-note">' . esc_html( $note ) . '</p>' ) . $content;
+	}
+
+	/**
+	 * Note below an image of the media library marked as made with AI (AI_META, ai_generated of add-media). Off by
+	 * default: the filter leitvia_studio_ai_image_note gives the text, for example
+	 * add_filter( 'leitvia_studio_ai_image_note', fn() => __( 'Image made with AI', 'my-site' ) ). The note is real text
+	 * in the figure, so screen readers read it too. Runs on render_block_core/image.
+	 *
+	 * @param string               $content Rendered image block.
+	 * @param array<string, mixed> $block   Parsed block.
+	 */
+	public static function image_note( $content, $block ): string {
+		$id = (int) ( $block['attrs']['id'] ?? 0 );
+		if ( ! $id || ! get_post_meta( $id, self::AI_META, true ) ) {
+			return (string) $content;
+		}
+		/**
+		 * Filters the note below an image made with AI; empty (the default) shows none.
+		 *
+		 * @param string $note          Text of the note.
+		 * @param int    $attachment_id Attachment ID.
+		 */
+		$note = (string) apply_filters( 'leitvia_studio_ai_image_note', '', $id );
+		$end  = strrpos( (string) $content, '</figure>' );
+		if ( '' === $note || false === $end ) {
+			return (string) $content;
+		}
+		return substr_replace( (string) $content, '<small class="leitvia-ai-note">' . esc_html( $note ) . '</small>', $end, 0 );
 	}
 }

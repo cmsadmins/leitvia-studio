@@ -529,6 +529,65 @@ final class Composition {
 	}
 
 	/**
+	 * Finding firstScreen (no points) for a saved page whose first section holds the h1 and a button: the button may
+	 * fall below the first screen when the heading or the text before the button is longer than the pattern of the
+	 * section allows in docs.contentLength. The hero patterns keep their first button in view at 1440 x 900 and
+	 * 390 x 844 within those lengths, below breadcrumbs too (tests/e2e/first-screen.spec.mjs); without lengths the
+	 * section is held to those of the stages, heading 70 and text 220 characters.
+	 * ponytail: counts characters, not pixels; a person checks the page at both sizes when a stage bends the rule.
+	 *
+	 * @param string               $content  Block markup of the page.
+	 * @param array<string, mixed> $contract Contract data.
+	 * @return array{rule: string, index: int, message: string}|null
+	 */
+	public static function first_screen( string $content, array $contract ): ?array {
+		$first = self::roots( $content )[0] ?? null;
+		if ( ! $first || ! self::find( array( $first ), static fn( array $block ): bool => 'core/heading' === ( $block['blockName'] ?? '' ) && 1 === (int) ( $block['attrs']['level'] ?? 2 ) ) ) {
+			return null;
+		}
+		$heading = 0;
+		$text    = 0;
+		$button  = false;
+		$walk    = static function ( array $blocks ) use ( &$walk, &$heading, &$text, &$button ): void {
+			foreach ( $blocks as $block ) {
+				$name = (string) ( $block['blockName'] ?? '' );
+				if ( $button || 'core/buttons' === $name || 'core/button' === $name ) {
+					$button = true;
+					return;
+				}
+				$length = mb_strlen( trim( wp_strip_all_tags( (string) ( $block['innerHTML'] ?? '' ) ) ) );
+				if ( 'core/heading' === $name && 1 === (int) ( $block['attrs']['level'] ?? 2 ) ) {
+					$heading = $length;
+				} elseif ( in_array( $name, array( 'core/paragraph', 'core/list-item' ), true ) ) {
+					$text += $length;
+				}
+				$walk( (array) ( $block['innerBlocks'] ?? array() ) );
+			}
+		};
+		$walk( array( $first ) );
+		$slug   = (string) ( $first['attrs']['metadata']['patternName'] ?? '' );
+		$length = array();
+		foreach ( array( 'patterns', 'studioPatterns', 'addonPatterns' ) as $list ) {
+			foreach ( (array) ( $contract[ $list ] ?? array() ) as $pattern ) {
+				if ( '' !== $slug && ( $pattern['slug'] ?? '' ) === $slug ) {
+					$length = (array) ( $pattern['docs']['contentLength'] ?? array() );
+				}
+			}
+		}
+		$max_heading = (int) ( $length['heading'][1] ?? 70 );
+		$max_text    = (int) ( $length['text'][1] ?? 220 );
+		if ( ! $button || ( $heading <= $max_heading && $text <= $max_text ) ) {
+			return null;
+		}
+		return array(
+			'rule'    => 'firstScreen',
+			'index'   => 0,
+			/* translators: 1: characters of the heading, 2: most characters of the heading, 3: characters of the text before the button, 4: most characters of that text. */
+			'message' => sprintf( __( 'The first button of the stage may fall below the first screen at 1440 x 900 or 390 x 844: the heading has %1$d characters (at most %2$d), the text before the button %3$d (at most %4$d). Shorten the heading or the text, or move the buttons above the text.', 'leitvia-studio' ), $heading, $max_heading, $text, $max_text ),
+		);
+	}
+
+	/**
 	 * First block, inner blocks included, that passes the test.
 	 *
 	 * @param array<int|string, array<string, mixed>> $blocks Parsed blocks.

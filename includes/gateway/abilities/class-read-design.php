@@ -7,6 +7,7 @@
 
 namespace LeitviaStudio\Gateway\Abilities;
 
+use LeitviaStudio\Blocks\Mega_Menu;
 use LeitviaStudio\Gateway;
 use LeitviaStudio\Lab\Status;
 use LeitviaStudio\Lab\Usage_Index;
@@ -98,9 +99,17 @@ final class Read_Design {
 							),
 						),
 					),
+					'megaMenu' => array(
+						'type'        => 'object',
+						'description' => __( 'Mega menus: panels lists the template parts in the area Mega menu (part, title, hash for leitvia/update-template-part, empty while only a file of the theme exists); patterns lists the patterns made for a panel (name, title, description). A new panel is a part named mega-menu-<name>: fill it with leitvia/update-template-part (pattern and edits; remove or repeat a column for two to four columns), then add an item with type mega and panel through leitvia/update-navigation.', 'leitvia-studio' ),
+						'properties'  => array(
+							'panels'   => $objects,
+							'patterns' => $objects,
+						),
+					),
 					'hashes'   => array(
 						'type'        => 'object',
-						'description' => __( 'Base hashes: templateParts and templates by name and slug for leitvia/update-template-part and leitvia/update-template (empty while only the file of the theme exists), navigation with id and hash per published menu, newest first, for leitvia/update-navigation.', 'leitvia-studio' ),
+						'description' => __( 'Base hashes: templateParts and templates by name and slug for leitvia/update-template-part and leitvia/update-template (empty while only the file of the theme exists; mega menu panels are among the template parts), navigation with id and hash per published menu, newest first, for leitvia/update-navigation.', 'leitvia-studio' ),
 						'properties'  => array(
 							'templateParts' => array( 'type' => 'object' ),
 							'templates'     => array( 'type' => 'object' ),
@@ -403,7 +412,28 @@ final class Read_Design {
 			'version'  => $contract->version(),
 			// The aliases as Studio applies them: by preset type, only those that point to a role.
 			'contract' => array( 'coreAliases' => $contract->core_aliases() ) + array_diff_key( $contract->data(), array_flip( self::CONTRACT_SKIP ) ),
+			'megaMenu' => self::mega_menu(),
 			'hashes'   => self::hashes( $contract->data() ),
+		);
+	}
+
+	/**
+	 * Panels of mega menus with their base hashes and the patterns made for a panel.
+	 *
+	 * @return array{panels: list<array{part: string, title: string, hash: string}>, patterns: list<array{name: string, title: string, description: string}>}
+	 */
+	private static function mega_menu(): array {
+		$panels = array();
+		foreach ( Mega_Menu::panels() as $slug => $part ) {
+			$panels[] = array(
+				'part'  => (string) $slug,
+				'title' => (string) $part->title,
+				'hash'  => $part->wp_id ? Gateway\Hashes::document( (int) $part->wp_id ) : '',
+			);
+		}
+		return array(
+			'panels'   => $panels,
+			'patterns' => Mega_Menu::panel_patterns(),
 		);
 	}
 
@@ -430,6 +460,9 @@ final class Read_Design {
 		}
 		foreach ( (array) ( $data['templates'] ?? array() ) as $template ) {
 			$out['templates'][ (string) ( $template['slug'] ?? '' ) ] = $saved( (string) ( $template['slug'] ?? '' ), false );
+		}
+		foreach ( Mega_Menu::panels() as $slug => $part ) {
+			$out['templateParts'][ (string) $slug ] ??= $part->wp_id ? Gateway\Hashes::document( (int) $part->wp_id ) : '';
 		}
 		unset( $out['templateParts'][''], $out['templates'][''] );
 		// Newest first, as update-navigation picks the menu published last when it gets none.

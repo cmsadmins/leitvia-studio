@@ -133,6 +133,15 @@
 			"error": "leitvia_static_markup"
 		},
 		{
+			"name": "text at a block without text, such as an ID that moved after a remove",
+			"content": "<!-- wp:buttons -->\n<div class=\"wp-block-buttons\"><!-- wp:button -->\n<div class=\"wp-block-button\"><a class=\"wp-block-button__link wp-element-button\" href=\"/a/\">Go</a></div>\n<!-- /wp:button --></div>\n<!-- /wp:buttons -->",
+			"block": "p:0",
+			"change": {
+				"text": "New"
+			},
+			"error": "leitvia_invalid_input"
+		},
+		{
 			"name": "a paragraph has no link to set",
 			"content": "<!-- wp:paragraph -->\n<p>Text</p>\n<!-- /wp:paragraph -->",
 			"block": "p:0",

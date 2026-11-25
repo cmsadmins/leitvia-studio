@@ -239,6 +239,9 @@ final class Plugin {
 		add_filter( 'render_block_core/template-part', array( Blocks\Sticky_Header::class, 'render_part' ), 10, 2 );
 		add_filter( 'default_wp_template_part_areas', array( Blocks\Mega_Menu::class, 'areas' ) );
 		add_filter( 'register_block_type_args', array( Blocks\Mega_Menu::class, 'block_args' ), 10, 2 );
+		add_filter( 'register_block_type_args', array( Blocks\Mega_Menu::class, 'link_args' ), 10, 2 );
+		add_filter( 'render_block_core/navigation-link', array( Blocks\Mega_Menu::class, 'link_icon' ), 10, 2 );
+		add_filter( 'render_block_core/navigation-submenu', array( Blocks\Mega_Menu::class, 'link_icon' ), 10, 2 );
 		add_filter( 'register_block_type_args', array( Blocks\Blocks::class, 'render_callbacks' ), 10, 2 );
 		add_action( 'enqueue_block_editor_assets', array( Blocks\Icon::class, 'editor_data' ) );
 		add_action( 'enqueue_block_editor_assets', array( Blocks\Consent_Embed::class, 'editor_data' ) );

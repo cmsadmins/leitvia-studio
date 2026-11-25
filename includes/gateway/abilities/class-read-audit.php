@@ -8,6 +8,7 @@
 namespace LeitviaStudio\Gateway\Abilities;
 
 use LeitviaStudio\Blocks\Animation;
+use LeitviaStudio\Blocks\Mega_Menu;
 use LeitviaStudio\Gateway;
 use LeitviaStudio\Lab\Status;
 
@@ -322,6 +323,7 @@ final class Read_Audit {
 			/* translators: 1: slug of the template part, 2: texts of the links. */
 			$findings[] = self::finding( 'leitvia/empty-link', sprintf( __( 'The template part %1$s has links that lead nowhere (empty href or # without target): %2$s.', 'leitvia-studio' ), $part, implode( ', ', $texts ) ), __( 'Give each link its target with leitvia/update-template-part, or remove it.', 'leitvia-studio' ), 'error' );
 		}
+		array_push( $findings, ...self::mega_menus() );
 		$posts = get_posts(
 			array(
 				'post_type'        => 'post',
@@ -375,7 +377,7 @@ final class Read_Audit {
 		add_filter( 'pre_render_block', $skip, 10, 2 );
 		ob_start();
 		try {
-			foreach ( array( 'header', 'footer' ) as $area ) {
+			foreach ( array( 'header', 'footer', 'mega-menu' ) as $area ) {
 				foreach ( get_block_templates( array( 'area' => $area ), 'wp_template_part' ) as $part ) {
 					// verify-ignore: readonly -- renders the part in memory for its links; render callbacks write at most caches.
 					$links = Gateway\Content_Checks::empty_links( do_blocks( (string) $part->content ) );
@@ -390,6 +392,106 @@ final class Read_Audit {
 			remove_filter( 'pre_render_block', $skip, 10 );
 		}
 		return $parts;
+	}
+
+	/**
+	 * Findings about mega menus. Error: a panel (template part in the area mega-menu) without a link, so the item opens
+	 * an empty panel; a mega menu item of a published navigation whose panel does not exist, or that has no overview
+	 * link, which is all visitors without JavaScript and search engines get. The filter
+	 * leitvia_studio_mega_menu_findings adds the findings of an add-on per panel, such as a price without its product.
+	 * Links of panels that lead nowhere are findings of part_links().
+	 *
+	 * @return list<array<string, mixed>>
+	 */
+	private static function mega_menus(): array {
+		$findings = array();
+		$panels   = Mega_Menu::panels();
+		foreach ( $panels as $slug => $part ) {
+			ob_start();
+			try {
+				// verify-ignore: readonly -- renders the panel in memory for its links; render callbacks write at most caches.
+				$html = do_blocks( (string) $part->content );
+			} finally {
+				ob_end_clean();
+			}
+			if ( ! self::has_link( $html ) ) {
+				/* translators: %s: slug of the template part. */
+				$findings[] = self::finding( 'leitvia/mega-menu', sprintf( __( 'The mega menu panel %s has no links, so its item opens an empty panel.', 'leitvia-studio' ), $slug ), __( 'Fill the panel with leitvia/update-template-part and a pattern from megaMenu.patterns of leitvia/get-contract.', 'leitvia-studio' ), 'error' );
+			}
+			/**
+			 * Filters the findings of leitvia/audit-site about one mega menu panel, so an add-on adds its own, such as a
+			 * price that names no product. Each finding has check, severity (error or warning), block, message and fix.
+			 *
+			 * @param array<mixed>               $found Findings about the panel, empty by default.
+			 * @param \WP_Block_Template         $part  The panel.
+			 * @param string                     $html  The rendered panel.
+			 */
+			foreach ( (array) apply_filters( 'leitvia_studio_mega_menu_findings', array(), $part, $html ) as $finding ) {
+				if ( is_array( $finding ) && isset( $finding['check'], $finding['message'] ) ) {
+					$findings[] = $finding + array(
+						'severity' => 'warning',
+						'block'    => '',
+						'fix'      => '',
+					);
+				}
+			}
+		}
+		$menus = get_posts(
+			array(
+				'post_type'      => 'wp_navigation',
+				'post_status'    => 'publish',
+				'posts_per_page' => 20,
+				'no_found_rows'  => true,
+			)
+		);
+		foreach ( $menus as $menu ) {
+			foreach ( self::mega_items( parse_blocks( $menu->post_content ) ) as $attrs ) {
+				$label = (string) ( $attrs['label'] ?? '' );
+				$slug  = (string) ( $attrs['slug'] ?? '' );
+				if ( '' === $slug || ! isset( $panels[ $slug ] ) ) {
+					/* translators: 1: text of the menu item, 2: name of the panel. */
+					$findings[] = self::finding( 'leitvia/mega-menu', sprintf( __( 'The mega menu item %1$s names the panel "%2$s", which does not exist, so it opens nothing.', 'leitvia-studio' ), $label, $slug ), __( 'Create the panel with leitvia/update-template-part (part mega-menu-<name>) or name one of megaMenu.panels in leitvia/update-navigation.', 'leitvia-studio' ), 'error' );
+				}
+				if ( '' === (string) ( $attrs['url'] ?? '' ) ) {
+					/* translators: %s: text of the menu item. */
+					$findings[] = self::finding( 'leitvia/mega-menu', sprintf( __( 'The mega menu item %s has no overview link; without JavaScript and for search engines it leads nowhere.', 'leitvia-studio' ), $label ), __( 'Give it the overview page of its topic as url with leitvia/update-navigation.', 'leitvia-studio' ), 'error' );
+				}
+			}
+		}
+		return $findings;
+	}
+
+	/**
+	 * Whether HTML holds a link with a target, not empty and not only a fragment (#).
+	 *
+	 * @param string $html HTML.
+	 */
+	private static function has_link( string $html ): bool {
+		$tags = new \WP_HTML_Tag_Processor( $html );
+		while ( $tags->next_tag( array( 'tag_name' => 'a' ) ) ) {
+			$href = trim( (string) $tags->get_attribute( 'href' ) );
+			if ( '' !== $href && ! str_starts_with( $href, '#' ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Attributes of every leitvia/mega-menu in parsed blocks, also inside submenus.
+	 *
+	 * @param array<int|string, array<string, mixed>> $blocks Parsed blocks.
+	 * @return list<array<string, mixed>>
+	 */
+	private static function mega_items( array $blocks ): array {
+		$found = array();
+		foreach ( $blocks as $block ) {
+			if ( 'leitvia/mega-menu' === ( $block['blockName'] ?? '' ) ) {
+				$found[] = (array) $block['attrs'];
+			}
+			array_push( $found, ...self::mega_items( (array) ( $block['innerBlocks'] ?? array() ) ) );
+		}
+		return $found;
 	}
 
 	/**

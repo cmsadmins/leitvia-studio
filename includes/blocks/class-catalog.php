@@ -110,7 +110,8 @@ final class Catalog {
 
 	/**
 	 * The icon blocks name no enum in block.json, so the icons of the filter leitvia_studio_icons pass the validation of
-	 * the editor; the catalog lists the names an agent may write, the bundled ones and those of the site.
+	 * the editor; the catalog lists the names an agent may write, the bundled ones and those of the site, also for the
+	 * icon of a mega menu item.
 	 *
 	 * @param list<array<string, mixed>> $catalog Catalog entries.
 	 * @return list<array<string, mixed>>
@@ -118,8 +119,9 @@ final class Catalog {
 	private static function icon_names( array $catalog ): array {
 		$names = array_keys( Icon::icons() );
 		foreach ( $catalog as &$entry ) {
-			if ( in_array( $entry['name'], array( 'leitvia/icon', 'leitvia/icon-list', 'leitvia/icon-list-item' ), true ) && isset( $entry['attributes']['properties']['icon'] ) ) {
-				$entry['attributes']['properties']['icon']['enum'] = $names;
+			if ( in_array( $entry['name'], array( 'leitvia/icon', 'leitvia/icon-list', 'leitvia/icon-list-item', 'leitvia/mega-menu' ), true ) && isset( $entry['attributes']['properties']['icon'] ) ) {
+				// The icon of a mega menu item is optional: '' draws none.
+				$entry['attributes']['properties']['icon']['enum'] = 'leitvia/mega-menu' === $entry['name'] ? array_merge( array( '' ), $names ) : $names;
 			}
 		}
 		unset( $entry );

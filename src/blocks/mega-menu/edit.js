@@ -14,9 +14,11 @@ import {
 import { useSelect } from '@wordpress/data';
 import { store as coreStore } from '@wordpress/core-data';
 import { addQueryArgs } from '@wordpress/url';
+import { IconPanel } from './menu-icon';
+import { Svg } from '../icon/picker';
 
 export default function Edit( {
-	attributes: { label, url, slug, description },
+	attributes: { label, url, slug, description, icon },
 	setAttributes,
 } ) {
 	const parts = useSelect(
@@ -89,12 +91,17 @@ export default function Edit( {
 						}
 					/>
 				</PanelBody>
+				<IconPanel
+					value={ icon }
+					onChange={ ( next ) => setAttributes( { icon: next } ) }
+				/>
 			</InspectorControls>
 			<li
 				{ ...useBlockProps( {
 					className: 'wp-block-navigation-item',
 				} ) }
 			>
+				{ icon && <Svg name={ icon } /> }
 				<RichText
 					tagName="span"
 					className="wp-block-navigation-item__content wp-block-navigation-item__label"

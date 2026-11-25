@@ -6,6 +6,7 @@
  */
 
 use LeitviaStudio\Gateway\Gateway;
+use LeitviaStudio\Gateway\Abilities\Read_Audit;
 use LeitviaStudio\Gateway\Hashes;
 use LeitviaStudio\Gateway\Packages;
 use LeitviaStudio\Gateway\Store;
@@ -816,6 +817,132 @@ class Test_Gateway_Setup extends WP_UnitTestCase {
 				)
 			)
 		);
+	}
+
+	/**
+	 * A mega menu as an agent builds it: update-template-part creates the panel mega-menu-services in the area
+	 * mega-menu from a panel pattern, get-contract lists it with its hash and the panel patterns, update-navigation
+	 * adds the item with type mega and icons; a missing panel, a mega menu without overview link or with sub items and
+	 * an unknown icon are refused. audit-site reports an empty panel and an item whose panel is gone.
+	 */
+	public function test_mega_menu_for_agents(): void {
+		$this->sign_in( 'full' );
+		$result = $this->assert_mode(
+			'live',
+			self::call(
+				'leitvia/update-template-part',
+				array(
+					'part'    => 'mega-menu-services',
+					'pattern' => 'leitvia-studio/mega-menu-columns',
+				)
+			)
+		);
+		$panel  = get_block_template( get_stylesheet() . '//mega-menu-services', 'wp_template_part' );
+		$this->assertSame( $result['target']['post'], $panel->wp_id );
+		$this->assertSame( 'mega-menu', $panel->area );
+		$this->assertStringContainsString( 'leitvia-mega-menu-head', $panel->content );
+		$data = $this->assert_rejected(
+			'leitvia_unknown_pattern',
+			self::call(
+				'leitvia/update-template-part',
+				array(
+					'part'      => 'mega-menu-services',
+					'pattern'   => 'leitvia/header-search',
+					'base_hash' => Hashes::document( $panel->wp_id ),
+				)
+			)
+		);
+		$this->assertContains( 'leitvia-studio/mega-menu-columns-card', $data['patterns'] );
+		$this->assert_rejected( 'leitvia_invalid_input', self::call( 'leitvia/update-template-part', array( 'part' => 'mega-menu-', 'pattern' => 'leitvia-studio/mega-menu-columns' ) ) ); // phpcs:ignore WordPress.Arrays.ArrayDeclarationSpacing.AssociativeArrayFound -- One input.
+
+		$contract = wp_get_ability( 'leitvia/get-contract' )->execute();
+		$panels   = array_column( $contract['megaMenu']['panels'], 'hash', 'part' );
+		$this->assertSame( Hashes::document( $panel->wp_id ), $panels['mega-menu-services'] );
+		$this->assertSame( $panels['mega-menu-services'], $contract['hashes']['templateParts']['mega-menu-services'] );
+		$names = array_column( $contract['megaMenu']['patterns'], 'name' );
+		foreach ( array( 'leitvia-studio/mega-menu-panel', 'leitvia-studio/mega-menu-columns', 'leitvia-studio/mega-menu-columns-card' ) as $name ) {
+			$this->assertContains( $name, $names );
+		}
+
+		$items = array(
+			array(
+				'label' => 'Services',
+				'url'   => '/services/',
+				'type'  => 'mega',
+				'panel' => 'mega-menu-services',
+				'icon'  => 'layers',
+			),
+			array(
+				'label' => 'About us',
+				'url'   => '/about/',
+				'icon'  => 'users',
+				'items' => array(
+					array(
+						'label' => 'Team',
+						'url'   => '/team/',
+						'icon'  => 'user',
+					),
+				),
+			),
+		);
+		$menu  = get_post( $this->assert_mode( 'live', self::call( 'leitvia/update-navigation', array( 'items' => $items ) ) )['target']['post'] );
+		$this->assertStringContainsString( '<!-- wp:leitvia/mega-menu {"label":"Services","url":"/services/","slug":"mega-menu-services","icon":"layers",', $menu->post_content );
+		$this->assertStringContainsString( '"leitviaIcon":"users"', $menu->post_content );
+		$this->assertStringContainsString( '"leitviaIcon":"user"', $menu->post_content );
+		$html = do_blocks( '<!-- wp:navigation {"ref":' . $menu->ID . '} /-->' );
+		foreach ( array( 'layers', 'users', 'user' ) as $icon ) {
+			$this->assertMatchesRegularExpression( '#<svg class="leitvia-icon leitvia-icon--' . $icon . '"[^>]*aria-hidden="true"#', $html, $icon );
+		}
+		$this->assertStringContainsString( 'class="wp-block-leitvia-mega-menu__panel"', $html );
+
+		$hash = Hashes::document( $menu->ID );
+		$mega = static fn( array $item ): array => array(
+			'items'     => array(
+				$item + array(
+					'label' => 'Services',
+					'type'  => 'mega',
+				),
+			),
+			'base_hash' => $hash,
+		);
+		$this->assertSame( 'panel', $this->assert_rejected( 'leitvia_invalid_input', self::call( 'leitvia/update-navigation', $mega( array( 'url' => '/services/', 'panel' => 'gone' ) ) ) )['reason'] ); // phpcs:ignore WordPress.Arrays.ArrayDeclarationSpacing.AssociativeArrayFound -- One item.
+		$this->assertSame( 'url', $this->assert_rejected( 'leitvia_invalid_input', self::call( 'leitvia/update-navigation', $mega( array( 'panel' => 'mega-menu-services' ) ) ) )['reason'] ); // phpcs:ignore WordPress.Arrays.ArrayDeclarationSpacing.AssociativeArrayFound -- One item.
+		$this->assertSame( 'items', $this->assert_rejected( 'leitvia_invalid_input', self::call( 'leitvia/update-navigation', $mega( array( 'url' => '/services/', 'panel' => 'mega-menu-services', 'items' => $items[1]['items'] ) ) ) )['reason'] ); // phpcs:ignore WordPress.Arrays.ArrayDeclarationSpacing.AssociativeArrayFound -- One item.
+		$data = $this->assert_rejected(
+			'leitvia_check_failed',
+			self::call(
+				'leitvia/update-navigation',
+				array(
+					'items'     => array(
+						array(
+							'label' => 'About us',
+							'url'   => '/about/',
+							'icon'  => 'no-such-icon',
+						),
+					),
+					'base_hash' => $hash,
+				)
+			)
+		);
+		$this->assertSame( array( 'leitvia/navigation' ), array_column( $data['findings'], 'check' ) );
+
+		// An empty panel and an item whose panel is gone.
+		$this->assert_mode(
+			'live',
+			self::call(
+				'leitvia/update-template-part',
+				array(
+					'part'      => 'mega-menu-services',
+					'content'   => '<!-- wp:paragraph --><p>Soon</p><!-- /wp:paragraph -->',
+					'base_hash' => Hashes::document( $panel->wp_id ),
+				)
+			)
+		);
+		$messages = implode( ' ', array_column( array_filter( Read_Audit::site(), static fn( array $f ): bool => 'leitvia/mega-menu' === $f['check'] ), 'message' ) );
+		$this->assertStringContainsString( 'mega-menu-services has no links', $messages );
+		wp_delete_post( $panel->wp_id, true );
+		$messages = implode( ' ', array_column( array_filter( Read_Audit::site(), static fn( array $f ): bool => 'leitvia/mega-menu' === $f['check'] ), 'message' ) );
+		$this->assertStringContainsString( 'names the panel "mega-menu-services", which does not exist', $messages );
 	}
 
 	/**

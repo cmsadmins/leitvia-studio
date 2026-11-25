@@ -220,16 +220,20 @@ final class Maintain {
 		Abilities::write(
 			'leitvia/set-alt-text',
 			__( 'Set alt text', 'leitvia-studio' ),
-			__( 'Sets the alt text of an image: without post and block on the attachment in the media library (base_hash of the attachment), with post and block on one image or cover block that shows it (base_hash of the post). leitvia/get-page-outline returns both hashes, for the attachment with its ID as post. Many images: items, one call and package. The alt text check applies.', 'leitvia-studio' ),
+			__( 'Sets the alt text of an image: without post and block on the attachment in the media library (base_hash of the attachment), with post and block on one image or cover block that shows it (base_hash of the post). leitvia/get-page-outline returns both hashes, for the attachment with its ID as post. Many images: items, one call and package. The alt text check applies. ai_generated marks the image in the media library as made with AI, or takes the mark off with false.', 'leitvia-studio' ),
 			'maintain',
 			$overwrite,
 			array(
 				'properties'           => array(
-					'image' => $image,
-					'alt'   => $alt,
-					'post'  => $post,
-					'block' => $block,
-					'items' => array(
+					'image'        => $image,
+					'alt'          => $alt,
+					'post'         => $post,
+					'block'        => $block,
+					'ai_generated' => array(
+						'type'        => 'boolean',
+						'description' => __( 'Without post and block only: true marks the image as made with AI (as ai_generated of leitvia/add-media), false takes the mark off; left out, the mark stays.', 'leitvia-studio' ),
+					),
+					'items'        => array(
 						'type'     => 'array',
 						'minItems' => 1,
 						'maxItems' => self::MAX_ALT_TEXTS,
@@ -258,7 +262,7 @@ final class Maintain {
 		Abilities::write(
 			'leitvia/replace-pattern',
 			__( 'Replace pattern', 'leitvia-studio' ),
-			__( 'Replaces top-level sections of one post with another pattern. Without pattern the sections that use a deprecated pattern (metadata.patternName) get the replacement the contract names, all of them or the one given by block; leitvia/audit-site reports such posts, and a section without replacement is rejected with leitvia_no_replacement. With pattern the one section given by block gets that pattern, any approved one of leitvia/list-patterns, with edits at block IDs of its outline as in leitvia/compose-page (text, link, image, caption, catalog attributes such as the level of a heading, anchor, columns of a grid, remove, repeat and insert): so a section of an existing page changes its pattern. Texts and button links of the old section move over in order per block type (carry false keeps the texts of the pattern), then the edits apply and win; the HTML anchor of the old section does not move over, set it again with an anchor edit. The base hash is the hash of the post from leitvia/get-page-outline.', 'leitvia-studio' ),
+			__( 'Replaces top-level sections of one post with another pattern. Without pattern the sections that use a deprecated pattern (metadata.patternName) get the replacement the contract names, all of them or the one given by block; leitvia/audit-site reports such posts, and a section without replacement is rejected with leitvia_no_replacement. With pattern the one section given by block gets that pattern, any approved one of leitvia/list-patterns, with edits at block IDs of its outline as in leitvia/compose-page (text, link, image, caption, catalog attributes such as the level of a heading, anchor, columns of a grid, remove, repeat and insert; they apply in order, and after a remove the later blocks of the same parent move up one place): so a section of an existing page changes its pattern. Texts and button links of the old section move over in order per block type (carry false keeps the texts of the pattern), then the edits apply and win; the HTML anchor of the old section does not move over, set it again with an anchor edit. The base hash is the hash of the post from leitvia/get-page-outline.', 'leitvia-studio' ),
 			'maintain',
 			$overwrite,
 			array(
@@ -591,12 +595,16 @@ final class Maintain {
 		if ( isset( $input['post'] ) !== isset( $input['block'] ) ) {
 			return Block_Edit::invalid( 'target', __( 'Send post and block together for a block, or neither for the attachment.', 'leitvia-studio' ), array( 'post' => $image ) );
 		}
+		if ( isset( $input['ai_generated'] ) && isset( $input['post'] ) ) {
+			return Block_Edit::invalid( 'ai_generated', __( 'ai_generated belongs to the image in the media library: send it without post and block.', 'leitvia-studio' ), array( 'post' => $image ) );
+		}
 		if ( ! isset( $input['post'] ) ) {
+			$ai = isset( $input['ai_generated'] ) ? ( $input['ai_generated'] ? '1' : '' ) : null;
 			return array(
 				'area'   => 'corrections',
 				'target' => array( 'post' => $image ),
 				'record' => true,
-				'change' => static function ( array $state ) use ( $image, $alt ) {
+				'change' => static function ( array $state ) use ( $image, $alt, $ai ) {
 					if ( 'attachment' !== $state['post_type'] || ! wp_attachment_is_image( $image ) ) {
 						return Block_Edit::invalid( 'image', __( 'The ID is no image of the media library.', 'leitvia-studio' ), array( 'post' => $image ) );
 					}
@@ -605,6 +613,9 @@ final class Maintain {
 						return Rejection::make( 'leitvia_check_failed', __( 'Checks found problems. Fix them as each finding suggests and try again.', 'leitvia-studio' ), 422, 'checks', array( 'post' => $image ), '', 'once', array( 'findings' => $findings ) );
 					}
 					$state['meta_input']['_wp_attachment_image_alt'] = $alt;
+					if ( null !== $ai ) {
+						$state['meta_input'][ Content::AI_META ] = $ai;
+					}
 					return $state;
 				},
 			);

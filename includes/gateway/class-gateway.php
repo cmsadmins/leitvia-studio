@@ -110,6 +110,7 @@ final class Gateway {
 		add_action( 'leitvia_studio_init', array( Abilities\Maintain::class, 'register' ) );
 		add_action( 'leitvia_studio_init', array( Abilities\Content::class, 'register' ) );
 		add_filter( 'the_content', array( Abilities\Content::class, 'note' ), 20 );
+		add_filter( 'render_block_core/image', array( Abilities\Content::class, 'image_note' ), 10, 2 );
 		add_action( 'leitvia_studio_init', array( Composition::class, 'register' ) );
 		add_action( 'leitvia_studio_init', array( Abilities\Read_Composition::class, 'register' ) );
 		add_action( 'leitvia_studio_init', array( Abilities\Read_Plan::class, 'register' ) );

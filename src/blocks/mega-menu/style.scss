@@ -47,6 +47,8 @@
 	inset-block-start: 100%;
 	inset-inline-start: 0;
 	inline-size: min(56rem, calc(100vw - 2 * var(--wp--preset--spacing--s, 1rem)));
+	// view.js moves a panel that would leave the window back inside it.
+	translate: var(--leitvia-mega-shift, 0) 0;
 	margin-block-start: var(--wp--preset--spacing--xs, 0.5rem);
 	padding: var(--wp--preset--spacing--m, 1.5rem);
 	border: 1px solid var(--wp--preset--color--stroke, currentcolor);
@@ -73,6 +75,62 @@
 	.items-justified-right & {
 		inset-inline: auto 0;
 	}
+
+	// Four columns or a column with a card need more room than three; :where() keeps the weight low for the overlay.
+	&:has(:where(.wp-block-column:nth-child(4))) {
+		inline-size: min(72rem, calc(100vw - 2 * var(--wp--preset--spacing--s, 1rem)));
+	}
+}
+
+// A tall panel scrolls inside itself, so no link of it ends up below the window (WCAG 2.4.11).
+.wp-block-navigation .wp-block-leitvia-mega-menu__panel {
+	box-sizing: border-box;
+	max-block-size: var(--leitvia-mega-max, calc(100vh - 8rem));
+	overflow-y: auto;
+}
+
+// Before view.js runs, and without JavaScript, the panel is in the HTML and shows while the focus or the pointer is in
+// the item: Tab walks from the link of the item into the panel, so every link stays reachable.
+.wp-block-leitvia-mega-menu:not([data-ready]) > .wp-block-leitvia-mega-menu__panel {
+	display: none;
+}
+
+.wp-block-leitvia-mega-menu:not([data-ready]):is(:focus-within, :hover) > .wp-block-leitvia-mega-menu__panel {
+	display: block;
+}
+
+// Icons of menu items (attribute icon of the mega menu, leitviaIcon of navigation links and submenus): decorative,
+// before the text, a little larger than it, in the accent role and with the line width of the token iconStroke.
+.wp-block-navigation-item__content > .leitvia-icon {
+	flex: none;
+	inline-size: auto;
+	block-size: 1.25em;
+	margin-inline-end: 0.375em;
+	color: var(--wp--preset--color--accent, currentcolor);
+	vertical-align: -0.25em;
+
+	&[stroke] {
+		stroke-width: calc(var(--wp--custom--icon-stroke, 2) * var(--leitvia-icon-scale, 1));
+	}
+}
+
+.wp-block-navigation-item__content:has(> .leitvia-icon) {
+	display: inline-flex;
+	align-items: center;
+}
+
+// Column heads of the panel patterns (class leitvia-mega-menu-head): icon and linked title on one line.
+.wp-block-leitvia-mega-menu__panel .leitvia-mega-menu-head {
+	align-items: center;
+
+	.leitvia-icon[stroke] {
+		stroke-width: calc(var(--wp--custom--icon-stroke, 2) * var(--leitvia-icon-scale, 1));
+	}
+}
+
+// The button view.js adds to each column head; it only shows in the overlay, where columns collapse.
+.wp-block-leitvia-mega-menu__column-toggle {
+	display: none;
 }
 
 // Overlay: the panel is a collapsible section in the flow of the menu. The selectors outweigh core's overlay rules
@@ -88,6 +146,8 @@ $overlay: ".wp-block-navigation__responsive-container.is-menu-open .wp-block-nav
 	position: static;
 	flex-basis: 100%;
 	inline-size: auto;
+	max-block-size: none;
+	overflow: visible;
 	margin: 0;
 	padding: var(--wp--preset--spacing--xs, 0.5rem) 0 0;
 	border: 0;
@@ -98,6 +158,51 @@ $overlay: ".wp-block-navigation__responsive-container.is-menu-open .wp-block-nav
 
 	&::before {
 		content: none;
+	}
+}
+
+// Columns of a panel in the overlay: each column head gets a button (view.js), a collapsed column shows only its head.
+.is-menu-open .wp-block-leitvia-mega-menu__panel {
+	.wp-block-column {
+		text-align: start;
+	}
+
+	.leitvia-mega-menu-head {
+		flex-wrap: nowrap;
+	}
+
+	.wp-block-leitvia-mega-menu__column-toggle {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		min-inline-size: 1.5rem;
+		min-block-size: 1.5rem;
+		margin-inline-start: auto;
+		padding: 0;
+		border: 0;
+		background: transparent;
+		color: inherit;
+		cursor: pointer;
+
+		svg {
+			inline-size: 0.75rem;
+			block-size: 0.75rem;
+			fill: none;
+			stroke: currentcolor;
+		}
+
+		&[aria-expanded="true"] svg {
+			transform: rotate(180deg);
+		}
+
+		&:focus-visible {
+			outline: 2px solid var(--wp--preset--color--focus, currentcolor);
+			outline-offset: 2px;
+		}
+	}
+
+	.wp-block-column.is-collapsed > :not(.leitvia-mega-menu-head) {
+		display: none;
 	}
 }
 

@@ -12,6 +12,8 @@ use LeitviaStudio\Gateway\Block_Edit;
 use LeitviaStudio\Gateway\Content_Checks;
 use LeitviaStudio\Gateway\Hashes;
 use LeitviaStudio\Admin\Settings;
+use LeitviaStudio\Blocks\Icon;
+use LeitviaStudio\Blocks\Mega_Menu;
 use LeitviaStudio\Consent\Consent;
 use LeitviaStudio\Gateway\Pipeline;
 use LeitviaStudio\Gateway\Recipes;
@@ -581,22 +583,44 @@ final class Setup {
 			) + $object,
 			array( self::class, 'describe_update_site_values' )
 		);
+		$icon = array(
+			'type'        => 'string',
+			'pattern'     => '^[a-z][a-z0-9-]*$',
+			'maxLength'   => 60,
+			'description' => __( 'Name of an icon from the icon set (enum of the attribute icon of leitvia/icon in leitvia/list-blocks), shown before the text in the accent color and hidden from screen readers; at most one per item, the text still names the target. Leave it out for none.', 'leitvia-studio' ),
+		);
 		$item = array(
 			'type'                 => 'object',
 			'properties'           => array(
-				'label' => array(
+				'label'       => array(
 					'type'        => 'string',
 					'minLength'   => 1,
 					'maxLength'   => 100,
 					'description' => __( 'Text of the link; it names the target.', 'leitvia-studio' ),
 				),
-				'url'   => array(
+				'url'         => array(
 					'type'        => 'string',
 					'minLength'   => 1,
 					'maxLength'   => 2000,
-					'description' => __( 'Address of this site, https, mailto: or tel:. An item with sub items may leave it out: it then only opens its submenu.', 'leitvia-studio' ),
+					'description' => __( 'Address of this site, https, mailto: or tel:. An item with sub items may leave it out: it then only opens its submenu. A mega menu needs it: the overview page of its topic, the link without JavaScript.', 'leitvia-studio' ),
 				),
-				'items' => array(
+				'type'        => array(
+					'type'        => 'string',
+					'enum'        => array( 'link', 'mega' ),
+					'description' => __( 'link (the default): a link, or a submenu with items. mega: a mega menu item, a link to url with a button beside it that opens the template part panel; fill the panel first with leitvia/update-template-part.', 'leitvia-studio' ),
+				),
+				'panel'       => array(
+					'type'        => 'string',
+					'pattern'     => '^[a-z0-9-]+$',
+					'description' => __( 'Only with type mega: name of the panel, a template part in the area Mega menu, such as mega-menu-services; leitvia/get-contract lists them under megaMenu.panels.', 'leitvia-studio' ),
+				),
+				'description' => array(
+					'type'        => 'string',
+					'maxLength'   => 200,
+					'description' => __( 'Only with type mega: a short text below the label, left out by most menus.', 'leitvia-studio' ),
+				),
+				'icon'        => $icon,
+				'items'       => array(
 					'type'     => 'array',
 					'maxItems' => 30,
 					'items'    => array(
@@ -614,6 +638,7 @@ final class Setup {
 								'maxLength'   => 2000,
 								'description' => __( 'Address of this site, https, mailto: or tel:.', 'leitvia-studio' ),
 							),
+							'icon'  => $icon,
 						),
 						'required'             => array( 'label', 'url' ),
 						'additionalProperties' => false,
@@ -626,7 +651,7 @@ final class Setup {
 		Abilities::write(
 			'leitvia/update-navigation',
 			__( 'Update navigation', 'leitvia-studio' ),
-			__( 'Replaces the links of a navigation menu, by default the one published last, which headers without a chosen menu show. Send items (with one level of sub items) or block markup of navigation links, submenus, page lists and mega menus. Links point to this site, use https, mailto: or tel:, and need a text that names their target. The change publishes the menu, a draft one too, since core shows no draft menu. The base hash is the hash of the menu, empty when the site has none. leitvia/get-contract returns it per published menu under hashes.navigation.', 'leitvia-studio' ),
+			__( 'Replaces the links of a navigation menu, by default the one published last, which headers without a chosen menu show. Send items (with one level of sub items) or block markup of navigation links, submenus, page lists and mega menus. Links point to this site, use https, mailto: or tel:, and need a text that names their target. An item with type mega and panel is a mega menu: a link to the overview page in url and a button that opens the panel, a template part in the area Mega menu that leitvia/update-template-part fills first (part mega-menu-<name>, pattern and edits). icon puts an icon of the icon set (enum of the attribute icon of leitvia/icon in leitvia/list-blocks) before the text of an item or sub item. The change publishes the menu, a draft one too, since core shows no draft menu. The base hash is the hash of the menu, empty when the site has none. leitvia/get-contract returns it per published menu under hashes.navigation.', 'leitvia-studio' ),
 			'setup',
 			$replace,
 			array(
@@ -652,7 +677,7 @@ final class Setup {
 		Abilities::write(
 			'leitvia/update-template-part',
 			__( 'Update template part', 'leitvia-studio' ),
-			__( 'Replaces a template part of the contract, such as header, footer or sidebar, with a pattern made for its area or with changed block markup. Part names come from leitvia/get-contract; with Polylang <part>-<language> (header-de) is the part the theme shows for that language and is created in the area of its part. Patterns come from leitvia/list-patterns; edits change the pattern at block IDs of leitvia/get-pattern first, as the sections of leitvia/compose-page do, so a footer or header needs no markup of its own. The change publishes the part, a draft one too: core shows no draft part, so where the area level is draft it waits in a change package. The base hash is the hash of the template part. leitvia/get-contract returns it per part under hashes.templateParts.', 'leitvia-studio' ),
+			__( 'Replaces a template part of the contract, such as header, footer or sidebar, with a pattern made for its area or with changed block markup. Part names come from leitvia/get-contract; with Polylang <part>-<language> (header-de) is the part the theme shows for that language and is created in the area of its part. A panel of a mega menu is a part named mega-menu-<name> (or one listed under megaMenu.panels of leitvia/get-contract), created in the area Mega menu on the first write; fill it with a pattern of megaMenu.patterns and edits, then link it with leitvia/update-navigation (type mega, panel). Patterns come from leitvia/list-patterns; edits change the pattern at block IDs of leitvia/get-pattern first, as the sections of leitvia/compose-page do, so a footer or header needs no markup of its own. The change publishes the part, a draft one too: core shows no draft part, so where the area level is draft it waits in a change package. The base hash is the hash of the template part. leitvia/get-contract returns it per part under hashes.templateParts.', 'leitvia-studio' ),
 			'setup',
 			$replace,
 			array(
@@ -660,7 +685,7 @@ final class Setup {
 					'part'    => array(
 						'type'        => 'string',
 						'pattern'     => '^[a-z0-9-]+$',
-						'description' => __( 'Name of a template part from leitvia/get-contract, such as header or footer.', 'leitvia-studio' ),
+						'description' => __( 'Name of a template part from leitvia/get-contract, such as header or footer, or of a mega menu panel, such as mega-menu-services.', 'leitvia-studio' ),
 					),
 					'pattern' => array( 'type' => 'string' ),
 					'edits'   => array( 'description' => __( 'Only with pattern: edits at block IDs of the pattern, as in the sections of leitvia/compose-page.', 'leitvia-studio' ) ) + Build::edits_schema(),
@@ -1471,6 +1496,12 @@ final class Setup {
 			);
 			$id     = (int) ( $latest[0] ?? 0 );
 		}
+		foreach ( (array) ( $input['items'] ?? array() ) as $index => $item ) {
+			$invalid = self::invalid_item( (array) $item, (int) $index );
+			if ( $invalid ) {
+				return $invalid;
+			}
+		}
 		$content = isset( $input['content'] ) ? (string) $input['content'] : serialize_blocks( self::links( (array) $input['items'] ) );
 		$target  = $id ? array( 'post' => $id ) : array(
 			'post'      => 0,
@@ -1516,8 +1547,13 @@ final class Setup {
 				break;
 			}
 		}
+		// Panels of mega menus are no part of the contract: a saved part in the area mega-menu or a new mega-menu-<name>.
+		if ( null === $area && Mega_Menu::is_panel( $name ) ) {
+			$area  = 'mega-menu';
+			$title = ucfirst( str_replace( '-', ' ', $name ) );
+		}
 		if ( null === $area ) {
-			return Block_Edit::invalid( 'part', __( 'The contract has no template part with this name.', 'leitvia-studio' ), array( 'part' => $name ), 'leitvia/get-contract' );
+			return Block_Edit::invalid( 'part', __( 'The contract has no template part with this name. Panels of mega menus are named mega-menu-<name>.', 'leitvia-studio' ), array( 'part' => $name ), 'leitvia/get-contract' );
 		}
 		if ( isset( $input['pattern'] ) === isset( $input['content'] ) ) {
 			return Block_Edit::invalid( 'change', __( 'Send either a pattern or content.', 'leitvia-studio' ), array( 'part' => $name ) );
@@ -1526,6 +1562,9 @@ final class Setup {
 		if ( isset( $input['pattern'] ) ) {
 			$pattern = \WP_Block_Patterns_Registry::get_instance()->get_registered( (string) $input['pattern'] );
 			$fits    = $pattern && ( in_array( 'core/template-part/' . $area, (array) ( $pattern['blockTypes'] ?? array() ), true ) || array_intersect( array( $name, $area ), (array) ( $pattern['categories'] ?? array() ) ) );
+			if ( ! $fits && 'mega-menu' === $area ) {
+				return Rejection::make( 'leitvia_unknown_pattern', __( 'There is no pattern with this name for a mega menu panel. Use one of the patterns the rejection lists in patterns.', 'leitvia-studio' ), 404, 'pattern', array( 'pattern' => (string) $input['pattern'] ), 'leitvia/get-contract', 'once', array( 'patterns' => array_column( Mega_Menu::panel_patterns(), 'name' ) ) );
+			}
 			if ( ! $fits ) {
 				return Rejection::make( 'leitvia_unknown_pattern', __( 'There is no pattern with this name for this template part. List the patterns of its area and use one of them.', 'leitvia-studio' ), 404, 'pattern', array( 'pattern' => (string) $input['pattern'] ), 'leitvia/list-patterns' );
 			}
@@ -1776,22 +1815,67 @@ final class Setup {
 	}
 
 	/**
-	 * Navigation link blocks of items.
+	 * Rejection for an item of update-navigation that does not fit its type: a mega menu needs a panel that exists, an
+	 * overview link and no sub items; panel and description belong to a mega menu only. Null when it fits.
 	 *
-	 * @param array<mixed> $items Items with label, url and sub items.
+	 * @param array<string, mixed> $item  Item.
+	 * @param int                  $index Position in items.
+	 */
+	private static function invalid_item( array $item, int $index ): ?\WP_Error {
+		$target = array( 'item' => $index );
+		if ( 'mega' !== ( $item['type'] ?? 'link' ) ) {
+			return isset( $item['panel'] ) || isset( $item['description'] ) ? Block_Edit::invalid( 'panel', __( 'panel and description belong to an item with type mega.', 'leitvia-studio' ), $target ) : null;
+		}
+		if ( ! empty( $item['items'] ) ) {
+			return Block_Edit::invalid( 'items', __( 'A mega menu shows its panel, not sub items. Put the links in the panel, or make the item a submenu without type mega.', 'leitvia-studio' ), $target );
+		}
+		if ( '' === (string) ( $item['url'] ?? '' ) ) {
+			return Block_Edit::invalid( 'url', __( 'A mega menu needs url, the overview page of its topic: without JavaScript and for search engines the item is that link.', 'leitvia-studio' ), $target );
+		}
+		$panel = (string) ( $item['panel'] ?? '' );
+		if ( '' === $panel || ! isset( Mega_Menu::panels()[ $panel ] ) ) {
+			return Block_Edit::invalid( 'panel', __( 'There is no mega menu panel with this name. Create and fill it with leitvia/update-template-part (part mega-menu-<name> and a pattern for the area Mega menu) first.', 'leitvia-studio' ), $target + array( 'part' => $panel ), 'leitvia/get-contract' );
+		}
+		return null;
+	}
+
+	/**
+	 * Navigation blocks of items: links, submenus and mega menus, each with its icon.
+	 *
+	 * @param array<mixed> $items Items with label, url, type, panel, description, icon and sub items.
 	 * @return list<array{blockName: string, attrs: array<string, string>, innerBlocks: list<array<string, mixed>>, innerHTML: string, innerContent: list<null>}>
 	 */
 	private static function links( array $items ): array {
 		$blocks = array();
 		foreach ( $items as $item ) {
+			if ( 'mega' === ( $item['type'] ?? 'link' ) ) {
+				$blocks[] = array(
+					'blockName'    => 'leitvia/mega-menu',
+					'attrs'        => array_filter(
+						array(
+							'label'       => (string) $item['label'],
+							'url'         => (string) ( $item['url'] ?? '' ),
+							'slug'        => (string) ( $item['panel'] ?? '' ),
+							'description' => (string) ( $item['description'] ?? '' ),
+							'icon'        => (string) ( $item['icon'] ?? '' ),
+						),
+						static fn( string $value ): bool => '' !== $value
+					),
+					'innerBlocks'  => array(),
+					'innerHTML'    => '',
+					'innerContent' => array(),
+				);
+				continue;
+			}
 			$inner    = self::links( (array) ( $item['items'] ?? array() ) );
 			$blocks[] = array(
 				'blockName'    => $inner ? 'core/navigation-submenu' : 'core/navigation-link',
 				'attrs'        => array_filter(
 					array(
-						'label' => (string) $item['label'],
-						'url'   => (string) ( $item['url'] ?? '' ),
-						'kind'  => 'custom',
+						'label'       => (string) $item['label'],
+						'url'         => (string) ( $item['url'] ?? '' ),
+						'kind'        => 'custom',
+						'leitviaIcon' => (string) ( $item['icon'] ?? '' ),
 					),
 					static fn( string $value ): bool => '' !== $value
 				),
@@ -1825,9 +1909,13 @@ final class Setup {
 				$findings[] = self::finding( $id, __( 'A navigation holds only navigation links, submenus, page lists and mega menus.', 'leitvia-studio' ), __( 'Remove the block or turn it into a navigation link.', 'leitvia-studio' ) );
 				continue;
 			}
-			$url = (string) ( $block['attrs']['url'] ?? '' );
+			$url  = (string) ( $block['attrs']['url'] ?? '' );
+			$icon = (string) ( $block['attrs']['leitviaIcon'] ?? $block['attrs']['icon'] ?? '' );
+			if ( '' !== $icon && ! isset( Icon::icons()[ $icon ] ) ) {
+				$findings[] = self::finding( $id, __( 'The icon is not in the icon set.', 'leitvia-studio' ), __( 'Use a name from the icon set (enum of the attribute icon of leitvia/icon in leitvia/list-blocks), or leave the icon out.', 'leitvia-studio' ) );
+			}
 			// A submenu without an address is a button that opens its links, as for a group like Specialities.
-			if ( 'core/navigation-link' === $name || ( 'core/navigation-submenu' === $name && '' !== $url ) ) {
+			if ( 'core/navigation-link' === $name || 'leitvia/mega-menu' === $name || ( 'core/navigation-submenu' === $name && '' !== $url ) ) {
 				if ( ! self::link_target( $url ) ) {
 					$findings[] = self::finding( $id, __( 'The link goes to another site without https, or to no page.', 'leitvia-studio' ), __( 'Link to a page of this site, an https address, an email address (mailto:) or a phone number (tel:).', 'leitvia-studio' ) );
 				}

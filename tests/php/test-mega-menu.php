@@ -58,9 +58,45 @@ class Test_Mega_Menu extends WP_UnitTestCase {
 			)
 		);
 		$this->assertMatchesRegularExpression( '#^<li class="wp-block-navigation-item wp-block-leitvia-mega-menu"><a class="wp-block-navigation-item__content" href="/products/"><span class="wp-block-navigation-item__label">Products</span></a>#', $html );
-		$this->assertMatchesRegularExpression( '#<button type="button" class="wp-block-leitvia-mega-menu__toggle" aria-expanded="false" aria-controls="(leitvia-mega-menu-\d+)" aria-label="Products submenu" hidden>.*</button><div id="\1" class="wp-block-leitvia-mega-menu__panel" hidden>#s', $html );
+		$this->assertMatchesRegularExpression( '#<button type="button" class="wp-block-leitvia-mega-menu__toggle" aria-expanded="false" aria-controls="(leitvia-mega-menu-\d+)" aria-label="Products submenu" hidden>.*</button><div id="\1" class="wp-block-leitvia-mega-menu__panel" data-column-label="%s submenu">#s', $html );
 		$this->assertStringContainsString( 'Panel content</p>', $html );
 		$this->assertStringEndsWith( '</div></li>', $html );
+	}
+
+	/**
+	 * An icon of the set stands before the text, decorative; an unknown name draws nothing. Navigation links and
+	 * submenus get it through leitviaIcon, before their own text only.
+	 */
+	public function test_icons_before_the_text(): void {
+		$html = do_blocks(
+			self::block(
+				array(
+					'label' => 'Products',
+					'url'   => '/products/',
+					'icon'  => 'layers',
+				)
+			)
+		);
+		$this->assertMatchesRegularExpression( '#<a class="wp-block-navigation-item__content" href="/products/"><svg class="leitvia-icon leitvia-icon--layers"[^>]*aria-hidden="true"[^>]*>.*</svg><span class="wp-block-navigation-item__label">Products</span></a>#s', $html );
+		$this->assertStringNotContainsString( '<svg', do_blocks( self::block( array( 'label' => 'Products', 'url' => '/products/', 'icon' => 'no-such-icon' ) ) ) ); // phpcs:ignore WordPress.Arrays.ArrayDeclarationSpacing.AssociativeArrayFound -- One block.
+
+		$menu = do_blocks( '<!-- wp:navigation --><!-- wp:navigation-submenu {"label":"About","url":"/about/","leitviaIcon":"users"} --><!-- wp:navigation-link {"label":"Team","url":"/team/"} /--><!-- /wp:navigation-submenu --><!-- wp:navigation-link {"label":"Contact","url":"/contact/","leitviaIcon":"mail"} /--><!-- /wp:navigation -->' );
+		$this->assertSame( 1, substr_count( $menu, 'leitvia-icon--users' ) );
+		$this->assertSame( 1, substr_count( $menu, 'leitvia-icon--mail' ) );
+		$this->assertSame( 2, substr_count( $menu, '<svg class="leitvia-icon ' ) );
+		$this->assertMatchesRegularExpression( '#leitvia-icon--mail"[^>]*>.*?</svg><span class="wp-block-navigation-item__label">Contact#s', $menu );
+		$this->assertArrayHasKey( 'leitviaIcon', WP_Block_Type_Registry::get_instance()->get_registered( 'core/navigation-link' )->attributes );
+	}
+
+	/**
+	 * Without JavaScript every link of the panel is in the HTML: the panel carries no hidden attribute, the stylesheet
+	 * shows it while the focus is in the item.
+	 */
+	public function test_panel_links_without_javascript(): void {
+		$this->part();
+		$html = do_blocks( self::block( array( 'label' => 'Products', 'url' => '/products/', 'slug' => 'mega-test' ) ) ); // phpcs:ignore WordPress.Arrays.ArrayDeclarationSpacing.AssociativeArrayFound -- One block.
+		$this->assertDoesNotMatchRegularExpression( '#class="wp-block-leitvia-mega-menu__panel"[^>]*hidden#', $html );
+		$this->assertStringContainsString( 'Panel content', $html );
 	}
 
 	/**

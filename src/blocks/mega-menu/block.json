@@ -7,7 +7,7 @@
 	"category": "leitvia",
 	"parent": [ "core/navigation" ],
 	"icon": "layout",
-	"description": "A menu item that opens a large panel. The panel is a template part in the area Mega menu, designed in the Site Editor. Without JavaScript the item is a plain link.",
+	"description": "A menu item that links to an overview page and opens a large panel beside it. The panel is a template part in the area Mega menu. Without JavaScript the panel links stay in the page and open with the focus.",
 	"keywords": [ "menu", "navigation", "panel", "dropdown" ],
 	"textdomain": "leitvia-studio",
 	"attributes": {
@@ -24,6 +24,10 @@
 			"default": ""
 		},
 		"description": {
+			"type": "string",
+			"default": ""
+		},
+		"icon": {
 			"type": "string",
 			"default": ""
 		}

@@ -1207,4 +1207,41 @@ trailer
 		$this->assertSame( array( 90, 'vh' ), array( parse_blocks( $content )[0]['attrs']['minHeight'], parse_blocks( $content )[0]['attrs']['minHeightUnit'] ) );
 		$this->assert_rejected( 'leitvia_invalid_input', self::edit( $cover, array( 'attributes' => array( 'minHeight' => 120 ) ) ) );
 	}
+
+	/**
+	 * A cover takes the focal point of its photo as the editor saves it, as object-position of the background image in
+	 * whole percent; a share outside 0 to 1 is refused, null puts the photo back in the middle.
+	 */
+	public function test_cover_focal_point(): void {
+		$url     = home_url( '/wp-content/uploads/stage.jpg' );
+		$cover   = self::page( '<!-- wp:cover {"url":"' . $url . '","dimRatio":70} --><div class="wp-block-cover"><img class="wp-block-cover__image-background" alt="" src="' . $url . '" data-object-fit="cover"/><span aria-hidden="true" class="wp-block-cover__background has-background-dim-70 has-background-dim"></span><div class="wp-block-cover__inner-container"><!-- wp:paragraph --><p>Hi</p><!-- /wp:paragraph --></div></div><!-- /wp:cover -->' );
+		$point   = array(
+			'x' => 0.3,
+			'y' => 0.25,
+		);
+		$content = self::edit( $cover, array( 'attributes' => array( 'focalPoint' => $point ) ) );
+		$this->assertIsString( $content, is_wp_error( $content ) ? $content->get_error_message() : '' );
+		$this->assertStringContainsString( 'data-object-position="30% 25%"', $content );
+		$this->assertStringContainsString( 'style="object-position:30% 25%"', $content );
+		$this->assertEquals( $point, parse_blocks( $content )[0]['attrs']['focalPoint'] );
+		$this->assertStringContainsString( 'object-position:30% 25%', do_blocks( $content ) );
+		$this->assert_rejected(
+			'leitvia_invalid_input',
+			self::edit(
+				$cover,
+				array(
+					'attributes' => array(
+						'focalPoint' => array(
+							'x' => 1.5,
+							'y' => 0,
+						),
+					),
+				)
+			)
+		);
+		$content = self::edit( $cover, array( 'attributes' => array( 'focalPoint' => null ) ) );
+		$this->assertIsString( $content, is_wp_error( $content ) ? $content->get_error_message() : '' );
+		$this->assertStringNotContainsString( 'object-position', $content );
+		$this->assertArrayNotHasKey( 'focalPoint', parse_blocks( $content )[0]['attrs'] );
+	}
 }

@@ -1,7 +1,7 @@
 {
 	"usage": {
-		"useWhen": "A main navigation item with many sub pages or teasers that need a large panel.",
+		"useWhen": "A main navigation item with many sub pages or teasers that need a large panel. Create the panel with leitvia/update-template-part (part mega-menu-<name>, a pattern of megaMenu.patterns of leitvia/get-contract), then the item with leitvia/update-navigation (type mega, panel, url of the overview page).",
 		"avoidWhen": "Menus with a few sub pages; use a normal submenu of the navigation block.",
-		"a11y": "The item is a link with a button that opens the panel; Escape closes it. Without JavaScript it stays a plain link."
+		"a11y": "The item is a link to the overview page with a button beside it (aria-expanded, aria-controls) that opens the panel; Escape closes it and returns focus, hover opens only after a pause. Without JavaScript the panel links stay in the page and open with the focus. In the mobile overlay the panel and its column heads are an accordion. The icon is decorative."
 	}
 }
