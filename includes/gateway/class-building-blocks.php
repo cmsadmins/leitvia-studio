@@ -262,6 +262,30 @@ final class Building_Blocks {
 	}
 
 	/**
+	 * Adds the fields a building block declares now to the post types and taxonomies of it the site stored before: an
+	 * update of the add-on with a new field reaches a site that added the block earlier, without a second
+	 * add-building-block. Only missing fields come in; stored fields, their values and entries from code stay as they
+	 * are, and a declaration the model check refuses stays out. Runs on init, priority 8, before the model registers.
+	 */
+	public static function refresh(): void {
+		$stored = Model::stored();
+		$next   = $stored;
+		foreach ( leitvia_studio()->registry( 'building_blocks' )->all() as $block ) {
+			foreach ( array( 'postTypes', 'taxonomies' ) as $section ) {
+				foreach ( (array) ( $block['model'][ $section ] ?? array() ) as $key => $entry ) {
+					if ( is_array( $next[ $section ][ $key ] ?? null ) && is_array( $entry['fields'] ?? null ) ) {
+						$next[ $section ][ $key ]['fields'] = (array) ( $next[ $section ][ $key ]['fields'] ?? array() ) + $entry['fields'];
+					}
+				}
+			}
+		}
+		if ( $next !== $stored && true === Model::save( $next, true ) ) {
+			update_option( Model::OPTION, $next, true );
+			Model::forget();
+		}
+	}
+
+	/**
 	 * The sample entries of a block: a list of { postType, terms, entries }, empty without samples.
 	 *
 	 * @param array<string, mixed> $block Registry entry.

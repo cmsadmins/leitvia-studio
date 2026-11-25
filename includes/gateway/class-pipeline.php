@@ -73,9 +73,9 @@ final class Pipeline {
 	 * Options an operation may target: the organization data of the site, the reading settings, the pages a recipe
 	 * connects and the options a recipe may turn off (see schemas/recipe.schema.json). Every option counts as
 	 * organization data. The site settings of the content model are open as well, see model_setting(), and the options
-	 * of add-ons, see addon_options().
+	 * of add-ons, see addon_options(). The SEO texts of archives (Abilities\Seo::ARCHIVE_OPTION) count as well.
 	 */
-	public const OPTIONS = array( 'blogname', 'blogdescription', 'site_logo', 'site_icon', 'show_on_front', 'page_on_front', 'page_for_posts', 'leitvia_studio_settings', 'default_pingback_flag', 'default_ping_status', 'default_comment_status', 'show_avatars', 'wp_page_for_privacy_policy', 'permalink_structure', 'category_base', 'tag_base', 'woocommerce_terms_page_id', 'woocommerce_feature_order_attribution_enabled', 'woocommerce_allow_tracking', 'woocommerce_show_marketplace_suggestions', 'woocommerce_feature_remote_logging_enabled' );
+	public const OPTIONS = array( 'blogname', 'blogdescription', 'site_logo', 'site_icon', 'show_on_front', 'page_on_front', 'page_for_posts', 'leitvia_studio_settings', 'default_pingback_flag', 'default_ping_status', 'default_comment_status', 'show_avatars', 'wp_page_for_privacy_policy', 'permalink_structure', 'category_base', 'tag_base', 'woocommerce_terms_page_id', 'woocommerce_feature_order_attribution_enabled', 'woocommerce_allow_tracking', 'woocommerce_show_marketplace_suggestions', 'woocommerce_feature_remote_logging_enabled', Abilities\Seo::ARCHIVE_OPTION );
 
 	/**
 	 * Core options that stay closed to add-ons, see protected_option().

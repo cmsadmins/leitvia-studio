@@ -109,6 +109,7 @@ final class Plugin {
 		add_action( 'rest_api_init', array( Admin\Admin::class, 'register_routes' ) );
 		add_action( 'leitvia_studio_screen_notes', array( Admin\Admin::class, 'pro_note' ) );
 		Avatars\Avatars::boot();
+		add_action( 'init', array( Gateway\Building_Blocks::class, 'refresh' ), 8 );
 		add_action( 'init', array( Model\Registrar::class, 'register' ), 9 );
 		add_action( 'init', array( Model\Registrar::class, 'maybe_flush' ), 999 );
 		add_filter( 'wp_insert_post_data', array( Model\Registrar::class, 'force_inherit' ) );

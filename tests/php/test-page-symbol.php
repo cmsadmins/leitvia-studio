@@ -142,6 +142,37 @@ class Test_Page_Symbol extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'Updates, backups and support for your site.', $card );
 		$this->assertStringContainsString( 'href="' . get_permalink( $hub ) . '"', $card );
 		$this->assertStringContainsString( 'wp:leitvia/table-of-contents', Aside::top( '' ) );
+
+		// The hub of many posts goes into one change package: package is the key of the task, as on every write.
+		$other = self::factory()->post->create( array( 'post_status' => 'publish' ) );
+		$first = self::structure(
+			$post,
+			array(
+				'hub'     => 0,
+				'package' => 'posts-hub',
+			)
+		);
+		$next  = self::structure(
+			$other,
+			array(
+				'hub'     => $hub,
+				'package' => 'posts-hub',
+			)
+		);
+		$this->assertNotWPError( $first );
+		$this->assertNotWPError( $next );
+		$this->assertSame( 'package', $first['mode'] );
+		$this->assertSame( $first['package'], $next['package'] );
+		$this->assertSame( $hub, (int) get_post_meta( $post, Cluster::HUB_META, true ), 'waits in the package' );
+		$this->assertWPError(
+			self::structure(
+				$other,
+				array(
+					'icon'    => 'server',
+					'package' => 'posts-hub',
+				)
+			)
+		);
 	}
 
 	/**

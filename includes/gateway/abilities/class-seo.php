@@ -42,6 +42,12 @@ final class Seo {
 	public const DESCRIPTION_MAX = 160;
 
 	/**
+	 * Option with SEO title and description of the archives of content types without an SEO plugin, by post type:
+	 * array( '<type>' => array( 'title' => …, 'description' => … ) ). update-seo with archive writes it, News\Head prints it.
+	 */
+	public const ARCHIVE_OPTION = 'leitvia_studio_archive_seo';
+
+	/**
 	 * Supported SEO plugins: constant that marks them active, name, meta key per field and the value that switches
 	 * noindex or nofollow on. Rank Math keeps robots as one list. All in One SEO keeps its data in a table of its own;
 	 * it is detected so nothing writes beside it, but not read. leitvia is no plugin: without an SEO plugin Studio keeps
@@ -275,6 +281,11 @@ final class Seo {
 						'minimum'     => 1,
 						'description' => __( 'Post ID from leitvia/list-content.', 'leitvia-studio' ),
 					),
+					'archive'     => array(
+						'type'        => 'string',
+						'maxLength'   => 20,
+						'description' => __( 'In place of post: the key of a content type whose archive (the overview at its address, such as /docs/) takes the title and description, without an SEO plugin only. base_hash is empty then; like every setting it waits in a change package for a person.', 'leitvia-studio' ),
+					),
 					'title'       => array(
 						'type'      => 'string',
 						'maxLength' => 200,
@@ -292,7 +303,6 @@ final class Seo {
 						'description' => __( 'Ask search engines not to follow the links of the page.', 'leitvia-studio' ),
 					),
 				),
-				'required'             => array( 'post' ),
 				'additionalProperties' => false,
 			),
 			array( self::class, 'describe_update' )
@@ -509,7 +519,7 @@ final class Seo {
 		$post   = (int) ( $input['post'] ?? 0 );
 		$target = array( 'post' => $post );
 		$type   = get_post_type( $post );
-		if ( 'post' === $type && Scope::readable( $post ) && array_diff( array_keys( $input ), array( 'post', 'hub', 'base_hash' ) ) ) {
+		if ( 'post' === $type && Scope::readable( $post ) && array_diff( array_keys( $input ), array( 'post', 'hub', 'base_hash', 'package' ) ) ) {
 			return Block_Edit::invalid( 'post', __( 'A post takes only hub, the page of the service it is about.', 'leitvia-studio' ), $target );
 		}
 		if ( ! in_array( $type, array( 'page', 'post' ), true ) || ! Scope::readable( $post ) ) {
@@ -822,9 +832,15 @@ final class Seo {
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	public static function describe_update( array $input ) {
+		if ( isset( $input['archive'] ) ) {
+			return self::describe_archive( $input );
+		}
 		$post   = (int) ( $input['post'] ?? 0 );
 		$target = array( 'post' => $post );
-		$key    = self::plugin();
+		if ( ! $post ) {
+			return Block_Edit::invalid( 'post', __( 'Name the post with post, or a content type with archive.', 'leitvia-studio' ), $target, 'leitvia/list-content' );
+		}
+		$key = self::plugin();
 		if ( '' === $key || array() === self::PLUGINS[ $key ]['meta'] ) {
 			return Rejection::make( 'leitvia_no_seo_plugin', __( 'No SEO plugin Leitvia Studio can write to is active (Yoast SEO, Rank Math, SEOPress or The SEO Framework). Change the excerpt with leitvia/update-content instead, or ask a person to install one.', 'leitvia-studio' ), 422, 'seo_plugin', $target, 'leitvia/update-content', 'never' );
 		}
@@ -865,6 +881,46 @@ final class Seo {
 				}
 				$state['meta_input'] = $meta;
 				return $state;
+			},
+		);
+	}
+
+	/**
+	 * Operation of update-seo with archive: title and description of the archive of a public content type in
+	 * ARCHIVE_OPTION, an empty string removes one. Without an SEO plugin only: a plugin keeps archive titles in its own
+	 * settings.
+	 *
+	 * @param array<string, mixed> $input Input.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public static function describe_archive( array $input ) {
+		$type   = (string) $input['archive'];
+		$target = array( 'archive' => $type );
+		if ( 'leitvia' !== self::plugin() ) {
+			return Rejection::make( 'leitvia_no_seo_plugin', __( 'The SEO plugin keeps the titles of archives in its own settings; report the wish to the person.', 'leitvia-studio' ), 422, 'seo_plugin', $target, '', 'never' );
+		}
+		$object = get_post_type_object( $type );
+		if ( ! $object || ! $object->public || ! $object->has_archive ) {
+			return Block_Edit::invalid( 'archive', __( 'archive names a public content type with an archive, as leitvia/get-content-model lists them.', 'leitvia-studio' ), $target, 'leitvia/get-content-model' );
+		}
+		if ( array_intersect_key( $input, array_flip( array( 'post', 'noindex', 'nofollow' ) ) ) ) {
+			return Block_Edit::invalid( 'archive', __( 'An archive takes title and description only.', 'leitvia-studio' ), $target );
+		}
+		$texts = self::texts( $input, $target );
+		if ( is_wp_error( $texts ) ) {
+			return $texts;
+		}
+		if ( ! $texts ) {
+			return Block_Edit::invalid( 'change', __( 'Name what to change: title or description.', 'leitvia-studio' ), $target );
+		}
+		return array(
+			'area'      => 'content',
+			'target'    => array( 'option' => self::ARCHIVE_OPTION ) + $target,
+			'base_hash' => Hashes::of( (string) wp_json_encode( get_option( self::ARCHIVE_OPTION ) ) ),
+			'change'    => static function ( array $state ) use ( $type, $texts ): array {
+				$all          = is_array( $state['value'] ?? null ) ? $state['value'] : array();
+				$all[ $type ] = array_filter( $texts + (array) ( $all[ $type ] ?? array() ), static fn( $text ): bool => '' !== $text );
+				return array( 'value' => array_filter( $all ) );
 			},
 		);
 	}

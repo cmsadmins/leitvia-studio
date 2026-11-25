@@ -167,6 +167,58 @@ class Test_Gateway_Seo extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The archive of a content type takes title and description through update-seo with archive: an agent proposes,
+	 * the change waits in a package; applied, the head of the archive prints them. Only public types with an archive,
+	 * only title and description, never beside an SEO plugin.
+	 */
+	public function test_archive_title_and_description(): void {
+		register_post_type(
+			'lv_guide',
+			array(
+				'public'      => true,
+				'has_archive' => true,
+				'label'       => 'Guides',
+			)
+		);
+		$texts  = array(
+			'archive'     => 'lv_guide',
+			'title'       => 'Guides for city bikes',
+			'description' => 'Guides on care, repairs and parts for city bikes and e-bikes, step by step with photos.',
+			'base_hash'   => '',
+		);
+		$update = static fn( array $input ) => wp_get_ability( 'leitvia/update-seo' )->execute( $input );
+		$result = $update( $texts );
+		$this->assertIsArray( $result, $result instanceof WP_Error ? $result->get_error_message() : '' );
+		$this->assertSame( 'package', $result['mode'] );
+		$this->assertFalse( get_option( \LeitviaStudio\Gateway\Abilities\Seo::ARCHIVE_OPTION ) );
+		$agent = get_current_user_id();
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+		$this->assertIsArray( Packages::apply( (int) $result['package'] ) );
+		wp_set_current_user( $agent );
+		$this->assertSame( array( 'lv_guide' => array_intersect_key( $texts, array_flip( array( 'title', 'description' ) ) ) ), get_option( \LeitviaStudio\Gateway\Abilities\Seo::ARCHIVE_OPTION ) );
+
+		$this->go_to( get_post_type_archive_link( 'lv_guide' ) );
+		$this->assertSame( 'Guides for city bikes | Bike Shop', html_entity_decode( wp_get_document_title(), ENT_QUOTES, 'UTF-8' ) );
+		$this->assertStringContainsString( '<meta name="description" content="Guides on care, repairs', get_echo( array( Head::class, 'print' ) ) );
+
+		$cleared = \LeitviaStudio\Gateway\Abilities\Seo::describe_archive(
+			array(
+				'archive' => 'lv_guide',
+				'title'   => '',
+			)
+		);
+		$this->assertSame( array( 'lv_guide' => array( 'description' => $texts['description'] ) ), $cleared['change']( array( 'value' => get_option( \LeitviaStudio\Gateway\Abilities\Seo::ARCHIVE_OPTION ) ) )['value'] );
+
+		$this->assert_rejected( 'leitvia_invalid_input', 'archive', $update( array( 'archive' => 'page' ) + $texts ) );
+		$this->assert_rejected( 'leitvia_invalid_input', 'archive', $update( array( 'noindex' => true ) + $texts ) );
+		$this->assertWPError( $update( array( 'title' => 'Bikes' ) + array( 'base_hash' => '' ) ) );
+		add_filter( 'leitvia_studio_seo_plugin_active', '__return_true' );
+		$this->assert_rejected( 'leitvia_no_seo_plugin', 'seo_plugin', $update( $texts ) );
+		remove_filter( 'leitvia_studio_seo_plugin_active', '__return_true' );
+		unregister_post_type( 'lv_guide' );
+	}
+
+	/**
 	 * Archives get a canonical address with their page number, single pages stay with core.
 	 */
 	public function test_canonical_of_archives(): void {

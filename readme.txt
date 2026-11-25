@@ -4,7 +4,7 @@ Tags: ai agent, mcp, abilities api, design tokens, block theme
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.54
+Stable tag: 1.3.55
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -277,6 +277,11 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 
 == Changelog ==
 
+= 1.3.55 =
+* New: leitvia/set-page-structure accepts package for posts with hub, so many posts fit in one package.
+* New: leitvia/update-seo takes archive (post type key) to set title and description of an archive without an SEO plugin; the change waits as a setting in a package.
+* Change: New fields a building block declares after an update join the stored content model on the next request; add-building-block need not run again.
+
 = 1.3.54 =
 * Change: Recipes recognize the sample links of the theme footers by their missing address (Leitvia 1.2.59 and later) as well as by "#", and put the pages of footerNavigation in their place.
 * Change: The link text check reports a link without an address, such as a sample link or button of a pattern, as it reports a link to "#".
@@ -356,8 +361,3 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * Fix: A link to the posts page no longer counts as broken in leitvia/audit-site and leitvia/repair-links.
 * Fix: The fact check of SEO texts knows the year of publication and of the last change.
 * Fix: The package diff of leitvia/delete-media names the final deletion, and leitvia/rollback-package no longer lists an input operations it never read.
-
-= 1.3.50 =
-* New: Add-ons add effects of their own to the animation of every block through the filter leitvia_studio_animation_effects: an entry effect plays once like those of Studio, a scroll effect follows the scroll position. Studio validates them, offers them in the Animation panel only on the blocks they fit, loads their style only where they are used and lists their description for agents in the block catalog.
-* Change: leitvia/audit-site reports a page with more than two kinds of scroll effect besides parallax as leitvia/motion; which effects are striking now comes from the same list as the editor.
-* Fix: The circle of the Highlight format draws itself again while it scrolls into view, and no highlight moves with Motion off.

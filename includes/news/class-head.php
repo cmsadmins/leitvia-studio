@@ -9,6 +9,7 @@ namespace LeitviaStudio\News;
 
 use LeitviaStudio\Gateway\Abilities\Seo;
 use WP_Post;
+use WP_Post_Type;
 use WP_Term;
 use WP_User;
 
@@ -77,13 +78,21 @@ final class Head {
 	}
 
 	/**
-	 * Stored value of the current page, '' when there is none or an SEO plugin takes care of it.
+	 * Stored value of the current page or archive of a content type (update-seo with archive), '' when there is none or
+	 * an SEO plugin takes care of it.
 	 *
 	 * @param string $field Field of the Seo::PLUGINS entry leitvia.
 	 */
 	private static function stored( string $field ): string {
 		$object = get_queried_object();
-		if ( 'leitvia' !== Seo::plugin() || ! $object instanceof WP_Post ) {
+		if ( 'leitvia' !== Seo::plugin() ) {
+			return '';
+		}
+		if ( $object instanceof WP_Post_Type && is_post_type_archive() ) {
+			$archives = get_option( Seo::ARCHIVE_OPTION );
+			return is_array( $archives ) ? (string) ( $archives[ $object->name ][ $field ] ?? '' ) : '';
+		}
+		if ( ! $object instanceof WP_Post ) {
 			return '';
 		}
 		return (string) get_post_meta( $object->ID, Seo::PLUGINS['leitvia']['meta'][ $field ], true );

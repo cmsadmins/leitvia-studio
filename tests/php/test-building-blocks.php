@@ -198,6 +198,47 @@ class Test_Building_Blocks extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A site stored the model of an older version of a block: a field the block declares now comes in on the next
+	 * request, stored fields and other entries keep what the site holds, and a block the site never added stays out.
+	 */
+	public function test_refresh_adds_new_fields_of_a_stored_block(): void {
+		$old = self::block()['model'];
+		unset( $old['postTypes']['lv_note']['fields'], $old['relations'], $old['settings'] );
+		$old['taxonomies']['lv_note_topic']['label'] = 'Themes';
+		update_option( Model::OPTION, array( 'version' => 1 ) + $old );
+		$memo = array(
+			'postTypes' => array(
+				'lv_memo' => array(
+					'fields' => array(
+						'memo_due' => array(
+							'type'  => 'date',
+							'label' => 'Due',
+						),
+					),
+				) + self::block()['model']['postTypes']['lv_note'],
+			),
+		);
+		self::register_blocks(
+			array(
+				'leitvia/notes' => self::block(),
+				'leitvia/memos' => array( 'model' => $memo ) + self::block(),
+			)
+		);
+		Building_Blocks::refresh();
+		$stored = Model::stored();
+		$this->assertSame( array( 'note_mood' ), array_keys( $stored['postTypes']['lv_note']['fields'] ) );
+		$this->assertSame( 'Themes', $stored['taxonomies']['lv_note_topic']['label'] );
+		$this->assertArrayNotHasKey( 'lv_memo', $stored['postTypes'] );
+		$this->assertArrayNotHasKey( 'relations', $stored );
+		$this->assertArrayHasKey( 'note_mood', Model::current()['postTypes']['lv_note']['fields'] );
+
+		$stored['postTypes']['lv_note']['fields']['note_mood']['label'] = 'Feeling';
+		update_option( Model::OPTION, $stored );
+		Building_Blocks::refresh();
+		$this->assertSame( 'Feeling', Model::stored()['postTypes']['lv_note']['fields']['note_mood']['label'], 'a stored field stays' );
+	}
+
+	/**
 	 * GET /leitvia-studio/v1/building-blocks: people who may edit the theme get every block with its state.
 	 */
 	public function test_rest_list(): void {

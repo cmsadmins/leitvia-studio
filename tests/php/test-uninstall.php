@@ -88,6 +88,7 @@ class Test_Uninstall extends WP_UnitTestCase {
 					'post_status' => 'auto-draft',
 				)
 			);
+			update_option( 'leitvia_studio_archive_seo', array( 'docs' => array( 'title' => 'Help' ) ) );
 			self::switch_to( 0 );
 		}
 		$user  = self::factory()->user->create();
@@ -116,6 +117,7 @@ class Test_Uninstall extends WP_UnitTestCase {
 			}
 			$this->assertSame( '', get_post_meta( $content[ $site ]['session'], '_leitvia_model_trashed_with_entry', true ) );
 			$this->assertFalse( get_option( 'leitvia_studio_usage_index_built' ) );
+			$this->assertFalse( get_option( 'leitvia_studio_archive_seo' ) );
 			// The model declaration goes, content created with it stays.
 			$this->assertFalse( get_option( 'leitvia_studio_model' ) );
 			$this->assert_site_content_kept( $content[ $site ] );
