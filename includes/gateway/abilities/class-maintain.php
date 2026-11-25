@@ -843,8 +843,8 @@ final class Maintain {
 
 	/**
 	 * A top-level block inside a new section as the text patterns build one (leitvia/content-text): a full-width
-	 * constrained group with the spacing xl of a section of regular density, its ground and an optional h2. The block
-	 * markup goes in as it is, so a shortcode or a block of another plugin stays byte for byte.
+	 * constrained group with the spacing xl of a section of regular density, its ground and an optional h2 at the wide
+	 * edge, where the headings of the patterns start. The block markup goes in as it is, so a shortcode or a block of another plugin stays byte for byte.
 	 *
 	 * @param string $block   Serialized top-level block.
 	 * @param string $ground  Key of GROUNDS.
@@ -867,7 +867,7 @@ final class Maintain {
 			),
 		) + array_intersect_key( $ground, array( 'backgroundColor' => true ) ) + array( 'layout' => array( 'type' => 'constrained' ) );
 		$class = 'wp-block-group alignfull' . ( isset( $attrs['className'] ) ? ' ' . $attrs['className'] : '' ) . ( isset( $attrs['backgroundColor'] ) ? ' has-' . $attrs['backgroundColor'] . '-background-color has-background' : '' );
-		$h2    = '' === $heading ? '' : "<!-- wp:heading {\"fontSize\":\"heading-l\"} -->\n<h2 class=\"wp-block-heading has-heading-l-font-size\">" . esc_html( $heading ) . "</h2>\n<!-- /wp:heading -->\n\n";
+		$h2    = '' === $heading ? '' : "<!-- wp:heading {\"align\":\"wide\",\"fontSize\":\"heading-l\"} -->\n<h2 class=\"wp-block-heading alignwide has-heading-l-font-size\">" . esc_html( $heading ) . "</h2>\n<!-- /wp:heading -->\n\n";
 		return '<!-- wp:group ' . wp_json_encode( $attrs, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) . " -->\n"
 			. '<div class="' . esc_attr( $class ) . '" style="padding-top:var(--wp--preset--spacing--xl);padding-bottom:var(--wp--preset--spacing--xl)">' . "\n"
 			. $h2 . $block . "\n</div>\n<!-- /wp:group -->";

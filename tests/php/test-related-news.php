@@ -25,7 +25,10 @@ class Test_Related_News extends WP_UnitTestCase {
 		if ( ! function_exists( 'Leitvia\related_news_vars' ) ) {
 			require_once get_theme_file_path( 'functions.php' );
 		}
-		add_filter( 'render_block_data', 'Leitvia\related_news_mark' );
+		add_filter( 'render_block_context', 'Leitvia\related_query_context', 10, 3 );
+		if ( ! WP_Block_Patterns_Registry::get_instance()->is_registered( 'leitvia/teaser-related-news' ) ) {
+			_register_theme_block_patterns();
+		}
 		add_filter( 'query_loop_block_query_vars', 'Leitvia\related_news_vars', 10, 2 );
 		wp_set_current_user( self::factory()->user->create( array( 'role' => Gateway::ROLE ) ) );
 		update_option(
@@ -72,13 +75,14 @@ class Test_Related_News extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Titles of the posts the related news query lists on the current page.
+	 * Titles of the posts the pattern Related news lists on the current page. Its query sits inside a group, as on a
+	 * page built with insert-section: core hands such a query to its post template before render_block_data runs on it.
 	 *
 	 * @return list<string>
 	 */
 	private static function listed(): array {
-		$html = do_blocks( '<!-- wp:query {"queryId":1,"query":{"perPage":3,"postType":"post","order":"desc","orderBy":"date","inherit":false,"excludeCurrent":true},"namespace":"leitvia/related-news"} --><div class="wp-block-query"><!-- wp:post-template --><!-- wp:post-title /--><!-- /wp:post-template --></div><!-- /wp:query -->' );
-		preg_match_all( '#<h2[^>]*>(.*?)</h2>#', $html, $found );
+		$html = do_blocks( (string) WP_Block_Patterns_Registry::get_instance()->get_registered( 'leitvia/teaser-related-news' )['content'] );
+		preg_match_all( '#<h3[^>]*wp-block-post-title[^>]*>(.*?)</h3>#s', $html, $found );
 		return array_map( 'wp_strip_all_tags', $found[1] );
 	}
 

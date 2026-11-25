@@ -28,10 +28,10 @@ class Test_Theme_Blog extends WP_UnitTestCase {
 		_register_theme_block_patterns();
 		// functions.php of the theme loads after switch_theme only on the next request, and the test case restores the
 		// hooks after every test: load it once, then add the filters under test and the block style again.
-		if ( ! function_exists( 'Leitvia\related_posts_query' ) ) {
+		if ( ! function_exists( 'Leitvia\related_query_context' ) ) {
 			require_once get_theme_file_path( 'functions.php' );
 		}
-		add_filter( 'render_block_data', 'Leitvia\related_posts_query' );
+		add_filter( 'render_block_context', 'Leitvia\related_query_context', 10, 3 );
 		add_filter( 'render_block', 'Leitvia\hide_empty_post_lists', 10, 2 );
 		if ( ! WP_Block_Styles_Registry::get_instance()->is_registered( 'core/list', 'download' ) ) {
 			Leitvia\register_block_style_variations();
@@ -286,6 +286,9 @@ class Test_Theme_Blog extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'Margins that breathe', $html );
 		$this->assertStringNotContainsString( 'Grids in print', $html, 'the current post is left out' );
 		$this->assertStringNotContainsString( 'Opening hours in winter', $html, 'other categories are left out' );
+		$query  = WP_Block_Patterns_Registry::get_instance()->get_registered( 'leitvia/hidden-page-related-posts' )['content'];
+		$nested = do_blocks( '<!-- wp:group --><div class="wp-block-group">' . $query . '</div><!-- /wp:group -->' );
+		$this->assertStringNotContainsString( 'Opening hours in winter', $nested, 'also with the query inside a group' );
 
 		$this->go_to( get_permalink( $lonely ) );
 		the_post();

@@ -1525,7 +1525,8 @@ class Test_Gateway_Maintain extends WP_UnitTestCase {
 		$this->assertSame( 'is-style-inverse', $section['attrs']['className'] );
 		$this->assertSame( 'var:preset|spacing|xl', $section['attrs']['style']['spacing']['padding']['top'] );
 		$this->assertSame( 'core/heading', $section['innerBlocks'][0]['blockName'] );
-		$this->assertStringContainsString( '<h2 class="wp-block-heading has-heading-l-font-size">Book a &lt;call&gt;</h2>', $section['innerHTML'] . serialize_block( $section['innerBlocks'][0] ) );
+		$this->assertSame( 'wide', $section['innerBlocks'][0]['attrs']['align'], 'the heading starts at the wide edge like those of the patterns' );
+		$this->assertStringContainsString( '<h2 class="wp-block-heading alignwide has-heading-l-font-size">Book a &lt;call&gt;</h2>', $section['innerHTML'] . serialize_block( $section['innerBlocks'][0] ) );
 		$this->assertSame( $before, serialize_block( $section['innerBlocks'][1] ), 'the shortcode block stays as it was' );
 		$this->assertTrue( has_blocks( get_post_field( 'post_content', $page ) ) );
 

@@ -4,7 +4,7 @@ Tags: ai agent, mcp, abilities api, design tokens, block theme
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.56
+Stable tag: 1.3.57
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -277,6 +277,9 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 
 == Changelog ==
 
+= 1.3.57 =
+* Change: leitvia/insert-section with wrap sets the h2 of the new section at the wide edge, where the headings of the patterns start.
+
 = 1.3.56 =
 * New: leitvia/insert-section takes template: the post switches to another template of the contract in the same operation, so a page gets a hero with its h1 and the template page-landing at once while its other blocks stay as they are.
 * New: leitvia/insert-section takes wrap: a top-level block, such as a shortcode or a block of another plugin, goes unchanged into a new section at its place, full width with the spacing of a section, the ground surface, surface-alt or inverse and an optional h2 above it.
@@ -305,49 +308,3 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * New: Token iconStroke sets the line width of the icon and icon list blocks; four more Lucide icons (box, layers, message-square, pen-tool), 122 in all.
 * New: Date and time formats follow the site language (filter leitvia_studio_date_formats); formats chosen by hand stay.
 * New: The packages of a service may carry price_from (the price specification gets minPrice) and addon (an Offer of its own that leaves lowPrice and highPrice to the others), for add-ons that keep prices.
-
-= 1.3.52 =
-* New: leitvia/import-post imports a post, page or entry of another site for a migration: its HTML and the shortcodes of WPBakery and Impreza become core blocks, images of the old host come into the media library once, links become paths, a second call with the same source updates the post, and dry_run shows the result first. Filter leitvia_studio_import_content for readers of add-ons.
-* New: leitvia/compose-page rebuilds an existing page with post: all its sections are replaced in one step, and the checks see only the finished page. The page remembers its page frame.
-* New: Page frames may require or recommend kinds of sections (answer, facts, packages, tiles, steps, faq, related); leitvia/check-composition counts them for a page that names its frame (missingSection, recommendedSection) and suggests patterns to add, leitvia/plan-page plans them. Patterns may continue a neighbor as one section (continues). leitvia/list-patterns filters by provides.
-* New: leitvia/set-page-structure sets the page frame, the hub page (breadcrumbs and BreadcrumbList show Home, hub and page while addresses stay flat) and the service of a page with its price, printed as Service with Offer and UnitPriceSpecification (net or gross).
-* New: Pages get a BreadcrumbList through their parents or hubs.
-* New: llms.txt at the root of the site, built from the site name, the summary or tagline, the hubs and the pages with a price; robots.txt keeps AI crawlers allowed and disallows them on request (leitvia/set-llms).
-* New: leitvia/set-redirects keeps permanent redirects (301) of moved addresses and refuses loops.
-* New: leitvia/set-organization takes aggregate_rating (value, count, source_url, confirmed); a confirmed rating is printed as aggregateRating, and leitvia/update-seo accepts a star rating in a title only when it equals that value.
-* New: The width of a site logo changes through block edits, also in the edits of a template part.
-* New: Block edits move a block next to a sibling (move with position before or after) and insert a new block before one (position before); insert also builds an empty paragraph, heading, separator or site logo with its text and block style, such as an eyebrow above a heading. A section takes up to 250 edits instead of 50.
-* New: leitvia/update-template-part takes edits with a pattern, as the sections of compose-page do, so a header or footer needs no markup of its own.
-* New: leitvia/update-block sets the text color (ink, ink-muted, accent) of a heading or paragraph, the size of a quote, the color and size of the icon and the icon list, and the height of a cover in vh (minHeight).
-* New: Token sets take the optional group fontWeight (heading, heading-s, eyebrow), also over a style variation, and the optional color roles button-hover and on-button-hover with their pair.
-* New: leitvia/set-organization takes the founder (schema.org founder) and the first year and the holder of the copyright line, which the footers of the theme Leitvia show.
-* New: leitvia/get-site-health says whether MCP clients reach the server of Leitvia Studio, its address and why not. leitvia/add-media refuses an SVG with the way to a raster logo.
-* New: Icons Gauge and Refresh (118 icons).
-* Change: Add-on patterns may name the area header or footer, for a pattern of a template part.
-* Change: In a theme that declares leitvia-sticky-header the header is measured without a block style, since it sticks by default.
-* New: Rows of a repeater are a list of small forms in the entry panel and are saved with the entry (REST field leitvia_rows), also for a new entry. Saving waits while a row lacks a required value or repeats a value of a field declared unique, such as a weekday.
-* New: Duplicate in the list of a content type copies an entry with its fields, terms, image and rows as a draft; a type that declares copyShiftDays moves the dates of the copy, so last week becomes next week. The list shows the first date, choice and number fields as columns.
-* New: A content type without text of its own opens in the block editor with title and fields only. A repeater can name its row title (titleLabel). Dates use the date picker of the browser, numbers take the decimal comma of the site language.
-* New: leitvia/update-navigation takes an item with sub items and no address: a group that opens its submenu.
-* Change: In the mobile menu every submenu collapses and expands, not only in menus with a mega menu or more than 12 links; the label of a group without an address toggles it too.
-
-* New: leitvia/set-permalinks sets the permalink structure of posts and the bases of categories and tags for a migration, in a change package; notice warns when published posts move.
-* New: Block edits fill the cells of a core/table or comparison table with table (head, rows, foot), accessibly with scope and caption; a new text gets its first link with link_text and url, also in insert; className takes block styles that combine, such as a sticky and an overlay header.
-* New: set-page-structure takes a price range (max_price) and the packages of a service (offers), printed as an AggregateOffer with one Offer per package.
-* New: import-post keeps the author name of an author without an account (author_name), removes scripts, styles and forms of rendered HTML, and keeps the SEO texts of the live site and linked images without alt text with notes in the report instead of failing.
-* New: compose-page builds the frame article as a page (type page) for guides under a page address; findings name the block they mean in plain words (place).
-* Fixed: A pattern that provides FAQ gives FAQPage data from its visible questions; the hub of a page wins over its parent page in the breadcrumbs, also for the hub of a hub.
-* Fixed: The check of design tokens no longer takes a house number such as #343 in a text for a color; a queued change returns the hash the next change of its package sends; get-seo and set-llms say why a requested llms.txt is not served yet.
-* Fixed: Activating a token set again writes the heading weights of global styles saved with an older theme; dark sets keep accent prices and marks on inverse bands; a building block may open its own content to abilities.
-* Fixed: import-post writes author_name on every import, so a second import adds or corrects it; update-content and create-content take author_name too.
-* Fixed: import-post removes only shortcodes (registered, of core, of known page builders and form plugins, or with a closing tag or quoted attribute) and nothing inside pre or code, so [R=301,L], [web_root] or [a-z0-9_-] stay.
-* Fixed: import-post finds a parent of parent_source that waits in the same open package; the child gets it as parent when the package is applied, also with the same slug in two branches. A parent nobody imported rejects the call instead of a page at the top level, and a second import moves a post under its parent.
-* Fixed: import-post keeps an SEO description of the live site with a figure the page does not say and warns in report.seo instead of failing the import.
-* Fixed: A rejected step of add-building-block or apply-recipe names its findings and the next ability, for example the page that holds the address of an archive and how to free it.
-* Fixed: set-page-structure takes max_price per package; highPrice of the AggregateOffer is the top of every price and range, also with one package and the max_price of the service.
-* New: A page with the frame article gets the template page-article of the theme (title, byline with author and dates, author box) and an Article with author and dates in its structured data, also when set-page-structure sets the frame.
-* Fixed: A comparison table inserted without a caption has none, instead of the English sample caption of the block example; its source line takes the labels of the site language.
-* New: The filter leitvia_studio_llms_sections lets an add-on add a section of its own to llms.txt; drafts, pages with a password and repeats stay out.
-* Change: The table of contents works in a template too: placed before the content, as in a column beside it, it gives the headings of the post the ids it links to.
-* Fixed: A link with an anchor from another page stops its target right below the sticky header: once the header is measured, the target scrolls into view again, since the browser jumped before the height was known.
-* Fixed: A header over the stage (overlay-header) is measured right after it is parsed, so the page no longer jumps by the height of the header when it moves over the first cover.
