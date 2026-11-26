@@ -1,7 +1,7 @@
 ---
 name: leitvia-news
 description: Writes a regular news post for the blog of a WordPress site with the Leitvia theme and Leitvia Studio, for example once a week, through the leitvia abilities only. Takes topics and sources from a news brief of the operator, checks candidates against the posts the site already has, writes the post from sources it lists under the post, makes it fit for search, Google News and AI answers (SEO and GEO: title, description, first paragraph, internal links, image, a site visible to search engines), marks it as written by AI and leaves it as a draft in a change package for a person. Use it for scheduled news runs or when someone asks for a news post from given sources; pages belong to leitvia-page.
-compatibility: WordPress 7.1+, PHP 8.2+. Needs the theme Leitvia and the plugin Leitvia Studio, reached over the MCP server leitvia or the REST routes of the Abilities API with an application password. Steps 2 and 6 need leitvia/list-content and leitvia/create-content (Leitvia Studio after 1.0.0), step 5 leitvia/get-seo.
+compatibility: WordPress 7.1+, PHP 8.2+. Needs the theme Leitvia and the plugin Leitvia Studio, reached over the MCP server leitvia (application password or OAuth token) or the REST routes of the Abilities API (application password only).
 ---
 
 # leitvia-news
@@ -15,9 +15,9 @@ One run, at most one post: find what is new in the sources of the brief, drop wh
 
 ## Inputs required
 
-- Access: MCP server `leitvia` or the REST routes of the Abilities API, as the agent user with its application password: [handbook, Access over MCP and REST](../../handbook/README.md#access-over-mcp-and-rest). Paths start at the address of the site, not at the host.
+- Access as the agent user: [handbook, Access over MCP and REST](../../handbook/README.md#access-over-mcp-and-rest).
 - The news brief of the operator (step 1).
-- Read before the first call: the [agent handbook](../../handbook/README.md) (access, hashes, autonomy, packages, rejections, index of all abilities). Read the page of each ability before you first call it (the handbook index links them): `get-contract`, `list-content`, `create-content`, `get-seo`, `update-seo`, `list-packages`, `get-package`. The brief, the duplicate check, the sources, the post format and the limits for SEO and GEO: [news details](references/brief.md). Overview, archives and post page come from the theme; setting up the blog itself: [blog or journal](../leitvia-page/references/blog.md).
+- Read before the first call: the [agent handbook](../../handbook/README.md). Read the page of each ability before you first call it (the handbook index links them): `get-contract`, `list-content`, `create-content`, `get-seo`, `update-seo`, `list-packages`, `get-package`. The brief, the duplicate check, the sources, the post format and the limits for SEO and GEO: [news details](references/brief.md). Overview, archives and post page come from the theme; setting up the blog itself: [blog or journal](../leitvia-page/references/blog.md).
 
 ## Modes
 
@@ -25,13 +25,11 @@ One run, at most one post: find what is new in the sources of the brief, drop wh
 
 ## Ground rules
 
-- Call `leitvia/get-contract` first and compare `site.url` with the address of your task; when they differ, write nothing and ask the person. Never use SQL, WP-CLI or the REST routes of WordPress core (`/wp-json/wp/v2/...`), not even to read. Reading public pages of the site and of the sources in the brief is fine. Where WP-Cron does not run by itself (WordPress Playground), call `GET /wp-cron.php` after each write. On a Leitvia site these abilities come before the WordPress skills `wp-patterns`, `wp-block-themes` and `wp-wpcli-and-ops`, and you never write files in the theme.
+- Follow the [rules for every task](../../handbook/README.md#rules-for-every-task). Reading the sources in the brief is fine.
 - **Facts are never guessed.** Organization data, prices, legal texts, figures, quotes and people come only from a source you can name: the person, a page of the site or a read ability, with the source in your report. Without one, stop at a checkpoint; never write a placeholder that looks like a fact.
 - In a news post the source of every fact is a source item of the brief, listed under the post. Quotes are short, marked and attributed; the rest is your own wording.
 - At most one post per run, and never one that covers what the site already has (duplicate check).
-- Every post is created with `ai_generated` true, so Studio shows readers a note that AI wrote it.
-- Never publish, never change or delete existing posts, never schedule.
-- A rejection is corrected at most once, following `message`, `next_ability` and `retry`. If the second call is rejected too, or `retry` is `never`, stop and tell the person.
+- Never publish or schedule, never delete existing posts and never change them beyond the SEO title and description of step 5.
 
 ## Procedure
 
@@ -57,24 +55,23 @@ Write title, excerpt and content as block markup following the [post format](ref
 
 Required for every post; limits and Google News rules: [SEO and GEO](references/brief.md#seo-and-geo).
 
-- `leitvia/get-seo` with the ID of the latest news post of step 2: `indexable` false means the site is hidden from search engines (checkpoint **Site hidden from search**); `plugin` says whether an SEO plugin is active.
+- `leitvia/get-seo` with the ID of the latest news post of step 2 (without one, any published page of `leitvia/list-content`; `indexable` is a site value): `indexable` false means the site is hidden from search engines (checkpoint **Site hidden from search**); `plugin` says whether an SEO plugin is active.
 - Title and excerpt within the limits: they are the SEO title and description of the draft, which has no ID until the package is applied. Published news posts of earlier runs with an empty `seo.description` get title and description through `leitvia/update-seo` and the same `package` key, at most five per run.
 - A first paragraph that answers who, what, when, where and why; h2 that name their section; two internal links, `link` from `leitvia/list-content`; a featured image of at least 1200 px width with alt text, or an open point in the report.
 
 ### 6. Create the draft
 
-Call `leitvia/create-content` with `post_type` `post` (or the type of the content model the brief names, with its `fields`), `title`, `content`, `excerpt`, `slug`, `terms` (category and tags from the brief by name; new ones are created with the post, in a package when it is applied), `status` `draft`, `ai_generated` true, `sources` (the URLs), `featured_image` when step 5 found one, empty `base_hash` and the `package` key. A user who may not create the category (`leitvia_forbidden`, reason `capability`): send the call once more without it and name the category in the report.
+Call `leitvia/create-content` with `post_type` `post` (or the type of the content model the brief names, with its `fields`), `title`, `content`, `excerpt`, `slug`, `terms` (category and tags from the brief by name; new ones are created with the post, in a package when it is applied), `status` `draft`, `ai_generated` true (Studio shows readers that AI wrote it), `sources` (the URLs), `featured_image` when step 5 found one, empty `base_hash` and the `package` key. A user who may not create the category (`leitvia_forbidden`, reason `capability`): send the call once more without it and name the category in the report.
 
 ## Verification
 
-- `leitvia/list-packages` with `state: open` and `leitvia/get-package`: the package holds the draft and the SEO writes of step 5, nothing else.
+- `leitvia/get-package` with the `package` ID of your writes: the package holds the draft and the SEO writes of step 5, nothing else.
 - Open the preview link of the package from `leitvia/list-packages`: the post shows date and author, and its JSON-LD has `@type` `NewsArticle`, or `BlogPosting` when `news_categories` of Studio leaves out the category of the post. Anything else goes into the report.
 
 ## Failure modes / debugging
 
 Every code with its retry rule: [rejections](../../handbook/rejections.md).
 
-- `leitvia_forbidden`, reason `capability`, on a new category: step 6 sends the call once more without it.
 - `leitvia_check_failed`: the featured image needs alt text; set it with `leitvia/set-alt-text` or mark the image as decorative.
 - `leitvia_out_of_scope`: a status other than `draft`; this skill never sets one.
 

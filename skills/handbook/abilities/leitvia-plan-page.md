@@ -1,6 +1,6 @@
 # leitvia/plan-page
 
-Generated from Leitvia Studio 1.3.60. Do not edit. Group: Read. How to call abilities, hashes, autonomy and rejections: [agent handbook](../README.md).
+Generated from Leitvia Studio 1.3.61. Do not edit. Group: Read. How to call abilities, hashes, autonomy and rejections: [agent handbook](../README.md).
 
 **Plan page.** Proposes a page for a goal and content points: page frame, template, the patterns in page order with role, slot, text lengths and the points each section carries, and the composition score. Without AI the plan follows the page frames, examples and composition rules of the contract and is the same for the same input; it leaves out patterns that need images while the media library has none, post teasers below three published posts and proof or offer patterns, which carry facts of the person, and patterns the inserter hides, and plans a shop home from the home page of the shop recipe. A point that starts with the role, slot or area of a section and a colon (Hero: ...) lands on that section. With ai set to true the AI connector the site owner set up in WordPress refines it; the goal, the points and pattern names with their metadata are sent to that provider. Writes nothing; build the page with leitvia/compose-page.
 

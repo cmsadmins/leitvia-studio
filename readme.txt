@@ -4,7 +4,7 @@ Tags: ai agent, mcp, abilities api, design tokens, block theme
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.60
+Stable tag: 1.3.61
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -286,6 +286,11 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 
 == Changelog ==
 
+= 1.3.61 =
+* New: A table of contents with 12 entries or more starts closed. Its title and the number of sections open it; the open list scrolls within itself, at most half the screen high, so the end of a long list stays reachable in a sticky sidebar. Add-ons extend the closed list through the class __details.
+* Change: Without a theme contract, the instructions of the MCP server say that a person activates the theme, and name leitvia-migrate for a classic site.
+* Change: The bundled agent skills follow a fact check: the handbook gathers the rules for every task in one section, the skills refer to it and are about 750 tokens shorter. Sign-in with OAuth, tasks, questions before deleting, approvals and resources are described as the server works.
+
 = 1.3.60 =
 * New: Own MCP server "leitvia" at /wp-json/leitvia-studio/v1/mcp, without MCP Adapter. It speaks the revisions 2026-07-28 (stateless, with server/discover and cacheable lists) and 2025-11-25 (with initialize and sessions, also 2025-06-18 and 2025-03-26). The default server of MCP Adapter 0.7.2 still lists the Leitvia abilities.
 * New: Sign-in over OAuth 2.1 for clients such as claude.ai, Claude Desktop, ChatGPT and VS Code. An administrator agrees on the page Connect agent and picks an agent user, with PKCE, client documents (CIMD) and dynamic registration as fallback; access tokens last an hour, refresh tokens 30 days and rotate. A connection as yourself reads only, unless an add-on offers decisions in its views. The Agents screen lists the connections and closes them. Application passwords keep working.
@@ -321,10 +326,3 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 
 = 1.3.57 =
 * Change: leitvia/insert-section with wrap sets the h2 of the new section at the wide edge, where the headings of the patterns start.
-
-= 1.3.56 =
-* New: leitvia/insert-section takes template: the post switches to another template of the contract in the same operation, so a page gets a hero with its h1 and the template page-landing at once while its other blocks stay as they are.
-* New: leitvia/insert-section takes wrap: a top-level block, such as a shortcode or a block of another plugin, goes unchanged into a new section at its place, full width with the spacing of a section, the ground surface, surface-alt or inverse and an optional h2 above it.
-* New: Related news of a page without a topic of its own lists the posts with the page as hub, then the posts in a category or tag with the slug of the page or of its product line, and only then the latest posts (theme filter leitvia_related_fallback). leitvia/audit-site reports such a page as leitvia/related-news, leitvia/check-composition as newsTopic without points.
-* New: leitvia/set-page-structure takes hub for entries with a page of their own, such as documentation, which show the card of the service below the text.
-* New: leitvia/import-post turns the FAQ part of a post into the block leitvia/faq with FAQPage data (faq, on by default) and counts the questions in report.faq.

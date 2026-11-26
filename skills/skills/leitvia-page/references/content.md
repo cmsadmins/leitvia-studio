@@ -27,7 +27,7 @@ Details for `leitvia-page`. Read it before you write the edits of step 4.
 
 - A site without a posts page has no address that lists its posts. Show the newest posts on a page with the pattern `leitvia/teaser-posts-grid` until `leitvia/set-posts-page` sets the posts page.
 - Images come from the media library. Add one with `leitvia/add-media` (Base64 data with a file name, or a URL of this site) and an `alt` that describes it, or `decorative: true` when the text around it carries the meaning. URLs of other hosts are rejected and never fetched.
-- A file the person handed you goes over REST: a short script reads it, encodes it and posts `{"input": {"data": ..., "filename": ..., "alt": ...}}`, so the Base64 never passes through your own output.
+- A file the person handed you goes through a short script that reads and encodes it, so the Base64 never passes through your own output: over REST it posts `{"input": {"data": ..., "filename": ..., "alt": ...}}` with the application password, over MCP (also with an OAuth token) it sends `tools/call` of `leitvia-add-media` with these `arguments`.
 - Look at the image before you write its alt text; when it does not show what the briefing says, ask instead of describing the briefing.
 - Use the attachment ID in the `image` edit with the same alt text or `decorative: true` (stored as `metadata.leitviaDecorative`). An image without alt and without that flag is rejected.
 - Sample images of a pattern come with a sample alt text that describes the sample picture. Replace the image, or choose a pattern without an image slot.

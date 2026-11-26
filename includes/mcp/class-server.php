@@ -77,13 +77,13 @@ final class Server {
 	}
 
 	/**
-	 * How an agent starts, for initialize and server/discover, by the state of the site: without a valid contract the
-	 * setup first, with open change packages the Inbox first, else the contract and the outline before any write.
+	 * How an agent starts, for initialize and server/discover, by the state of the site: without a valid contract a
+	 * person who switches the theme, with open change packages the Inbox first, else the contract and the outline before any write.
 	 * Texts of Studio only, never data of the site.
 	 */
 	public static function instructions(): string {
 		if ( ! leitvia_studio_contract()->is_valid() ) {
-			return __( 'The active theme has no valid Leitvia design contract yet. Set the site up first with the skill leitvia-setup: it activates the Leitvia theme or repairs its contract file. Until then leitvia-get-contract answers leitvia_no_contract.', 'leitvia-studio' );
+			return __( 'The active theme has no valid Leitvia design contract yet. A person activates the Leitvia theme or repairs its contract file; agents cannot switch themes. Until then leitvia-get-contract answers leitvia_no_contract. A classic site moves with the skill leitvia-migrate.', 'leitvia-studio' );
 		}
 		/* translators: %s: short product name */
 		$start = sprintf( __( 'Read the design contract with leitvia-get-contract and the outline of a page with leitvia-get-page-outline before you change it. Every write runs through the %s pipeline with autonomy levels, checks and rollback; what may not go live waits as a package in the Inbox.', 'leitvia-studio' ), leitvia_studio_brand_short() );

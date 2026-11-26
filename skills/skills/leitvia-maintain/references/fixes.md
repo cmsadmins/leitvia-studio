@@ -14,7 +14,7 @@ The audit covers the content of posts, not header, footer or navigation. Open th
 
 For each `alt-text` finding read the block with `leitvia/get-block` (`post`, `block`): `attributes.id` is the attachment, `inner_html` holds the image URL. Look at the image and its place on the page and write the alt text yourself: what the image shows that matters here, in one short sentence, in the language of the page, without "image of". An image that only decorates, because the text around it carries the meaning, gets no description: mark it with `leitvia/update-block` and `image: { "id": <attachment>, "decorative": true }`.
 
-Call `leitvia/set-alt-text` with `image`, `alt`, `post`, `block` and the `hash` of the post as `base_hash`. Without `post` and `block` it sets the alt text of the attachment in the media library only, which fixes no page. When the AI plugin of WordPress offers the ability `ai/alt-text-generation` and the person agreed that images go to the AI provider of the site, you may use it for a first draft; read and correct the draft before you send it.
+Call `leitvia/set-alt-text` with `image`, `alt`, `post`, `block` and the `hash` of the post as `base_hash`; many images go in one call with `items` (up to 100). Without `post` and `block` it sets the alt text of the attachment in the media library only, which fixes no page. When the AI plugin of WordPress offers the ability `ai/alt-text-generation` and the person agreed that images go to the AI provider of the site, you may use it for a first draft; read and correct the draft before you send it.
 
 ## Deprecated patterns
 
@@ -35,7 +35,7 @@ Roll back only when a person asks for it, never to tidy up your own run.
 1. `leitvia/list-packages` with `state: applied`: find the package the person means and confirm it with them.
 2. `leitvia/rollback` with `id`. It restores the snapshots of every applied operation, newest first.
 3. `leitvia_rollback_conflict` (`retry: never`): someone changed a post after the package was applied. Nothing was rolled back. `data.conflicts` lists per operation both hashes and the `diff` (what changed since). Show the person the diff and stop; never overwrite a change of a person, and never rebuild the old state by hand.
-4. `leitvia_needs_human`: the operations belong to an area that is not `autonomous` for you; the person rolls back in the inbox.
+4. `leitvia_needs_human`: the operations belong to an area that is not `autonomous` for you; the person rolls back in the inbox or, with Leitvia Pro, in the view History of changes.
 
 ## Speed
 

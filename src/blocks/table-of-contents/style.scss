@@ -7,7 +7,8 @@
 		list-style: none;
 	}
 
-	> ol {
+	> ol,
+	> details > ol {
 		padding-inline-start: 0;
 	}
 
@@ -27,6 +28,36 @@
 	font-size: var(--wp--preset--font-size--lead, inherit);
 }
 
+// A long list, closed: the title with the number of sections is the summary and keeps its marker on the same line.
+// The row is at least 44 px high (WCAG 2.5.8), its focus ring like the buttons of the companion.
+.wp-block-leitvia-table-of-contents__details > summary {
+	padding-block: 0.6rem;
+	cursor: pointer;
+
+	&:focus-visible {
+		outline: 2px solid var(--wp--preset--color--focus, Highlight);
+		outline-offset: 2px;
+	}
+
+	.wp-block-leitvia-table-of-contents__title {
+		display: inline;
+		margin: 0;
+	}
+}
+
+// Opened, the long list scrolls in itself, so its end stays in reach in a sticky sidebar (the post sidebar of the
+// theme stays in place while the text scrolls). The padding keeps the focus ring of the links inside the box.
+.wp-block-leitvia-table-of-contents__details[open] > ol {
+	max-height: 50vh;
+	overflow-y: auto;
+	padding: 0.25rem;
+}
+
+.wp-block-leitvia-table-of-contents__total {
+	font-size: var(--wp--preset--font-size--meta, 0.875rem);
+	color: var(--wp--preset--color--ink-muted, inherit);
+}
+
 // Style Lines: one entry per row between thin rules, a darker rule on top, small and without underline until hover,
 // focus or the section being read (they sit in a list of links named On this page, not in running text). The column
 // beside a legal text (theme template page-legal) takes it.
@@ -37,7 +68,8 @@
 		font-size: inherit;
 	}
 
-	> ol {
+	> ol,
+	> details > ol {
 		border-block-start: 1px solid currentcolor;
 	}
 

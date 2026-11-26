@@ -50,6 +50,7 @@ Replace a planned section when it needs facts nobody gave you: prices (`leitvia/
 - `page-landing` (frames `home`, `service`, `about`) prints no title: the hero carries the only h1.
 - `page` (frame `contact`) prints the title as h1: start the content with h2 and do not use a hero.
 - `page-docs` prints the title as h1 and a page list.
+- `page-article` (frame `article`, `type` page) prints title, byline and author box: start the content with h2.
 - `page-legal` prints the title as h1 in display across the wide width, then on the left the table of contents of the h2 (filled by Studio, lines between the entries, jump links) and on the right the text in a reading width of 46rem. For imprint, privacy policy and terms: switch an imported or written legal page to it with `template: "page-legal"` in `leitvia/update-content`; the text stays as it is, its h2 become the entries. Never rebuild a legal text from patterns to get this look.
 - A page needs exactly one h1; the structure check rejects a write with none or several.
 - Width and edge come from the template (`layout` in the contract): head and running text start on one left edge, the wide edge, at most `contentSize` wide. Never center running text and never set `align`, `contentSize` or a max width on a block; `wide` and `full` come with the patterns for media, grids and bands.

@@ -1,7 +1,7 @@
 ---
 name: leitvia-page
 description: Compose a page on a WordPress site with the Leitvia theme and Leitvia Studio from a goal and content points. Plans the outline from the page frames of the design contract, picks patterns by their composition metadata, fills every text, link and image, scores the composition and builds the page through the Leitvia abilities. Use when someone asks for a new landing page, service page, about page, contact page or any page built from sections.
-compatibility: WordPress 7.1+, PHP 8.2+. Needs the theme Leitvia and the plugin Leitvia Studio, reached over the MCP server leitvia or the REST routes of the Abilities API with an application password.
+compatibility: WordPress 7.1+, PHP 8.2+. Needs the theme Leitvia and the plugin Leitvia Studio, reached over the MCP server leitvia (application password or OAuth token) or the REST routes of the Abilities API (application password only).
 ---
 
 # leitvia-page
@@ -15,9 +15,9 @@ You turn a goal and a few content points into a page that reads as designed: a c
 
 ## Inputs required
 
-- Access: MCP server `leitvia` or the REST routes of the Abilities API, as the agent user with its application password: [handbook, Access over MCP and REST](../../handbook/README.md#access-over-mcp-and-rest). Paths start at the address of the site, not at the host.
+- Access as the agent user: [handbook, Access over MCP and REST](../../handbook/README.md#access-over-mcp-and-rest).
 - The brief of step 1.
-- Read before the first call: the [agent handbook](../../handbook/README.md) (access, hashes, autonomy, packages, rejections, index of all abilities). Read the page of each ability before you first call it (the handbook index links them): `get-contract`, `list-patterns`, `plan-page`, `check-composition`, `get-pattern`, `add-media`, `compose-page`, `get-page-outline`, `insert-section`, `audit-site`. Composition, templates, edits, later changes: [composition details](references/composition.md); several photos of people, trips or groups: [photo collage](references/photo-collage.md). Texts, links, images: [content rules](references/content.md). Entries of a content type and their overview: [entries](references/entries.md). A blog or journal: [blog](references/blog.md). Effects on scroll come with the patterns, one motion per site (`set-motion`): [animation](../leitvia-pattern/references/animation.md). Businesses with a history, sub-brands, samples: [business pages](references/business.md).
+- Read before the first call: the [agent handbook](../../handbook/README.md). Read the page of each ability before you first call it (the handbook index links them): `get-contract`, `list-patterns`, `plan-page`, `check-composition`, `get-pattern`, `add-media`, `compose-page`, `get-page-outline`, `insert-section`, `audit-site`. Composition, templates, edits, later changes: [composition details](references/composition.md); several photos of people, trips or groups: [photo collage](references/photo-collage.md). Texts, links, images: [content rules](references/content.md). Entries of a content type and their overview: [entries](references/entries.md). A blog or journal: [blog](references/blog.md). Effects on scroll come with the patterns, one motion per site (`set-motion`): [animation](../leitvia-pattern/references/animation.md). Businesses with a history, sub-brands, samples: [business pages](references/business.md).
 
 ## Modes
 
@@ -28,8 +28,8 @@ The result of every write says what happened in `mode`: `live`, `draft`, `packag
 
 ## Ground rules
 
-- Call `leitvia/get-contract` first and compare `site.url` with the address of your task; when they differ, write nothing and ask the person. Never use SQL, WP-CLI or the REST routes of WordPress core (`/wp-json/wp/v2/...`), not even to read: the abilities give you every ID, hash and status you need. Reading public pages of the site is fine. Where WP-Cron does not run by itself (WordPress Playground), call `GET /wp-cron.php` after each write.
-- On a Leitvia site these abilities come before the WordPress skills `wp-patterns`, `wp-block-themes` and `wp-wpcli-and-ops`, and you never write files in the theme `leitvia`. Files no ability can replace (`wp-block-themes`, `wp-patterns`, developers) go only into the child theme `leitvia-child`, whose patterns follow the contract; a person switches to it, Studio carries the design over. Custom blocks go into a plugin from `leitvia-block-starter` (WordPress skill `wp-block-development`), never into a theme.
+- Follow the [rules for every task](../../handbook/README.md#rules-for-every-task).
+- Custom blocks go into a plugin from `leitvia-block-starter` (WordPress skill `wp-block-development`), never into a theme.
 - **Facts are never guessed.** Organization data, prices, legal texts, figures, quotes and people come only from a source you can name: the person, a page of the site or a read ability, with the source in your report. Without one, stop at a checkpoint; never write a placeholder that looks like a fact.
 - Here that covers prices, legal texts (imprint, privacy, terms, withdrawal, accessibility statement), company name, address, phone, e-mail, register numbers, opening hours, figures, testimonials and team members. Missing facts are a visible question in your report, not a placeholder on the page.
 - Blocks that keep their content in HTML, steps, image sizes, rows, sections and a section under every post: [page rules](references/page-rules.md); icon per entry: [icon sections](references/icon-sections.md). Fonts, alignment and italics per edit, menu links: [block edits](references/block-edits.md); marquee and leftover sample text: [page rules](references/page-rules.md).
@@ -44,8 +44,8 @@ The result of every write says what happened in `mode`: `live`, `draft`, `packag
 
 Collect, before any call: the goal of the page (what should a visitor do), the content points, the audience, the language of the page, the links the buttons should lead to, and the images you may use. Facts you do not have stay open questions. Then read:
 
-- `leitvia/get-contract`: `pageFrames` (frame types, their template, slots and the section kinds they require or recommend), `sectionKinds`, `compositionRules`, `templates`, `roles` and `blockStyles`.
-- `leitvia/list-patterns`: filter by `role`, `tone`, `layout` or `provides` (a section kind such as `faq`); each item has `composition`, `images`, `useWhen`, `avoidWhen`, `provides`, `continues`, `status`, `replacedBy` and `successor` (the newer form of an older pattern that stays approved, [sections with icons](references/icon-sections.md)). Use only patterns with `status` `approved`: `leitvia/compose-page` refuses a Lab pattern (`block:<ID>`) in draft or review with `leitvia_pattern_not_approved`.
+- `leitvia/get-contract`: `contract.pageFrames` (frame types, their template, slots and the section kinds they require or recommend), `contract.sectionKinds`, `contract.compositionRules`, `contract.templates`, `contract.roles` and `contract.blockStyles`.
+- `leitvia/list-patterns`: filter by `role`, `tone`, `layout` or `provides` (a section kind such as `faq`); each item has `composition`, `images`, `useWhen`, `avoidWhen`, `provides`, `continues`, `status`, `replacedBy` and `successor` (the newer form of an older pattern that stays approved, [sections with icons](references/icon-sections.md)). Use only patterns with `status` `approved` ([why](../../handbook/README.md#read-before-write)); with the tool page up to `pages` (20 per page); over MCP the resource `leitvia://patterns` holds every page.
 - [`leitvia/list-building-blocks`](../../handbook/abilities/leitvia-list-building-blocks.md): a pattern in `patterns` of a block with `installed: false` shows nothing until the block is on the site. Add just that block with [`leitvia/add-building-block`](../../handbook/abilities/leitvia-add-building-block.md) (`name`, your `package` key; sample entries come as drafts) once the person agreed, never a whole recipe: a recipe also replaces design, header and front page.
 
 ### 2. Plan the outline
@@ -73,15 +73,12 @@ For each section call `leitvia/get-pattern` and read its markup. Write one edit 
 
 ### 5. Build the page
 
-Call `leitvia/compose-page` with `title`, `frame`, `sections` (`pattern` and `edits` each), `base_hash: ""`, an optional `slug`, and `package`. A page that exists and should get new sections throughout: the same call with `post` and the `hash` of `leitvia/get-page-outline` as `base_hash` replaces all its sections in one step, and the checks see only the finished page; never rebuild it with many `insert-section` and `remove-section` calls, the state in between (two h1) is refused. `template` only when the person asked for another page template of the contract (for example `page-docs`); `kind` only for legal, editorial, contact or authors pages. Each section keeps `metadata.patternName`, so the composition can be checked later. Exactly one h1 per page; which template prints the title: [templates and the h1](references/composition.md#templates-and-the-h1).
+Call `leitvia/compose-page` with `title`, `frame`, `sections` (`pattern` and `edits` each), `base_hash: ""`, an optional `slug`, and `package`. A page that exists and should get new sections throughout: the same call with `post` and the `hash` of `leitvia/get-page-outline` as `base_hash` replaces all its sections in one step, and the checks see only the finished page; never rebuild it with many `insert-section` and `remove-section` calls, the state in between (two h1) is refused. `template` only when the person asked for another page template of the contract (for example `page-docs`); `kind` only for legal, editorial, contact, authors or about pages. Each section keeps `metadata.patternName`, so the composition can be checked later. Exactly one h1 per page; which template prints the title: [templates and the h1](references/composition.md#templates-and-the-h1).
 
-On a rejection follow its `message` and `next_ability` and correct the call **once** (`retry: once`). A second rejection of the same call, or any `retry: never`, is a checkpoint: stop and tell the person the code and message. `leitvia_rate_limited` means wait `after:<seconds>` and repeat.
-
-A post or an entry of a post type of the content model is no page: `leitvia/compose-page` creates pages only. For those, [`leitvia/create-content`](../../handbook/abilities/leitvia-create-content.md) takes `post_type`, the `sections` of the outline (or `content` as block markup), `terms` and `fields`, with the same `package` key. Entry pages with their fields and the overview page of a type: [entries](references/entries.md). Products come from `leitvia/create-product`.
+A post or an entry of a post type of the content model is no page: `leitvia/compose-page` creates pages, and posts only with the frame `article` (`type` post, or page for the template `page-article`). For other entries, [`leitvia/create-content`](../../handbook/abilities/leitvia-create-content.md) takes `post_type`, the `sections` of the outline (or `content` as block markup), `terms` and `fields`, with the same `package` key. Entry pages with their fields and the overview page of a type: [entries](references/entries.md). Products come from `leitvia/create-product`.
 
 ## Verification
 
-- `GET /wp-cron.php` where WP-Cron does not run by itself.
 - `leitvia/check-composition` with `post` set to the new page: the score must match the score of the outline.
 - `leitvia/get-page-outline` with `post`: status, template and the sections.
 - `leitvia/audit-site` for published pages: pass the ID before the page as `after` and `limit: 1`, or page through with `next`. The page needs no findings.
@@ -91,7 +88,7 @@ A post or an entry of a post type of the content model is no page: `leitvia/comp
 
 Every code with its retry rule: [rejections](../../handbook/rejections.md).
 
-- `leitvia_pattern_not_approved`: a Lab pattern waits for review; take an approved pattern of the same role.
+- `leitvia_pattern_not_approved`: a Lab or `unreviewed` pattern waits for approval; take an approved one of the same role.
 - `leitvia_unknown_pattern` or `leitvia_not_found`: slug or path ID is wrong; read `leitvia/list-patterns` or the markup again.
 - `leitvia_check_failed` with `leitvia/bindings`, or a bound block shows its saved text: [bindings](references/entries.md#values-of-fields-on-the-front-end).
 - `leitvia_unsafe_content`: scripts, Custom HTML or Base64 in an edit; use registered blocks and media of the library.

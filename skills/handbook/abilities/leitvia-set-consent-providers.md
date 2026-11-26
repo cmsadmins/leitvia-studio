@@ -1,6 +1,6 @@
 # leitvia/set-consent-providers
 
-Generated from Leitvia Studio 1.3.60. Do not edit. Group: Set up. How to call abilities, hashes, autonomy and rejections: [agent handbook](../README.md).
+Generated from Leitvia Studio 1.3.61. Do not edit. Group: Set up. How to call abilities, hashes, autonomy and rejections: [agent handbook](../README.md).
 
 **Set consent providers.** Replaces the providers of embedded content in the privacy settings. Send the whole list, at most 20; a provider you leave out is removed. Read them with leitvia/get-consent-providers first, send its hash as base_hash and the key of every provider that stays. A built-in service such as YouTube needs no entry. Hosts lose scheme, port and path; a provider without a valid host of another site is rejected. Use only providers the site embeds and privacy policies the provider publishes. Like every setting it waits in a change package for a person.
 

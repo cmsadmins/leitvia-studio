@@ -1,6 +1,13 @@
-== Changelog of Leitvia Studio, versions 1.0.0 to 1.3.55 ==
+== Changelog of Leitvia Studio, versions 1.0.0 to 1.3.56 ==
 
 Newer versions are listed in readme.txt.
+
+= 1.3.56 =
+* New: leitvia/insert-section takes template: the post switches to another template of the contract in the same operation, so a page gets a hero with its h1 and the template page-landing at once while its other blocks stay as they are.
+* New: leitvia/insert-section takes wrap: a top-level block, such as a shortcode or a block of another plugin, goes unchanged into a new section at its place, full width with the spacing of a section, the ground surface, surface-alt or inverse and an optional h2 above it.
+* New: Related news of a page without a topic of its own lists the posts with the page as hub, then the posts in a category or tag with the slug of the page or of its product line, and only then the latest posts (theme filter leitvia_related_fallback). leitvia/audit-site reports such a page as leitvia/related-news, leitvia/check-composition as newsTopic without points.
+* New: leitvia/set-page-structure takes hub for entries with a page of their own, such as documentation, which show the card of the service below the text.
+* New: leitvia/import-post turns the FAQ part of a post into the block leitvia/faq with FAQPage data (faq, on by default) and counts the questions in report.faq.
 
 = 1.3.55 =
 * New: leitvia/set-page-structure accepts package for posts with hub, so many posts fit in one package.

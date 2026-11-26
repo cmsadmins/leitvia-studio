@@ -1,6 +1,6 @@
 # leitvia/set-site-identity
 
-Generated from Leitvia Studio 1.3.60. Do not edit. Group: Set up. How to call abilities, hashes, autonomy and rejections: [agent handbook](../README.md).
+Generated from Leitvia Studio 1.3.61. Do not edit. Group: Set up. How to call abilities, hashes, autonomy and rejections: [agent handbook](../README.md).
 
 **Set site identity.** Sets the site title, the tagline, the logo and the site icon. logo and icon are image IDs from leitvia/list-media or leitvia/add-media, 0 removes them. The logo is the one core/site-logo shows in the header and WordPress hands out as custom logo, the title is the text of core/site-title and the start of every page title in the browser, the tagline that of core/site-tagline; so the header needs no image block for the logo. The icon is the small image of browser tabs and bookmarks, square and at least 512 pixels wide; notice says so otherwise. Only the fields you send change, an empty string clears the tagline. base_hash is empty. Like every setting it waits in a change package for a person.
 

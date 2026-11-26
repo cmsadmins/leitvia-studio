@@ -1,7 +1,7 @@
 ---
 name: leitvia-setup
 description: Sets up a WordPress site with the Leitvia theme and Leitvia Studio from a briefing, through the leitvia abilities only. Picks a site recipe (company, shop, blog, publication, documentation), applies content model, style variation, header, footer, navigation and base pages, and hands everything to a person as a change package. Use it for a new site or a fresh start of an existing one; brand colors and fonts belong to leitvia-design, single pages to leitvia-page.
-compatibility: WordPress 7.1+, PHP 8.2+. Needs the theme Leitvia and the plugin Leitvia Studio, reached over the MCP server leitvia or the REST routes of the Abilities API with an application password. The recipe for a shop also needs WooCommerce.
+compatibility: WordPress 7.1+, PHP 8.2+. Needs the theme Leitvia and the plugin Leitvia Studio, reached over the MCP server leitvia (application password or OAuth token) or the REST routes of the Abilities API (application password only). The recipe for a shop also needs WooCommerce.
 ---
 
 # leitvia-setup
@@ -15,19 +15,18 @@ Turn a briefing into a working site: recipe, style variation, header, footer, na
 
 ## Inputs required
 
-- Access as the agent user over MCP or REST: [handbook, Access over MCP and REST](../../handbook/README.md#access-over-mcp-and-rest).
+- Access as the agent user: [handbook, Access over MCP and REST](../../handbook/README.md#access-over-mcp-and-rest).
 - The answers of step 1. For a shop, WooCommerce is active.
-- Read before the first call: the [agent handbook](../../handbook/README.md) (access, hashes, autonomy, packages, rejections, index of all abilities). Read the page of each ability before you first call it (the handbook index links them): `get-contract`, `list-recipes`, `get-content-model`, `define-content-type`, `apply-recipe`, `compose-page`, `get-package`, `get-page-outline`, `update-content`, `audit-site`, `list-packages`, `get-seo`, for a shop `create-product`. Statuses of a recipe run, shop sites and what a recipe does not cover: [recipe details](references/recipe.md). Format of own content types: [content model](references/content-model.md). Header and footer in grid cells and the menu overlay: [grid header](references/grid-header.md).
+- Read before the first call: the [agent handbook](../../handbook/README.md). Read the page of each ability before you first call it (the handbook index links them): `get-contract`, `list-recipes`, `get-content-model`, `define-content-type`, `apply-recipe`, `compose-page`, `get-package`, `get-page-outline`, `update-content`, `audit-site`, `list-packages`, `get-seo`, for a shop `create-product`. Statuses of a recipe run, shop sites and what a recipe does not cover: [recipe details](references/recipe.md). Format of own content types: [content model](references/content-model.md). Header and footer in grid cells and the menu overlay: [grid header](references/grid-header.md).
 
 ## Ground rules
 
-- Write only through `leitvia/*` abilities. No SQL, no WP-CLI, no REST routes of WordPress core (`/wp-json/wp/v2/...`), not even to read. Reading public pages of the site and of the operator's other sites is allowed. On a Leitvia site these abilities come before the WordPress skills `wp-patterns`, `wp-block-themes` and `wp-wpcli-and-ops`, and you never write files in the theme `leitvia`. Files that no ability can replace (workflows of `wp-block-themes` and `wp-patterns`, a developer's task) go only into the child theme `leitvia-child`, whose patterns follow the contract. Switching to it is a step of the person; Studio carries over Global Styles and customized templates.
-- The site is the one at the address of your task, which in a multisite network can have a path (`https://example.org/club/`); every path starts there, not at the host. Call `leitvia/get-contract` first and compare `site.url` with that address; when they differ, write nothing and ask the person.
+- Follow the [rules for every task](../../handbook/README.md#rules-for-every-task). Reading the operator's other sites is allowed.
 - Mode `package` is the default for a live site: send the same `package` key on every write of the task, for example `setup-2026-10`. Use mode `direct` only when a person is present and says the site is not live yet; the drafts it leaves are theirs to publish.
 - **Facts are never guessed.** Organization data, prices, legal texts, figures, quotes and people come only from a source you can name: the person, a page of the site or a read ability, with the source in your report. Without one, stop at a checkpoint; never write a placeholder that looks like a fact.
 - Here that covers company name, address, register entries, VAT ID, managing directors, data protection officer, server location and retention periods.
 - Take numbers about the site (patterns, page frames, variations, template parts) from `leitvia/get-contract` and `leitvia/list-patterns` (`total`), never from prose, marketing pages or memory.
-- A rejection is corrected at most once, following `message`, `next_ability` and `retry`. If the second call is rejected too, stop and ask the person. The round of an empty `base_hash` with `leitvia_stale_hash` is protocol, not a rejection.
+- The round of an empty `base_hash` with `leitvia_stale_hash` is protocol, not a rejection.
 
 ## Procedure
 
@@ -65,7 +64,7 @@ Pick the recipe whose `description` and `pages` fit the briefing:
 | Magazine, newsroom | `leitvia/publication` |
 | Product or project documentation | `leitvia/documentation` |
 
-Tell the person which pages the recipe creates and which slugs they get. If a fixed slug from step 1 differs, the page has to be created by hand with `leitvia/compose-page` and `slug` before the recipe runs (the recipe keeps pages of the same kind or slug).
+Tell the person which pages the recipe creates and which slugs they get. A fixed slug from step 1 that differs goes to `leitvia/apply-recipe` as `slugs` (`{"imprint": "legal-notice"}`); navigation, footer and settings follow.
 
 Checkpoint "Recipe chosen".
 

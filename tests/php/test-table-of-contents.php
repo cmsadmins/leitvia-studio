@@ -308,4 +308,28 @@ class Test_Table_Of_Contents extends WP_UnitTestCase {
 		$this->assertSame( '#start', Table_Of_Contents::anchor_url( $this->post_id, 'start' ) );
 		$this->assertSame( '#x', Table_Of_Contents::anchor_url( 0, 'x' ) );
 	}
+
+	/**
+	 * (9) A long list starts closed: from COLLAPSE_FROM entries the title and the number of sections are the summary of
+	 * a details around the list, the nav stays named by the title. One entry fewer renders open as before.
+	 */
+	public function test_long_list_renders_closed(): void {
+		$headings = static fn( int $n ): string => implode( '', array_map( static fn( int $i ): string => self::heading( 1 === $i % 3 ? 2 : 3, 'Section ' . $i ), range( 1, $n ) ) );
+		$long     = $this->render_post( "<!-- wp:leitvia/table-of-contents /-->\n" . $headings( Table_Of_Contents::COLLAPSE_FROM ) );
+		$this->assertMatchesRegularExpression( '#<nav [^>]*aria-labelledby="leitvia-toc-title"[^>]*><details class="wp-block-leitvia-table-of-contents__details"><summary><h2 id="leitvia-toc-title" class="wp-block-leitvia-table-of-contents__title">On this page</h2> <span class="wp-block-leitvia-table-of-contents__total">12 sections</span></summary><ol><li><a href="\#section-1">Section 1</a><ol>#', $long );
+		$this->assertStringContainsString( '</ol></details></nav>', $long );
+		$this->assertStringNotContainsString( '<details open', $long );
+
+		$short = $this->render_post( "<!-- wp:leitvia/table-of-contents /-->\n" . $headings( Table_Of_Contents::COLLAPSE_FROM - 1 ) );
+		$this->assertStringNotContainsString( '<details', $short );
+		$this->assertStringContainsString( '<h2 id="leitvia-toc-title" class="wp-block-leitvia-table-of-contents__title">On this page</h2><ol>', $short );
+	}
+
+	/**
+	 * (10) The opened long list scrolls in itself: in the sticky post sidebar of the theme its end stays in reach.
+	 */
+	public function test_opened_list_scrolls_in_itself(): void {
+		$css = (string) file_get_contents( dirname( LEITVIA_STUDIO_FILE ) . '/build/blocks/table-of-contents/style-index.css' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Local build file.
+		$this->assertMatchesRegularExpression( '#\.wp-block-leitvia-table-of-contents__details\[open\]>ol\{[^}]*max-height:50vh[^}]*overflow-y:auto#', $css );
+	}
 }

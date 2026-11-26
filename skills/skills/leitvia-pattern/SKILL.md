@@ -1,7 +1,7 @@
 ---
 name: leitvia-pattern
 description: Build a new section pattern or a variant of an existing one on a WordPress site with the Leitvia theme and Leitvia Studio, strictly from the design contract (color roles, spacing and type presets, block styles), and hand it to a person for review in the Lab. Also replaces deprecated patterns on pages. Use when no existing pattern fits a section a page needs, when someone asks for a pattern variant, or when an audit reports deprecated patterns.
-compatibility: WordPress 7.1+, PHP 8.2+. Needs the theme Leitvia and the plugin Leitvia Studio, reached over the MCP server leitvia or the REST routes of the Abilities API with an application password.
+compatibility: WordPress 7.1+, PHP 8.2+. Needs the theme Leitvia and the plugin Leitvia Studio, reached over the MCP server leitvia (application password or OAuth token) or the REST routes of the Abilities API (application password only).
 ---
 
 # leitvia-pattern
@@ -15,9 +15,9 @@ A pattern is a reusable section of block markup. New patterns start in the Lab o
 
 ## Inputs required
 
-- Access: MCP server `leitvia` or the REST routes of the Abilities API, as the agent user with its application password: [handbook, Access over MCP and REST](../../handbook/README.md#access-over-mcp-and-rest). Paths start at the address of the site, not at the host.
+- Access as the agent user: [handbook, Access over MCP and REST](../../handbook/README.md#access-over-mcp-and-rest).
 - The section the page needs, and fixed texts and images from the person.
-- Read before the first call: the [agent handbook](../../handbook/README.md) (access, hashes, autonomy, packages, rejections, index of all abilities). Read the page of each ability before you first call it (the handbook index links them): `get-contract`, `list-patterns`, `get-pattern`, `list-blocks`, `create-pattern`, `vary-pattern`, `get-page-outline`, `replace-pattern`. Markup rules and how to replace deprecated patterns: [markup details](references/markup.md). Effects on scroll: [animation](references/animation.md).
+- Read before the first call: the [agent handbook](../../handbook/README.md). Read the page of each ability before you first call it (the handbook index links them): `get-contract`, `list-patterns`, `get-pattern`, `list-blocks`, `create-pattern`, `vary-pattern`, `get-page-outline`, `replace-pattern`. Markup rules and how to replace deprecated patterns: [markup details](references/markup.md). Effects on scroll: [animation](references/animation.md).
 
 ## Modes
 
@@ -26,8 +26,8 @@ A pattern is a reusable section of block markup. New patterns start in the Lab o
 
 ## Ground rules
 
-- Call `leitvia/get-contract` first and compare `site.url` with the address of your task; when they differ, write nothing and ask the person. Never use SQL, WP-CLI or the REST routes of WordPress core (`/wp-json/wp/v2/...`), not even to read: the abilities give you every ID, hash and status you need. Where WP-Cron does not run by itself (WordPress Playground), call `GET /wp-cron.php` after each write.
-- On a Leitvia site these abilities come before the WordPress skills `wp-patterns`, `wp-block-themes` and `wp-wpcli-and-ops`, and you never write files in the theme `leitvia`. Files no ability can replace (`wp-block-themes`, `wp-patterns`, developers) go only into the child theme `leitvia-child`, whose patterns follow the contract; a person switches to it, Studio carries the design over. Custom blocks go into a plugin from `leitvia-block-starter` (WordPress skill `wp-block-development`), never into a theme.
+- Follow the [rules for every task](../../handbook/README.md#rules-for-every-task).
+- Custom blocks go into a plugin from `leitvia-block-starter` (WordPress skill `wp-block-development`), never into a theme.
 - **Facts are never guessed.** Organization data, prices, legal texts, figures, quotes and people come only from a source you can name: the person, a page of the site or a read ability, with the source in your report. Without one, stop at a checkpoint; never write a placeholder that looks like a fact.
 - Texts and images that stay fixed in a pattern on every page are facts of this kind: they come from the person.
 
@@ -66,7 +66,7 @@ The write result or the rejection lists `findings` with check, block path and a 
 
 ### 5. Review in the Lab
 
-Every new pattern and variant starts with Lab status `draft` and version 0.1.0. A person moves it to `review`, then to `approved`, in the Lab of Leitvia Studio; agents cannot change the Lab status. The Lab rates a page by the least mature pattern it uses, so a draft pattern marks every page that uses it as draft. Checkpoint **Review in the Lab**.
+Every new pattern and variant starts with Lab status `draft` and version 0.1.0. A person moves it to `review`, then to `approved`, in the Lab of Leitvia Studio; agents cannot change the Lab status. Over MCP 2026-07-28, `subscriptions/listen` with `resourceSubscriptions: ["leitvia://patterns"]` tells you when the Lab saved the pattern; then read it again. The Lab rates a page by the least mature pattern it uses, so a draft pattern marks every page that uses it as draft. Checkpoint **Review in the Lab**.
 
 ### Replace deprecated patterns
 
@@ -74,9 +74,8 @@ Every new pattern and variant starts with Lab status `draft` and version 0.1.0. 
 
 ## Verification
 
-- `GET /wp-cron.php` where WP-Cron does not run by itself.
 - `leitvia/get-page-outline` with `post` set to the `target.post` of the write: type `wp_block`, status, title and the block tree.
-- A page can use it only after a person approved it in the Lab: `leitvia/compose-page` refuses a Lab pattern in draft or review, or with a part that is not approved, with `leitvia_pattern_not_approved`. `leitvia/check-composition` likewise counts only an approved Lab pattern as known, with the composition of the theme pattern it varies; until then it is `unknownPattern`. Say so in your report instead of working around it.
+- A page can use it only after a person approved it in the Lab ([read before write](../../handbook/README.md#read-before-write)); until then `leitvia/check-composition` counts it as `unknownPattern`, after it with the composition of the pattern it varies. Say so in your report instead of working around it.
 - `leitvia/list-patterns` lists the Lab patterns after those of the theme and of Studio, as `block:<ID>` with `status`, `version` and `hash`.
 
 ## Failure modes / debugging

@@ -1,6 +1,6 @@
 # leitvia/set-motion
 
-Generated from Leitvia Studio 1.3.60. Do not edit. Group: Set up. How to call abilities, hashes, autonomy and rejections: [agent handbook](../README.md).
+Generated from Leitvia Studio 1.3.61. Do not edit. Group: Set up. How to call abilities, hashes, autonomy and rejections: [agent handbook](../README.md).
 
 **Set motion.** Sets the motion of the whole site: off (no effect on scroll and no hover motion of the theme), subtle (800 ms, the default) or bold (twice the way, 1200 ms). It is the strength and duration of every effect of leitviaAnimation without leitviaMotion, so one setting keeps the motion of all pages the same. When a person wants more or less motion, change this setting instead of giving single blocks effects or leitviaMotion. base_hash is empty. Like every setting it waits in a change package for a person.
 

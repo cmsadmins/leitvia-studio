@@ -789,7 +789,8 @@ class Test_Mcp_Server extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'leitvia://inbox', Server::instructions() );
 		add_filter( 'leitvia_studio_contract_path', '__return_empty_array' );
 		\LeitviaStudio\Plugin::forget_contract();
-		$this->assertStringContainsString( 'leitvia-setup', Server::instructions() );
+		$this->assertStringContainsString( 'A person activates the Leitvia theme', Server::instructions() );
+		$this->assertStringNotContainsString( 'leitvia-setup', Server::instructions() );
 		remove_filter( 'leitvia_studio_contract_path', '__return_empty_array' );
 		\LeitviaStudio\Plugin::forget_contract();
 	}

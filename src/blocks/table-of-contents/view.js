@@ -11,7 +11,9 @@ const PREFIX = '.wp-block-leitvia-table-of-contents__';
 for ( const nav of document.querySelectorAll(
 	'.wp-block-leitvia-table-of-contents'
 ) ) {
-	const list = nav.querySelector( ':scope > ol' );
+	// A long list sits in a closed details (Table_Of_Contents::COLLAPSE_FROM); while closed, the details is what shows.
+	const list = nav.querySelector( ':scope > ol, :scope > details > ol' );
+	const shown = nav.querySelector( ':scope > details' ) ?? list;
 	const links = [ ...nav.querySelectorAll( 'a[href^="#"]' ) ];
 	const flow = [ ...list.querySelectorAll( 'a[href^="#"]' ) ];
 	// A part of a post without headings of its own links only to other parts: nothing to mark or follow here.
@@ -38,7 +40,7 @@ for ( const nav of document.querySelectorAll(
 	};
 	const companionUpdate = () => {
 		const box = content.getBoundingClientRect();
-		const past = list.getBoundingClientRect().bottom < 0;
+		const past = shown.getBoundingClientRect().bottom < 0;
 		const ahead = box.bottom > window.innerHeight;
 		companion.classList.toggle(
 			'is-visible',

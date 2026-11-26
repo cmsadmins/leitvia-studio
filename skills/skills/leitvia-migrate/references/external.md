@@ -23,7 +23,7 @@ Per source page one target entry: title from the `h1` (or the `<title>` without 
 ## 3. Images
 
 - Download each image of the source once (a GET of a public file, like reading a page). Files over 5 MB, or formats other than JPEG, PNG, GIF and WebP, go to checkpoint **Open items**.
-- Add it with `leitvia/add-media`: `data` (Base64), `filename`, `alt` and the `package` key. Encode in a short script that posts the request, so the Base64 never passes through your own output.
+- Add it with `leitvia/add-media`: `data` (Base64), `filename`, `alt` and the `package` key. Encode in a short script that sends the request (REST with the application password, or `tools/call` of `leitvia-add-media` over MCP), so the Base64 never passes through your own output.
 - Alt text: the `alt` of the source character for character when it describes the image; otherwise write one short sentence from what the image shows and why it is on the page, or mark it `decorative: true` when the text around it carries the meaning. List every alt text you wrote.
 - Images are never loaded from the source host in the new content; only attachments of this site.
 - An image with text burned in: once package A is applied, cut off the text band with `leitvia/crop-media` (the text goes into the content), see [images](translate.md#images).

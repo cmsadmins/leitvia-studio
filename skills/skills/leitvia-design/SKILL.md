@@ -1,7 +1,7 @@
 ---
 name: leitvia-design
 description: Derives a Leitvia token set from a brand (colors, fonts, radii, spacing, logo) and activates it through the leitvia abilities only. Maps brand values to the color roles of the design contract, computes every contrast pair before writing, fixes a contrast rejection itself once, and hands the set to a person as a change package; without a brand of its own it applies a style variation of the theme instead. Use it when a site should carry a brand or another look; site structure belongs to leitvia-setup, pages to leitvia-page.
-compatibility: WordPress 7.1+, PHP 8.2+. Needs the theme Leitvia and the plugin Leitvia Studio, reached over the MCP server leitvia or the REST routes of the Abilities API with an application password.
+compatibility: WordPress 7.1+, PHP 8.2+. Needs the theme Leitvia and the plugin Leitvia Studio, reached over the MCP server leitvia (application password or OAuth token) or the REST routes of the Abilities API (application password only).
 ---
 
 # leitvia-design
@@ -15,19 +15,17 @@ Bring a brand onto a Leitvia site as a token set: one DTCG document with every r
 
 ## Inputs required
 
-- Access as the agent user over MCP or REST: [handbook, Access over MCP and REST](../../handbook/README.md#access-over-mcp-and-rest).
+- Access as the agent user: [handbook, Access over MCP and REST](../../handbook/README.md#access-over-mcp-and-rest).
 - The brand source the person names (style guide, design file, existing site), or the request to design the brand.
-- Read before the first call: the [agent handbook](../../handbook/README.md) (access, hashes, autonomy, packages, rejections, index of all abilities). Read the page of each ability before you first call it (the handbook index links them): `get-contract`, `get-tokens`, `create-token-set`, `preview-token-set`, `activate-token-set`, `set-variation`, `audit-site`. Roles, token format, the contrast formula, fonts and what a token set cannot carry: [token details](references/tokens.md).
+- Read before the first call: the [agent handbook](../../handbook/README.md). Read the page of each ability before you first call it (the handbook index links them): `get-contract`, `get-tokens`, `create-token-set`, `preview-token-set`, `activate-token-set`, `set-variation`, `audit-site`. Roles, token format, the contrast formula, fonts and what a token set cannot carry: [token details](references/tokens.md).
 
 ## Ground rules
 
-- Write only through `leitvia/*` abilities. No CSS, no child theme of your own, no SQL, no WP-CLI, no REST routes of WordPress core (`/wp-json/wp/v2/...`), not even to read. On a Leitvia site these abilities come before the WordPress skills `wp-patterns`, `wp-block-themes` and `wp-wpcli-and-ops`, and you never write files in the theme `leitvia`. Files that no ability can replace (workflows of `wp-block-themes` and `wp-patterns`, a developer's task) go only into the child theme `leitvia-child`, whose patterns follow the contract. Switching to it is a step of the person; Studio carries over Global Styles and customized templates.
-- The site is the one at the address of your task, which in a multisite network can have a path (`https://example.org/club/`); every path starts there, not at the host. Call `leitvia/get-contract` first and compare `site.url` with that address; when they differ, write nothing and ask the person.
+- Follow the [rules for every task](../../handbook/README.md#rules-for-every-task). No CSS and no child theme of your own.
 - Token sets and their activation are in the area `design`, which by default only suggests: every write lands in a change package for a person. Send one `package` key for the task, for example `brand-2026-10`.
 - **Facts are never guessed.** Organization data, prices, legal texts, figures, quotes and people come only from a source you can name: the person, a page of the site or a read ability, with the source in your report. Without one, stop at a checkpoint; never write a placeholder that looks like a fact.
 - Brand values are facts too: they come from the brand source the person names (style guide, design file, existing site). Never guess a brand color or font; a value you cannot find is a question to the person. The one exception: the person asks you to design the brand ("own brand, your proposal", an invented demo site). Then choose the values, compute every pair and call the set a proposal in its `$description` and in your report.
 - Roles, slugs and the contrast pairs come from `leitvia/get-contract`, never from memory or from files of the theme.
-- A rejection is corrected once. If the corrected call is rejected again, stop and ask the person.
 
 ## Procedure
 
@@ -39,8 +37,8 @@ Checkpoint "Brand confirmed".
 
 ### 2. Read the site
 
-- `leitvia/get-contract`: `roles` (every color, font size, font family, spacing, radius and shadow slug), `pairs` (foreground, background, minimum ratio, optional `ring`), `optionalRoles` and `optionalPairs` (button and band colors a set may add).
-- `leitvia/get-tokens`: the current `document` (start from it), `sets` (existing token sets) and `contrast` (findings of the current palette).
+- `leitvia/get-contract`: `contract.roles` (every color, font size, font family, spacing, radius and shadow slug), `contract.pairs` (foreground, background, minimum ratio, optional `ring`), `contract.optionalRoles` and `contract.optionalPairs` (button and band colors a set may add).
+- `leitvia/get-tokens`: the current `document` (start from it), `sets` (existing token sets), `contrast` (findings of the current palette) and `hash` (of the global styles).
 - The front page: its `--wp--preset--color--*` and `--wp--preset--font-family--*` values are what visitors see. When they differ from the `document`, tell the person which values differ and ask which ones to keep before you write; never build a set on values the site does not show.
 - A style variation of a recipe (such as `corporate-light`, in the same package as the recipe) and a token set do not add up: once the set is active, its colors and fonts replace those of the variation. Build the set on the `document` of `leitvia/get-tokens`; a variation that still waits in an open package is no reason to ask.
 
@@ -62,7 +60,7 @@ Checkpoint "Contrast correction accepted" whenever you changed a brand value.
 
 ### 6. Preview
 
-The new set exists only after the person applied the package of step 5 (checkpoint "Package applied"). Show it before anything is activated: `leitvia/preview-token-set` with `set` and the `path` of a page (front page when empty) returns a signed `url`, valid for an hour, that opens without signing in and changes nothing for visitors. Take screenshots there or give the addresses to the person. To compare style variants, create one set per variant and preview each; never activate a set just to look at it, visitors would see it.
+The new set exists only after the person applied the package of step 5 (checkpoint "Package applied"). Show it before anything is activated: `leitvia/preview-token-set` with `set` and the `path` of a page (front page when empty) returns a signed `url`, valid for an hour, that opens without signing in and changes nothing for visitors. Take screenshots there or give the addresses to the person. To compare style variants, create one set per variant and preview each; never activate a set just to look at it, visitors would see it. With Leitvia Pro the person can compare sets in the token studio view of `leitvia/get-tokens`.
 
 The warning `font_no_italic` names a role whose family has no italic cut: italic text in it gets slanted upright letters. Keep italics out of that role or choose another family, and tell the person.
 
@@ -71,12 +69,12 @@ The warning `font_no_italic` names a role whose family has no italic cut: italic
 When the person chose a set:
 
 1. `leitvia/get-tokens`: take the `id` of the new set from `sets` (status `inactive`).
-2. `leitvia/activate-token-set` with `set`, empty `base_hash` and the same `package` key. When the site already has global styles the call is rejected with `leitvia_stale_hash`; repeat it once with `current_hash` from the rejection.
+2. `leitvia/activate-token-set` with `set`, the `hash` of `leitvia/get-tokens` as `base_hash` and the same `package` key.
 3. The activation lands in a new package. Checkpoint "Package applied" again.
 
 ### Style variation instead of a brand
 
-When the person wants one of the looks of the theme and no brand of its own, take the slug from the style variations of `leitvia/get-contract` and call `leitvia/set-variation` with `variation`, empty `base_hash` and the `package` key; after `leitvia_stale_hash` repeat it once with `current_hash`. A full variation replaces the global styles, a colors or typography variation only its part. While a token set is active (`source` of `leitvia/get-tokens` is `set`), its colors and fonts win over any variation, so do not set one; tell the person. Then checkpoint "Package applied" and the verification.
+When the person wants one of the looks of the theme and no brand of its own, take the slug from `contract.variations` of `leitvia/get-contract` and call `leitvia/set-variation` with `variation`, the `hash` of `leitvia/get-tokens` as `base_hash` and the `package` key. A full variation replaces the global styles, a colors or typography variation only its part. While a token set is active (`source` of `leitvia/get-tokens` is `set`), its colors and fonts win over any variation, so do not set one; tell the person. Then checkpoint "Package applied" and the verification.
 
 Brand fonts that are not bundled wait for an upload by the person or the operator, before the set is activated. Those, heading weights, the logo and composition rules of the brand: [token details](references/tokens.md#fonts). A brand with many photos may widen the text to the image bands: [widths](references/widths.md). Tell the person what the set cannot carry; a look beyond the roles (a line, a hover, a size between two steps) is a site style finding for the child theme: [deviations](../leitvia-page/references/deviations.md).
 
@@ -85,7 +83,7 @@ Brand fonts that are not bundled wait for an upload by the person or the operato
 After the person applied the activation:
 
 - `leitvia/get-tokens`: `source` is `set`, `active` is the ID of your set, `drift` is false, `contrast` is empty.
-- Fetch the front page and check that the CSS custom properties carry your values, for example `--wp--preset--color--accent` with your accent hex. On some sites global styles written without a signed in user were not found again and the site silently fell back to the theme default; only the front end proves the brand is live.
+- Fetch the front page and check that the CSS custom properties carry your values, for example `--wp--preset--color--accent` with your accent hex. Only the front end proves the brand is live.
 - `leitvia/audit-site`: no new findings.
 
 ## Failure modes / debugging
@@ -93,7 +91,7 @@ After the person applied the activation:
 Every code with its retry rule: [rejections](../../handbook/rejections.md).
 
 - `leitvia_check_failed` on `leitvia/create-token-set`: a pair misses its ratio; step 5 has the one correction.
-- `leitvia_stale_hash` on activation or variation: the site has global styles; repeat once with `current_hash`.
+- `leitvia_stale_hash` on activation or variation: the global styles changed since your read; read `leitvia/get-tokens` again and send its `hash` once.
 - `leitvia_forbidden` on a preview: the agent user may not edit theme options; a person grants it or previews.
 - The front end still shows the old colors: `drift` is true or the package waits; read `leitvia/get-tokens` and the open packages.
 
@@ -104,8 +102,6 @@ Stop and wait for the person at each of these checkpoints. Report the values, th
 1. **Brand confirmed:** colors with their use, fonts, radii, spacing and logo come from the source the person named.
 2. **Contrast correction accepted:** you changed a brand value to meet a contrast pair; the person agrees to the new value (or the second attempt failed and you show both finding lists).
 3. **Package applied:** the person applied the package with the token set, and later the package with the activation, in the inbox of Leitvia Studio.
-
-Also stop after the second rejection of the same call.
 
 ## Unattended
 

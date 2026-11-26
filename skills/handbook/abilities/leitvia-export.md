@@ -1,6 +1,6 @@
 # leitvia/export
 
-Generated from Leitvia Studio 1.3.60. Do not edit. Group: Read. How to call abilities, hashes, autonomy and rejections: [agent handbook](../README.md).
+Generated from Leitvia Studio 1.3.61. Do not edit. Group: Read. How to call abilities, hashes, autonomy and rejections: [agent handbook](../README.md).
 
 **Export site.** Exports the site as a portable JSON package, page by page. Pages (block markup), navigation menus and token sets (DTCG document) come in items; the first call (offset 0) also carries the template parts of the active theme and the content model. Each item carries its hash. Items of one call stay under 1048576 bytes; call again with offset set to next until next is null. Choose parts to export less. Writes nothing; drafts are included, private and password protected content is not.
 

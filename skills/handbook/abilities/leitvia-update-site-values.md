@@ -1,6 +1,6 @@
 # leitvia/update-site-values
 
-Generated from Leitvia Studio 1.3.60. Do not edit. Group: Set up. How to call abilities, hashes, autonomy and rejections: [agent handbook](../README.md).
+Generated from Leitvia Studio 1.3.61. Do not edit. Group: Set up. How to call abilities, hashes, autonomy and rejections: [agent handbook](../README.md).
 
 **Update site values.** Sets values of site settings of the content model declared with bindable true, the values blocks show on every page through the binding source leitvia/setting, such as opening hours or a phone number. values names them by key; the settings you leave out stay. Each value follows the field type of its setting, an empty string empties a text. leitvia/get-content-model returns the values as settings_values and their hash as settings_hash, the base_hash. Like every setting it waits in a change package for a person, and leitvia/rollback undoes it once applied. Declare a new setting with leitvia/define-content-type first.
 

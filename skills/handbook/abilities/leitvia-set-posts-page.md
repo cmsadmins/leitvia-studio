@@ -1,6 +1,6 @@
 # leitvia/set-posts-page
 
-Generated from Leitvia Studio 1.3.60. Do not edit. Group: Set up. How to call abilities, hashes, autonomy and rejections: [agent handbook](../README.md).
+Generated from Leitvia Studio 1.3.61. Do not edit. Group: Set up. How to call abilities, hashes, autonomy and rejections: [agent handbook](../README.md).
 
 **Set posts page.** Makes an existing page the posts page of the reading settings, the address that lists all posts; 0 clears it. base_hash is empty. The page must exist, so create it first and wait until a package with it is applied. Like every setting it waits in a change package for a person. It takes effect with a static front page; notice says so while the site has none, or while the page is not published.
 

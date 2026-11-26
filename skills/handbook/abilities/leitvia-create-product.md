@@ -1,6 +1,6 @@
 # leitvia/create-product
 
-Generated from Leitvia Studio 1.3.60. Do not edit. Group: Build. How to call abilities, hashes, autonomy and rejections: [agent handbook](../README.md).
+Generated from Leitvia Studio 1.3.61. Do not edit. Group: Build. How to call abilities, hashes, autonomy and rejections: [agent handbook](../README.md).
 
 **Create product.** Creates a simple product. It takes title, slug, texts as block markup or plain text (a long description in plain text becomes paragraph blocks, one per block of text between blank lines), prices, SKU, stock, categories and an image of the media library; base_hash is empty. Categories take IDs, slugs or names; a name no category has yet creates that category. The image needs alt text (leitvia/set-alt-text). The status is capped by the autonomy level, and a product with a price lands at most as a suggestion unless a person unlocked prices.
 

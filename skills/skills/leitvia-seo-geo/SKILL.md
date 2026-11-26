@@ -1,7 +1,7 @@
 ---
 name: leitvia-seo-geo
 description: Improves how a WordPress site with the Leitvia theme and Leitvia Studio is found in search engines and cited in AI answers (ChatGPT, Perplexity, Google AI Overviews), without tricks. Reads titles, meta descriptions, robots and structured data of every page through the active SEO plugin (Yoast SEO, Rank Math, SEOPress, The SEO Framework), writes better titles and descriptions from what the pages say in a change package, suggests clearer structure and drafts an llms.txt for the person to publish. Checks first that the whole site is visible to search engines and fit for Google News. Use it after a site went live, after new pages, or when someone asks about SEO, rankings, AI search or llms.txt; a full report on a site belongs to leitvia-report.
-compatibility: WordPress 7.1+, PHP 8.2+. Needs the theme Leitvia and the plugin Leitvia Studio, reached over the MCP server leitvia or the REST routes of the Abilities API with an application password. Writing SEO data needs one of the four SEO plugins; without one the skill reads and suggests only.
+compatibility: WordPress 7.1+, PHP 8.2+. Needs the theme Leitvia and the plugin Leitvia Studio, reached over the MCP server leitvia (application password or OAuth token) or the REST routes of the Abilities API (application password only). Writing SEO data needs one of the four SEO plugins; without one the skill reads and suggests only.
 ---
 
 # leitvia-seo-geo
@@ -15,9 +15,9 @@ You make each page say clearly, in its title, description and first lines, what 
 
 ## Inputs required
 
-- Access: MCP server `leitvia` or the REST routes of the Abilities API, as the agent user with its application password: [handbook, Access over MCP and REST](../../handbook/README.md#access-over-mcp-and-rest). Paths start at the address of the site, not at the host.
+- Access as the agent user: [handbook, Access over MCP and REST](../../handbook/README.md#access-over-mcp-and-rest).
 - The pages that matter and who should find them (step 1).
-- Read before the first call: the [agent handbook](../../handbook/README.md) (access, hashes, autonomy, packages, rejections, index of all abilities). Read the page of each ability before you first call it (the handbook index links them): `list-content`, `get-seo`, `update-seo`, `get-page-outline`, `update-content`, `list-packages`, `get-package`. Rules for site visibility, titles, descriptions, structure, structured data, Google News and llms.txt: [SEO and GEO details](references/seo.md).
+- Read before the first call: the [agent handbook](../../handbook/README.md). Read the page of each ability before you first call it (the handbook index links them): `list-content`, `get-seo`, `update-seo`, `get-page-outline`, `update-content`, `list-packages`, `get-package`. Rules for site visibility, titles, descriptions, structure, structured data, Google News and llms.txt: [SEO and GEO details](references/seo.md).
 
 ## Modes
 
@@ -26,13 +26,12 @@ You make each page say clearly, in its title, description and first lines, what 
 
 ## Ground rules
 
-- Call `leitvia/get-contract` first and compare `site.url` with the address of your task; when they differ, write nothing and ask the person. Never use SQL, WP-CLI or the REST routes of WordPress core (`/wp-json/wp/v2/...`), not even to read. Reading public pages of the site, `robots.txt` and `llms.txt` is fine and part of the work. Where WP-Cron does not run by itself (WordPress Playground), call `GET /wp-cron.php` after each write. On a Leitvia site these abilities come before the WordPress skills `wp-patterns`, `wp-block-themes` and `wp-wpcli-and-ops`, and you never write files in the theme.
+- Follow the [rules for every task](../../handbook/README.md#rules-for-every-task). Reading `robots.txt` and `llms.txt` is part of the work.
 - **No tricks.** No keyword lists, no repeated phrases, no hidden text, no texts written for machines rather than people, no structured data for content the page does not show, no fake reviews, ratings or FAQ. They do not help and they can cost the site its place in search.
 - **Say only what the page says.** A title or description summarizes the page; `leitvia/update-seo` rejects numbers the post does not contain (`unsupported_fact`). Do not promise what the page does not offer.
 - **Facts are never guessed.** Organization data, prices, legal texts, figures, quotes and people come only from a source you can name: the person, a page of the site or a read ability, with the source in your report. Without one, stop at a checkpoint; never write a placeholder that looks like a fact.
 - **noindex is the person's decision.** Never set `noindex` or `nofollow` on your own; legal pages and thank-you pages are the usual cases, and the person confirms each (checkpoint **Indexing**).
-- **Without an SEO plugin** `plugin.key` is `leitvia`: `leitvia/update-seo` stores title, description and robots and prints them, the title plus " | " and the site name where the whole keeps to 60 characters (Studio setting `title_site_name`, on by default). Write the title without the site name. Never change the title of a page to change its `<title>`: it is the `h1`. With an SEO plugin Studio cannot write to the write is rejected with `leitvia_no_seo_plugin`; list the titles and descriptions you would write.
-- A rejection is corrected at most once, following `message`, `next_ability` and `retry`. If the second call is rejected too, or `retry` is `never`, stop and tell the person.
+- **Without an SEO plugin** `plugin.key` is `leitvia`: `leitvia/update-seo` stores title, description and robots and prints them, the title plus " | " and the site name where the whole keeps to 60 characters (Studio setting `title_site_name`, on by default). Write the title without the site name. Never change the title of a page to change its `<title>`: it is the `h1`. Whether titles end with the site name: `leitvia/set-seo-titles` (`site_name`), waits in a package. With an SEO plugin Studio cannot write to, the write is rejected with `leitvia_no_seo_plugin`; list the titles and descriptions you would write.
 
 ## Procedure
 
@@ -59,7 +58,7 @@ For each page that needs it, write a title (at most 60 characters) and a descrip
 
 ### 5. Structure for search and AI answers
 
-AI answers quote passages that stand on their own. Suggest, per page, what would make it clearer: a first paragraph that answers the main question, headings that name their section, lists for steps, the date and author on articles: [structure](references/seo.md#structure-for-ai-answers). Text changes go through `leitvia/update-content` in the same package, only with facts from the page or the person (checkpoint **New text**). Structured data comes from the SEO plugin or Leitvia Studio; you do not write JSON-LD. Without an SEO plugin Studio prints the organization once (front page), a BreadcrumbList on every page, FAQPage only for visible questions (the FAQ block and FAQ patterns that provide `faq`), the article with its author (also a page with the frame `article`, which compose-page gives the template `page-article` with byline and author box), and per page what `leitvia/set-page-structure` sets: the hub of the page (breadcrumbs Home, hub of the hub, hub, page; the hub wins over a parent page) and a service with its price as Service and Offer (net with `vat_included` false); a range with `max_price`, packages with `offers` (one Offer each in an AggregateOffer), a package whose price is a range with its own `max_price`; `highPrice` is the top of all of them. Set them only as the page states them. A rating goes in only through `aggregate_rating` of `leitvia/set-organization` with the source address, and `confirmed` true only after the person compared value and count with the source (checkpoint **Rating**); a star in a title must equal that value. Organization data, job postings and the anchors of a one-pager: [local business and jobs](references/local-business.md).
+AI answers quote passages that stand on their own. Suggest, per page, what would make it clearer: a first paragraph that answers the main question, headings that name their section, lists for steps, the date and author on articles: [structure](references/seo.md#structure-for-ai-answers). Text changes go through `leitvia/update-content` in the same package, only with facts from the page or the person (checkpoint **New text**). Structured data comes from the SEO plugin or Leitvia Studio; you never write JSON-LD. What Studio prints and what `leitvia/set-page-structure` adds (hub, service, prices): [structure](references/seo.md#structure-for-ai-answers); set it only as the page states it. A rating goes in only through `aggregate_rating` of `leitvia/set-organization` with the source address, and `confirmed` true only after the person compared value and count with the source (checkpoint **Rating**); a star in a title must equal that value. Organization data, job postings and the anchors of a one-pager: [local business and jobs](references/local-business.md).
 
 ### 6. llms.txt and AI crawlers
 
@@ -67,7 +66,7 @@ Without an SEO plugin Leitvia Studio serves `/llms.txt` itself, built on each re
 
 ## Verification
 
-`leitvia/list-packages` with `state: open` gives your package; the person applies it in the inbox (checkpoint **Package applied**). Then `leitvia/get-package` for conflicts, `leitvia/get-seo` and the public pages again: the "after" of your report.
+The person applies your package (its ID comes with every write) in the inbox (checkpoint **Package applied**). Then `leitvia/get-package` for conflicts, `leitvia/get-seo` and the public pages again: the "after" of your report.
 
 ## Failure modes / debugging
 

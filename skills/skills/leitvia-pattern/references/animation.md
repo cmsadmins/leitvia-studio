@@ -74,10 +74,10 @@ Every page of a site moves alike; strength and duration come from the site setti
 
 ## Through the abilities
 
-- **New pattern or variant:** set `leitviaAnimation` and `leitviaMotion` in the markup of `leitvia/create-pattern`, or of `leitvia/vary-pattern` with a full `content`. `edits` of a variant cannot set them.
-- **New page:** `leitvia/compose-page` keeps the attributes the patterns carry; its edits (text, link, image) cannot add or remove them. Pick a pattern that already has the effect, or a variant with it.
-- **Existing page:** `leitvia/update-block` with `attributes: { "leitviaAnimation": "fade" }` works on every block that lists the attributes, core blocks and blocks with saved markup included, since only the block comment changes. `"leitviaAnimation": "none"` removes the effect, `"leitviaMotion": null` returns to the site setting.
-- **Whole site:** `leitvia/set-motion`. Send only these two keys in that call; other attributes of a core block still go through their own rules. A block without the attributes (the excluded ones above) is refused with `leitvia_invalid_input`.
+- **New pattern or variant:** set `leitviaAnimation` and `leitviaMotion` in the markup of `leitvia/create-pattern`, or of `leitvia/vary-pattern` with a full `content`. `edits` of a variant set them too, with `attributes: {"leitviaAnimation": "fade"}` at a block ID, as `leitvia/update-block` does.
+- **New page:** `leitvia/compose-page` keeps the attributes the patterns carry; its edits set or remove them the same way.
+- **Existing page:** `leitvia/update-block` with `attributes: { "leitviaAnimation": "fade" }` works on every block that lists the attributes, core blocks and blocks with saved markup included, since only the block comment changes; they go with other attributes in the same call. `"leitviaAnimation": "none"` removes the effect, `"leitviaMotion": null` returns to the site setting.
+- **Whole site:** `leitvia/set-motion` (`motion`), waits in a package. A block without the attributes (the excluded ones above) is refused with `leitvia_invalid_input`.
 
 ## Effects of add-ons
 

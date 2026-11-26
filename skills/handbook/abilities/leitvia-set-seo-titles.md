@@ -1,6 +1,6 @@
 # leitvia/set-seo-titles
 
-Generated from Leitvia Studio 1.3.60. Do not edit. Group: Set up. How to call abilities, hashes, autonomy and rejections: [agent handbook](../README.md).
+Generated from Leitvia Studio 1.3.61. Do not edit. Group: Set up. How to call abilities, hashes, autonomy and rejections: [agent handbook](../README.md).
 
 **Set SEO titles.** Sets whether titles in search results end with " | " and the site name, without an SEO plugin. site_name true (the default) adds it to the titles of pages, posts, entries and archives, stored with leitvia/update-seo or built by WordPress, as long as the whole title keeps to 60 characters and does not name the site already; the front page keeps its stored title, and without one shows the site name and the tagline joined by " | ". false leaves a stored title as written and the others as WordPress builds them. base_hash is empty. Like every setting it waits in a change package for a person.
 

@@ -1,6 +1,6 @@
 # leitvia/set-permalinks
 
-Generated from Leitvia Studio 1.3.60. Do not edit. Group: Set up. How to call abilities, hashes, autonomy and rejections: [agent handbook](../README.md).
+Generated from Leitvia Studio 1.3.61. Do not edit. Group: Set up. How to call abilities, hashes, autonomy and rejections: [agent handbook](../README.md).
 
 **Set permalinks.** Sets the permalink structure of posts and the bases of category and tag addresses, as in Settings, Permalinks, for a migration that keeps the addresses of the old site: structure such as /news/%postname%/ or /%postname%/ (needs %postname% or %post_id%), category_base and tag_base such as topic (empty for the default). Pages keep their addresses, posts take the structure. Only the fields you send change; the rewrite rules are rebuilt on the next request. base_hash is empty. Like every setting it waits in a change package for a person; notice warns when published posts change their address, which leitvia/set-redirects can lead from the old addresses.
 

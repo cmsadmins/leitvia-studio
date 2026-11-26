@@ -27,6 +27,11 @@ final class Table_Of_Contents {
 	public const BLOCK = 'leitvia/table-of-contents';
 
 	/**
+	 * From this many entries the list renders closed in details, with the title and the number of entries as summary.
+	 */
+	public const COLLAPSE_FROM = 12;
+
+	/**
 	 * Post whose content renders right now (core/post-content), 0 outside of it.
 	 *
 	 * @var int
@@ -55,7 +60,8 @@ final class Table_Of_Contents {
 	private static array $outside = array();
 
 	/**
-	 * Renders the block. Fewer than two entries render nothing. Display companion adds the chapter button, see companion().
+	 * Renders the block. Fewer than two entries render nothing, COLLAPSE_FROM entries or more render closed (details,
+	 * class __details, which add-ons may extend). Display companion adds the chapter button, see companion().
 	 *
 	 * @param array<string, mixed> $attributes Block attributes.
 	 * @param \WP_Block|null       $block      Block instance.
@@ -95,17 +101,25 @@ final class Table_Of_Contents {
 
 		$title_id  = 'leitvia-toc-title'; // One instance per page: supports.multiple false, and one part renders at a time.
 		$companion = 'companion' === ( $attributes['display'] ?? 'inline' );
+		$title     = sprintf( '<h2 id="%1$s" class="wp-block-leitvia-table-of-contents__title">%2$s</h2>', esc_attr( $title_id ), esc_html__( 'On this page', 'leitvia-studio' ) );
+		$count     = count( $entries );
+		// A long list starts closed: the title and the number of sections open it, the list works as before.
+		$inline = $count < self::COLLAPSE_FROM ? $title . $list : sprintf(
+			'<details class="wp-block-leitvia-table-of-contents__details"><summary>%1$s <span class="wp-block-leitvia-table-of-contents__total">%2$s</span></summary>%3$s</details>',
+			$title,
+			/* translators: %d: number of sections listed in the table of contents. */
+			esc_html( sprintf( _n( '%d section', '%d sections', $count, 'leitvia-studio' ), $count ) ),
+			$list
+		);
 		return sprintf(
-			'<nav %1$s><h2 id="%2$s" class="wp-block-leitvia-table-of-contents__title">%3$s</h2>%4$s%5$s</nav>',
+			'<nav %1$s>%2$s%3$s</nav>',
 			get_block_wrapper_attributes(
 				array(
 					'aria-labelledby' => $title_id,
 					'class'           => $companion ? 'is-display-companion' : '',
 				)
 			),
-			esc_attr( $title_id ),
-			esc_html__( 'On this page', 'leitvia-studio' ),
-			$list,
+			$inline,
 			$companion ? self::companion( $list ) : ''
 		);
 	}

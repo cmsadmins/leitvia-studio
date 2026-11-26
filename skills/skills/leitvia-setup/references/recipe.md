@@ -58,7 +58,7 @@ Tell the person about these points; there is no ability for them:
 - Copyright line of the footer: `copyright_since` (YYYY) and `copyright_holder` of `leitvia/set-organization`; the owner goes in `founder`.
 - People: `people` of `leitvia/set-organization`, a profile of founder and authors (`name` as in `founder`), from what the site says.
 - Header or footer with other texts: `leitvia/update-template-part` with `pattern` and `edits`, as a section of `leitvia/compose-page`.
-- `mcp.ready` false in `leitvia/get-site-health`: report its `reason` and go on over REST. The header shows them through `core/site-title` and `core/site-logo`; never put the logo there as an image block. The front page of a site without a recipe: `leitvia/set-front-page`.
+- Site title and logo: the header shows them through `core/site-title` and `core/site-logo`; never put the logo there as an image block. The front page of a site without a recipe: `leitvia/set-front-page`.
 - Embedded content from a provider Studio does not know (a map, a booking tool) shows a placeholder named after its host: add the provider with `leitvia/get-consent-providers` and `leitvia/set-consent-providers`, with name, hosts, purpose and the privacy policy the provider publishes.
 - The header sticks by default, the logo size: [header](sticky-header.md).
 - A header written as `content` keeps the navigation block of the theme with its attributes, only its items change: [navigation in the header](sticky-header.md#navigation-in-the-header).
