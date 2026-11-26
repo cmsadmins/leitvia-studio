@@ -7,6 +7,8 @@
 
 namespace LeitviaStudio\Blocks;
 
+use LeitviaStudio\Gateway\Outline;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -258,6 +260,40 @@ final class Table_Of_Contents {
 	}
 
 	/**
+	 * Class of an empty column or group of a template that takes the table of contents of the page, the h2 as lines
+	 * (block style lines), such as the column beside the text of the theme template for legal texts (page-legal). Themes
+	 * name the place, Studio fills it; without Studio the column stays empty.
+	 */
+	public const PLACE = 'leitvia-toc';
+
+	/**
+	 * A column or group with the class PLACE and no content of its own, with the table of contents of the page in it.
+	 * Runs on render_block_core/column and render_block_core/group.
+	 *
+	 * @param string               $content Block HTML.
+	 * @param array<string, mixed> $block   Parsed block.
+	 */
+	public static function fill( string $content, array $block ): string {
+		if ( ! in_array( self::PLACE, explode( ' ', (string) ( $block['attrs']['className'] ?? '' ) ), true ) || ! empty( $block['innerBlocks'] ) || ! is_singular() ) {
+			return $content;
+		}
+		$toc = render_block(
+			array(
+				'blockName'    => self::BLOCK,
+				'attrs'        => array(
+					'levels'    => array( 2 ),
+					'className' => 'is-style-lines',
+				),
+				'innerBlocks'  => array(),
+				'innerHTML'    => '',
+				'innerContent' => array(),
+			)
+		);
+		$at  = strrpos( $content, '</' );
+		return '' === $toc || false === $at ? $content : substr_replace( $content, $toc, $at, 0 );
+	}
+
+	/**
 	 * Marks the start of a post content render. Runs on render_block_data.
 	 *
 	 * @param array<string, mixed> $block Parsed block.
@@ -355,7 +391,8 @@ final class Table_Of_Contents {
 			$own = '' !== $heading['id'];
 			$id  = $heading['id'];
 			if ( ! $own ) {
-				$base = sanitize_title( $heading['text'] );
+				// The id stays the one of a plain space, as before the text kept its non-breaking spaces.
+				$base = sanitize_title( str_replace( array( "\u{00A0}", "\u{202F}", "\u{2007}" ), ' ', $heading['text'] ) );
 				$base = ( '' === $base || str_contains( $base, '%' ) ) ? 'section' : $base;
 				$id   = $base;
 				for ( $n = 2; isset( $used[ $id ] ); $n++ ) {
@@ -421,12 +458,14 @@ final class Table_Of_Contents {
 	}
 
 	/**
-	 * Plain text of a heading's saved HTML.
+	 * Plain text of a heading's saved HTML, its shortcodes resolved as the page shows them (such as [leitvia_price]), so
+	 * the list and the generated id never carry the raw shortcode. Non-breaking spaces of the heading stay, so "ab 14,90 €"
+	 * does not break in a narrow list either.
 	 *
 	 * @param string $html Heading HTML.
 	 */
 	private static function text( string $html ): string {
-		return trim( (string) preg_replace( '/\s+/u', ' ', html_entity_decode( wp_strip_all_tags( $html ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) ) );
+		return Outline::plain( $html );
 	}
 
 	/**

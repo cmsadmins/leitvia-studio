@@ -811,8 +811,8 @@ class Test_Gateway_Content extends WP_UnitTestCase {
 		$this->assertSame( get_bloginfo( 'version' ), $health['wordpress']['version'] );
 		$studio = array_values( array_filter( $health['plugins'], static fn( array $plugin ): bool => 'leitvia-studio/leitvia-studio.php' === $plugin['file'] ) );
 		$this->assertSame( '9.9.9', $studio[0]['update'] ?? null );
-		$this->assertSame( array( 'ready', 'version', 'reason', 'url' ), array_keys( $health['mcp'] ) );
-		$this->assertSame( '' === $health['mcp']['version'], ! $health['mcp']['ready'] && '' !== $health['mcp']['reason'] );
+		$this->assertSame( array( 'ready', 'version', 'reason', 'url', 'protocols' ), array_keys( $health['mcp'] ) );
+		$this->assertTrue( $health['mcp']['ready'] );
 	}
 
 	/**

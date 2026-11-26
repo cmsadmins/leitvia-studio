@@ -14,8 +14,10 @@ defined( 'ABSPATH' ) || exit;
  * an https address, none for 410); a request of a from path answers with its status, before the template and before
  * canonical redirects: 301 and 302 lead to the target, 410 says the page is gone for good and shows the 404 template
  * of the theme. Paths compare without a trailing slash, case-insensitive. A from without a query matches its path
- * with any query; a from with a query (such as /?p=45 or /?attachment_id=123 of an old site) matches only that exact
- * query, in any order of its parameters, and wins over the row of the bare path. Rows are looked up by their key. sanitize() keeps valid
+ * with any query; a from with a query (such as /?p=45 or /?attachment_id=123 of an old site) matches a request that
+ * has all its parameters with the same values, in any order, and wins over the row of the bare path. Further
+ * parameters of the request (such as ?von= of a button) go along to the target; of several rows the one with the most
+ * parameters wins. Rows are looked up by their key. sanitize() keeps valid
  * rows only and loops() finds rows that lead back to their own path, so leitvia/set-redirects refuses them. Inactive while an SEO plugin is active,
  * which usually brings a redirect manager of its own, so a request never meets two.
  */
@@ -97,7 +99,7 @@ final class Redirects {
 	}
 
 	/**
-	 * Answers a request of a from path (with its exact query first, then the bare path) with the status of its row: 301 or 302 to its target, 410 with the 404 template
+	 * Answers a request of a from path (a row with its query first, see find(), then the bare path) with the status of its row: 301 or 302 to its target, 410 with the 404 template
 	 * of the theme. Runs on template_redirect, priority 0.
 	 */
 	public static function maybe_redirect(): void {
@@ -113,10 +115,7 @@ final class Redirects {
 		// A site in a subdirectory stores paths below its address.
 		$path  = '/' !== $home && ( $path === $home || str_starts_with( $path, $home . '/' ) ) ? '/' . ltrim( substr( $path, strlen( $home ) ), '/' ) : $path;
 		$query = self::query( (string) wp_parse_url( (string) ( $_SERVER['REQUEST_URI'] ?? '' ), PHP_URL_QUERY ) ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized,WordPress.Security.ValidatedSanitizedInput.MissingUnslash -- Compared only.
-		// Index by from: one array_column per request over at most MAX rows, then a hash lookup per candidate.
-		// ponytail: built per request; a stored index (option keyed by from) if MAX grows well past a few thousand.
-		$index = array_column( array_filter( $rows, 'is_array' ), null, 'from' );
-		$row   = ( '' !== $query ? $index[ $path . '?' . $query ] ?? null : null ) ?? $index[ $path ] ?? null;
+		$row   = self::find( $rows, $path, $query );
 		if ( is_array( $row ) ) {
 			$status = (int) ( $row['status'] ?? 301 );
 			if ( 410 === $status ) {
@@ -127,6 +126,53 @@ final class Redirects {
 			wp_safe_redirect( str_starts_with( $to, '/' ) ? home_url( $to ) : $to, 302 === $status ? 302 : 301, 'Leitvia Studio' );
 			exit;
 		}
+	}
+
+	/**
+	 * The row a request answers to: the row of its path and query, else the row of its path whose query parameters the
+	 * request all has with the same values (the most parameters win), its other parameters added to the target; else the
+	 * row of the bare path. null for none.
+	 *
+	 * @param array<mixed> $rows  Saved rows.
+	 * @param string       $path  Path as path() makes it.
+	 * @param string       $query Query as query() makes it, '' for none.
+	 * @return array<string, mixed>|null
+	 */
+	public static function find( array $rows, string $path, string $query ): ?array {
+		// Index by from: one array_column per request over at most MAX rows, then a hash lookup per candidate.
+		// ponytail: built per request; a stored index (option keyed by from) if MAX grows well past a few thousand.
+		$index = array_column( array_filter( $rows, 'is_array' ), null, 'from' );
+		if ( '' === $query ) {
+			return $index[ $path ] ?? null;
+		}
+		if ( isset( $index[ $path . '?' . $query ] ) ) {
+			return $index[ $path . '?' . $query ];
+		}
+		parse_str( $query, $params );
+		$best = null;
+		$need = array();
+		foreach ( $index as $from => $row ) {
+			$at = strpos( (string) $from, '?' );
+			if ( false === $at || substr( (string) $from, 0, $at ) !== $path ) {
+				continue;
+			}
+			parse_str( substr( (string) $from, $at + 1 ), $wants );
+			$has = array_intersect_key( $params, $wants );
+			ksort( $has );
+			ksort( $wants );
+			if ( $has === $wants && count( $wants ) > count( $need ) ) {
+				$best = $row;
+				$need = $wants;
+			}
+		}
+		if ( null === $best ) {
+			return $index[ $path ] ?? null;
+		}
+		$extra = array_diff_key( $params, $need );
+		if ( $extra && isset( $best['to'] ) ) {
+			$best['to'] = add_query_arg( urlencode_deep( $extra ), (string) $best['to'] );
+		}
+		return $best;
 	}
 
 	/**

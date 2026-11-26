@@ -18,8 +18,14 @@ defined( 'ABSPATH' ) || exit;
  *
  * With scripts of plugins that wait for consent (Scripts), the module @leitvia/consent loads on every page anyway, and
  * the dialog holds the consent settings: the categories with Allow and the providers the visitor always allows with
- * Revoke. Without them the site uses no service that needs consent, so the dialog says that, names the embeds that ask
- * one by one and links the privacy policy page; then the link loads no file of Studio at all.
+ * Revoke. Without them the dialog says that no script needs consent, names the embeds that ask one by one and links
+ * the privacy policy page; then the link loads no file of Studio at all.
+ *
+ * The link shows on every page, also on a site without any service that needs consent: then its dialog says that the
+ * site uses no cookies or services that need consent, so visitors find the answer where they look for it. The filter
+ * leitvia_studio_consent_link_always (bool, default true) set to false shows the link only where a service needs
+ * consent: scripts that wait for it, or an embed of another provider shown as a consent placeholder on the page
+ * (rendered before the footer).
  */
 final class Consent_Link {
 
@@ -36,19 +42,43 @@ final class Consent_Link {
 	private static bool $used = false;
 
 	/**
+	 * Whether an embed of another provider waits for consent on this page.
+	 *
+	 * @var bool
+	 */
+	private static bool $embed = false;
+
+	/**
+	 * Notes that the page shows an embed behind a consent placeholder. Called by Consent::placeholder().
+	 */
+	public static function embed(): void {
+		self::$embed = true;
+	}
+
+	/**
 	 * Attributes of the link. Filter leitvia_consent_link.
 	 *
 	 * @param mixed $attributes Attributes from earlier filters.
 	 * @return array<string, string>
 	 */
 	public static function attributes( $attributes = array() ): array {
+		$attributes = is_array( $attributes ) ? $attributes : array();
+		/**
+		 * Filters whether the Cookie settings link shows although no service on the page needs consent.
+		 *
+		 * @param bool $always Default true: the link shows on every page; false shows it only with scripts that wait or
+		 *                     an embed on the page.
+		 */
+		if ( ! self::has_services() && ! self::$embed && ! apply_filters( 'leitvia_studio_consent_link_always', true ) ) {
+			return $attributes;
+		}
 		self::$used = true;
 		$privacy    = get_privacy_policy_url();
 		return array(
 			'href'                      => '' === $privacy ? '#' . self::ID : $privacy,
 			'aria-haspopup'             => 'dialog',
 			'data-leitvia-consent-open' => self::ID,
-		) + ( is_array( $attributes ) ? $attributes : array() );
+		) + $attributes;
 	}
 
 	/**
@@ -85,7 +115,7 @@ final class Consent_Link {
 	 */
 	public static function notice(): string {
 		$privacy = get_privacy_policy_url();
-		return '<p>' . esc_html__( 'This site uses no services that need your consent. Content from other providers, such as a video or a map, loads only after you allow it where it is shown.', 'leitvia-studio' ) . '</p>'
+		return '<p>' . esc_html__( 'This site uses no cookies or services that need your consent. Content from other providers, such as a video or a map, loads only after you allow it where it is shown.', 'leitvia-studio' ) . '</p>'
 			. ( '' === $privacy ? '' : '<p>' . sprintf(
 				/* translators: %s: link to the privacy policy page. */
 				esc_html__( 'You revoke a provider you always allow in the %s.', 'leitvia-studio' ),

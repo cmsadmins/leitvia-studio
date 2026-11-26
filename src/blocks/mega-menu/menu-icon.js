@@ -55,6 +55,23 @@ addFilter(
 			: settings
 );
 
+// The word on the menu button of a navigation (Mega_Menu::menu_text() on the server, edit text of update-block): kept
+// when the editor saves the block.
+addFilter(
+	'blocks.registerBlockType',
+	'leitvia-studio/menu-text',
+	( settings, name ) =>
+		'core/navigation' === name && ! settings.attributes?.leitviaMenuText
+			? {
+					...settings,
+					attributes: {
+						...settings.attributes,
+						leitviaMenuText: { type: 'string' },
+					},
+				}
+			: settings
+);
+
 addFilter(
 	'editor.BlockEdit',
 	'leitvia-studio/menu-icon',

@@ -53,22 +53,47 @@ final class Packages {
 		Abilities::read(
 			'leitvia/list-packages',
 			__( 'List change packages', 'leitvia-studio' ),
-			__( 'Lists your change packages, newest first: ID, title, key, state (open, applied, partial, rejected, rolled_back), operations per status and a preview link.', 'leitvia-studio' ),
+			__( 'Lists your change packages, newest first, a page at a time: items with ID, title, key, state (open, applied, partial, rejected, rolled_back), operations per status and a preview link, plus total (all packages that match), page, per_page and pages. Fetch the next page while page is below pages; filter with state open to find work that waits.', 'leitvia-studio' ),
 			array(
 				'type'                 => 'object',
 				'properties'           => array(
-					'state' => array(
+					'state'    => array(
 						'type' => 'string',
 						'enum' => Store::STATES,
+					),
+					'page'     => array(
+						'type'        => 'integer',
+						'minimum'     => 1,
+						'default'     => 1,
+						'description' => __( 'Page, from 1.', 'leitvia-studio' ),
+					),
+					'per_page' => array(
+						'type'        => 'integer',
+						'minimum'     => 1,
+						'maximum'     => 100,
+						'default'     => 100,
+						'description' => __( 'Packages per page, at most 100.', 'leitvia-studio' ),
 					),
 				),
 				'additionalProperties' => false,
 			),
 			array(
-				'type'  => 'array',
-				'items' => $object,
+				'type'       => 'object',
+				'properties' => array(
+					'items'    => array(
+						'type'  => 'array',
+						'items' => $object,
+					),
+					'total'    => array(
+						'type'        => 'integer',
+						'description' => __( 'Number of all packages that match, on every page.', 'leitvia-studio' ),
+					),
+					'page'     => array( 'type' => 'integer' ),
+					'per_page' => array( 'type' => 'integer' ),
+					'pages'    => array( 'type' => 'integer' ),
+				),
 			),
-			static fn( $input ) => Store::all( current_user_can( 'manage_options' ) ? 0 : get_current_user_id(), (string) ( $input['state'] ?? '' ) )
+			static fn( $input ) => Store::page( current_user_can( 'manage_options' ) ? 0 : get_current_user_id(), (string) ( $input['state'] ?? '' ), (int) ( $input['page'] ?? 1 ), min( 100, (int) ( $input['per_page'] ?? 100 ) ) )
 		);
 		Abilities::read(
 			'leitvia/get-package',

@@ -18,7 +18,9 @@ defined( 'ABSPATH' ) || exit;
  * started its output shows the confirmation in the POST response instead.
  *
  * The block renders itself as a leitvia/form-errors block: that block fills its summary from aria-invalid and
- * aria-describedby on the server, validates in the browser and brings its stylesheet. No script of its own.
+ * aria-describedby on the server, validates in the browser and brings its stylesheet. No script of its own. It renders
+ * in the flow layout, not in the constrained default of leitvia/form-errors: the fields fill the column the block stands
+ * in, so a form in a column lines up with the columns of the sections around it (no content width centered inside).
  *
  * Nothing is stored. An extension can take a checked message instead of the mail through the filter
  * leitvia_studio_contact_form_send. The rate limit keeps a counter under a salted hash of the IP address for an hour.
@@ -86,7 +88,7 @@ final class Contact_Form {
 		return render_block(
 			array(
 				'blockName'    => 'leitvia/form-errors',
-				'attrs'        => array(),
+				'attrs'        => array( 'layout' => array( 'type' => 'default' ) ),
 				'innerBlocks'  => array(),
 				'innerHTML'    => $html,
 				'innerContent' => array( $html ),

@@ -44,7 +44,12 @@ final class Organization {
 	/**
 	 * Fields of leitvia/set-organization, each stored as the setting organization_<field>.
 	 */
-	public const FIELDS = array( 'type', 'street', 'postal_code', 'city', 'country', 'phone', 'email', 'founding_date', 'founder', 'copyright_since', 'copyright_holder', 'area_served', 'opening_hours', 'same_as' );
+	public const FIELDS = array( 'type', 'description', 'logo', 'street', 'postal_code', 'city', 'country', 'phone', 'email', 'contact_type', 'founding_date', 'founder', 'copyright_since', 'copyright_holder', 'area_served', 'opening_hours', 'same_as', 'people' );
+
+	/**
+	 * Most characters of the description of the organization (field description of set-organization).
+	 */
+	public const DESCRIPTION_MAX = 500;
 
 	/**
 	 * Settings of the rating of the organization (field aggregate_rating of set-organization), by key of the field.
@@ -62,12 +67,22 @@ final class Organization {
 	private const MAX_HOURS = 14;
 
 	/**
+	 * Most people of the organization (field people of set-organization).
+	 */
+	public const MAX_PEOPLE = 10;
+
+	/**
+	 * Most profiles and most topics of one person.
+	 */
+	public const MAX_PERSON_ENTRIES = 20;
+
+	/**
 	 * The organization from the settings: kind of business (Organization unless the setting names one of TYPES), name
-	 * and address of the site, address, phone, email, founding date, founder or owner, the start year and holder of the
-	 * copyright line, area served, opening hours, profiles and the rating (rating()). Empty strings and lists where
+	 * and address of the site, its description, the media ID of the logo for structured data (0 for the site logo), address, phone, email, founding date, founder or owner, the start year and holder of the
+	 * copyright line, area served, opening hours, profiles, the people (people()) and the rating (rating()). Empty strings and lists where
 	 * nothing is set.
 	 *
-	 * @return array{type: string, name: string, url: string, street: string, postal_code: string, city: string, country: string, phone: string, email: string, founding_date: string, founder: string, copyright_since: string, copyright_holder: string, area_served: list<string>, opening_hours: list<array{days: list<string>, opens: string, closes: string}>, same_as: list<string>, aggregate_rating: array{value: string, count: int, source_url: string, confirmed: bool}|null}
+	 * @return array{type: string, name: string, url: string, description: string, logo: int, street: string, postal_code: string, city: string, country: string, phone: string, email: string, contact_type: string, founding_date: string, founder: string, copyright_since: string, copyright_holder: string, area_served: list<string>, opening_hours: list<array{days: list<string>, opens: string, closes: string}>, same_as: list<string>, people: list<array<string, mixed>>, aggregate_rating: array{value: string, count: int, source_url: string, confirmed: bool}|null}
 	 */
 	public static function details(): array {
 		$type    = leitvia_studio_setting( 'organization_type' );
@@ -77,12 +92,15 @@ final class Organization {
 			'type'             => is_string( $type ) && in_array( $type, self::TYPES, true ) ? $type : 'Organization',
 			'name'             => \LeitviaStudio\News\Schema::text( get_bloginfo( 'name' ) ),
 			'url'              => home_url( '/' ),
+			'description'      => $text( 'description' ),
+			'logo'             => (int) leitvia_studio_setting( 'organization_logo' ),
 			'street'           => $text( 'street' ),
 			'postal_code'      => $text( 'postal_code' ),
 			'city'             => $text( 'city' ),
 			'country'          => $text( 'country' ),
 			'phone'            => $text( 'phone' ),
 			'email'            => $text( 'email' ),
+			'contact_type'     => '' === $text( 'contact_type' ) ? 'customer service' : $text( 'contact_type' ),
 			'founding_date'    => $text( 'founding_date' ),
 			'founder'          => $text( 'founder' ),
 			'copyright_since'  => $text( 'copyright_since' ),
@@ -90,6 +108,7 @@ final class Organization {
 			'area_served'      => $list( 'area_served' ),
 			'opening_hours'    => self::hours( leitvia_studio_setting( 'organization_opening_hours' ) ),
 			'same_as'          => $list( 'same_as' ),
+			'people'           => self::people(),
 			'aggregate_rating' => self::rating(),
 		);
 		return $details;
@@ -148,11 +167,12 @@ final class Organization {
 	}
 
 	/**
-	 * The organization as schema.org node with @id: type, name, address of the site, postal address, phone, email,
-	 * founding date, area served and profiles where they are set, a confirmed rating (confirmed_rating()) as
+	 * The organization as schema.org node with @id: type, name, address of the site, description, postal address, phone, email,
+	 * founding date, the founder (person()), area served and profiles where they are set, a confirmed rating (confirmed_rating()) as
 	 * aggregateRating, the logo (logo()), and for a local business the
 	 * opening hours and the logo as image. Opening hours stay out of an Organization, which schema.org does not give
-	 * them.
+	 * them; with a phone or an email every type gets a ContactPoint (contactType from the setting, customer service by
+	 * default) with the opening hours as hoursAvailable.
 	 *
 	 * @return array<string, mixed>
 	 */
@@ -164,6 +184,9 @@ final class Organization {
 			'name'  => $details['name'],
 			'url'   => $details['url'],
 		);
+		if ( '' !== $details['description'] ) {
+			$node['description'] = $details['description'];
+		}
 		$address = array_filter(
 			array(
 				'streetAddress'   => $details['street'],
@@ -185,21 +208,21 @@ final class Organization {
 			)
 		);
 		if ( '' !== $details['founder'] ) {
-			$node['founder'] = array(
-				'@type' => 'Person',
-				'name'  => $details['founder'],
-			);
+			$node['founder'] = self::person( $details['founder'] );
 		}
 		$local = 'Organization' !== $details['type'];
 		if ( $local && $details['opening_hours'] ) {
-			$node['openingHoursSpecification'] = array_map(
-				static fn( array $row ): array => array(
-					'@type'     => 'OpeningHoursSpecification',
-					'dayOfWeek' => $row['days'],
-					'opens'     => $row['opens'],
-					'closes'    => $row['closes'],
-				),
-				$details['opening_hours']
+			$node['openingHoursSpecification'] = self::hours_specification( $details['opening_hours'] );
+		}
+		// A ContactPoint for every type, so an Organization names its service times too (hoursAvailable).
+		if ( '' !== $details['phone'] || '' !== $details['email'] ) {
+			$node['contactPoint'] = array( '@type' => 'ContactPoint' ) + array_filter(
+				array(
+					'telephone'      => $details['phone'],
+					'email'          => $details['email'],
+					'contactType'    => $details['contact_type'],
+					'hoursAvailable' => self::hours_specification( $details['opening_hours'] ),
+				)
 			);
 		}
 		$rating = self::confirmed_rating();
@@ -223,9 +246,29 @@ final class Organization {
 	}
 
 	/**
-	 * Logo: the custom logo when that is a raster image of at least News\Schema::LOGO_MIN pixels in both directions,
+	 * Opening hours as schema.org OpeningHoursSpecification nodes.
+	 *
+	 * @param list<array{days: list<string>, opens: string, closes: string}> $rows Rows of hours().
+	 * @return list<array<string, mixed>>
+	 */
+	private static function hours_specification( array $rows ): array {
+		return array_map(
+			static fn( array $row ): array => array(
+				'@type'     => 'OpeningHoursSpecification',
+				'dayOfWeek' => $row['days'],
+				'opens'     => $row['opens'],
+				'closes'    => $row['closes'],
+			),
+			$rows
+		);
+	}
+
+	/**
+	 * Logo: the logo for structured data (setting organization_logo, field logo of set-organization), else the custom
+	 * logo of the header, each when it is a raster image of at least News\Schema::LOGO_MIN pixels in both directions,
 	 * else the site icon in its 512 px size under the same rule, else none. An SVG has no pixel size and never
-	 * qualifies.
+	 * qualifies. A separate logo lets the header keep a light logo for a dark background while search engines, which
+	 * show logos on white, get a dark one.
 	 *
 	 * @return array{"@type": string, url: string, width: int, height: int}|null
 	 */
@@ -236,7 +279,8 @@ final class Organization {
 		if ( $icon ) {
 			$icon[0] = $icon_url;
 		}
-		foreach ( array( wp_get_attachment_image_src( (int) get_theme_mod( 'custom_logo' ), 'full' ), $icon ) as $logo ) {
+		$own = (int) leitvia_studio_setting( 'organization_logo' );
+		foreach ( array( $own ? wp_get_attachment_image_src( $own, 'full' ) : false, wp_get_attachment_image_src( (int) get_theme_mod( 'custom_logo' ), 'full' ), $icon ) as $logo ) {
 			if ( $logo && $logo[1] >= $min && $logo[2] >= $min ) {
 				return array(
 					'@type'  => 'ImageObject',
@@ -247,6 +291,143 @@ final class Organization {
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * The people of the organization as set-organization stores them (setting organization_people), see clean_people().
+	 *
+	 * @return list<array{name: string, job_title: string, description: string, image: int, same_as: list<string>, knows_about: list<string>, page: int}>
+	 */
+	public static function people(): array {
+		return self::clean_people( leitvia_studio_setting( 'organization_people' ) );
+	}
+
+	/**
+	 * Valid profiles of people: name (required, each name once), job title, description, image (media ID), profiles on
+	 * other sites (same_as, https addresses), topics (knows_about) and page (ID of the page about the person, such as
+	 * the author page of leitvia/update-content author_page). At most MAX_PEOPLE, each list at most MAX_PERSON_ENTRIES.
+	 *
+	 * @param mixed $rows Submitted rows.
+	 * @return list<array{name: string, job_title: string, description: string, image: int, same_as: list<string>, knows_about: list<string>, page: int}>
+	 */
+	public static function clean_people( $rows ): array {
+		$list  = static function ( $items, bool $urls ): array {
+			$items = array_map(
+				static fn( $item ): string => ! is_string( $item ) ? '' : ( $urls ? ( str_starts_with( $item, 'https://' ) ? esc_url_raw( $item, array( 'https' ) ) : '' ) : sanitize_text_field( $item ) ),
+				is_array( $items ) ? $items : array()
+			);
+			return array_slice( array_values( array_unique( array_filter( $items ) ) ), 0, self::MAX_PERSON_ENTRIES );
+		};
+		$clean = array();
+		foreach ( is_array( $rows ) ? $rows : array() as $row ) {
+			$row  = is_array( $row ) ? $row : array();
+			$name = sanitize_text_field( (string) ( $row['name'] ?? '' ) );
+			$key  = mb_strtolower( $name );
+			if ( '' === $name || isset( $clean[ $key ] ) ) {
+				continue;
+			}
+			$clean[ $key ] = array(
+				'name'        => $name,
+				'job_title'   => sanitize_text_field( (string) ( $row['job_title'] ?? '' ) ),
+				'description' => sanitize_textarea_field( (string) ( $row['description'] ?? '' ) ),
+				'image'       => absint( $row['image'] ?? 0 ),
+				'same_as'     => $list( $row['same_as'] ?? array(), true ),
+				'knows_about' => $list( $row['knows_about'] ?? array(), false ),
+				'page'        => absint( $row['page'] ?? 0 ),
+			);
+		}
+		return array_slice( array_values( $clean ), 0, self::MAX_PEOPLE );
+	}
+
+	/**
+	 * The profile of a person by name, the case aside; null without one.
+	 *
+	 * @param string $name Name of the person.
+	 * @return array{name: string, job_title: string, description: string, image: int, same_as: list<string>, knows_about: list<string>, page: int}|null
+	 */
+	public static function profile( string $name ): ?array {
+		foreach ( self::people() as $profile ) {
+			if ( 0 === strcasecmp( $profile['name'], trim( $name ) ) ) {
+				return $profile;
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * The @id of a person: the address of the site with #person- and the name as slug. The founder of the organization,
+	 * the author of an article and the main entity of a profile page share it.
+	 *
+	 * @param string $name Name of the person.
+	 */
+	public static function person_id( string $name ): string {
+		return home_url( '/#person-' . sanitize_title( $name ) );
+	}
+
+	/**
+	 * Person node of a name with its @id (person_id()) and, with a profile (people()), job title, description, image,
+	 * profiles (sameAs), topics (knowsAbout), the organization as employer (worksFor) and the address of its published
+	 * page as url. $url stands in for a profile without a page and a person without a profile; $extra fills what the
+	 * profile leaves empty, such as the biography of a user account.
+	 *
+	 * @param string               $name  Name of the person.
+	 * @param string               $url   Address of a page about the person, '' for none.
+	 * @param array<string, mixed> $extra Schema.org properties for where the profile has none.
+	 * @return array<string, mixed>
+	 */
+	public static function person( string $name, string $url = '', array $extra = array() ): array {
+		$profile = self::profile( $name );
+		$page    = $profile && $profile['page'] && 'publish' === get_post_status( $profile['page'] ) ? (string) get_permalink( $profile['page'] ) : '';
+		$node    = array(
+			'@type' => 'Person',
+			'@id'   => self::person_id( $name ),
+			'name'  => $profile ? $profile['name'] : trim( $name ),
+		) + array_filter( array( 'url' => '' !== $page ? $page : $url ) );
+		if ( $profile ) {
+			$image = $profile['image'] ? wp_get_attachment_image_url( $profile['image'], 'large' ) : '';
+			$node += array_filter(
+				array(
+					'jobTitle'    => $profile['job_title'],
+					'description' => $profile['description'],
+					'image'       => is_string( $image ) ? $image : '',
+					'sameAs'      => $profile['same_as'],
+					'knowsAbout'  => $profile['knows_about'],
+					'worksFor'    => array( '@id' => self::id() ),
+				)
+			);
+		}
+		return $node + array_filter( $extra );
+	}
+
+	/**
+	 * Name of the person a page is about: the profile whose page it is, else the author without an account of a
+	 * published post that links to it (leitvia/update-content author_page) while that author has no profile with a page
+	 * of its own; '' when it is about no person. So a person gets one ProfilePage: a post that names another page, such
+	 * as a booking page, as author page does not make that page a second profile.
+	 *
+	 * @param int $page Page ID.
+	 */
+	public static function person_of_page( int $page ): string {
+		$profiled = array();
+		foreach ( self::people() as $profile ) {
+			if ( $page === $profile['page'] ) {
+				return $profile['name'];
+			}
+			if ( $profile['page'] ) {
+				$profiled[] = mb_strtolower( $profile['name'] );
+			}
+		}
+		$posts = get_posts(
+			array(
+				'post_type'   => 'any',
+				'numberposts' => 1,
+				'fields'      => 'ids',
+				'meta_key'    => \LeitviaStudio\News\Schema::AUTHOR_PAGE_META, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Few posts name an author page.
+				'meta_value'  => (string) $page, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- As above.
+			)
+		);
+		$name  = $posts ? trim( (string) get_post_meta( (int) $posts[0], \LeitviaStudio\News\Schema::AUTHOR_NAME_META, true ) ) : '';
+		return in_array( mb_strtolower( $name ), $profiled, true ) ? '' : $name;
 	}
 
 	/**

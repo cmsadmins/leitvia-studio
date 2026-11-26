@@ -10,6 +10,7 @@
 		"@id": { "$ref": "#/definitions/url" },
 		"name": { "type": "string", "minLength": 1 },
 		"url": { "$ref": "#/definitions/url" },
+		"description": { "type": "string", "minLength": 1 },
 		"publishingPrinciples": { "$ref": "#/definitions/url" },
 		"foundingDate": { "type": "string", "pattern": "^\\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\\d|3[01]))?)?$" },
 		"areaServed": { "type": "array", "items": { "type": "string", "minLength": 1 } },

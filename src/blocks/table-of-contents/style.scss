@@ -27,6 +27,37 @@
 	font-size: var(--wp--preset--font-size--lead, inherit);
 }
 
+// Style Lines: one entry per row between thin rules, a darker rule on top, small and without underline until hover,
+// focus or the section being read (they sit in a list of links named On this page, not in running text). The column
+// beside a legal text (theme template page-legal) takes it.
+.wp-block-leitvia-table-of-contents.is-style-lines {
+	font-size: var(--wp--preset--font-size--meta, 0.875rem);
+
+	.wp-block-leitvia-table-of-contents__title {
+		font-size: inherit;
+	}
+
+	> ol {
+		border-block-start: 1px solid currentcolor;
+	}
+
+	li {
+		margin: 0;
+		border-block-end: 1px solid var(--wp--preset--color--stroke, currentcolor);
+	}
+
+	a {
+		display: block;
+		padding-block: var(--wp--preset--spacing--xs, 0.5rem);
+		color: inherit;
+		text-decoration-line: none;
+
+		&:is(:hover, :focus-visible, [aria-current]) {
+			text-decoration-line: underline;
+		}
+	}
+}
+
 // Jump targets stay clear of the top edge and of a sticky header (WCAG 2.4.11). Loaded only with the block.
 .wp-block-heading[id] {
 	scroll-margin-block-start: var(--wp--preset--spacing--xl, 4rem);

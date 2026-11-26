@@ -226,6 +226,7 @@ final class Consent {
 		wp_enqueue_script_module( self::MODULE );
 		wp_enqueue_style( 'leitvia-consent-settings-style' );
 		self::site_state();
+		Consent_Link::embed();
 
 		$privacy_link = '' === $privacy ? '' : sprintf(
 			' <a href="%1$s">%2$s</a>',

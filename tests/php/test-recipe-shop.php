@@ -35,6 +35,9 @@ class Test_Recipe_Shop extends WP_UnitTestCase {
 	 */
 	public function set_up(): void {
 		parent::set_up();
+		if ( in_array( 'woocommerce', $this->getGroups(), true ) && ! class_exists( 'WooCommerce' ) ) {
+			$this->markTestSkipped( 'Needs WooCommerce (npm run test:php:commerce).' );
+		}
 		switch_theme( 'leitvia' );
 		_register_theme_block_patterns();
 		wp_clean_theme_json_cache();

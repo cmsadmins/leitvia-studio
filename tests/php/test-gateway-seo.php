@@ -381,4 +381,67 @@ class Test_Gateway_Seo extends WP_UnitTestCase {
 		$this->assert_rejected( 'leitvia_invalid_input', 'length', $create( array( 'title' => str_repeat( 'a', 61 ) ) ) );
 		$this->assert_rejected( 'leitvia_invalid_input', 'unsupported_fact', $create( array( 'title' => 'Bike repairs since 1998' ) ) );
 	}
+
+	/**
+	 * Without an SEO plugin the head carries Open Graph and Twitter Card tags: the fields of update-seo where they are
+	 * set, else the SEO texts and the featured image, else the site icon. An SEO plugin and the filter turn them off;
+	 * an image ID that is no image is refused, and a plugin stores the address of the image.
+	 */
+	public function test_open_graph_without_plugin(): void {
+		update_option( Gateway::OPTION, array( 'profile' => 'full' ) + Gateway::DEFAULTS );
+		$page  = $this->page();
+		$image = self::factory()->attachment->create_upload_object( DIR_TESTDATA . '/images/canola.jpg' );
+		update_post_meta( $image, '_wp_attachment_image_alt', 'A canola field' );
+		$tags = function () use ( $page ): array {
+			$this->go_to( get_permalink( $page ) );
+			return array_column( Head::social(), 1, 0 );
+		};
+
+		$this->assertSame( 'live', self::update( $page, array( 'description' => 'We repair city bikes and e-bikes in 2 days, from 40 euros. Bring your bike on weekdays.' ) )['mode'] );
+		$plain = $tags();
+		$this->assertSame( array( 'website', 'Repairs', get_permalink( $page ), 'Bike Shop', 'summary' ), array( $plain['og:type'], $plain['og:title'], $plain['og:url'], $plain['og:site_name'], $plain['twitter:card'] ) );
+		$this->assertStringStartsWith( 'We repair city bikes', $plain['og:description'] );
+		$this->assertArrayNotHasKey( 'og:image', $plain );
+
+		set_post_thumbnail( $page, $image );
+		$this->assertSame( 'live', self::update( $page, array( 'og_title' => 'Bike repairs in 2 days' ) )['mode'] );
+		$featured = $tags();
+		$this->assertSame( array( 'Bike repairs in 2 days', 'summary_large_image', 'A canola field' ), array( $featured['og:title'], $featured['twitter:card'], $featured['og:image:alt'] ) );
+		$this->assertStringContainsString( 'canola', $featured['og:image'] );
+		$this->assertGreaterThan( 0, (int) $featured['og:image:width'] );
+		$this->assertStringContainsString( '<meta property="og:title" content="Bike repairs in 2 days" />', get_echo( array( Head::class, 'print' ) ) );
+		$this->assertStringContainsString( '<meta name="twitter:card" content="summary_large_image" />', get_echo( array( Head::class, 'print' ) ) );
+
+		$this->assert_rejected( 'leitvia_invalid_input', 'og_image', self::update( $page, array( 'og_image' => $page ) ) );
+		$this->assert_rejected( 'leitvia_invalid_input', 'length', self::update( $page, array( 'og_title' => str_repeat( 'a', 91 ) ) ) );
+		$this->assertSame( 'live', self::update( $page, array( 'og_image' => $image ) )['mode'] );
+		$seo = wp_get_ability( 'leitvia/get-seo' )->execute( array( 'posts' => array( $page ) ) )['items'][0]['seo'];
+		$this->assertSame( array( 'Bike repairs in 2 days', (string) $image ), array( $seo['og_title'], $seo['og_image'] ) );
+
+		add_filter( 'leitvia_studio_open_graph', '__return_false' );
+		$this->assertSame( array(), $tags() );
+		remove_filter( 'leitvia_studio_open_graph', '__return_false' );
+		add_filter( 'leitvia_studio_seo_plugin_active', '__return_true' );
+		$this->assertSame( array(), $tags() );
+		remove_filter( 'leitvia_studio_seo_plugin_active', '__return_true' );
+
+		self::adapter( 'yoast' );
+		self::update( $page, array( 'og_image' => $image ) );
+		$this->assertSame( wp_get_attachment_url( $image ), get_post_meta( $page, '_yoast_wpseo_opengraph-image', true ) );
+		$this->remove_added_uploads();
+	}
+
+	/**
+	 * Get-seo says why the news sitemap is not served: the site closed to search engines or the setting off.
+	 */
+	public function test_news_sitemap_held_back(): void {
+		update_option( 'blog_public', '1' );
+		$post = self::factory()->post->create();
+		$read = static fn(): array => wp_get_ability( 'leitvia/get-seo' )->execute( array( 'posts' => array( $post ) ) );
+		$this->assertSame( '', $read()['news_sitemap_held_back'] );
+		update_option( 'blog_public', '0' );
+		$this->assertStringContainsString( 'open to search engines', $read()['news_sitemap_held_back'] );
+		update_option( 'leitvia_studio_settings', array( 'news_sitemap' => false ) );
+		$this->assertStringContainsString( 'switched off', $read()['news_sitemap_held_back'] );
+	}
 }

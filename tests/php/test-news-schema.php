@@ -463,6 +463,7 @@ class Test_News_Schema extends WP_UnitTestCase {
 		$this->assertSame(
 			array(
 				'@type'       => 'Person',
+				'@id'         => home_url( '/#person-mara-lindqvist' ),
 				'name'        => 'Mara Lindqvist',
 				'url'         => get_author_posts_url( $this->author ),
 				'description' => 'Mara writes about design systems & accessible publishing.',

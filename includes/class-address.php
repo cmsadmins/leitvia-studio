@@ -114,7 +114,7 @@ final class Address {
 	 */
 	public static function studio(): array {
 		return array(
-			'This site uses no services that need your consent. Content from other providers, such as a video or a map, loads only after you allow it where it is shown.' => _x( 'This site uses no services that need your consent. Content from other providers, such as a video or a map, loads only after you allow it where it is shown.', 'formal address', 'leitvia-studio' ),
+			'This site uses no cookies or services that need your consent. Content from other providers, such as a video or a map, loads only after you allow it where it is shown.' => _x( 'This site uses no cookies or services that need your consent. Content from other providers, such as a video or a map, loads only after you allow it where it is shown.', 'formal address', 'leitvia-studio' ),
 			/* translators: %s: link to the privacy policy page. */
 			'You revoke a provider you always allow in the %s.' => _x( 'You revoke a provider you always allow in the %s.', 'formal address', 'leitvia-studio' ),
 			'Choose which scripts of other providers may load on this site. Providers you always allow:' => _x( 'Choose which scripts of other providers may load on this site. Providers you always allow:', 'formal address', 'leitvia-studio' ),

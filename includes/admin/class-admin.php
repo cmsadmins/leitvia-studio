@@ -428,6 +428,9 @@ final class Admin {
 				leitvia_studio_contract()->is_valid() ? leitvia_studio_contract()->variations() : array()
 			),
 			'labPanels'      => $panels,
+			// Values the Lab offers when a person approves a pattern outside the contract (Foreign_Patterns::save()).
+			'patternReview'  => \LeitviaStudio\Lab\Foreign_Patterns::choices(),
+			'canReview'      => current_user_can( 'edit_theme_options' ),
 			// Exports of add-ons in the token list; Studio's own download is the action "Export".
 			'syncTargets'    => array_map(
 				static fn( string $name, array $target ): array => array(

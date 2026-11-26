@@ -1,6 +1,6 @@
 <?php
 /**
- * MCP server leitvia through the separately installed plugin MCP Adapter.
+ * MCP integration of the abilities of Studio.
  *
  * @package LeitviaStudio
  */
@@ -10,11 +10,11 @@ namespace LeitviaStudio\Gateway;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Registers the own MCP server leitvia with the abilities of Studio and its compatible add-ons when the MCP Adapter is
- * active in a supported version. The same abilities set meta.mcp.public (Studio::register_abilities()), so the default
- * server of the adapter offers them too through its tools discover-abilities, get-ability-info and execute-ability.
- * Pipeline and autonomy apply on both servers, the details of a rejection too. Without the adapter nothing happens and
- * the abilities stay available over REST.
+ * MCP integration of the abilities. Studio serves the server leitvia itself (LeitviaStudio\Mcp\Server) at
+ * /wp-json/leitvia-studio/v1/mcp, with or without the MCP Adapter. The abilities set meta.mcp.public
+ * (Studio::register_abilities()), so the default server of an active adapter offers them too through
+ * discover-abilities, get-ability-info and execute-ability; this class keeps that second way safe and its rejections
+ * complete.
  */
 final class Mcp {
 
@@ -23,11 +23,6 @@ final class Mcp {
 	public const ROUTE_NAMESPACE = 'leitvia-studio/v1';
 
 	public const ROUTE = 'mcp';
-
-	/**
-	 * Supported adapter versions: 0.7.x, tested with 0.7.1 in the CI job studio-compat. 0.x releases may break.
-	 */
-	public const SUPPORTED = '0.7.';
 
 	/**
 	 * Ability through which the default server of the adapter runs every other ability.
@@ -52,10 +47,10 @@ final class Mcp {
 	private static array $rejections = array();
 
 	/**
-	 * Hooks of the MCP integration. The adapter fires mcp_adapter_init on rest_api_init, under WP-CLI on init.
+	 * Route of the own server and the hooks for the default server of the adapter.
 	 */
 	public static function boot(): void {
-		add_action( 'mcp_adapter_init', array( self::class, 'register' ) );
+		\LeitviaStudio\Mcp\Server::boot();
 		add_filter( 'mcp_adapter_tool_call_result', array( self::class, 'error_details' ), 10, 5 );
 		add_filter( 'wp_ability_execute_result', array( self::class, 'remember' ), 10, 2 );
 	}
@@ -99,11 +94,12 @@ final class Mcp {
 
 	/**
 	 * Whether the current request is a call to an MCP server: the route of this server or of another server of the
-	 * adapter (/mcp/…). Runs of an MCP client never apply a package at once, see Recipes::may_settle().
+	 * adapter (/mcp/…). A task of the server leitvia (Mcp\Tasks) counts as such a call too. Runs of an MCP client
+	 * never apply a package at once, see Recipes::may_settle().
 	 */
 	public static function serving(): bool {
 		$route = isset( $GLOBALS['wp']->query_vars['rest_route'] ) ? '/' . trim( (string) $GLOBALS['wp']->query_vars['rest_route'], '/' ) : '';
-		return '/' . self::ROUTE_NAMESPACE . '/' . self::ROUTE === $route || str_starts_with( $route, '/mcp/' );
+		return '/' . self::ROUTE_NAMESPACE . '/' . self::ROUTE === $route || str_starts_with( $route, '/mcp/' ) || \LeitviaStudio\Mcp\Tasks::running();
 	}
 
 	/**
@@ -114,25 +110,18 @@ final class Mcp {
 	}
 
 	/**
-	 * State for the Agents page: whether the server is available, why not, and its endpoint.
+	 * State for the Agents page and leitvia/get-site-health: the own server always answers; version is that of an
+	 * active MCP Adapter, empty without one.
 	 *
-	 * @param string|null $version Adapter version, null for the active one.
-	 * @return array{ready: bool, version: string, reason: string, url: string}
+	 * @return array{ready: bool, version: string, reason: string, url: string, protocols: list<string>}
 	 */
-	public static function status( ?string $version = null ): array {
-		$version = $version ?? self::version();
-		$reason  = '';
-		if ( '' === $version ) {
-			$reason = __( 'Install and activate the plugin MCP Adapter to connect MCP clients. Without it the abilities stay available over the REST API.', 'leitvia-studio' );
-		} elseif ( ! str_starts_with( $version, self::SUPPORTED ) ) {
-			/* translators: 1: installed version of the MCP Adapter, 2: product name, 3: supported version series */
-			$reason = sprintf( __( 'MCP Adapter %1$s is not supported, %2$s needs version %3$sx. The abilities stay available over the REST API.', 'leitvia-studio' ), $version, leitvia_studio_brand()['name'], self::SUPPORTED );
-		}
+	public static function status(): array {
 		return array(
-			'ready'   => '' === $reason,
-			'version' => $version,
-			'reason'  => $reason,
-			'url'     => rest_url( self::ROUTE_NAMESPACE . '/' . self::ROUTE ),
+			'ready'     => true,
+			'version'   => self::version(),
+			'reason'    => '',
+			'url'       => rest_url( self::ROUTE_NAMESPACE . '/' . self::ROUTE ),
+			'protocols' => \LeitviaStudio\Mcp\Server::versions(),
 		);
 	}
 
@@ -153,35 +142,6 @@ final class Mcp {
 	}
 
 	/**
-	 * Creates the server leitvia on mcp_adapter_init. HTTP transport at /wp-json/leitvia-studio/v1/mcp, sign-in with
-	 * an application password; the transport asks for the same capability as the abilities, the pipeline checks again.
-	 *
-	 * @param object      $adapter Instance of WP\MCP\Core\McpAdapter.
-	 * @param string|null $version Adapter version, null for the active one.
-	 */
-	public static function register( $adapter, ?string $version = null ): void {
-		if ( ! self::status( $version )['ready'] || ! method_exists( $adapter, 'create_server' ) ) {
-			return;
-		}
-		$adapter->create_server(
-			self::SERVER,
-			self::ROUTE_NAMESPACE,
-			self::ROUTE,
-			leitvia_studio_brand_short(),
-			/* translators: %s: product name */
-			sprintf( __( 'Design contract, patterns, pages and change packages of this site. Every write runs through the %s pipeline with autonomy levels, checks and rollback.', 'leitvia-studio' ), leitvia_studio_brand_short() ),
-			LEITVIA_STUDIO_VERSION,
-			array( 'WP\\MCP\\Transport\\HttpTransport' ),
-			null,
-			null,
-			self::abilities(),
-			array(),
-			array(),
-			array( Abilities::class, 'can_use' )
-		);
-	}
-
-	/**
 	 * Keeps the rejection of a Leitvia ability, so error_details() can restore code and data after execute-ability of
 	 * the default server reduced it to its message.
 	 *
@@ -198,9 +158,9 @@ final class Mcp {
 
 	/**
 	 * The adapter passes only the message of a WP_Error to the client. For Leitvia abilities the message becomes JSON
-	 * with code, message and data, so agents get the hash, next_ability and retry of a rejection: on the server
-	 * leitvia, for a Leitvia ability another server offers as a tool, and for execute-ability of the default server.
-	 * Other tools stay as they are.
+	 * with code, message and data, so agents get the hash, next_ability and retry of a rejection: for a Leitvia ability
+	 * the default server offers as a tool, and for its execute-ability. The server leitvia needs no filter, it answers
+	 * itself. Other tools stay as they are.
 	 *
 	 * @param mixed  $result    Result of the tool.
 	 * @param mixed  $args      Tool arguments.
@@ -210,10 +170,10 @@ final class Mcp {
 	 * @return mixed
 	 */
 	public static function error_details( $result, $args = null, $tool_name = '', $tool = null, $server = null ) {
+		unset( $server );
 		$ability = is_object( $tool ) && method_exists( $tool, 'get_observability_context' ) ? (string) ( $tool->get_observability_context()['ability_name'] ?? '' ) : '';
 		if ( is_wp_error( $result ) ) {
-			$leitvia = is_object( $server ) && method_exists( $server, 'get_server_id' ) && self::SERVER === $server->get_server_id();
-			return $leitvia || self::is_leitvia( $ability ) ? self::with_details( $result ) : $result;
+			return self::is_leitvia( $ability ) ? self::with_details( $result ) : $result;
 		}
 		$name = is_array( $args ) ? (string) ( $args['ability_name'] ?? '' ) : '';
 		if ( self::EXECUTE !== $ability || ! is_array( $result ) || false !== ( $result['success'] ?? null ) || ! isset( self::$rejections[ $name ] ) ) {
@@ -237,16 +197,25 @@ final class Mcp {
 	}
 
 	/**
+	 * Code, message and data of a rejection.
+	 *
+	 * @param \WP_Error $error Rejection.
+	 * @return array{code: string|int, message: string, data: mixed}
+	 */
+	public static function details( \WP_Error $error ): array {
+		return array(
+			'code'    => $error->get_error_code(),
+			'message' => $error->get_error_message(),
+			'data'    => $error->get_error_data(),
+		);
+	}
+
+	/**
 	 * The error with code, message and data as JSON message.
 	 *
 	 * @param \WP_Error $error Rejection.
 	 */
 	private static function with_details( \WP_Error $error ): \WP_Error {
-		$details = array(
-			'code'    => $error->get_error_code(),
-			'message' => $error->get_error_message(),
-			'data'    => $error->get_error_data(),
-		);
-		return new \WP_Error( $error->get_error_code(), (string) wp_json_encode( $details ), $error->get_error_data() );
+		return new \WP_Error( $error->get_error_code(), (string) wp_json_encode( self::details( $error ) ), $error->get_error_data() );
 	}
 }

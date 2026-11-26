@@ -100,12 +100,15 @@ class Test_Organization extends WP_UnitTestCase {
 				'type'             => 'Organization',
 				'name'             => 'Example Joinery',
 				'url'              => home_url( '/' ),
+				'description'      => '',
+				'logo'             => 0,
 				'street'           => '',
 				'postal_code'      => '',
 				'city'             => '',
 				'country'          => '',
 				'phone'            => '',
 				'email'            => '',
+				'contact_type'     => 'customer service',
 				'founding_date'    => '',
 				'founder'          => '',
 				'copyright_since'  => '',
@@ -113,6 +116,7 @@ class Test_Organization extends WP_UnitTestCase {
 				'area_served'      => array(),
 				'opening_hours'    => array(),
 				'same_as'          => array(),
+				'people'           => array(),
 				'aggregate_rating' => null,
 			),
 			Organization::details()
@@ -184,6 +188,61 @@ class Test_Organization extends WP_UnitTestCase {
 		);
 		$this->assertSame( 'Organization', Organization::node()['@type'] );
 		$this->assertArrayNotHasKey( 'openingHoursSpecification', Organization::node() );
+	}
+
+	/**
+	 * With a phone or an email every type gets a ContactPoint; the opening hours become its hoursAvailable, also for an
+	 * Organization, and contact_type names what it is for. Without either there is none.
+	 */
+	public function test_contact_point_with_service_times(): void {
+		$this->assertArrayNotHasKey( 'contactPoint', Organization::node() );
+		self::save(
+			array(
+				'organization_phone'         => '+49 30 000',
+				'organization_email'         => 'help@example.org',
+				'organization_opening_hours' => array(
+					array(
+						'days'   => array( 'Monday', 'Friday' ),
+						'opens'  => '09:00',
+						'closes' => '17:00',
+					),
+				),
+			)
+		);
+		$node = Organization::node();
+		$this->assertSame( 'Organization', $node['@type'] );
+		$this->assertArrayNotHasKey( 'openingHoursSpecification', $node );
+		$this->assertSame(
+			array(
+				'@type'          => 'ContactPoint',
+				'telephone'      => '+49 30 000',
+				'email'          => 'help@example.org',
+				'contactType'    => 'customer service',
+				'hoursAvailable' => array(
+					array(
+						'@type'     => 'OpeningHoursSpecification',
+						'dayOfWeek' => array( 'Monday', 'Friday' ),
+						'opens'     => '09:00',
+						'closes'    => '17:00',
+					),
+				),
+			),
+			$node['contactPoint']
+		);
+		self::save(
+			array(
+				'organization_email'        => 'sales@example.org',
+				'organization_contact_type' => 'sales',
+			)
+		);
+		$this->assertSame(
+			array(
+				'@type'       => 'ContactPoint',
+				'email'       => 'sales@example.org',
+				'contactType' => 'sales',
+			),
+			Organization::node()['contactPoint']
+		);
 	}
 
 	/**
@@ -296,6 +355,7 @@ class Test_Organization extends WP_UnitTestCase {
 		$this->assertSame(
 			array(
 				'@type' => 'Person',
+				'@id'   => home_url( '/#person-ada-example' ),
 				'name'  => 'Ada Example',
 			),
 			Organization::node()['founder']

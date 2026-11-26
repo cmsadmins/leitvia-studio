@@ -282,6 +282,38 @@ class Test_Gateway_Import extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A legal text comes in with its kind: it waits for a person, as compose-page with a legal kind does; with the
+	 * override for legal texts it is written with the kind, and a second import sets the kind on the same page. Only
+	 * pages take a kind.
+	 */
+	public function test_import_with_page_kind(): void {
+		$import = static fn( string $kind, string $type = 'page' ) => wp_get_ability( Import::NAME )->execute(
+			array(
+				'source'    => 'https://old.example/privacy/',
+				'post_type' => $type,
+				'title'     => 'Privacy policy',
+				'content'   => '<p>We keep your data safe.</p>',
+				'kind'      => $kind,
+			)
+		);
+		$queued = $import( 'privacy' );
+		$this->assertIsArray( $queued, is_wp_error( $queued ) ? $queued->get_error_message() : '' );
+		$this->assertSame( 'package', $queued['mode'], 'a legal text waits for a person' );
+		$this->assertWPError( $import( 'privacy', 'post' ) );
+
+		$settings                       = get_option( Gateway::OPTION );
+		$settings['overrides']['kinds'] = array( 'legal' );
+		update_option( Gateway::OPTION, $settings );
+		$created = $import( 'privacy' );
+		$this->assertIsArray( $created, is_wp_error( $created ) ? $created->get_error_message() : '' );
+		$page = Import::find( 'https://old.example/privacy/' );
+		$this->assertSame( 'privacy', get_post_meta( $page, '_leitvia_page_kind', true ) );
+		$updated = $import( 'imprint' );
+		$this->assertIsArray( $updated, is_wp_error( $updated ) ? $updated->get_error_message() : '' );
+		$this->assertSame( array( $page, 'imprint' ), array( Import::find( 'https://old.example/privacy/' ), get_post_meta( $page, '_leitvia_page_kind', true ) ) );
+	}
+
+	/**
 	 * Text in square brackets that is no shortcode stays: a rewrite flag, a placeholder, a character class, a key name;
 	 * inside pre and code nothing changes, not even a builder shortcode. Known shortcodes still go.
 	 */

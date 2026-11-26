@@ -377,6 +377,24 @@ final class Contract {
 	}
 
 	/**
+	 * Metadata of a section pattern of the theme, of Studio or of an add-on, or null when none of them lists it.
+	 *
+	 * @param string $slug Pattern slug, for example leitvia-studio/teaser-icon-areas.
+	 * @return array<string, mixed>|null
+	 */
+	public function any_pattern( string $slug ): ?array {
+		$data = $this->data();
+		foreach ( array( 'patterns', 'studioPatterns', 'addonPatterns' ) as $key ) {
+			foreach ( (array) ( $data[ $key ] ?? array() ) as $pattern ) {
+				if ( is_array( $pattern ) && ( $pattern['slug'] ?? null ) === $slug ) {
+					return $pattern;
+				}
+			}
+		}
+		return null;
+	}
+
+	/**
 	 * Style variations.
 	 *
 	 * @return list<array<mixed>>

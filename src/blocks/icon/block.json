@@ -21,6 +21,11 @@
 		"url": {
 			"type": "string",
 			"default": ""
+		},
+		"size": {
+			"type": "string",
+			"enum": [ "", "large", "x-large", "xx-large" ],
+			"default": ""
 		}
 	},
 	"supports": {

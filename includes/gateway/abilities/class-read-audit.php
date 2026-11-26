@@ -11,6 +11,8 @@ use LeitviaStudio\Blocks\Animation;
 use LeitviaStudio\Blocks\Mega_Menu;
 use LeitviaStudio\Gateway;
 use LeitviaStudio\Lab\Status;
+use LeitviaStudio\News\Schema;
+use LeitviaStudio\Organization\Organization;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -18,7 +20,7 @@ defined( 'ABSPATH' ) || exit;
  * Ability leitvia/audit-site: the content checks over published content, page by page, plus classic content,
  * deprecated patterns, token drift, internal links without a target, links of the rendered page that lead nowhere,
  * pages that look like legal texts without a page kind, placeholders left on legal pages and uneven motion (motion()). The first page adds findings about the whole site under site: a site
- * closed to search engines, a missing imprint, contact or editorial page, and recent news without a large image or
+ * closed to search engines, change packages left open for more than a day, a missing imprint, contact or editorial page, and recent news without a large image or
  * whose author has no biography.
  */
 final class Read_Audit {
@@ -112,7 +114,7 @@ final class Read_Audit {
 		Gateway\Abilities::read(
 			'leitvia/audit-site',
 			__( 'Audit site', 'leitvia-studio' ),
-			__( 'Runs the content checks (headings, alt text, link text, #anchor links, block validity, unregistered blocks, tokens, contrast, one h1 and landmarks) over published content, at most 20 posts per call in ID order. Also reports classic content without blocks, deprecated patterns, preset slugs missing from the active tokens, internal links that lead to no page or to the old address of a renamed post, links that lead nowhere (empty href, # without target) on the rendered page outside content and template parts, with their class, pages that look like legal texts without a page kind, placeholders left on legal pages (square brackets such as [Organization name] and sentences that say they are a placeholder), a page with the pattern Related news but no topic of its news (leitvia/related-news: it shows the posts with the page as hub, posts in a category or tag with the slug of the page, else the latest posts of the site), and uneven motion (leitvia/motion): leitviaMotion other than the site setting, fade and rise on one page, more than one kind of striking effect, more than 3 striking or 6 animated blocks. The first page (after 0) also returns site: an error when the site is closed to search engines outside a local or staging site, a warning when Gravity Forms loads a captcha from another host (a captcha add-on or a reCAPTCHA field), an error per header or footer part with such links, warnings for a missing imprint, contact or editorial page while there are posts, and for the latest 20 news posts without a featured image of at least 1200 px width or whose author has no biography. Pass next as after for the following page; next is null at the end.', 'leitvia-studio' ),
+			__( 'Runs the content checks (headings, alt text, link text, #anchor links, block validity, unregistered blocks, tokens, contrast, one h1 and landmarks) over published content, at most 20 posts per call in ID order. Also reports classic content without blocks, deprecated patterns, preset slugs missing from the active tokens, internal links that lead to no page or to the old address of a renamed post, links that lead nowhere (empty href, # without target) on the rendered page outside content and template parts, with their class, pages that look like legal texts without a page kind, placeholders left on legal pages (square brackets such as [Organization name] and sentences that say they are a placeholder), a page with the pattern Related news but no topic of its news (leitvia/related-news: it shows the posts with the page as hub, posts in a category or tag with the slug of the page, else the latest posts of the site), and uneven motion (leitvia/motion): leitviaMotion other than the site setting, fade and rise on one page, more than one kind of striking effect, more than 3 striking or 6 animated blocks. The first page (after 0) also returns site: an error when the site is closed to search engines outside a local or staging site, a warning when Gravity Forms loads a captcha from another host (a captcha add-on or a reCAPTCHA field), a warning for open or partly applied change packages older than a day (leitvia/stale-package), an error per header or footer part with such links, warnings for a missing imprint, contact or editorial page while there are posts, and for the latest 20 news posts without a featured image of at least 1200 px width or whose author has no biography. Pass next as after for the following page; next is null at the end.', 'leitvia-studio' ),
 			array(
 				'type'                 => 'object',
 				'properties'           => array(
@@ -147,7 +149,10 @@ final class Read_Audit {
 					),
 				),
 			),
-			static fn( $input ) => self::audit( (int) ( $input['after'] ?? 0 ), (int) ( $input['limit'] ?? 10 ) )
+			static fn( $input ) => self::audit( (int) ( $input['after'] ?? 0 ), (int) ( $input['limit'] ?? 10 ) ),
+			false,
+			null,
+			true
 		);
 	}
 
@@ -193,11 +198,14 @@ final class Read_Audit {
 		$start = microtime( true );
 		$last  = (int) end( $ids );
 		$done  = 0;
+		$n     = 0;
 		foreach ( $ids as $id ) {
 			$post = get_post( $id );
 			if ( $post && Gateway\Scope::readable( $post ) ) {
 				$items[] = self::item( $post );
 			}
+			/** Progress of the page, one report per post; see includes/mcp/class-progress.php. */
+			do_action( 'leitvia_studio_progress', ++$n, count( $ids ), '' );
 			$done = $id;
 			// Each post renders its page; past the time budget the page ends early and the cursor goes on from here.
 			if ( microtime( true ) - $start > self::TIME_BUDGET ) {
@@ -231,6 +239,12 @@ final class Read_Audit {
 			if ( 'deprecated' === Status::own( $ref ) ) {
 				/* translators: %s: pattern reference. */
 				$findings[] = self::finding( 'leitvia/deprecated-pattern', sprintf( __( 'The page uses the deprecated pattern %s.', 'leitvia-studio' ), $ref ), __( 'Replace it with leitvia/replace-pattern.', 'leitvia-studio' ) );
+				continue;
+			}
+			$successor = str_starts_with( $ref, 'pattern:' ) ? (string) ( leitvia_studio_contract()->any_pattern( substr( $ref, 8 ) )['docs']['successor'] ?? '' ) : '';
+			if ( '' !== $successor ) {
+				/* translators: 1: pattern reference, 2: slug of its successor. */
+				$findings[] = self::finding( 'leitvia/successor-pattern', sprintf( __( 'The page uses %1$s; its successor %2$s gives each entry an icon of its own.', 'leitvia-studio' ), $ref, $successor ), __( 'Switch each section with leitvia/replace-pattern (block, without pattern): texts, links, icons and the number of entries move over. Then give each entry its own icon.', 'leitvia-studio' ), 'notice' );
 			}
 		}
 		foreach ( self::drift( $post->post_content ) as $preset ) {
@@ -273,7 +287,8 @@ final class Read_Audit {
 		if ( has_block( 'leitvia/contact-form', $post ) && ! str_contains( $post->post_content, '"privacyNote":false' ) && '' === get_privacy_policy_url() ) {
 			$findings[] = self::finding( 'leitvia/privacy-page', __( 'The contact form promises a note on data use with a link, but the site has no published privacy policy page, so the link is missing.', 'leitvia-studio' ), __( 'Publish the page, then ask for leitvia/set-privacy-page; a person applies it.', 'leitvia-studio' ) );
 		}
-		$legal = self::LEGAL_SLUGS[ $post->post_name ] ?? '';
+		// Legal texts are pages; a docs or glossary entry with the slug imprint explains the term.
+		$legal = 'page' === $post->post_type ? ( self::LEGAL_SLUGS[ $post->post_name ] ?? '' ) : '';
 		if ( in_array( '' !== $kind ? $kind : $legal, self::LEGAL_SLUGS, true ) ) {
 			foreach ( self::placeholders( $post->post_content ) as $placeholder ) {
 				/* translators: %s: placeholder in square brackets, or a sentence that says it is a placeholder. */
@@ -287,7 +302,7 @@ final class Read_Audit {
 		return array(
 			'post'     => $post->ID,
 			'type'     => $post->post_type,
-			'title'    => $post->post_title,
+			'title'    => html_entity_decode( $post->post_title, ENT_QUOTES | ENT_HTML5, 'UTF-8' ),
 			'slug'     => $post->post_name,
 			'kind'     => $kind,
 			'findings' => $findings,
@@ -324,6 +339,15 @@ final class Read_Audit {
 			$findings[] = self::finding( 'leitvia/empty-link', sprintf( __( 'The template part %1$s has links that lead nowhere (empty href or # without target): %2$s.', 'leitvia-studio' ), $part, implode( ', ', $texts ) ), __( 'Give each link its target with leitvia/update-template-part, or remove it.', 'leitvia-studio' ), 'error' );
 		}
 		array_push( $findings, ...self::mega_menus() );
+		$stale = Gateway\Packages::stale( current_user_can( 'manage_options' ) ? 0 : get_current_user_id() );
+		if ( $stale ) {
+			$findings[] = self::finding(
+				'leitvia/stale-package',
+				/* translators: %s: IDs and titles of the change packages. */
+				sprintf( __( 'Change packages wait for more than a day: %s. Their changes are not on the site yet.', 'leitvia-studio' ), implode( ', ', array_map( static fn( array $package ): string => sprintf( '%d "%s"', $package['id'], $package['title'] ), $stale ) ) ),
+				__( 'Check each with leitvia/get-package; let a person apply it in the inbox, or discard it with leitvia/reject-package when the change was made another way.', 'leitvia-studio' )
+			);
+		}
 		$posts = get_posts(
 			array(
 				'post_type'        => 'post',
@@ -355,14 +379,35 @@ final class Read_Audit {
 				/* translators: 1: post title, 2: post ID, 3: width in pixels. */
 				$findings[] = self::finding( 'leitvia/news-image', sprintf( __( 'The news post "%1$s" (%2$d) has no featured image of at least %3$d px width, which Google News and Discover need for a large preview.', 'leitvia-studio' ), $post->post_title, $post->ID, \LeitviaStudio\News\Schema::IMAGE_MIN_WIDTH ), __( 'Set a larger featured image with leitvia/update-content.', 'leitvia-studio' ) );
 			}
-			$author = (int) $post->post_author;
-			if ( ! isset( $authors[ $author ] ) && '' === trim( (string) get_the_author_meta( 'description', $author ) ) ) {
-				$authors[ $author ] = true;
+			$name = trim( (string) get_post_meta( $post->ID, Schema::AUTHOR_NAME_META, true ) );
+			$name = '' !== $name ? $name : \LeitviaStudio\Model\Author_Name::stored( (int) $post->post_author );
+			$key  = mb_strtolower( $name );
+			if ( ! isset( $authors[ $key ] ) && ! self::has_bio( $post, $name ) ) {
+				$authors[ $key ] = true;
 				/* translators: %s: author name. */
-				$findings[] = self::finding( 'leitvia/author-bio', sprintf( __( 'The author %s writes news but has no biography; readers and search engines cannot see who they are.', 'leitvia-studio' ), \LeitviaStudio\Model\Author_Name::stored( (int) $author ) ), __( 'The author adds a short biography in their profile.', 'leitvia-studio' ) );
+				$findings[] = self::finding( 'leitvia/author-bio', sprintf( __( 'The author %s writes news but has no biography; readers and search engines cannot see who they are.', 'leitvia-studio' ), $name ), __( 'Give the person a profile with a description (leitvia/set-organization people) or a published page about them (author_page of leitvia/update-content, or page of the profile). An author with an account can also add a biography in their profile.', 'leitvia-studio' ) );
 			}
 		}
 		return $findings;
+	}
+
+	/**
+	 * Whether the author of a news post has a biography: a published author page (author_page), a profile of the same
+	 * name (leitvia/set-organization people) with a description or a published page, or, for an author with an
+	 * account and no name of their own, the biography of the account.
+	 *
+	 * @param \WP_Post $post News post.
+	 * @param string   $name Name of the author.
+	 */
+	private static function has_bio( \WP_Post $post, string $name ): bool {
+		if ( '' !== Schema::author_page_url( $post ) ) {
+			return true;
+		}
+		$profile = Organization::profile( $name );
+		if ( $profile && ( '' !== trim( $profile['description'] ) || ( $profile['page'] && 'publish' === get_post_status( $profile['page'] ) ) ) ) {
+			return true;
+		}
+		return '' === (string) get_post_meta( $post->ID, Schema::AUTHOR_NAME_META, true ) && '' !== trim( (string) get_the_author_meta( 'description', (int) $post->post_author ) );
 	}
 
 	/**

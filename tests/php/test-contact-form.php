@@ -150,6 +150,16 @@ class Test_Contact_Form extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The form fills its column: flow layout, no content width and no root padding of the constrained layout.
+	 */
+	public function test_form_fills_its_column(): void {
+		$html = $this->html( array() );
+		$this->assertStringContainsString( 'is-layout-flow', $html );
+		$this->assertStringNotContainsString( 'is-layout-constrained', $html );
+		$this->assertStringNotContainsString( 'has-global-padding', $html );
+	}
+
+	/**
 	 * The privacy note links the privacy policy page and can be switched off.
 	 */
 	public function test_privacy_note(): void {

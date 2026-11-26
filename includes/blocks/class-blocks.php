@@ -83,6 +83,76 @@ final class Blocks {
 	}
 
 	/**
+	 * Block styles of the section patterns, by block, with assets/section-styles.css: icon fields of leitvia/icon
+	 * (field framed in stroke, field-accent framed in accent, field-filled on accent) and three styles of core/group,
+	 * steps-line (a line from the icon field of each step to the next), link-card (a framed card that is one link with
+	 * an arrow), grid-net (a grid of items sharing fine lines) and grid-rows (the same net with one item per row, its
+	 * blocks side by side). Free, so every site can use and switch them.
+	 */
+	public const SECTION_STYLES = array(
+		'leitvia/icon' => array( 'field', 'field-accent', 'field-filled' ),
+		'core/group'   => array( 'steps-line', 'link-card', 'grid-net', 'grid-rows' ),
+	);
+
+	/**
+	 * Registers SECTION_STYLES, so the editor offers them in the style picker. Runs on init.
+	 */
+	public static function register_styles(): void {
+		$labels = array(
+			'field'        => __( 'Icon field', 'leitvia-studio' ),
+			'field-accent' => __( 'Icon field highlighted', 'leitvia-studio' ),
+			'field-filled' => __( 'Icon field filled', 'leitvia-studio' ),
+			'steps-line'   => __( 'Steps with line', 'leitvia-studio' ),
+			'link-card'    => __( 'Link card', 'leitvia-studio' ),
+			'grid-net'     => __( 'Grid with lines', 'leitvia-studio' ),
+			'grid-rows'    => __( 'Rows with lines', 'leitvia-studio' ),
+		);
+		foreach ( self::SECTION_STYLES as $block => $names ) {
+			foreach ( $names as $name ) {
+				register_block_style(
+					$block,
+					array(
+						'name'  => $name,
+						'label' => $labels[ $name ],
+					)
+				);
+			}
+		}
+	}
+
+	/**
+	 * Loads assets/section-styles.css on the front end while a rendered block uses one of SECTION_STYLES. Runs on
+	 * render_block.
+	 *
+	 * @param string $content Block HTML.
+	 * @return string
+	 */
+	public static function section_style( string $content ): string {
+		if ( str_contains( $content, 'is-style-' ) && preg_match( '/\bis-style-(?:' . implode( '|', array_merge( ...array_values( self::SECTION_STYLES ) ) ) . ')\b/', $content ) ) {
+			self::enqueue_section_style();
+		}
+		return $content;
+	}
+
+	/**
+	 * Loads assets/section-styles.css in the editor canvas, so the style picker previews the styles. Runs on
+	 * enqueue_block_assets, which also fires on the front end.
+	 */
+	public static function editor_section_style(): void {
+		if ( is_admin() ) {
+			self::enqueue_section_style();
+		}
+	}
+
+	/**
+	 * Enqueues the style of SECTION_STYLES, inline where core inlines small block styles.
+	 */
+	private static function enqueue_section_style(): void {
+		wp_enqueue_style( 'leitvia-studio-section-styles', plugins_url( 'assets/section-styles.css', LEITVIA_STUDIO_FILE ), array(), LEITVIA_STUDIO_VERSION );
+		wp_style_add_data( 'leitvia-studio-section-styles', 'path', dirname( LEITVIA_STUDIO_FILE ) . '/assets/section-styles.css' );
+	}
+
+	/**
 	 * Loads assets/highlight.css for the format "Highlight" on the front end while a rendered block contains the class
 	 * leitvia-highlight. Block templates render before wp_head, so the style still lands in the head. Runs on
 	 * render_block.

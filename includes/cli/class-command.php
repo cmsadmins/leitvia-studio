@@ -48,7 +48,7 @@ final class Command {
 		'model get'        => array( 'model_get', 'Prints the content model declaration.', '[--format=<format>]' ),
 		'model apply'      => array( 'model_apply', 'Adds or replaces content model entries from a JSON file.', '<file> [--dry-run] [--base-hash=<hash>] [--format=<format>]' ),
 		'audit'            => array( 'audit', 'Audits published content page by page and sums the findings per check.', '[--after=<cursor>] [--limit=<n>] [--format=<format>]' ),
-		'package list'     => array( 'package_list', 'Lists change packages.', '[--state=<state>] [--format=<format>]' ),
+		'package list'     => array( 'package_list', 'Lists change packages, 100 per page.', '[--state=<state>] [--page=<n>] [--format=<format>]' ),
 		'package show'     => array( 'package_show', 'Shows a change package with its operations.', '<id> [--format=<format>]' ),
 		'package apply'    => array( 'package_apply', 'Applies the open operations of a change package.', '<id> [--ops=<ids>] [--format=<format>]' ),
 		'package reject'   => array( 'package_reject', 'Rejects a change package.', '<id> [--format=<format>]' ),
@@ -325,7 +325,16 @@ final class Command {
 	 */
 	public function package_list( array $args, array $assoc ): void {
 		$input = isset( $assoc['state'] ) ? array( 'state' => (string) $assoc['state'] ) : array();
-		self::show( self::execute( 'leitvia/list-packages', $input, $assoc ), $assoc, array( 'id', 'title', 'state', 'author', 'created', 'operations' ) );
+		if ( isset( $assoc['page'] ) ) {
+			$input['page'] = max( 1, (int) $assoc['page'] );
+		}
+		// The list stays a list in every format (scripts parse --format=json); the table adds a line with the pages.
+		$list = (array) self::execute( 'leitvia/list-packages', $input, $assoc );
+		self::show( (array) ( $list['items'] ?? array() ), $assoc, array( 'id', 'title', 'state', 'author', 'created', 'operations' ) );
+		if ( 'table' === self::format( $assoc, 'table' ) ) {
+			/* translators: 1: page, 2: number of pages, 3: number of packages. */
+			\WP_CLI::line( sprintf( __( 'Page %1$d of %2$d, packages in all: %3$d.', 'leitvia-studio' ), (int) ( $list['page'] ?? 1 ), (int) ( $list['pages'] ?? 0 ), (int) ( $list['total'] ?? 0 ) ) );
+		}
 	}
 
 	/**

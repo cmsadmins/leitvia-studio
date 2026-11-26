@@ -78,7 +78,7 @@ class Test_Extensions extends WP_UnitTestCase {
 			function ( Studio $studio ) use ( &$results ): void {
 				$results['ok']  = $studio->extensions()->register( 'ok-addon', $this->addon() );
 				$results['new'] = $studio->extensions()->register( 'new-addon', $this->addon( array( 'requires_studio' => '9.0.0' ) ) );
-				$results['api'] = $studio->extensions()->register( 'api-addon', $this->addon( array( 'requires_api' => 2 ) ) );
+				$results['api'] = $studio->extensions()->register( 'api-addon', $this->addon( array( 'requires_api' => LEITVIA_STUDIO_API + 1 ) ) );
 				$results['old'] = $studio->extensions()->register( 'old-addon', $this->addon( array( 'requires_api' => LEITVIA_STUDIO_API_MIN - 1 ) ) );
 			}
 		);
@@ -116,7 +116,7 @@ class Test_Extensions extends WP_UnitTestCase {
 		);
 		$this->init_with(
 			function ( Studio $studio ) use ( $item ): void {
-				$studio->extensions()->register( 'old-addon', $this->addon( array( 'requires_api' => 2 ) ) );
+				$studio->extensions()->register( 'old-addon', $this->addon( array( 'requires_api' => LEITVIA_STUDIO_API + 1 ) ) );
 				$studio->registry( 'checks' )->register( 'old-addon/a', $item, 'old-addon' );
 				$studio->registry( 'checks' )->register( 'stranger/a', $item, 'stranger' );
 			}

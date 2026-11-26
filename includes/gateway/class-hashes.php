@@ -106,6 +106,14 @@ final class Hashes {
 		if ( 'page' !== $post->post_type && '' === ( $content['meta_input'][ \LeitviaStudio\Seo\Cluster::HUB_META ] ?? null ) ) {
 			unset( $content['meta_input'][ \LeitviaStudio\Seo\Cluster::HUB_META ] );
 		}
+		// Nor does the kind of a page that has none, so hashes read before set-page-structure took kind stay valid.
+		if ( '' === ( $content['meta_input']['_leitvia_page_kind'] ?? null ) ) {
+			unset( $content['meta_input']['_leitvia_page_kind'] );
+		}
+		// Nor do breadcrumbs a page shows, the default.
+		if ( '' === ( $content['meta_input'][ \LeitviaStudio\Seo\Cluster::NO_BREADCRUMBS_META ] ?? null ) ) {
+			unset( $content['meta_input'][ \LeitviaStudio\Seo\Cluster::NO_BREADCRUMBS_META ] );
+		}
 		// Offerings a page does not name do not count either.
 		if ( '' === ( $content['meta_input'][ \LeitviaStudio\Seo\Cluster::OFFERINGS_META ] ?? null ) ) {
 			unset( $content['meta_input'][ \LeitviaStudio\Seo\Cluster::OFFERINGS_META ] );

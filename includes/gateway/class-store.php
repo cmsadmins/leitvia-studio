@@ -1,6 +1,6 @@
 <?php
 /**
- * Gateway tables: audit log and snapshots.
+ * Gateway tables: audit log, snapshots and OAuth tokens.
  *
  * @package LeitviaStudio
  */
@@ -10,16 +10,18 @@ namespace LeitviaStudio\Gateway;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Creates the tables {prefix}leitvia_audit and {prefix}leitvia_snapshots per site, writes to them and prunes them.
- * The audit log holds user, ability, object, package, result and a short code, never content.
+ * Creates the tables {prefix}leitvia_audit, {prefix}leitvia_snapshots and {prefix}leitvia_oauth_tokens per site, writes
+ * to the first two and prunes them; Mcp\OAuth\Tokens writes the third. The audit log holds user, ability, object,
+ * package, result and a short code, never content.
  */
 final class Store {
 
 	/**
 	 * Schema version, stored in the option leitvia_studio_db. Raise it when a table or other stored data of the gateway
 	 * changes: Gateway::maybe_install() then installs again. 2: waiting files moved to Packages::PRIVATE_DIR (1.3.10).
+	 * 3: table oauth_tokens of the MCP server.
 	 */
-	public const VERSION = 2;
+	public const VERSION = 3;
 
 	public const VERSION_OPTION = 'leitvia_studio_db';
 
@@ -51,7 +53,7 @@ final class Store {
 	/**
 	 * Table name of the current site.
 	 *
-	 * @param string $name 'audit' or 'snapshots'.
+	 * @param string $name 'audit', 'snapshots' or 'oauth_tokens'.
 	 */
 	public static function table( string $name ): string {
 		global $wpdb;
@@ -66,11 +68,11 @@ final class Store {
 	 * @return string[]
 	 */
 	public static function drop_tables( array $tables ): array {
-		return array_values( array_unique( array_merge( $tables, array( self::table( 'audit' ), self::table( 'snapshots' ) ) ) ) );
+		return array_values( array_unique( array_merge( $tables, array( self::table( 'audit' ), self::table( 'snapshots' ), self::table( 'oauth_tokens' ) ) ) ) );
 	}
 
 	/**
-	 * Creates or updates both tables of the current site and stores the schema version.
+	 * Creates or updates the three tables of the current site and stores the schema version.
 	 */
 	public static function install(): void {
 		global $wpdb;
@@ -78,6 +80,7 @@ final class Store {
 		$charset = $wpdb->get_charset_collate();
 		$audit   = self::table( 'audit' );
 		$snaps   = self::table( 'snapshots' );
+		$oauth   = self::table( 'oauth_tokens' );
 		dbDelta(
 			array(
 				"CREATE TABLE {$audit} (
@@ -107,6 +110,29 @@ final class Store {
   PRIMARY KEY  (id),
   KEY user_created (user_id,created_at),
   KEY object (object_type,object_id)
+) {$charset};",
+				"CREATE TABLE {$oauth} (
+  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  token_hash char(64) NOT NULL,
+  kind varchar(10) NOT NULL,
+  family char(32) NOT NULL,
+  user_id bigint(20) unsigned NOT NULL DEFAULT 0,
+  client_id varchar(500) NOT NULL DEFAULT '',
+  client_name varchar(100) NOT NULL DEFAULT '',
+  scope varchar(100) NOT NULL DEFAULT '',
+  resource varchar(500) NOT NULL DEFAULT '',
+  redirect_uri varchar(2000) NOT NULL DEFAULT '',
+  challenge varchar(64) NOT NULL DEFAULT '',
+  created_at datetime NOT NULL,
+  expires_at datetime NOT NULL,
+  used_at datetime DEFAULT NULL,
+  last_used datetime DEFAULT NULL,
+  ip varchar(45) NOT NULL DEFAULT '',
+  revoked tinyint(1) unsigned NOT NULL DEFAULT 0,
+  PRIMARY KEY  (id),
+  UNIQUE KEY token_hash (token_hash),
+  KEY family (family),
+  KEY user_kind (user_id,kind)
 ) {$charset};",
 			)
 		);

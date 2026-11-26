@@ -731,14 +731,14 @@ final class Commerce {
 		foreach ( is_array( $terms ) ? $terms : array() as $term ) {
 			$values[] = array(
 				'id'    => (int) $term->term_id,
-				'name'  => (string) $term->name,
+				'name'  => html_entity_decode( (string) $term->name, ENT_QUOTES | ENT_HTML5, 'UTF-8' ),
 				'order' => (int) get_term_meta( (int) $term->term_id, 'order', true ),
 			);
 		}
 		usort( $values, static fn( array $a, array $b ): int => array( $a['order'], $a['name'], $a['id'] ) <=> array( $b['order'], $b['name'], $b['id'] ) );
 		return array(
 			'attribute' => array(
-				'name'     => (string) $attribute->name,
+				'name'     => html_entity_decode( (string) $attribute->name, ENT_QUOTES | ENT_HTML5, 'UTF-8' ),
 				'order_by' => (string) $attribute->order_by,
 				'values'   => $values,
 			),
@@ -1072,7 +1072,7 @@ final class Commerce {
 			if ( $product instanceof \WC_Product ) {
 				$products[] = array(
 					'id'           => $product->get_id(),
-					'title'        => $product->get_name(),
+					'title'        => html_entity_decode( $product->get_name(), ENT_QUOTES | ENT_HTML5, 'UTF-8' ),
 					'type'         => $product->get_type(),
 					'status'       => $product->get_status(),
 					'price'        => $product->get_price( 'edit' ),
@@ -1129,7 +1129,7 @@ final class Commerce {
 			'type'              => $product->get_type(),
 			'parent'            => $product->get_parent_id(),
 			'status'            => $product->get_status(),
-			'title'             => $product->get_name(),
+			'title'             => html_entity_decode( $product->get_name(), ENT_QUOTES | ENT_HTML5, 'UTF-8' ),
 			'slug'              => $product->get_slug(),
 			'link'              => (string) get_permalink( $product->get_id() ),
 			'description'       => $product->get_description( 'edit' ),
@@ -1470,7 +1470,7 @@ final class Commerce {
 	private static function term( \WP_Term $term ): array {
 		$item = array(
 			'id'          => $term->term_id,
-			'name'        => $term->name,
+			'name'        => html_entity_decode( $term->name, ENT_QUOTES | ENT_HTML5, 'UTF-8' ),
 			'slug'        => $term->slug,
 			'description' => $term->description,
 			'parent'      => (int) $term->parent,

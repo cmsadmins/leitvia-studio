@@ -58,7 +58,8 @@ final class Gateway {
 	public const KINDS = array( 'prices', 'legal', 'slugs', 'organization', 'tax', 'shipping' );
 
 	/**
-	 * Every setting with its default.
+	 * Every setting with its default. oauth lets clients connect over OAuth (Mcp\OAuth\OAuth), oauth_dcr lets clients
+	 * without a client document register (RFC 7591, deprecated in MCP 2026-07-28).
 	 */
 	public const DEFAULTS = array(
 		'retention_days'        => 90,
@@ -72,6 +73,8 @@ final class Gateway {
 			'areas' => array(),
 			'kinds' => array(),
 		),
+		'oauth'                 => true,
+		'oauth_dcr'             => true,
 	);
 
 	/**
@@ -402,6 +405,8 @@ final class Gateway {
 					),
 					'additionalProperties' => false,
 				),
+				'oauth'                 => array( 'type' => 'boolean' ),
+				'oauth_dcr'             => array( 'type' => 'boolean' ),
 			),
 			'additionalProperties' => false,
 		);

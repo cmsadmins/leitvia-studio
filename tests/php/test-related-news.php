@@ -174,6 +174,50 @@ class Test_Related_News extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The ability set-page-structure sets the kind of a page, such as privacy for an imported legal text, and clears it with "";
+	 * without the override for legal texts the same change waits in a package. A post takes no kind.
+	 */
+	public function test_page_kind(): void {
+		$page = self::factory()->post->create(
+			array(
+				'post_type'   => 'page',
+				'post_status' => 'publish',
+				'post_title'  => 'Privacy',
+			)
+		);
+		$set  = static fn( $kind ) => wp_get_ability( 'leitvia/set-page-structure' )->execute(
+			array(
+				'post'      => $page,
+				'base_hash' => Hashes::document( $page ),
+				'kind'      => $kind,
+			)
+		);
+		$done = $set( 'privacy' );
+		$this->assertIsArray( $done, is_wp_error( $done ) ? $done->get_error_message() : '' );
+		$this->assertSame( 'privacy', get_post_meta( $page, '_leitvia_page_kind', true ) );
+		$this->assertWPError( $set( 'cookbook' ) );
+		$this->assertIsArray( $set( '' ) );
+		$this->assertSame( '', get_post_meta( $page, '_leitvia_page_kind', true ) );
+
+		update_option( Gateway::OPTION, array( 'overrides' => array( 'areas' => array( 'content' => 'autonomous' ) ) ) + get_option( Gateway::OPTION ) );
+		$queued = $set( 'imprint' );
+		$this->assertIsArray( $queued, is_wp_error( $queued ) ? $queued->get_error_message() : '' );
+		$this->assertSame( 'package', $queued['mode'], 'a legal text waits for a person' );
+		$this->assertSame( '', get_post_meta( $page, '_leitvia_page_kind', true ) );
+
+		$post = self::factory()->post->create();
+		$this->assertWPError(
+			wp_get_ability( 'leitvia/set-page-structure' )->execute(
+				array(
+					'post'      => $post,
+					'base_hash' => Hashes::document( $post ),
+					'kind'      => 'imprint',
+				)
+			)
+		);
+	}
+
+	/**
 	 * A page without a topic shows the posts with the page as hub, else the posts in a category or tag with the slug of
 	 * the page, else the latest posts; audit-site and check-composition say what it shows and how to name a topic.
 	 */

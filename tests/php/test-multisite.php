@@ -10,6 +10,8 @@ use LeitviaStudio\Gateway\Block_Edit;
 use LeitviaStudio\Gateway\Gateway;
 use LeitviaStudio\Gateway\Packages;
 use LeitviaStudio\Gateway\Store;
+use LeitviaStudio\Mcp\OAuth\OAuth;
+use LeitviaStudio\Mcp\OAuth\Tokens;
 use LeitviaStudio\Model\Model;
 use LeitviaStudio\Rest\Gateway_Access_Controller;
 
@@ -197,6 +199,7 @@ class Test_Multisite extends WP_UnitTestCase {
 		restore_current_blog();
 		$ours = wp_upload_dir();
 		wp_mkdir_p( $theirs['path'] );
+		wp_mkdir_p( $ours['path'] );
 		wp_mkdir_p( $ours['basedir'] . '/' . Packages::PRIVATE_DIR . '/x' );
 		copy( $fixture, $theirs['path'] . '/secret.png' );
 		copy( $fixture, $ours['basedir'] . '/' . Packages::PRIVATE_DIR . '/x/secret.png' );
@@ -312,5 +315,34 @@ class Test_Multisite extends WP_UnitTestCase {
 			$this->assertSame( '1', (string) get_option( Model::FLUSH_OPTION ), "site {$site}" );
 			restore_current_blog();
 		}
+	}
+
+	/**
+	 * An OAuth token works on the site it was made on only: another site has its own table and its own resource, even
+	 * for an agent of both sites.
+	 */
+	public function test_oauth_token_works_on_its_own_site_only(): void {
+		add_filter( 'leitvia_studio_oauth_available', '__return_true' );
+		$agent    = $this->agent( true );
+		$verifier = str_repeat( 'v', 43 );
+		$code     = Tokens::issue_code(
+			array(
+				'user_id'      => $agent,
+				'client_id'    => 'lv-test',
+				'client_name'  => 'Test',
+				'scope'        => 'leitvia:read',
+				'resource'     => OAuth::resource(),
+				'redirect_uri' => 'https://client.example/cb',
+				'challenge'    => rtrim( strtr( base64_encode( hash( 'sha256', $verifier, true ) ), '+/', '-_' ), '=' ), // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- PKCE S256 in a test.
+			)
+		);
+		$pair     = Tokens::exchange( $code, 'lv-test', 'https://client.example/cb', $verifier, OAuth::resource() );
+		$this->assertIsArray( $pair );
+		$this->assertNotNull( Tokens::access( $pair['access_token'] ) );
+		switch_to_blog( $this->other );
+		$this->assertNull( Tokens::access( $pair['access_token'] ), 'another site, another table and resource' );
+		$this->assertWPError( Tokens::refresh( $pair['refresh_token'], 'lv-test', '', '' ) );
+		restore_current_blog();
+		$this->assertNotNull( Tokens::access( $pair['access_token'] ), 'still valid at home' );
 	}
 }

@@ -27,6 +27,10 @@
 		}
 	},
 	"usesContext": [ "postId" ],
+	"styles": [
+		{ "name": "default", "label": "Default", "isDefault": true },
+		{ "name": "lines", "label": "Lines" }
+	],
 	"supports": {
 		"anchor": true,
 		"html": false,

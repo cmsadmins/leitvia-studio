@@ -1,10 +1,15 @@
 import { __ } from '@wordpress/i18n';
 import { InspectorControls, useBlockProps } from '@wordpress/block-editor';
-import { Notice, PanelBody, TextControl } from '@wordpress/components';
+import {
+	Notice,
+	PanelBody,
+	SelectControl,
+	TextControl,
+} from '@wordpress/components';
 import { IconPicker, Svg } from './picker';
 
 export default function Edit( {
-	attributes: { icon, label, url },
+	attributes: { icon, label, url, size },
 	setAttributes,
 } ) {
 	// Icon::render() drops a link without a label, so it never renders a link without an accessible name.
@@ -17,6 +22,34 @@ export default function Edit( {
 						label={ __( 'Icon', 'leitvia-studio' ) }
 						value={ icon }
 						onChange={ ( next ) => setAttributes( { icon: next } ) }
+					/>
+					<SelectControl
+						__next40pxDefaultSize
+						label={ __( 'Size', 'leitvia-studio' ) }
+						help={ __(
+							'Large, extra large and huge draw the icon 64, 80 or 96 px high, whatever the font size, for an icon that heads an entry.',
+							'leitvia-studio'
+						) }
+						value={ size }
+						options={ [
+							{
+								label: __( 'Font size', 'leitvia-studio' ),
+								value: '',
+							},
+							{
+								label: __( 'Large', 'leitvia-studio' ),
+								value: 'large',
+							},
+							{
+								label: __( 'Extra large', 'leitvia-studio' ),
+								value: 'x-large',
+							},
+							{
+								label: __( 'Huge', 'leitvia-studio' ),
+								value: 'xx-large',
+							},
+						] }
+						onChange={ ( next ) => setAttributes( { size: next } ) }
 					/>
 				</PanelBody>
 				<PanelBody title={ __( 'Label and link', 'leitvia-studio' ) }>
@@ -49,7 +82,11 @@ export default function Edit( {
 					) }
 				</PanelBody>
 			</InspectorControls>
-			<div { ...useBlockProps() }>
+			<div
+				{ ...useBlockProps( {
+					className: size ? `is-size-${ size }` : undefined,
+				} ) }
+			>
 				<Svg name={ icon } />
 			</div>
 		</>

@@ -69,8 +69,9 @@ $leitvia_studio_uninstall_site = static function (): void {
 			delete_post_meta_by_key( $leitvia_studio_key );
 		}
 	}
-	// Gateway: change packages, audit log, snapshots, schema version, settings, the prune event, pending checks after
-	// writing with their tokens, the application passwords of agents and the role; agent users stay.
+	// Gateway: change packages, audit log, snapshots, OAuth tokens and registered clients, schema version, settings, the
+	// prune event, pending checks after writing with their tokens, the application passwords of agents and the role;
+	// agent users stay.
 	$delete_posts( 'leitvia_package' );
 	// Files of package operations that were never applied wait in uploads/leitvia-studio/private/<random>/; before
 	// 1.3.10 they waited in uploads/leitvia-private/, which stays on sites that never loaded 1.3.10.
@@ -86,17 +87,23 @@ $leitvia_studio_uninstall_site = static function (): void {
 		}
 	}
 	global $wpdb;
-	$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}leitvia_audit, {$wpdb->prefix}leitvia_snapshots" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.DirectDatabaseQuery.SchemaChange -- Own tables, removed on uninstall.
+	$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}leitvia_audit, {$wpdb->prefix}leitvia_snapshots, {$wpdb->prefix}leitvia_oauth_tokens" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.DirectDatabaseQuery.SchemaChange -- Own tables, removed on uninstall.
 	delete_option( 'leitvia_studio_db' );
 	delete_option( 'leitvia_studio_rewrite_front' );
 	delete_option( 'leitvia_studio_gateway' );
 	delete_option( 'leitvia_studio_recipe_writes' );
+	delete_option( 'leitvia_studio_oauth_clients' );
 	wp_clear_scheduled_hook( 'leitvia_studio_gateway_prune' );
 	// Checks after writing are single events with arguments; wp_unschedule_hook() takes them all.
 	wp_unschedule_hook( 'leitvia_studio_verify' );
 	$leitvia_studio_tokens = $wpdb->get_col( $wpdb->prepare( "SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE %s", $wpdb->esc_like( '_transient_leitvia_verify_' ) . '%' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- One-time cleanup on uninstall, no API lists transients by prefix.
 	foreach ( $leitvia_studio_tokens as $leitvia_studio_token ) {
 		delete_transient( substr( $leitvia_studio_token, strlen( '_transient_' ) ) );
+	}
+	// Client documents kept for a day and the throttle of the OAuth routes.
+	$leitvia_studio_oauth = $wpdb->get_col( $wpdb->prepare( "SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE %s", $wpdb->esc_like( '_transient_leitvia_oauth_' ) . '%' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- One-time cleanup on uninstall, no API lists transients by prefix.
+	foreach ( $leitvia_studio_oauth as $leitvia_studio_name ) {
+		delete_transient( substr( $leitvia_studio_name, strlen( '_transient_' ) ) );
 	}
 	// Application passwords of agents, while the role still names them: on a network only those bound to this site, a
 	// user may be a person elsewhere (Gateway_Access_Controller::SITES_META). The users and their content stay.
@@ -124,6 +131,24 @@ $leitvia_studio_uninstall_site = static function (): void {
 	delete_option( 'leitvia_studio_news_sitemap_rules' );
 	// The language the date formats were set for; the formats stay, they are settings of the site.
 	delete_option( 'leitvia_studio_date_locale' );
+	delete_option( 'leitvia_studio_pattern_reviews' );
+	delete_option( 'leitvia_studio_mcp_patterns' );
+	delete_option( 'leitvia_studio_mcp_prompts' );
+	// Tasks of the MCP server: options leitvia_studio_mcp_task_<id> with their lock, their runs and expiries.
+	wp_unschedule_hook( 'leitvia_studio_mcp_task' );
+	wp_unschedule_hook( 'leitvia_studio_mcp_task_expire' );
+	if ( function_exists( 'as_unschedule_all_actions' ) ) {
+		as_unschedule_all_actions( 'leitvia_studio_mcp_task' );
+	}
+	$leitvia_studio_tasks = $wpdb->get_col( $wpdb->prepare( "SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE %s", $wpdb->esc_like( 'leitvia_studio_mcp_task_' ) . '%' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- One-time cleanup on uninstall, no API lists options by prefix.
+	foreach ( $leitvia_studio_tasks as $leitvia_studio_task ) {
+		delete_option( $leitvia_studio_task );
+	}
+	// Nonces of open requestState values, ten minutes at most; with an object cache they expire there.
+	$leitvia_studio_nonces = $wpdb->get_col( $wpdb->prepare( "SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE %s", $wpdb->esc_like( '_transient_leitvia_mcp_rs_' ) . '%' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery -- One-time cleanup on uninstall, no API lists transients by prefix.
+	foreach ( $leitvia_studio_nonces as $leitvia_studio_nonce ) {
+		delete_transient( substr( $leitvia_studio_nonce, strlen( '_transient_' ) ) );
+	}
 	delete_transient( 'leitvia_news_sitemap' );
 	delete_option( 'leitvia_studio_model_checked' );
 	// Overlay state, windows and the compiled overlay sets: the transients leitvia_studio_overlay_*. With an external

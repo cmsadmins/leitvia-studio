@@ -7,6 +7,8 @@
 
 namespace LeitviaStudio\Blocks;
 
+use LeitviaStudio\Gateway\Outline;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -126,8 +128,12 @@ final class Faq {
 		$allowed['a'] = array( 'href' => true );
 		$questions    = array();
 		foreach ( $entries as list( $question, $answer ) ) {
-			$question = trim( (string) preg_replace( '/\s+/u', ' ', $question ) );
-			$answer   = (string) preg_replace( '/\s+/u', ' ', wp_kses( $answer, $allowed ) );
+			// Blocks render before the shortcodes of the_content run: resolve them here, as the page shows them.
+			$question = do_shortcode( (string) $question );
+			$answer   = do_shortcode( (string) $answer );
+			// One line each; non-breaking spaces stay, as in the table of contents.
+			$question = Outline::one_line( $question );
+			$answer   = Outline::one_line( wp_kses( $answer, $allowed ) );
 			// Space around block tags carries no meaning; around inline tags (a, b, em) it stays.
 			$answer = trim( (string) preg_replace( '#\s*(</?(?:p|div|ul|ol|li|h[2-6])>|<br ?/?>)\s*#', '$1', $answer ) );
 			if ( '' === $question || '' === trim( wp_strip_all_tags( $answer ) ) ) {

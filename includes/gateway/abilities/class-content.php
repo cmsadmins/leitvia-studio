@@ -249,7 +249,7 @@ final class Content {
 		Abilities::read(
 			'leitvia/get-site-health',
 			__( 'Get site health', 'leitvia-studio' ),
-			__( 'Returns the versions of WordPress, PHP, the theme and the plugins and the updates WordPress knows of, read from its last update check; nothing is requested. mcp says whether MCP clients reach the server of Leitvia Studio (ready), its address (url) and, when not, why (reason, such as the plugin MCP Adapter missing): report that to the person and go on over the REST API. Needs a user who may view the Site Health checks, usually an administrator, or the agent role.', 'leitvia-studio' ),
+			__( 'Returns the versions of WordPress, PHP, the theme and the plugins and the updates WordPress knows of, read from its last update check; nothing is requested. mcp gives the address of the MCP server of Leitvia Studio (url), its protocol revisions (protocols) and the version of an active MCP Adapter (version, empty without one); the server answers without the adapter. Needs a user who may view the Site Health checks, usually an administrator, or the agent role.', 'leitvia-studio' ),
 			array(),
 			array( 'type' => 'object' ),
 			static fn() => self::health(),
@@ -651,6 +651,10 @@ final class Content {
 		// out while they are empty, so the hash of every other page, post and entry stays as it was.
 		if ( 'page' === $type ) {
 			$state['meta_input'][ \LeitviaStudio\Seo\Cluster::ICON_META ] = (string) get_post_meta( $id, \LeitviaStudio\Seo\Cluster::ICON_META, true );
+			// The kind of a page (set-page-structure kind), so a rollback restores it; Hashes leaves it out while it is empty.
+			$state['meta_input']['_leitvia_page_kind'] = (string) get_post_meta( $id, '_leitvia_page_kind', true );
+			// A page without breadcrumbs (set-page-structure breadcrumbs false); not counted while empty, as kind.
+			$state['meta_input'][ \LeitviaStudio\Seo\Cluster::NO_BREADCRUMBS_META ] = (string) get_post_meta( $id, \LeitviaStudio\Seo\Cluster::NO_BREADCRUMBS_META, true );
 		} elseif ( is_post_type_viewable( $type ) ) {
 			$state['meta_input'][ \LeitviaStudio\Seo\Cluster::HUB_META ] = (string) get_post_meta( $id, \LeitviaStudio\Seo\Cluster::HUB_META, true );
 		}
@@ -1189,7 +1193,8 @@ final class Content {
 			foreach ( self::taxonomies( $post->post_type ) as $taxonomy ) {
 				$names = wp_get_object_terms( $post->ID, $taxonomy, array( 'fields' => 'names' ) );
 				if ( is_array( $names ) && $names ) {
-					$terms[ $taxonomy ] = $names;
+					// Plain names: core stores term names with entities (&amp;).
+					$terms[ $taxonomy ] = array_map( static fn( $name ): string => html_entity_decode( (string) $name, ENT_QUOTES | ENT_HTML5, 'UTF-8' ), $names );
 				}
 			}
 			$state   = self::state( $post->ID, $post->post_type );
@@ -1200,7 +1205,8 @@ final class Content {
 				'id'          => $post->ID,
 				'type'        => $post->post_type,
 				'status'      => $post->post_status,
-				'title'       => $post->post_title,
+				// The title as typed: kses stores & as &amp; for users without unfiltered_html.
+				'title'       => html_entity_decode( $post->post_title, ENT_QUOTES | ENT_HTML5, 'UTF-8' ),
 				'slug'        => $post->post_name,
 				'date'        => $post->post_date,
 				'modified'    => $post->post_modified,

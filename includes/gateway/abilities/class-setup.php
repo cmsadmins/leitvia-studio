@@ -205,7 +205,7 @@ final class Setup {
 		Abilities::write(
 			'leitvia/set-organization',
 			__( 'Set organization details', 'leitvia-studio' ),
-			__( 'Sets the details of the organization behind the site: kind of business (type, Organization or a type of LocalBusiness; type falls back to Organization), address, phone, email, founding date (founding_date, YYYY, YYYY-MM or YYYY-MM-DD), founder or owner (founder, a person, printed as schema.org founder), the copyright line of the footer (copyright_since, the first year as YYYY, and copyright_holder, the name after the years; the theme Leitvia then shows the first year, a dash, the current year and the holder), area served (area_served, places), opening hours (opening_hours, rows of days with opens and closes as HH:MM, only printed for a local business), profiles on other sites (same_as, https addresses), the rating on a review site (aggregate_rating: value 1 to 5, count of reviews, source_url where it is shown, confirmed true only after a person checked it there; printed as aggregateRating and allowed as a star in SEO titles only when confirmed, with count and source; null removes it) and how the default texts visitors read address them (address: informal, the default, or formal, in German du or Sie; it covers messages, hints, confirmations and emails of forms and the dialog of the privacy settings, also those of add-ons that register their texts; a site language such as de_DE_formal is formal anyway). Leitvia Studio prints them as structured data on the front page and as publisher of posts while no SEO plugin is active; the name and the logo stay those of the site. Only the fields you send change, an empty string or an empty list clears one. leitvia/get-seo returns the current values. base_hash is empty. Use only facts the person gave or the site shows; never guess opening hours. Like every setting it waits in a change package for a person.', 'leitvia-studio' ),
+			__( 'Sets the details of the organization behind the site: kind of business (type, Organization or a type of LocalBusiness; type falls back to Organization), a description of what it does (description, at most 500 characters, printed as description of the Organization or LocalBusiness), a logo for structured data (logo, ID of a raster image from leitvia/list-media of at least 112 pixels each way, 0 for the logo of the header; search engines show it on white, so a header with a light logo on a dark background can hand them a dark one), the page with the editorial guidelines (editorial_page, ID of a page, 0 clears it; printed as publishingPrinciples of the organization, also as publisher of news posts, and linked from the author box of the theme; without it the only published page with the page kind editorial counts, with several none), address, phone, email, founding date (founding_date, YYYY, YYYY-MM or YYYY-MM-DD), founder or owner (founder, a person, printed as schema.org founder), people (people, profiles with name, job_title, description, image as media ID, same_as with https profiles, knows_about with topics, page as the ID of the page about the person; the list replaces the saved one, at most 10; Leitvia Studio prints each as a Person with one @id for the founder of the same name, the author of articles with the same author name and the main entity of a ProfilePage on its page), the copyright line of the footer (copyright_since, the first year as YYYY, and copyright_holder, the name after the years; the theme Leitvia then shows the first year, a dash, the current year and the holder), area served (area_served, places), opening hours or service times (opening_hours, rows of days with opens and closes as HH:MM; a local business prints them as openingHoursSpecification, every type as hoursAvailable of the ContactPoint), what phone and email are for (contact_type, contactType of the ContactPoint that every type with a phone or an email gets, customer service by default), profiles on other sites (same_as, https addresses), the rating on a review site (aggregate_rating: value 1 to 5, count of reviews, source_url where it is shown, confirmed true only after a person checked it there; printed as aggregateRating and allowed as a star in SEO titles only when confirmed, with count and source; null removes it) and how the default texts visitors read address them (address: informal, the default, or formal, in German du or Sie; it covers messages, hints, confirmations and emails of forms and the dialog of the privacy settings, also those of add-ons that register their texts; a site language such as de_DE_formal is formal anyway). Leitvia Studio prints them as structured data on the front page and as publisher of posts while no SEO plugin is active; the name stays that of the site, the logo too unless logo names one. Only the fields you send change, an empty string or an empty list clears one. leitvia/get-seo returns the current values. base_hash is empty. Use only facts the person gave or the site shows; never guess opening hours. Like every setting it waits in a change package for a person.', 'leitvia-studio' ),
 			'setup',
 			$replace,
 			array(
@@ -213,6 +213,21 @@ final class Setup {
 					'type'             => array(
 						'type' => 'string',
 						'enum' => Organization::TYPES,
+					),
+					'description'      => array(
+						'type'        => 'string',
+						'maxLength'   => Organization::DESCRIPTION_MAX,
+						'description' => __( 'What the organization does, in one or two sentences as the site says it.', 'leitvia-studio' ),
+					),
+					'logo'             => array(
+						'type'        => 'integer',
+						'minimum'     => 0,
+						'description' => __( 'ID of a raster image from leitvia/list-media as logo in structured data, 0 for the logo of the header.', 'leitvia-studio' ),
+					),
+					'editorial_page'   => array(
+						'type'        => 'integer',
+						'minimum'     => 0,
+						'description' => __( 'ID of the page with the editorial guidelines from leitvia/list-content, 0 to clear the setting.', 'leitvia-studio' ),
 					),
 					'street'           => array( 'type' => 'string' ),
 					'postal_code'      => array( 'type' => 'string' ),
@@ -223,6 +238,11 @@ final class Setup {
 					),
 					'phone'            => array( 'type' => 'string' ),
 					'email'            => array( 'type' => 'string' ),
+					'contact_type'     => array(
+						'type'        => 'string',
+						'maxLength'   => 60,
+						'description' => __( 'What phone and email are for, printed as contactType of the ContactPoint, such as customer service, sales or technical support; empty means customer service.', 'leitvia-studio' ),
+					),
 					'founding_date'    => array(
 						'type'    => 'string',
 						'pattern' => Organization::DATE,
@@ -230,6 +250,62 @@ final class Setup {
 					'founder'          => array(
 						'type'      => 'string',
 						'maxLength' => 200,
+					),
+					'people'           => array(
+						'type'        => 'array',
+						'maxItems'    => Organization::MAX_PEOPLE,
+						'description' => __( 'The people behind the site, such as the founder and the authors; the list replaces the saved one, an empty list removes all. The name links a profile to the founder and to authors of the same name.', 'leitvia-studio' ),
+						'items'       => array(
+							'type'                 => 'object',
+							'properties'           => array(
+								'name'        => array(
+									'type'        => 'string',
+									'minLength'   => 1,
+									'maxLength'   => 200,
+									'description' => __( 'Name of the person as the site writes it.', 'leitvia-studio' ),
+								),
+								'job_title'   => array(
+									'type'        => 'string',
+									'maxLength'   => 200,
+									'description' => __( 'Role or title as the site names it, for example Founder and managing director.', 'leitvia-studio' ),
+								),
+								'description' => array(
+									'type'        => 'string',
+									'maxLength'   => 1000,
+									'description' => __( 'Short biography as the site says it: experience, qualifications.', 'leitvia-studio' ),
+								),
+								'image'       => array(
+									'type'        => 'integer',
+									'minimum'     => 0,
+									'description' => __( 'ID of a portrait from leitvia/list-media, 0 for none.', 'leitvia-studio' ),
+								),
+								'same_as'     => array(
+									'type'        => 'array',
+									'maxItems'    => Organization::MAX_PERSON_ENTRIES,
+									'description' => __( 'Profiles of the person on other sites, https addresses.', 'leitvia-studio' ),
+									'items'       => array(
+										'type'    => 'string',
+										'pattern' => '^https://',
+									),
+								),
+								'knows_about' => array(
+									'type'        => 'array',
+									'maxItems'    => Organization::MAX_PERSON_ENTRIES,
+									'description' => __( 'Topics the person knows about, as the site names them.', 'leitvia-studio' ),
+									'items'       => array(
+										'type'      => 'string',
+										'maxLength' => 100,
+									),
+								),
+								'page'        => array(
+									'type'        => 'integer',
+									'minimum'     => 0,
+									'description' => __( 'ID of the page about the person, such as the author page; it gets a ProfilePage. 0 for none.', 'leitvia-studio' ),
+								),
+							),
+							'required'             => array( 'name' ),
+							'additionalProperties' => false,
+						),
 					),
 					'copyright_since'  => array(
 						'type'    => 'string',
@@ -321,7 +397,7 @@ final class Setup {
 			'leitvia/set-redirects',
 			__( 'Set redirects', 'leitvia-studio' ),
 			/* translators: %d: most rows */
-			sprintf( __( 'Sets the redirects of moved and removed addresses, for a migration or a new structure. Rows of from, a path of this site such as /old-page/, status and to. A from with a query, such as /?p=45 or /?attachment_id=123 of an old site, matches only that query (in any order of its parameters) and comes before the row of its bare path; a from without a query matches its path with any query. status 301 (the default) moves for good, 302 for a while; both need to, a path of this site or an https address. status 410 says the page is gone for good (search engines drop it faster than a 404) and takes no to; the visitor sees the 404 page of the theme. The list replaces the saved one (at most %d rows, read the current one with leitvia/get-seo); an empty list removes all. A request of a from path gets its answer before the page loads; a trailing slash and the case do not matter. Rows that lead back to a path they passed (a loop) are refused, as are the start page as from, a target equal to its from and a 410 with a target. Inactive while an SEO plugin is active, which brings its own redirects. base_hash is empty. Like every setting it waits in a change package for a person.', 'leitvia-studio' ), \LeitviaStudio\Seo\Redirects::MAX ),
+			sprintf( __( 'Sets the redirects of moved and removed addresses, for a migration or a new structure. Rows of from, a path of this site such as /old-page/, status and to. A from with a query, such as /?p=45 or /?attachment_id=123 of an old site, matches every request with these parameters and values (in any order) and comes before the row of its bare path; further parameters of the request, such as ?von= of a button, go along to to, and of several rows the one with the most parameters wins; a from without a query matches its path with any query. status 301 (the default) moves for good, 302 for a while; both need to, a path of this site or an https address. status 410 says the page is gone for good (search engines drop it faster than a 404) and takes no to; the visitor sees the 404 page of the theme. The list replaces the saved one (at most %d rows, read the current one with leitvia/get-seo); an empty list removes all. A request of a from path gets its answer before the page loads; a trailing slash and the case do not matter. Rows that lead back to a path they passed (a loop) are refused, as are the start page as from, a target equal to its from and a 410 with a target. Inactive while an SEO plugin is active, which brings its own redirects. base_hash is empty. Like every setting it waits in a change package for a person.', 'leitvia-studio' ), \LeitviaStudio\Seo\Redirects::MAX ),
 			'setup',
 			$replace,
 			array(
@@ -364,8 +440,8 @@ final class Setup {
 		Abilities::write(
 			'leitvia/set-llms',
 			__( 'Set llms.txt and AI crawlers', 'leitvia-studio' ),
-			/* translators: %d: most characters of the summary */
-			sprintf( __( 'Sets llms.txt, the file at the root of the site that tells AI assistants what the site is about, and whether robots.txt lets AI crawlers in. llms.txt is built on each request: the site name, summary (at most %d characters, empty for the tagline), the pages with the page frame hub, the pages with a service and price (leitvia/set-page-structure) and the extra pages of pages (IDs, published). enabled switches the file off and on, ai_crawlers false disallows the crawlers of AI search and assistants in robots.txt (default true, they may crawl as every other crawler). Without an SEO plugin and only on a site open to search engines: otherwise the setting is saved and notice says what holds the file back, get-seo shows llms.requested, llms.enabled and llms.held_back. Only the fields you send change. base_hash is empty. Like every setting it waits in a change package for a person.', 'leitvia-studio' ), \LeitviaStudio\Admin\Settings::SUMMARY_MAX ),
+			/* translators: 1: most characters of the summary, 2: most latest posts, 3: most Disallow paths */
+			sprintf( __( 'Sets llms.txt, the file at the root of the site that tells AI assistants what the site is about, and whether robots.txt lets AI crawlers in. llms.txt is built on each request: the site name, summary (at most %1$d characters, empty for the tagline), the pages with the page frame hub, the pages with a service and price (leitvia/set-page-structure), the extra pages of pages (IDs, published) and, with news above 0, that many latest posts with title and excerpt (at most %2$d, 0 by default). enabled switches the file off and on, ai_crawlers false disallows the crawlers of AI search and assistants in robots.txt (default true, they may crawl as every other crawler). disallow closes paths of the site to every crawler in robots.txt, such as /downloads/ (each with a leading slash, no spaces or line breaks, at most %3$d; the list replaces the saved one, an empty list removes all). Without an SEO plugin and only on a site open to search engines: otherwise the setting is saved and notice says what holds the file back, get-seo shows llms.requested, llms.enabled and llms.held_back. Only the fields you send change. base_hash is empty. Like every setting it waits in a change package for a person.', 'leitvia-studio' ), \LeitviaStudio\Admin\Settings::SUMMARY_MAX, \LeitviaStudio\Seo\Llms::MAX_NEWS, \LeitviaStudio\Seo\Llms::MAX_DISALLOW ),
 			'setup',
 			$replace,
 			array(
@@ -386,6 +462,21 @@ final class Setup {
 					'ai_crawlers' => array(
 						'type'        => 'boolean',
 						'description' => __( 'false disallows the crawlers of AI search and assistants in robots.txt.', 'leitvia-studio' ),
+					),
+					'news'        => array(
+						'type'        => 'integer',
+						'minimum'     => 0,
+						'maximum'     => \LeitviaStudio\Seo\Llms::MAX_NEWS,
+						'description' => __( 'Number of latest posts llms.txt lists with title and excerpt, 0 for none.', 'leitvia-studio' ),
+					),
+					'disallow'    => array(
+						'type'        => 'array',
+						'maxItems'    => \LeitviaStudio\Seo\Llms::MAX_DISALLOW,
+						'description' => __( 'Paths robots.txt closes to every crawler, such as /downloads/; the list replaces the saved one.', 'leitvia-studio' ),
+						'items'       => array(
+							'type'    => 'string',
+							'pattern' => \LeitviaStudio\Seo\Llms::DISALLOW_PATTERN,
+						),
 					),
 				),
 			) + $object,
@@ -905,9 +996,32 @@ final class Setup {
 			$fields[ \LeitviaStudio\Address::SETTING ] = 'formal' === $input['address'];
 		}
 		$target = array( 'option' => Settings::OPTION );
+		if ( isset( $input['editorial_page'] ) ) {
+			$page = (int) $input['editorial_page'];
+			if ( $page && ( 'page' !== get_post_type( $page ) || ! Scope::readable( $page ) ) ) {
+				return Block_Edit::invalid( 'editorial_page', __( 'There is no page with this ID that agents can read. Take the ID from leitvia/list-content.', 'leitvia-studio' ), $target + array( 'page' => $page ), 'leitvia/list-content' );
+			}
+			$fields['editorial_page'] = $page;
+		}
+		$logo = (int) ( $input['logo'] ?? 0 );
+		$size = $logo && wp_attachment_is_image( $logo ) ? wp_get_attachment_image_src( $logo, 'full' ) : false;
+		if ( $logo && ( ! $size || min( $size[1], $size[2] ) < \LeitviaStudio\News\Schema::LOGO_MIN ) ) {
+			/* translators: %d: fewest pixels */
+			return Block_Edit::invalid( 'logo', sprintf( __( 'logo is the ID of a raster image (PNG, JPEG or WebP) from leitvia/list-media of at least %d pixels each way.', 'leitvia-studio' ), \LeitviaStudio\News\Schema::LOGO_MIN ), $target + array( 'image' => $logo ), 'leitvia/list-media' );
+		}
+		foreach ( (array) ( $input['people'] ?? array() ) as $person ) {
+			$image = (int) ( $person['image'] ?? 0 );
+			$page  = (int) ( $person['page'] ?? 0 );
+			if ( $image && ! wp_attachment_is_image( $image ) ) {
+				return Block_Edit::invalid( 'people', __( 'image of a person is the ID of an image from leitvia/list-media.', 'leitvia-studio' ), $target + array( 'image' => $image ), 'leitvia/list-media' );
+			}
+			if ( $page && 'page' !== get_post_type( $page ) ) {
+				return Block_Edit::invalid( 'people', __( 'page of a person is the ID of a page from leitvia/list-content.', 'leitvia-studio' ), $target + array( 'page' => $page ), 'leitvia/list-content' );
+			}
+		}
 		if ( ! $fields ) {
 			/* translators: %s: list of field names. */
-			return Block_Edit::invalid( 'change', sprintf( __( 'Name what to change: %s.', 'leitvia-studio' ), implode( ', ', array_merge( Organization::FIELDS, array( 'aggregate_rating', 'address' ) ) ) ), $target );
+			return Block_Edit::invalid( 'change', sprintf( __( 'Name what to change: %s.', 'leitvia-studio' ), implode( ', ', array_merge( Organization::FIELDS, array( 'editorial_page', 'aggregate_rating', 'address' ) ) ) ), $target );
 		}
 		return array(
 			'area'      => 'structure',
@@ -948,7 +1062,8 @@ final class Setup {
 	}
 
 	/**
-	 * Operation of set-llms: llms_txt, llms_summary, llms_pages and ai_crawlers over the saved Studio settings.
+	 * Operation of set-llms: llms_txt, llms_summary, llms_pages, llms_news, robots_disallow and ai_crawlers over the
+	 * saved Studio settings. A Disallow path the sanitizer would drop is refused, so nothing changes silently.
 	 *
 	 * @param array<string, mixed> $input Input.
 	 * @return array<string, mixed>|\WP_Error
@@ -961,6 +1076,8 @@ final class Setup {
 			'summary'     => 'llms_summary',
 			'pages'       => 'llms_pages',
 			'ai_crawlers' => 'ai_crawlers',
+			'news'        => 'llms_news',
+			'disallow'    => 'robots_disallow',
 		) as $key => $setting ) {
 			if ( array_key_exists( $key, $input ) ) {
 				$fields[ $setting ] = $input[ $key ];
@@ -971,8 +1088,14 @@ final class Setup {
 				return Block_Edit::invalid( 'pages', __( 'llms.txt lists published pages and posts agents can read only.', 'leitvia-studio' ), $target + array( 'post' => (int) $page ), 'leitvia/list-content' );
 			}
 		}
+		$paths = array_values( (array) ( $fields['robots_disallow'] ?? array() ) );
+		$bad   = array_diff( array_map( 'strval', $paths ), \LeitviaStudio\Seo\Llms::disallow_paths( $paths ) );
+		if ( $bad || count( array_unique( array_map( 'strval', $paths ) ) ) !== count( $paths ) ) {
+			/* translators: %s: paths */
+			return Block_Edit::invalid( 'disallow', sprintf( __( 'These Disallow paths are not valid or come twice: %s. Each starts with a slash and has no spaces, line breaks or #.', 'leitvia-studio' ), implode( ', ', $bad ? $bad : array_diff_assoc( $paths, array_unique( $paths ) ) ) ), $target );
+		}
 		if ( ! $fields ) {
-			return Block_Edit::invalid( 'change', __( 'Name what to change: enabled, summary, pages or ai_crawlers.', 'leitvia-studio' ), $target );
+			return Block_Edit::invalid( 'change', __( 'Name what to change: enabled, summary, pages, news, disallow or ai_crawlers.', 'leitvia-studio' ), $target );
 		}
 		$on = array_key_exists( 'llms_txt', $fields ) ? (bool) $fields['llms_txt'] : (bool) leitvia_studio_setting( 'llms_txt' );
 		return array(
@@ -1088,7 +1211,7 @@ final class Setup {
 			}
 			$size    = $id ? wp_get_attachment_image_src( $id, 'full' ) : false;
 			$small   = 'icon' === $field && $size && ( (int) $size[1] !== (int) $size[2] || (int) $size[1] < 512 );
-			$batch[] = self::option_op( $option, $id, $small ? __( 'The site icon should be square and at least 512 pixels wide, or browsers show it blurred or cut.', 'leitvia-studio' ) : '' );
+			$batch[] = self::option_op( $option, $id, $small ? __( 'The site icon should be square and at least 512 pixels wide, or browsers show it blurred or cut. leitvia/crop-media with the whole image as rectangle, square true and min_size 512 makes such a copy with a transparent margin.', 'leitvia-studio' ) : '' );
 		}
 		if ( ! $batch ) {
 			/* translators: %s: list of field names. */

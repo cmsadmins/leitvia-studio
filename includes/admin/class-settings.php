@@ -43,6 +43,7 @@ final class Settings {
 		'organization_country'          => '',
 		'organization_phone'            => '',
 		'organization_email'            => '',
+		'organization_contact_type'     => '',
 		'consent_providers'             => array(),
 		'organization_type'             => 'Organization',
 		'organization_founding_date'    => '',
@@ -52,6 +53,7 @@ final class Settings {
 		'organization_area_served'      => array(),
 		'organization_opening_hours'    => array(),
 		'organization_same_as'          => array(),
+		'organization_people'           => array(),
 		'organization_rating_value'     => '',
 		'organization_rating_count'     => 0,
 		'organization_rating_source'    => '',
@@ -61,6 +63,10 @@ final class Settings {
 		'llms_summary'                  => '',
 		'llms_pages'                    => array(),
 		'redirects'                     => array(),
+		'organization_description'      => '',
+		'organization_logo'             => 0,
+		'robots_disallow'               => array(),
+		'llms_news'                     => 0,
 	);
 
 	/**
@@ -82,6 +88,10 @@ final class Settings {
 	 * Settings that hold a list, with the schema of one item. news_categories, a list of term IDs, is not one of them.
 	 */
 	private const LISTS = array(
+		'robots_disallow'            => array(
+			'type'    => 'string',
+			'pattern' => \LeitviaStudio\Seo\Llms::DISALLOW_PATTERN,
+		),
 		'consent_providers'          => array(
 			'type'                 => 'object',
 			'properties'           => array(
@@ -119,6 +129,31 @@ final class Settings {
 			'additionalProperties' => false,
 		),
 		'organization_same_as'       => array( 'type' => 'string' ),
+		'organization_people'        => array(
+			'type'                 => 'object',
+			'properties'           => array(
+				'name'        => array( 'type' => 'string' ),
+				'job_title'   => array( 'type' => 'string' ),
+				'description' => array( 'type' => 'string' ),
+				'image'       => array(
+					'type'    => 'integer',
+					'minimum' => 0,
+				),
+				'same_as'     => array(
+					'type'  => 'array',
+					'items' => array( 'type' => 'string' ),
+				),
+				'knows_about' => array(
+					'type'  => 'array',
+					'items' => array( 'type' => 'string' ),
+				),
+				'page'        => array(
+					'type'    => 'integer',
+					'minimum' => 0,
+				),
+			),
+			'additionalProperties' => false,
+		),
 		'redirects'                  => array(
 			'type'                 => 'object',
 			'properties'           => array(
@@ -229,7 +264,8 @@ final class Settings {
 	}
 
 	/**
-	 * Keeps the known keys as booleans, page IDs and lists of term IDs, the tile URL as a valid tile URL, motion as off,
+	 * Keeps the known keys as booleans, page IDs and lists of term IDs, the number of news in llms.txt up to
+	 * Llms::MAX_NEWS, the Disallow paths of robots.txt as Llms::disallow_paths() keeps them, the tile URL as a valid tile URL, motion as off,
 	 * subtle or bold (else the saved value or its default), the organization details as plain text, the lists of consent
 	 * providers, area served, opening hours and profiles as their valid entries (Consent::sanitize_providers(),
 	 * Organization::hours()), the kind of business as one of Organization::TYPES and the founding date as YYYY, YYYY-MM
@@ -246,11 +282,13 @@ final class Settings {
 			$given         = array_key_exists( $key, $value ) ? $value[ $key ] : self::get( $key );
 			$clean[ $key ] = match ( true ) {
 				is_bool( $fallback )  => array_key_exists( $key, $value ) ? filter_var( $given, FILTER_VALIDATE_BOOLEAN ) : (bool) $given,
+				'llms_news' === $key  => min( \LeitviaStudio\Seo\Llms::MAX_NEWS, absint( $given ) ),
 				is_int( $fallback )   => absint( $given ),
 				'consent_providers' === $key => Consent::sanitize_providers( $given ),
 				'organization_opening_hours' === $key => Organization::hours( $given ),
 				'organization_area_served' === $key => self::texts( $given ),
 				'organization_same_as' === $key => self::https_urls( $given ),
+				'organization_people' === $key => Organization::clean_people( $given ),
 				'organization_type' === $key => is_string( $given ) && in_array( $given, Organization::TYPES, true ) ? $given : self::DEFAULTS['organization_type'],
 				'organization_founding_date' === $key => self::founding_date( $given ),
 				'organization_copyright_since' === $key => is_string( $given ) && preg_match( '#' . Organization::YEAR . '#', $given ) ? $given : '',
@@ -258,6 +296,8 @@ final class Settings {
 				'organization_rating_source' === $key => self::https_url( $given ),
 				'llms_summary' === $key => mb_substr( sanitize_textarea_field( (string) $given ), 0, self::SUMMARY_MAX ),
 				'redirects' === $key  => \LeitviaStudio\Seo\Redirects::sanitize( $given ),
+				'robots_disallow' === $key => \LeitviaStudio\Seo\Llms::disallow_paths( $given ),
+				'organization_description' === $key => mb_substr( sanitize_text_field( (string) $given ), 0, Organization::DESCRIPTION_MAX ),
 				is_array( $fallback ) => array_values( array_unique( array_filter( array_map( 'absint', (array) $given ) ) ) ),
 				'motion' === $key     => in_array( $given, \LeitviaStudio\Blocks\Animation::SITE, true ) ? $given : self::motion(),
 				'organization_email' === $key => sanitize_email( (string) $given ),

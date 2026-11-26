@@ -1,6 +1,6 @@
 # Leitvia Studio Extension API
 
-Leitvia Studio is extended through nine typed registries. Studio itself uses the same registries as every add-on, so an add-on docks on without any change to Studio. This document describes API version 1 (`LEITVIA_STUDIO_API`); add-ons written for any version from `LEITVIA_STUDIO_API_MIN` up to it are accepted.
+Leitvia Studio is extended through eleven typed registries. Studio itself uses the same registries as every add-on, so an add-on docks on without any change to Studio. This document describes API version 2 (`LEITVIA_STUDIO_API`); add-ons written for any version from `LEITVIA_STUDIO_API_MIN` up to it are accepted. Version 2 added the registries `mcp_prompts` and `mcp_apps`; an add-on that uses one of them declares `requires_api` 2.
 
 Studio contains no code for keys or paid unlocks. Add-ons that need one handle it themselves.
 
@@ -60,6 +60,8 @@ add_action(
 | `recipes` | `label` (string), `path` (string, absolute path to a `recipe.json`) | Gateway abilities `leitvia/list-recipes` and `leitvia/apply-recipe` |
 | `patterns` | `title` (string), `description` (string), `area` (`hero`, `content`, `teaser`, `proof`, `cta`, `offer`, or `header` and `footer` for a pattern of a template part with the role `frame`, which `leitvia/update-template-part` takes and composition checks ignore), `composition` (array) | Contract data (`addonPatterns`), composition checks, `leitvia/list-patterns` |
 | `building_blocks` | `title` (string), `description` (string), `model` (array, content model entries) | `leitvia/add-building-block`, recipes with `buildingBlocks`, `GET /leitvia-studio/v1/building-blocks` |
+| `mcp_prompts` | `path` (string, absolute path to a Markdown file); optional `root` (folder its links may point into), `title`, `description`, `arguments` (list of `name`, `description`, `required`, `complete`) | MCP server `leitvia`: `prompts/list`, `prompts/get`, resources `leitvia://skills/<owner>/<path>` |
+| `mcp_apps` | `title` (string), `path` (string, absolute path to an HTML file); optional `description`, `tools` (list of ability names), `data` (callable returning an array), `csp` (`connectDomains`, `resourceDomains`, `frameDomains`, `baseUriDomains`, each a list of `https://` origins), `prefers_border` (bool, default true) | MCP server `leitvia`: `ui://` resources, `_meta.ui` of the tools in `tools/list` |
 
 A `token_sources` callback takes no arguments and returns a list of `array( 'title' => string, 'document' => array )`, each document a DTCG token document. `POST /leitvia-studio/v1/token-sets` with `source`, `index` and an optional `title` creates a set from one of them; it passes the same checks as an import (size, depth, contract roles, CSS allowlist, contrast). Studio registers `leitvia/active-theme` and `leitvia/style-variations`.
 
@@ -117,7 +119,11 @@ When the entry is registered, before any hand-over, Studio checks that
 
 MCP clients assume the worst case when annotations are missing, so `register()` rejects an entry without them with `_doing_it_wrong()` and it never reaches core.
 
-Studio never sets `meta.public` or `meta.show_in_rest`. An ability is exposed to REST or other clients only when its own `args` say so. An entry with `meta.show_in_rest` gets `meta.mcp.public` true unless its `args` set it, so the default server of the MCP Adapter offers it next to the server `leitvia`; exposure is not a permission, `permission_callback` always applies. Studio bundles no MCP Adapter and does not require one: abilities reach MCP clients through the separately installed MCP Adapter plugin.
+Studio never sets `meta.public` or `meta.show_in_rest`. An ability is exposed to REST or other clients only when its own `args` say so. An entry with `meta.show_in_rest` gets `meta.mcp.public` true unless its `args` set it, so the default server of the MCP Adapter offers it next to the server `leitvia`; exposure is not a permission, `permission_callback` always applies. Studio bundles no MCP Adapter and does not require one: abilities reach MCP clients through Studio's own MCP server at `/wp-json/leitvia-studio/v1/mcp`, and the default server of the MCP Adapter offers them as well when that plugin is active.
+
+An entry whose `args.meta.long_running` is `true` runs as a task of the MCP extension `io.modelcontextprotocol/tasks` when the client declares it: the call answers with a task handle at once, Action Scheduler or WP-Cron runs the ability as the calling user, and the client polls `tasks/get`. The `permission_callback` runs first: a call the user may not make gets neither a task nor a question. A user holds at most three working tasks, a further call runs in the request; a task started over OAuth belongs to that connection and fails when it is revoked before the run. Studio sets it on `leitvia/apply-recipe`, `leitvia/audit-site` and `leitvia/export`. Long abilities report progress with `do_action( 'leitvia_studio_progress', $done, $total, $message )`; MCP clients get it as `notifications/progress`, tasks as `statusMessage`.
+
+Before an MCP client that takes form elicitation (revision 2026-07-28) runs an ability that removes or reverts, the server asks the person for a yes: annotated `destructive`, its name without namespace starting with `delete-`, `remove-` or `reject-` or being `rollback`, without a `package` key and without `dryRun`. When required arguments with a closed list of values are missing (`enum`), it offers the choice. A yes counts for the whole call and is not asked again after a choice. A yes changes no permission: autonomy, checks and the Inbox apply as for any call. The filter `leitvia_studio_mcp_confirm` narrows or widens the questions.
 
 Add-ons that call AI models use the WordPress AI Client (`wp_ai_client_prompt()`) and the site's Connectors; Studio ships no provider integration.
 
@@ -258,6 +264,51 @@ add_filter(
 
 `GET /leitvia-studio/v1/patterns` takes `source` (`theme`, `addon`, `user`), `orderby` (`modified`, the default, or `title`) and `order` (`desc`, the default, or `asc`); equal values sort by title. Each item carries `added` and `modified` as ISO 8601 dates in UTC, empty when unknown, and `status_label` and `effective_status_label` in the language of the user.
 
+### MCP prompts
+
+Entries of `mcp_prompts` become prompts of the MCP server `leitvia`, named after the entry with a hyphen for the slash: `my-addon/audit` becomes `my-addon-audit`. The text of a prompt is the Markdown file without its frontmatter; relative links to Markdown files below `root` become resources `leitvia://skills/<owner>/<path>` that the client reads with `resources/read`, everything else stays as written. Title and description come from `name` and `description` of the frontmatter (a `SKILL.md` in the format of WordPress/agent-skills), else from the first heading and the paragraph below it; `title` and `description` of the entry replace them. `arguments` lists what a client may pass (strings); the values follow the text under `## Input`. `complete` names the source of `completion/complete` for an argument: `patterns`, `pages` or `recipes`. Without `arguments` a prompt takes one optional `task`. Studio registers its free skills and agent workflows (`leitvia/page`, `leitvia/setup`, `leitvia/new-site` and the others) from its folder `skills/`, a copy of the skills package of the same version.
+
+```php
+$studio->registry( 'mcp_prompts' )->register(
+	'my-addon/audit',
+	array(
+		'path'      => __DIR__ . '/skills/my-audit/SKILL.md',
+		'root'      => __DIR__ . '/skills',
+		'arguments' => array(
+			array(
+				'name'        => 'page',
+				'description' => __( 'ID of the page to check.', 'my-addon' ),
+				'complete'    => 'pages',
+			),
+		),
+	),
+	'my-addon'
+);
+```
+
+Prompt files ship with the add-on; never build them from data of the site. When a plugin is switched on or off, subscribed clients get `notifications/prompts/list_changed`.
+
+### MCP apps
+
+Entries of `mcp_apps` are views (MCP Apps, extension `io.modelcontextprotocol/ui`, SEP-1865 in its stable revision 2026-01-26) of the MCP server `leitvia`. The entry `my-addon/review` is the resource `ui://my-addon/review` with the MIME type `text/html;profile=mcp-app`; its text is the file at `path`, with the JSON that `data` returns as `<script type="application/json" id="mcp-app-data">` before `</head>`. Each tool of an ability listed in `tools` carries `_meta.ui.resourceUri` (and the older flat key `ui/resourceUri`) in `tools/list`, so a host shows the view with the result of that tool. A host loads the document into a sandboxed iframe under its own Content Security Policy: without `csp` no connections are allowed and images only come as `data:` URIs, so ship scripts and styles inline. Studio adds all of this only for a client that declared the extension with that MIME type, in `_meta` under 2026-07-28 or at `initialize` under 2025-11-25 (the session keeps the extensions); every other client sees the tools as before, and `server/discover` and `initialize` name the extension only for a client that shows views.
+
+An ability with `'mcp' => array( 'public' => false, 'visibility' => array( 'app' ) )` in its meta is a tool only views call: it is listed with `_meta.ui.visibility` for clients that show views and unknown to all others, and the default server of the MCP Adapter does not offer it.
+
+```php
+$studio->registry( 'mcp_apps' )->register(
+	'my-addon/review',
+	array(
+		'title' => __( 'Review', 'my-addon' ),
+		'path'  => __DIR__ . '/build/review.html',
+		'tools' => array( 'leitvia/get-package' ),
+		'data'  => static fn(): array => array( 'strings' => array( 'title' => __( 'Review', 'my-addon' ) ) ),
+	),
+	'my-addon'
+);
+```
+
+Two filters belong to it. `leitvia_studio_mcp_tool_meta` gets the `_meta` of each tool with the tool name, the `WP_Ability` and the protocol context (`LeitviaStudio\Mcp\Apps::offered( $context )` tells whether the client shows views). `leitvia_studio_mcp_approve_tools` lists the tools a person may call with the OAuth scope `leitvia:approve`. Studio names none, so without an add-on such a token only reads and nobody approves a change package in the chat: a model holding the token of a person approves nothing itself. An add-on that lets the person decide in a view puts its own tool for views there.
+
 ## Child theme
 
 Files belong into the child theme `leitvia-child` (package `packages/leitvia-child`, zip `leitvia-child-<version>.zip`), never into Leitvia itself, which a theme update replaces: patterns, templates and template parts written by developers, agencies or agents with the WordPress skills `wp-block-themes` and `wp-patterns`. It inherits every preset, style variation and pattern of Leitvia and ships no CSS and no presets of its own; a new preset needs a role in the contract of Leitvia first.
@@ -282,6 +333,7 @@ Add-ons dock onto the gateway through hooks, for example to run one workflow on 
 | `leitvia_studio_package_created` | action | `int $id`, `array $entry` (the first operation) | After a change package was created. |
 | `leitvia_studio_package_applied` | action | `int $id` | After a change package was applied, fully or in part. |
 | `leitvia_studio_package_rolled_back` | action | `int $id` | After an applied change package was rolled back. |
+| `leitvia_studio_patterns_changed` | action | `string $slug` | After a registered pattern outside the contract was approved in the Pattern Lab or its approval withdrawn. The MCP server tells subscribed clients. |
 | `leitvia_studio_gateway_areas` | filter | `array $levels` (level by area), `array $settings` | When the autonomy level of an area is read. Add the area of an add-on or cap levels with a policy shared by several sites. `admin` and areas without a valid level (`locked`, `suggest`, `draft`, `autonomous`) stay locked. |
 | `leitvia_studio_rate_limit` | filter | `int $limit`, `bool $read`, `int $user_id` | Calls per minute of one user, reads and changes apart, from the settings `read_rate_per_minute` (300) and `rate_per_minute` (60). |
 | `leitvia_studio_gateway_options` | filter | `array $options` (check of a new value by option name) | Options of an add-on that its own abilities write through `Pipeline::run()` with the target `array( 'option' => <name> )`. The check gets the new value and returns `true` or a `WP_Error`, whose message the rejection `leitvia_invalid_input` carries; it runs on every write but a rollback, also when a package is applied, and a check that throws refuses the write. Agents propose such a write, a person applies it. The options of `Pipeline::OPTIONS` and of the content model are left out, and core options that matter for security never open (`Pipeline::protected_option()`: addresses, plugins, theme, users and roles, admin email, keys and salts, cron, uploads, transients, names ending in `_key` or `_salt`). Create the option before the first write (`add_option( 'my_addon_icons', array(), '', false )`) so it keeps its autoload. |
@@ -299,6 +351,8 @@ Add-ons dock onto the gateway through hooks, for example to run one workflow on 
 | `leitvia_studio_recipe_model` | filter | `array $declaration`, `string $name` | The content model declaration of a recipe (`contentModel`) before `leitvia/define-content-type` writes it, and in the plan and dry run. Localise labels here; keep the keys. |
 | `leitvia_studio_import_content` | filter | `string\|null $markup` (null), `string $html`, `array $input` | Before `leitvia/import-post` turns the HTML of the source into core blocks. Return block markup to convert it yourself, for example with a reader of a page builder; `null` lets Studio convert. The markup still runs through the checks of `leitvia/create-content` or `leitvia/update-content`. |
 | `leitvia_studio_recipe_step_labels` | filter | `array $labels` (`steps` and `codes`, each name or code to a translated label) | When a Studio screen shows recipe steps. An add-on names its own steps and codes, for example `'steps' => array( 'myImport' => __( 'Sample images', 'my-addon' ) )`. |
+| `leitvia_studio_progress` | action | `int\|float $done`, `int\|float $total` (0 when unknown), `string $message` | While a long ability runs, for example per step of a recipe and per post of `leitvia/audit-site`. Report a growing `$done`; the MCP server passes it on as `notifications/progress` or as `statusMessage` of a task. |
+| `leitvia_studio_mcp_confirm` | filter | `bool $confirm`, `string $ability`, `array $input` (arguments of the call with the values chosen so far) | Whether an MCP client with form elicitation asks the person before the call. By default for abilities annotated `destructive` whose name without namespace starts with `delete-`, `remove-` or `reject-` or is `rollback`, without `package` and without `dryRun`. A yes changes no permission. |
 
 A change package is a private post of the type `leitvia_package` whose author is the user who caused it. Meta `_leitvia_package_state` holds `open`, `applied`, `partial`, `rejected` or `rolled_back`, meta `_leitvia_package_key` the package key. `post_content` holds the operations as a JSON list, each with `id` (from 1), `ability`, `area`, `target` (`post` and `post_type`, or `option`; `media` names the file of an image of `leitvia/add-media` in the same package that becomes the featured image when applied), `base_hash` (the hash the change was based on, empty for a new object), `level`, `kinds`, `state` (the complete new state: the post fields `post_title`, `post_content`, `post_excerpt`, `post_status`, `post_name`, `post_parent`, `menu_order`; for posts, pages and entries of the content model also `post_date`, `terms` (term IDs by taxonomy) and under `meta_input` the featured image and the fields of the content model; for new posts any `meta_input`; or `value` for an option) and `findings`. Because every operation carries its base hash and full new state, a package can move between sites, for example from a staging copy to the live site, and be applied there only where the base hash still matches.
 
@@ -449,7 +503,7 @@ While the filter has entries, every page loads the script module `@leitvia/conse
 
 ## Organization
 
-`leitvia_studio_organization_details()` returns the organization behind the site from the Studio settings: `type` (`Organization` or a type of `LocalBusiness` from `LeitviaStudio\Organization\Organization::TYPES`), `name` and `url` of the site, `street`, `postal_code`, `city`, `country`, `phone`, `email`, `founding_date` (YYYY, YYYY-MM or YYYY-MM-DD), `founder`, `copyright_since` (YYYY or empty) and `copyright_holder`, `area_served` (list of places), `opening_hours` (list of `days`, `opens`, `closes` as HH:MM) and `same_as` (list of https addresses). Empty strings and lists where nothing is set.
+`leitvia_studio_organization_details()` returns the organization behind the site from the Studio settings: `type` (`Organization` or a type of `LocalBusiness` from `LeitviaStudio\Organization\Organization::TYPES`), `name` and `url` of the site, `description`, `logo` (media ID of the logo for structured data, 0 for the logo of the header), `street`, `postal_code`, `city`, `country`, `phone`, `email`, `founding_date` (YYYY, YYYY-MM or YYYY-MM-DD), `founder`, `copyright_since` (YYYY or empty) and `copyright_holder`, `area_served` (list of places), `opening_hours` (list of `days`, `opens`, `closes` as HH:MM) and `same_as` (list of https addresses). Empty strings and lists where nothing is set.
 
 `leitvia_studio_organization_schema()` returns the schema.org node with `@id` (`home_url( '/#organization' )`) that Studio prints on the front page and as publisher of posts. An add-on refers to it by `array( '@id' => … )` or uses the node whole, for example as `hiringOrganization` of a job posting. Neither function checks for an SEO plugin; call `leitvia_studio_seo_plugin_active()` before printing JSON-LD.
 
@@ -600,7 +654,7 @@ Activating the token set copies the faces into the global styles, so the font ke
 
 ## Versioning and deprecations
 
-`LEITVIA_STUDIO_API` changes only when a change breaks existing add-ons. Studio keeps accepting the previous API versions for two major Studio versions after such a change; `LEITVIA_STUDIO_API_MIN` is raised only then. Deprecated functions, fields and hooks keep working with a `_deprecated_function()` or `_deprecated_argument()` notice for two major Studio versions before they are removed. New registries and optional fields are added without changing the API version.
+`LEITVIA_STUDIO_API` rises by one when a change breaks existing add-ons or when a new registry appears, so an add-on that needs it can declare `requires_api` and is listed as incompatible on an older Studio instead of failing there. Studio keeps accepting the previous API versions for two major Studio versions after such a change; `LEITVIA_STUDIO_API_MIN` is raised only then. Deprecated functions, fields and hooks keep working with a `_deprecated_function()` or `_deprecated_argument()` notice for two major Studio versions before they are removed. New optional fields are added without changing the API version.
 
 ## REST
 

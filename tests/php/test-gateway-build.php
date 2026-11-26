@@ -168,7 +168,8 @@ class Test_Gateway_Build extends WP_UnitTestCase {
 		);
 		$this->assertIsArray( $result, is_wp_error( $result ) ? wp_json_encode( $result->get_error_data() ) : '' );
 		$this->assertSame( 'live', $result['mode'] );
-		$this->assertSame( array(), $result['findings'] );
+		// Texts the edits left as in the pattern are reported as sample text and hold nothing back.
+		$this->assertSame( array( 'leitvia/sample-text' ), array_values( array_unique( array_column( $result['findings'], 'check' ) ) ) );
 		$this->assertGreaterThan( 0, $result['snapshot'] );
 		$post = get_post( $result['target']['post'] );
 		$this->assertSame( 'page', $post->post_type );
@@ -424,6 +425,38 @@ class Test_Gateway_Build extends WP_UnitTestCase {
 		$this->assertWPError( Block_Edit::structure( $group( $para ), 'p:0.0', array( 'insert' => array( 'block' => 'core/buttons' ) ) ) );
 		$this->assertWPError( Block_Edit::structure( $group( $para ), 'p:0.0', array( 'insert' => array( 'block' => 'core/button', 'text' => 'No link' ) ) ) ); // phpcs:ignore WordPress.Arrays.ArrayDeclarationSpacing.AssociativeArrayFound -- One block.
 
+		// A marquee from its example with statements of its own: a list with one list item per statement.
+		$marquee = Block_Edit::structure(
+			$group( $para ),
+			'p:0.0',
+			array(
+				'insert' => array(
+					'block' => 'leitvia/marquee',
+					'inner' => array(
+						array(
+							'block' => 'core/list',
+							'inner' => array(
+								array(
+									'block' => 'core/list-item',
+									'text'  => 'Strategy',
+								),
+								array(
+									'block' => 'core/list-item',
+									'text'  => 'Press',
+								),
+							),
+						),
+					),
+				),
+			)
+		);
+		$this->assertIsString( $marquee, is_wp_error( $marquee ) ? $marquee->get_error_message() : '' );
+		$this->assertStringContainsString( 'wp-block-leitvia-marquee__track', $marquee );
+		$this->assertStringContainsString( '<li>Strategy</li>', $marquee );
+		$this->assertStringContainsString( '<li>Press</li>', $marquee );
+		$this->assertStringNotContainsString( 'Fast setup', $marquee );
+		$this->assertWPError( Block_Edit::structure( $group( $para ), 'p:0.0', array( 'insert' => array( 'block' => 'core/list' ) ) ) );
+
 		// bind: a binding of a registered source on an attribute WordPress binds, in insert and in an edit; null removes it.
 		$bound = Block_Edit::structure(
 			$group( $para ),
@@ -518,6 +551,38 @@ class Test_Gateway_Build extends WP_UnitTestCase {
 		$this->assertStringContainsString( '<table class="has-fixed-layout"><thead><tr><th scope="col">Sites</th><th scope="col">Price per year</th></tr></thead><tbody><tr><th scope="row">1</th><td>89 €</td></tr><tr><th scope="row">5</th><td>349 €</td></tr></tbody><tfoot><tr><th scope="row">Total</th><td>438 €</td></tr></tfoot></table><figcaption class="wp-element-caption">Prices per year</figcaption></figure>', $changed );
 		$parsed = parse_blocks( $changed )[0];
 		$this->assertSame( 'is-style-comparison', $parsed['attrs']['className'] );
+
+		// head is optional: a core/table without it has no header row, the rows take the width of the first.
+		$bare = Block_Edit::apply(
+			$table,
+			'p:0',
+			array(
+				'table' => array(
+					'rows'        => array( array( 'Topic', 'In short' ), array( 'Price', '89 €' ) ),
+					'row_headers' => false,
+				),
+			)
+		);
+		$this->assertIsString( $bare, is_wp_error( $bare ) ? $bare->get_error_message() : '' );
+		$this->assertStringContainsString( '<table class="has-fixed-layout"><tbody><tr><td>Topic</td><td>In short</td></tr><tr><td>Price</td><td>89 €</td></tr></tbody></table>', $bare );
+		$this->assertWPError( Block_Edit::apply( $table, 'p:0', array( 'table' => array( 'rows' => array( array( 'a', 'b' ), array( 'c' ) ) ) ) ), 'rows as long as the first' );
+		// A comparison table without head keeps its column names.
+		$kept = Block_Edit::apply( serialize_block( $block ), 'p:0', array( 'table' => array( 'rows' => array( array( 'Mid', '89 €', '3' ) ) ) ) );
+		$this->assertIsString( $kept, is_wp_error( $kept ) ? $kept->get_error_message() : '' );
+		$this->assertSame( array( 'Plan', 'Price', 'Hours' ), parse_blocks( $kept )[0]['attrs']['columns'] );
+
+		// New cells in a pattern section drop the sample caption of the pattern; in a post the caption stays.
+		$sample = '<!-- wp:table --><figure class="wp-block-table"><table class="has-fixed-layout"><tbody><tr><td>x</td></tr></tbody></table><figcaption class="wp-element-caption">Source: sample sheet</figcaption></figure><!-- /wp:table -->';
+		$edits  = array(
+			array(
+				'block' => 'p:0',
+				'table' => array( 'rows' => array( array( 'Price', '89 €' ) ) ),
+			),
+		);
+		$this->assertStringNotContainsString( 'sample sheet', (string) \LeitviaStudio\Gateway\Abilities\Build::edit( $sample, $edits, array( 'pattern' => 'leitvia/content-comparison' ) ) );
+		$this->assertStringContainsString( 'sample sheet', (string) \LeitviaStudio\Gateway\Abilities\Build::edit( $sample, $edits, array( 'post' => 1 ) ) );
+		$edits[0]['caption'] = 'Prices 2026';
+		$this->assertStringContainsString( 'Prices 2026', (string) \LeitviaStudio\Gateway\Abilities\Build::edit( $sample, $edits, array( 'pattern' => 'leitvia/content-comparison' ) ) );
 	}
 
 	/**
@@ -638,7 +703,7 @@ class Test_Gateway_Build extends WP_UnitTestCase {
 			$data = $this->assert_rejected( 'leitvia_pattern_not_approved', $page( 'block:' . $id ) );
 			$this->assertSame( 'leitvia/list-patterns', $data['next_ability'] );
 			$this->assertSame( 'block:' . $id, $data['target']['pattern'] );
-			$this->assertNotSame( 'approved', $data['status'] );
+			$this->assertNotSame( 'approved', $data['lab_status'] );
 		}
 		$this->assertSame( $pages, wp_count_posts( 'page' )->publish );
 	}
@@ -725,7 +790,7 @@ class Test_Gateway_Build extends WP_UnitTestCase {
 
 		$this->assert_rejected( 'leitvia_check_failed', self::call( 'leitvia/update-block', $level( 5 ) ) );
 		$this->assert_rejected( 'leitvia_invalid_input', self::call( 'leitvia/update-block', $level( 7 ) ) );
-		$data = $this->assert_rejected( 'leitvia_invalid_input', self::call( 'leitvia/update-block', array( 'attributes' => array( 'textAlign' => 'center' ) ) + $level( 2 ) ) );
+		$data = $this->assert_rejected( 'leitvia_invalid_input', self::call( 'leitvia/update-block', array( 'attributes' => array( 'textIndent' => '1em' ) ) + $level( 2 ) ) );
 		$this->assertSame( 'attributes', $data['reason'] );
 
 		$this->assertIsArray( self::call( 'leitvia/update-block', $level( 2 ) ) );
@@ -1135,6 +1200,22 @@ class Test_Gateway_Build extends WP_UnitTestCase {
 		$this->assertIsArray( $edge, is_wp_error( $edge ) ? wp_json_encode( $edge->get_error_data() ) : '' );
 		$this->assertSame( 50, wp_get_attachment_metadata( $edge['target']['post'] )['width'] );
 		$this->assertSame( 20, wp_get_attachment_metadata( $edge['target']['post'] )['height'] );
+		// square: the same rectangle centred on a transparent square PNG, at least min_size wide, never scaled up.
+		$square = $crop(
+			array(
+				'x'        => 75,
+				'y'        => 90,
+				'width'    => 25,
+				'height'   => 10,
+				'square'   => true,
+				'min_size' => 64,
+			)
+		);
+		$this->assertIsArray( $square, is_wp_error( $square ) ? wp_json_encode( $square->get_error_data() ) : '' );
+		$this->assertSame( 'image/png', get_post_mime_type( $square['target']['post'] ) );
+		$this->assertSame( array( 64, 64 ), array( wp_get_attachment_metadata( $square['target']['post'] )['width'], wp_get_attachment_metadata( $square['target']['post'] )['height'] ) );
+		$png = imagecreatefromstring( (string) file_get_contents( (string) get_attached_file( $square['target']['post'] ) ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Test file.
+		$this->assertSame( 127, imagecolorsforindex( $png, imagecolorat( $png, 0, 0 ) )['alpha'], 'transparent margin' );
 
 		// A query, not wp_count_posts(): its cached counts miss attachments the factory adds.
 		$attachments = static fn(): int => count(

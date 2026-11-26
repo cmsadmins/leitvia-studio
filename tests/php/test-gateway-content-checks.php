@@ -6,6 +6,7 @@
  */
 
 use LeitviaStudio\Gateway\Abilities\Read_Audit;
+use LeitviaStudio\Gateway\Block_Edit;
 use LeitviaStudio\Gateway\Content_Checks;
 use LeitviaStudio\Gateway\Gateway;
 use LeitviaStudio\Gateway\Hashes;
@@ -133,12 +134,59 @@ class Test_Gateway_Content_Checks extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The same decorative icon twice in one section is a warning at the second one, also when the mark above the steps
+	 * shares the icon of a step; other sections, labelled icons and different icons do not count.
+	 */
+	public function test_repeated_icons(): void {
+		$icon    = static fn( string $name, string $more = '' ): string => '<!-- wp:leitvia/icon {"icon":"' . $name . '"' . $more . '} /-->';
+		$section = static fn( string $inner ): string => '<!-- wp:group --><div class="wp-block-group">' . $inner . '</div><!-- /wp:group -->';
+		$found   = static fn( string $content ): array => array_map(
+			static fn( array $finding ): string => $finding['severity'] . ':' . $finding['block'],
+			Content_Checks::repeated_icons( $content, array( 'post_type' => 'page' ) )
+		);
+
+		$this->assertSame( array(), $found( $section( $icon( 'send' ) . $icon( 'phone' ) ) . $section( $icon( 'send' ) ) ) );
+		$this->assertSame( array( 'warning:p:1.2' ), $found( $section( $icon( 'eye' ) ) . $section( $icon( 'activity' ) . $icon( 'send' ) . $icon( 'send' ) ) ) );
+		$this->assertSame( array( 'warning:p:0.1.0' ), $found( $section( $icon( 'activity' ) . $section( $icon( 'activity' ) ) ) ), 'mark and step' );
+		$this->assertSame( array(), $found( $section( $icon( 'mail', ',"label":"Mail","url":"mailto:a@example.org"' ) . $icon( 'mail' ) ) ), 'labelled' );
+		$this->assertSame( array(), $found( $section( $icon( 'quote' ) . $icon( 'quote' ) ) ), 'signs' );
+	}
+
+	/**
+	 * A section that still holds a text of its pattern word for word, such as the sample citation of content-quote, is a
+	 * warning at that block; a new citation, an empty one and pages without patterns pass.
+	 */
+	public function test_sample_text(): void {
+		// The patterns of the theme register on init for the theme active then; set_up switched to it after.
+		_register_theme_block_patterns();
+		$pattern = \WP_Block_Patterns_Registry::get_instance()->get_registered( 'leitvia/content-quote' );
+		$this->assertNotNull( $pattern );
+		$content = str_replace( '"metadata":{"name":"Quote"}', '"metadata":{"name":"Quote","patternName":"leitvia/content-quote"}', (string) $pattern['content'] );
+		$found   = static fn( string $content ): array => array_map(
+			static fn( array $finding ): string => $finding['severity'] . ':' . $finding['block'],
+			Content_Checks::sample_text( $content, array( 'post_type' => 'page' ) )
+		);
+
+		$this->assertSame( array( 'warning:p:0.0', 'warning:p:0.0.0' ), $found( $content ), 'citation and quote text' );
+		$cite = Block_Edit::apply( $content, 'p:0.0', array( 'text' => '' ) );
+		$this->assertIsString( $cite );
+		$this->assertSame( array( 'warning:p:0.0.0' ), $found( $cite ), 'empty citation' );
+		$this->assertSame( array(), $found( str_replace( ',"patternName":"leitvia/content-quote"', '', $content ) ), 'no pattern' );
+
+		// The heading of a pattern that lists posts of the site is its standard label, not a sample.
+		$news = \WP_Block_Patterns_Registry::get_instance()->get_registered( 'leitvia/teaser-related-news' );
+		$this->assertNotNull( $news );
+		$this->assertStringContainsString( 'News on this topic', (string) $news['content'] );
+		$this->assertSame( array(), $found( str_replace( '"metadata":{"name":"Related news"}', '"metadata":{"name":"Related news","patternName":"leitvia/teaser-related-news"}', (string) $news['content'] ) ), 'related news' );
+	}
+
+	/**
 	 * Studio registers its checks with the scopes content and page; post types without the editor are skipped.
 	 */
 	public function test_registry(): void {
 		$checks = leitvia_studio()->registry( 'checks' );
 		$this->assertSame(
-			array( 'leitvia/headings', 'leitvia/alt-text', 'leitvia/link-text', 'leitvia/block-validity', 'leitvia/unregistered', 'leitvia/shortcodes', 'leitvia/image-height', 'leitvia/anchors', 'leitvia/content-tokens', 'leitvia/content-contrast', 'leitvia/query-context', 'leitvia/bindings', 'leitvia/template-parts' ),
+			array( 'leitvia/headings', 'leitvia/alt-text', 'leitvia/link-text', 'leitvia/block-validity', 'leitvia/unregistered', 'leitvia/shortcodes', 'leitvia/image-height', 'leitvia/anchors', 'leitvia/content-tokens', 'leitvia/content-contrast', 'leitvia/query-context', 'leitvia/bindings', 'leitvia/template-parts', 'leitvia/repeated-icons', 'leitvia/sample-text' ),
 			array_keys( $checks->all( array( 'scope' => 'content' ) ) )
 		);
 		$this->assertSame( array( 'leitvia/page-structure', 'leitvia/composition' ), array_keys( $checks->all( array( 'scope' => 'page' ) ) ) );
@@ -723,6 +771,76 @@ class Test_Gateway_Content_Checks extends WP_UnitTestCase {
 		update_option( 'leitvia_studio_settings', array( 'news_categories' => array( self::factory()->category->create() ) ) );
 		$this->assertSame( array(), $site() );
 		$this->assertArrayNotHasKey( 'site', wp_get_ability( 'leitvia/audit-site' )->execute( array( 'after' => $post ) ) );
+	}
+
+	/**
+	 * A published author page or a profile of the same name with a description or a page counts as biography of a news
+	 * author; the biography of the account only for an author without a name of their own.
+	 */
+	public function test_audit_site_author_bio_from_page_or_profile(): void {
+		$bio    = static fn(): array => wp_list_filter( wp_get_ability( 'leitvia/audit-site' )->execute( array( 'limit' => 1 ) )['site'], array( 'check' => 'leitvia/author-bio' ) );
+		$author = self::factory()->user->create( array( 'role' => 'author' ) );
+		$post   = self::factory()->post->create(
+			array(
+				'post_author' => $author,
+				'meta_input'  => array( '_leitvia_author_name' => 'Ada Example' ),
+			)
+		);
+		$this->assertCount( 1, $bio() );
+		$this->assertStringContainsString( 'Ada Example', array_values( $bio() )[0]['message'] );
+		update_user_meta( $author, 'description', 'Account biography.' );
+		$this->assertCount( 1, $bio(), 'the account biography is not the biography of another name' );
+
+		$page = self::factory()->post->create( array( 'post_type' => 'page' ) );
+		update_post_meta( $post, '_leitvia_author_page', $page );
+		$this->assertSame( array(), $bio(), 'author page' );
+
+		delete_post_meta( $post, '_leitvia_author_page' );
+		update_option(
+			'leitvia_studio_settings',
+			array(
+				'organization_people' => array(
+					array(
+						'name'        => 'ada example',
+						'description' => 'Writes about bikes.',
+					),
+				),
+			)
+		);
+		$this->assertSame( array(), $bio(), 'profile with a description' );
+		update_option(
+			'leitvia_studio_settings',
+			array(
+				'organization_people' => array(
+					array(
+						'name' => 'Ada Example',
+						'page' => $page,
+					),
+				),
+			)
+		);
+		$this->assertSame( array(), $bio(), 'profile with a page' );
+	}
+
+	/**
+	 * Shortcodes inside code and pre are explained examples, not rests of a builder; legal checks look at pages only.
+	 */
+	public function test_audit_skips_code_and_non_pages_for_legal(): void {
+		$this->assertSame( array(), Content_Checks::unknown_shortcodes( '<!-- wp:paragraph --><p>Use <code>[web_root]</code> or <code>[vc_row]</code>.</p><!-- /wp:paragraph -->' ) );
+		$this->assertCount( 1, Content_Checks::unknown_shortcodes( '<!-- wp:paragraph --><p>[vc_row] <code>[web_root]</code></p><!-- /wp:paragraph -->' ) );
+
+		// A post stands in for a docs or glossary entry that explains the term.
+		$entry = self::factory()->post->create( array( 'post_name' => 'impressum' ) );
+		$page  = self::factory()->post->create(
+			array(
+				'post_type' => 'page',
+				'post_name' => 'impressum',
+			)
+		);
+		$items = array_column( wp_get_ability( 'leitvia/audit-site' )->execute( array( 'after' => $entry - 1 ) )['items'], null, 'post' );
+		$this->assertArrayHasKey( $page, $items );
+		$this->assertNotEmpty( wp_list_filter( $items[ $page ]['findings'], array( 'check' => 'leitvia/page-kind' ) ) );
+		$this->assertEmpty( wp_list_filter( $items[ $entry ]['findings'], array( 'check' => 'leitvia/page-kind' ) ) );
 	}
 
 	/**

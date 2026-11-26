@@ -51,30 +51,6 @@ class Test_Gateway_Mcp extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Double of WP\MCP\Core\McpAdapter: records the arguments of create_server().
-	 */
-	private static function adapter(): object {
-		return new class() {
-			/**
-			 * Arguments of each create_server() call.
-			 *
-			 * @var list<array<int, mixed>>
-			 */
-			public array $servers = array();
-
-			/**
-			 * Records the call.
-			 *
-			 * @param mixed ...$args Server arguments.
-			 */
-			public function create_server( ...$args ): bool {
-				$this->servers[] = $args;
-				return true;
-			}
-		};
-	}
-
-	/**
 	 * Double of WP\MCP\Core\McpServer: only the server ID.
 	 *
 	 * @param string $id Server ID.
@@ -222,57 +198,35 @@ class Test_Gateway_Mcp extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Without the adapter the hook never fires: nothing registered, no output, a reason for the Agents page.
+	 * Studio serves its own server and registers none with the adapter; its default server stays a second way.
 	 */
-	public function test_without_adapter_nothing_happens(): void {
-		$this->assertFalse( defined( 'WP_MCP_VERSION' ) );
-		$this->assertSame( 10, has_action( 'mcp_adapter_init', array( Mcp::class, 'register' ) ) );
+	public function test_own_server_without_adapter(): void {
+		$this->assertFalse( has_action( 'mcp_adapter_init' ) );
 		$status = Mcp::status();
-		$this->assertFalse( $status['ready'] );
-		$this->assertStringContainsString( 'MCP Adapter', $status['reason'] );
-		$adapter = self::adapter();
-		ob_start();
-		Mcp::register( $adapter );
-		$this->assertSame( '', ob_get_clean() );
-		$this->assertSame( array(), $adapter->servers );
+		$this->assertTrue( $status['ready'] );
+		$this->assertSame( '', $status['reason'] );
+		$this->assertSame( array( '2026-07-28', '2025-11-25' ), $status['protocols'] );
+		$this->assertStringEndsWith( '/leitvia-studio/v1/mcp', $status['url'] );
+		$this->assertSame( Mcp::version(), $status['version'] );
 	}
 
 	/**
-	 * A supported adapter gets exactly one server leitvia with the tool list and the HTTP transport.
+	 * A rejection as array with code, message and data, the form tool results carry.
 	 */
-	public function test_supported_adapter_gets_one_server(): void {
-		$adapter = self::adapter();
-		Mcp::register( $adapter, '0.7.1' );
-		$this->assertCount( 1, $adapter->servers );
-		$args = $adapter->servers[0];
-		$this->assertSame( 'leitvia', $args[0] );
-		$this->assertSame( 'leitvia-studio/v1', $args[1] );
-		$this->assertSame( 'mcp', $args[2] );
-		$this->assertSame( array( 'WP\\MCP\\Transport\\HttpTransport' ), $args[6] );
-		$this->assertSame( Mcp::abilities(), $args[9] );
-		$this->assertSame( array( Abilities::class, 'can_use' ), $args[12] );
-		$this->assertTrue( call_user_func( $args[12] ) );
-		$this->assertTrue( Mcp::status( '0.7.1' )['ready'] );
-		$this->assertStringEndsWith( '/leitvia-studio/v1/mcp', Mcp::status( '0.7.1' )['url'] );
+	public function test_details_of_a_rejection(): void {
+		$error = new WP_Error( 'leitvia_stale_hash', 'Stale.', array( 'current_hash' => 'abc' ) );
+		$this->assertSame(
+			array(
+				'code'    => 'leitvia_stale_hash',
+				'message' => 'Stale.',
+				'data'    => array( 'current_hash' => 'abc' ),
+			),
+			Mcp::details( $error )
+		);
 	}
 
 	/**
-	 * Another adapter series registers nothing and names the installed and the supported version.
-	 */
-	public function test_unsupported_version_registers_nothing(): void {
-		foreach ( array( '0.6.0', '0.8.0', '1.0.0' ) as $version ) {
-			$adapter = self::adapter();
-			Mcp::register( $adapter, $version );
-			$this->assertSame( array(), $adapter->servers, $version );
-			$status = Mcp::status( $version );
-			$this->assertFalse( $status['ready'] );
-			$this->assertStringContainsString( $version, $status['reason'] );
-			$this->assertStringContainsString( '0.7.x', $status['reason'] );
-		}
-	}
-
-	/**
-	 * Rejections over the server leitvia keep code and data as JSON message; other servers and results stay as they are.
+	 * Rejections of Leitvia abilities keep code and data as JSON message; others and results stay as they are.
 	 */
 	public function test_error_details_only_for_leitvia(): void {
 		$data   = array(
@@ -281,7 +235,7 @@ class Test_Gateway_Mcp extends WP_UnitTestCase {
 			'retry'        => 'once',
 		);
 		$error  = new WP_Error( 'leitvia_stale_hash', 'Stale.', $data );
-		$result = Mcp::error_details( $error, array(), 'leitvia-update-content', null, self::server( 'leitvia' ) );
+		$result = Mcp::error_details( $error, array(), 'leitvia-update-content', self::tool( 'leitvia/update-content' ), self::server( 'mcp-adapter-default-server' ) );
 		$this->assertWPError( $result );
 		$this->assertSame(
 			array(
@@ -296,7 +250,8 @@ class Test_Gateway_Mcp extends WP_UnitTestCase {
 			json_decode( $result->get_error_message(), true )
 		);
 		$this->assertSame( $error, Mcp::error_details( $error, array(), 'x', null, self::server( 'mcp-adapter-default-server' ) ) );
-		$this->assertSame( array( 'ok' => true ), Mcp::error_details( array( 'ok' => true ), array(), 'x', null, self::server( 'leitvia' ) ) );
+		$this->assertSame( $error, Mcp::error_details( $error, array(), 'x', null, self::server( 'leitvia' ) ) );
+		$this->assertSame( array( 'ok' => true ), Mcp::error_details( array( 'ok' => true ), array(), 'x', null, self::server( 'mcp-adapter-default-server' ) ) );
 	}
 
 	/**

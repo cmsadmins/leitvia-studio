@@ -126,6 +126,16 @@ class Test_News_Google extends WP_UnitTestCase {
 		update_option( 'show_on_front', 'page' );
 		update_option( 'page_on_front', $page );
 		$this->assertSame( 'Opening hours of the harbour office', $title( $page ) );
+		// Without a stored title WordPress builds name and tagline, joined by the same separator.
+		update_option( 'blogdescription', 'News from the harbour' );
+		update_option( 'page_on_front', $named );
+		delete_post_meta( $named, $meta );
+		$this->go_to( home_url( '/' ) );
+		$this->assertSame( 'Harbour Notes | News from the harbour', html_entity_decode( wp_get_document_title(), ENT_QUOTES, 'UTF-8' ) );
+		// The title of the front page may join name and claim (FRONT_TITLE_MAX), other titles keep to TITLE_MAX.
+		$claim = str_repeat( 'a', 72 );
+		$this->assertIsArray( \LeitviaStudio\Gateway\Abilities\Seo::texts( array( 'title' => $claim ), array( 'post' => $named ) ) );
+		$this->assertWPError( \LeitviaStudio\Gateway\Abilities\Seo::texts( array( 'title' => $claim ), array( 'post' => $page ) ) );
 		update_option( 'show_on_front', 'posts' );
 
 		update_option( \LeitviaStudio\Admin\Settings::OPTION, array( 'title_site_name' => false ) + (array) get_option( \LeitviaStudio\Admin\Settings::OPTION, array() ) );

@@ -12,4 +12,4 @@ composer.lock
 node_modules/
 vendor/
 .wordpress-org/
-README.md
+/README.md

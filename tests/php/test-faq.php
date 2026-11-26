@@ -104,6 +104,16 @@ class Test_Faq extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A shortcode in a question or answer (a price of an add-on) is resolved in the structured data as on the page.
+	 */
+	public function test_answers_resolve_shortcodes(): void {
+		add_shortcode( 'leitvia_test_price', static fn(): string => '519 €' );
+		$nodes = \LeitviaStudio\Blocks\Faq::questions( array( array( 'What does it cost?', '<p>From [leitvia_test_price] per month.</p>' ) ) );
+		remove_shortcode( 'leitvia_test_price' );
+		$this->assertSame( '<p>From 519 € per month.</p>', $nodes[0]['acceptedAnswer']['text'] );
+	}
+
+	/**
 	 * Two FAQ blocks give one FAQPage node; a block rendered twice adds no question twice.
 	 */
 	public function test_one_node_per_page(): void {

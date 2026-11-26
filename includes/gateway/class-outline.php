@@ -107,6 +107,17 @@ final class Outline {
 	}
 
 	/**
+	 * Block tree of markup that is no post, such as a pattern (leitvia/get-pattern): the nodes of the page outline,
+	 * with the path IDs (p:0.1.2) edits of compose-page and replace-pattern name.
+	 *
+	 * @param string $content Block markup.
+	 * @return list<array<string, mixed>>
+	 */
+	public static function markup( string $content ): array {
+		return self::tree( Block_Ids::blocks( parse_blocks( $content ) ), 'p:' );
+	}
+
+	/**
 	 * A parsed block and its path ID, found by leitviaId or path ID; null when there is none.
 	 *
 	 * @param list<array<string, mixed>> $blocks Parsed blocks without whitespace, see Block_Ids::blocks().
@@ -153,10 +164,12 @@ final class Outline {
 	private static function tree( array $blocks, string $path ): array {
 		$nodes = array();
 		foreach ( $blocks as $index => $block ) {
+			// A shortcode block keeps its shortcode, so an agent sees which one it is; other blocks show the text the
+			// page shows, with a bound price ([leitvia_price] of an add-on) resolved.
 			$here       = $path . $index;
 			$serialized = serialize_block( $block );
 			$attrs      = (array) $block['attrs'];
-			$text       = trim( (string) preg_replace( '/\s+/u', ' ', html_entity_decode( wp_strip_all_tags( (string) $block['innerHTML'] ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) ) );
+			$text       = self::plain( (string) $block['innerHTML'], 'core/shortcode' !== $block['blockName'] );
 			$node       = array(
 				'id'        => self::key( $block, $here ),
 				'id_stable' => '' !== Block_Ids::id( $block ),
@@ -188,6 +201,28 @@ final class Outline {
 			$nodes[] = $node;
 		}
 		return $nodes;
+	}
+
+	/**
+	 * Plain text of block markup as a reader sees it: shortcodes resolved, no tags, entities decoded, white space on one
+	 * line. The outline, the table of contents and the places of findings share it.
+	 *
+	 * @param string $html       Markup.
+	 * @param bool   $shortcodes Whether to resolve shortcodes.
+	 */
+	public static function plain( string $html, bool $shortcodes = true ): string {
+		$html = $shortcodes && str_contains( $html, '[' ) ? do_shortcode( $html ) : $html;
+		return self::one_line( html_entity_decode( wp_strip_all_tags( $html ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
+	}
+
+	/**
+	 * A text on one line: each run of spaces, tabs and line breaks becomes one space. Non-breaking spaces (U+00A0,
+	 * U+202F, U+2007) stay, as they hold "ab 14,90 €" or "10 %" together; \s of a /u pattern would take them too.
+	 *
+	 * @param string $text Text.
+	 */
+	public static function one_line( string $text ): string {
+		return trim( (string) preg_replace( '/[^\S\x{00A0}\x{202F}\x{2007}]+/u', ' ', $text ) );
 	}
 
 	/**

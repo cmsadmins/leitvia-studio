@@ -116,6 +116,40 @@ class Test_Page_Symbol extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The field breadcrumbs false hides the breadcrumbs block of the template on that page alone, get-seo shows it, true shows
+	 * them again; a post is refused.
+	 */
+	public function test_breadcrumbs_hidden_on_a_page(): void {
+		$page  = self::factory()->post->create(
+			array(
+				'post_type'   => 'page',
+				'post_status' => 'publish',
+				'post_title'  => 'Consulting',
+			)
+		);
+		$other = self::factory()->post->create(
+			array(
+				'post_type'   => 'page',
+				'post_status' => 'publish',
+				'post_title'  => 'Contact',
+			)
+		);
+		$this->assertNotWPError( self::structure( $page, array( 'breadcrumbs' => false ) ) );
+		$this->assertSame( '1', get_post_meta( $page, Cluster::NO_BREADCRUMBS_META, true ) );
+		$this->assertFalse( wp_get_ability( 'leitvia/get-seo' )->execute( array( 'posts' => array( $page ) ) )['items'][0]['structure']['breadcrumbs'] );
+
+		$this->go_to( get_permalink( $page ) );
+		$this->assertSame( '', do_blocks( '<!-- wp:breadcrumbs /-->' ) );
+		$this->go_to( get_permalink( $other ) );
+		$this->assertNull( Cluster::hide_breadcrumbs( null, array( 'blockName' => 'core/breadcrumbs' ) ), 'other pages keep their trail' );
+
+		$this->assertNotWPError( self::structure( $page, array( 'breadcrumbs' => true ) ) );
+		$this->assertSame( '', get_post_meta( $page, Cluster::NO_BREADCRUMBS_META, true ) );
+		$post = self::factory()->post->create( array( 'post_status' => 'publish' ) );
+		$this->assertWPError( self::structure( $post, array( 'breadcrumbs' => false ) ) );
+	}
+
+	/**
 	 * An entry with a page of its own (here a type of the content model, as documentation pages) takes only hub, like a
 	 * post; its template shows the card at the end on every screen, without the class for small screens.
 	 */

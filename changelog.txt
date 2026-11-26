@@ -1,6 +1,11 @@
-== Changelog of Leitvia Studio, versions 1.0.0 to 1.3.54 ==
+== Changelog of Leitvia Studio, versions 1.0.0 to 1.3.55 ==
 
 Newer versions are listed in readme.txt.
+
+= 1.3.55 =
+* New: leitvia/set-page-structure accepts package for posts with hub, so many posts fit in one package.
+* New: leitvia/update-seo takes archive (post type key) to set title and description of an archive without an SEO plugin; the change waits as a setting in a package.
+* Change: New fields a building block declares after an update join the stored content model on the next request; add-building-block need not run again.
 
 = 1.3.54 =
 * Change: Recipes recognize the sample links of the theme footers by their missing address (Leitvia 1.2.59 and later) as well as by "#", and put the pages of footerNavigation in their place.

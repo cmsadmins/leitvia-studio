@@ -125,6 +125,20 @@ class Test_Gateway_Outline extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The text of a block is the one the page shows: a shortcode such as a bound price resolved, non-breaking spaces
+	 * kept. A shortcode block keeps its shortcode, so an agent sees which one it is.
+	 */
+	public function test_outline_text_as_shown(): void {
+		add_shortcode( 'leitvia_test_price', static fn(): string => "<strong>149\u{00A0}€</strong>" );
+		$content = '<!-- wp:paragraph --><p>Setup once for ab&nbsp;[leitvia_test_price]  only.</p><!-- /wp:paragraph -->'
+			. '<!-- wp:shortcode -->[leitvia_test_price]<!-- /wp:shortcode -->';
+		$outline = self::ability( 'leitvia/get-page-outline', array( 'post' => $this->page( $content, false ) ) );
+		remove_shortcode( 'leitvia_test_price' );
+		$this->assertSame( "Setup once for ab\u{00A0}149\u{00A0}€ only.", $outline['blocks'][0]['text'] );
+		$this->assertSame( '[leitvia_test_price]', $outline['blocks'][1]['text'] );
+	}
+
+	/**
 	 * Image and cover blocks name their image: attachment ID from the attributes, else from wp-image-<id>, alt text or
 	 * null without alt attribute, and the decorative mark. A cover without an image and other blocks have no key image.
 	 */

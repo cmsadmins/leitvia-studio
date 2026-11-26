@@ -5,6 +5,7 @@
 			"@type": "ProfilePage",
 			"mainEntity": {
 				"@type": "Person",
+				"@id": "http://example.org/#person-mara-lindqvist",
 				"name": "Mara Lindqvist",
 				"url": "http://example.org/author/mara/",
 				"description": "Mara writes about design systems & accessible publishing."

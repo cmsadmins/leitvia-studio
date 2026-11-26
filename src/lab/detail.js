@@ -17,6 +17,7 @@ import Loading from '../admin/loading';
 import Breadcrumbs from '../admin/breadcrumbs';
 import PreviewFrame from './preview-frame';
 import MetaForm from './meta-form';
+import ReviewForm from './review-form';
 import {
 	STATUS_RANK,
 	VIEWPORTS,
@@ -314,6 +315,13 @@ export default function Detail( { patternRef } ) {
 						block={ block }
 						onSaved={ reload }
 					/>
+					{ ! block && item.reviewable && settings.canReview && (
+						<ReviewForm
+							key={ item.ref }
+							item={ item }
+							onSaved={ reload }
+						/>
+					) }
 				</Flex>
 			</div>
 		</Flex>

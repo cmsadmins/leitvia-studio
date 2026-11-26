@@ -28,6 +28,12 @@ defined( 'ABSPATH' ) || exit;
 final class Maintain {
 
 	/**
+	 * Icons for copies of an entry in a section that moved to another pattern, in this order, each only where the
+	 * section does not use it yet.
+	 */
+	private const SPARE_ICONS = array( 'circle-check', 'flag', 'target', 'lightbulb', 'rocket', 'award', 'star', 'sparkles', 'calendar', 'clipboard-check', 'handshake', 'settings' );
+
+	/**
 	 * Most items of one call of set-alt-text.
 	 */
 	public const MAX_ALT_TEXTS = 100;
@@ -73,7 +79,7 @@ final class Maintain {
 		Abilities::write(
 			'leitvia/update-content',
 			__( 'Update content', 'leitvia-studio' ),
-			__( 'Updates title, excerpt, slug, date, status, author, terms, fields, rows of repeaters, featured image, comment status and the texts and button links of several blocks of one post in one operation, blocks found by their ID from the outline. Per block, url changes the one link of a text too, link_text names the part that stays linked, add_link sets a new link on a passage and caption the caption of a figure, as in leitvia/update-block. status publishes a draft, schedules it (future, with a date) or takes a post back to draft or pending; like every change it follows the autonomy level, so at a lower level it waits in a change package, and publishing needs the right to publish when it is applied. Terms, fields, rows, featured image and template follow the rules of leitvia/create-content; terms replace those of their taxonomy, and template switches the post to another template of the contract (page-landing for a page). Instead of blocks, content replaces the whole content with block markup, for example to turn classic content into blocks; the new content may hold no classic block. parent moves a page below another page of the same type, 0 to the top level; a page cannot go below itself or one of its subpages. Read the post with leitvia/get-page-outline first and send its hash as base_hash. A slug or parent change is a URL change and lands at most as a suggestion; after a slug change leitvia/repair-links with auto points the links of other posts to the new address, after a parent change leitvia/repair-links with from and to. For attributes or images of a block use leitvia/update-block.', 'leitvia-studio' ),
+			__( 'Updates title, excerpt, slug, date, status, author, terms, fields, rows of repeaters, featured image, comment status and the texts and button links of several blocks of one post in one operation, blocks found by their ID from the outline. Per block, url changes the one link of a text too, link_text names the part that stays linked, add_link sets a new link on a passage, replace_text changes words in a text and keeps its links and inline formatting, and caption the caption of a figure, as in leitvia/update-block. status publishes a draft, schedules it (future, with a date) or takes a post back to draft or pending; like every change it follows the autonomy level, so at a lower level it waits in a change package, and publishing needs the right to publish when it is applied. Terms, fields, rows, featured image and template follow the rules of leitvia/create-content; terms replace those of their taxonomy, and template switches the post to another template of the contract (page-landing for a page). Instead of blocks, content replaces the whole content with block markup, for example to turn classic content into blocks; the new content may hold no classic block. parent moves a page below another page of the same type, 0 to the top level; a page cannot go below itself or one of its subpages. Read the post with leitvia/get-page-outline first and send its hash as base_hash. A slug or parent change is a URL change and lands at most as a suggestion; after a slug change leitvia/repair-links with auto points the links of other posts to the new address, after a parent change leitvia/repair-links with from and to. For attributes or images of a block use leitvia/update-block.', 'leitvia-studio' ),
 			'maintain',
 			$overwrite,
 			array(
@@ -98,30 +104,31 @@ final class Maintain {
 						'items'    => array(
 							'type'                 => 'object',
 							'properties'           => array(
-								'block'     => array(
+								'block'        => array(
 									'type'        => 'string',
 									'minLength'   => 1,
 									'maxLength'   => 200,
 									'description' => __( 'Block ID or path ID from the outline.', 'leitvia-studio' ),
 								),
-								'text'      => array(
+								'text'         => array(
 									'type'        => 'string',
 									'maxLength'   => 5000,
 									'description' => __( 'Plain text of a paragraph, heading, list item or button.', 'leitvia-studio' ),
 								),
-								'link_text' => array(
+								'link_text'    => array(
 									'type'        => 'string',
 									'minLength'   => 1,
 									'maxLength'   => 500,
 									'description' => __( 'Part of text that stays linked when the text holds a link, such as the mail address in a contact line; with url it links that part of a text without a link. Without it the link stays around its old text, and a text without that is refused unless the link only points to #.', 'leitvia-studio' ),
 								),
-								'url'       => array(
+								'url'          => array(
 									'type'        => 'string',
 									'maxLength'   => 2000,
 									'description' => __( 'Link of a button, or of the one link in a paragraph, heading or list item (mailto: and tel: work too).', 'leitvia-studio' ),
 								),
-								'add_link'  => Build::add_link_schema(),
-								'caption'   => Build::caption_schema(),
+								'add_link'     => Build::add_link_schema(),
+								'replace_text' => Build::replace_text_schema(),
+								'caption'      => Build::caption_schema(),
 							),
 							'required'             => array( 'block' ),
 							'additionalProperties' => false,
@@ -146,6 +153,11 @@ final class Maintain {
 					'rows'           => Content::rows_schema(),
 					'featured_image' => Content::image_schema( false ),
 					'comment_status' => Content::comment_status_schema(),
+					'kind'           => array(
+						'type'        => 'string',
+						'enum'        => array_merge( array( '' ), Build::PAGE_KINDS ),
+						'description' => __( 'Kind of the page, such as imprint or privacy for a legal text that was imported or written before; empty clears it. A legal kind (imprint, privacy, terms, withdrawal, accessibility) keeps the page at suggest: the change waits in a package for a person.', 'leitvia-studio' ),
+					),
 					'template'       => array(
 						'type'        => 'string',
 						'pattern'     => '^[a-z0-9-]*$',
@@ -262,7 +274,7 @@ final class Maintain {
 		Abilities::write(
 			'leitvia/replace-pattern',
 			__( 'Replace pattern', 'leitvia-studio' ),
-			__( 'Replaces top-level sections of one post with another pattern. Without pattern the sections that use a deprecated pattern (metadata.patternName) get the replacement the contract names, all of them or the one given by block; leitvia/audit-site reports such posts, and a section without replacement is rejected with leitvia_no_replacement. With pattern the one section given by block gets that pattern, any approved one of leitvia/list-patterns, with edits at block IDs of its outline as in leitvia/compose-page (text, link, image, caption, catalog attributes such as the level of a heading, anchor, columns of a grid, remove, repeat and insert; they apply in order, and after a remove the later blocks of the same parent move up one place): so a section of an existing page changes its pattern. Texts and button links of the old section move over in order per block type (carry false keeps the texts of the pattern), then the edits apply and win; the HTML anchor of the old section does not move over, set it again with an anchor edit. The base hash is the hash of the post from leitvia/get-page-outline.', 'leitvia-studio' ),
+			__( 'Replaces top-level sections of one post with another pattern. Without pattern the sections that use a deprecated pattern (metadata.patternName) get the replacement the contract names, all of them or the one given by block; the one given by block also gets the successor of an older pattern (successor in leitvia/list-patterns, such as leitvia-studio/teaser-icon-areas for leitvia/teaser-services); leitvia/audit-site reports such posts, and a section without replacement is rejected with leitvia_no_replacement. With pattern the one section given by block gets that pattern, any approved one of leitvia/list-patterns, with edits at block IDs of its outline as in leitvia/compose-page (text, link, image, caption, catalog attributes such as the level of a heading, anchor, columns of a grid, remove, repeat and insert; they apply in order, and after a remove the later blocks of the same parent move up one place): so a section of an existing page changes its pattern. Texts and button links of the old section move over in order per block type (carry false keeps the texts of the pattern); a section of entries such as services or steps moves over entry by entry, with as many entries as before, headings, eyebrows, texts, links and icons by role (an eyebrow without a heading becomes the heading, labels count the steps), and texts and sample links of the pattern without a counterpart are removed, a group whose blocks all go as a whole. The edits name the path IDs of the pattern (outline of leitvia/get-pattern) and apply first; carry leaves the blocks they change, so they win and stay without a counterpart, such as a key figure the old section lacked. The HTML anchor of the old section does not move over, set it again with an anchor edit. The base hash is the hash of the post from leitvia/get-page-outline.', 'leitvia-studio' ),
 			'maintain',
 			$overwrite,
 			array(
@@ -303,7 +315,7 @@ final class Maintain {
 		Abilities::write(
 			'leitvia/insert-section',
 			__( 'Insert section', 'leitvia-studio' ),
-			__( 'Inserts sections into the content of an existing post, page or entry, or moves one of its top-level sections; the rest of the content stays as it is. sections takes patterns with edits as in leitvia/compose-page, with the same checks; move takes the ID of a top-level section of the post instead. The place is after or before a top-level section (block ID or path ID from the outline) or position start or end; without a place the sections go to the end. wrap takes the ID of a top-level block instead, for example a shortcode or a block of another plugin, and puts it unchanged into a new section at its place: full width with the spacing of a section, the ground surface, surface-alt or inverse, and with heading an h2 above it. template switches the post to another template of the contract in the same operation, so a page with the template page gets a hero with its h1 and page-landing, which prints no title, at once and keeps its other blocks as they are. An anchor of a new section must be unique on the whole page. Read the post with leitvia/get-page-outline first and send its hash as base_hash. leitvia/remove-section takes a section out, leitvia/replace-pattern gives one another pattern.', 'leitvia-studio' ),
+			__( 'Inserts sections into the content of an existing post, page or entry, or moves one of its top-level sections; the rest of the content stays as it is. sections takes patterns with edits as in leitvia/compose-page, with the same checks; move takes the ID of a top-level section of the post instead. The place is after or before a top-level section (block ID or path ID from the outline) or position start or end; without a place the sections go to the end. wrap takes the ID of a top-level block instead, for example a shortcode or a block of another plugin, and puts it unchanged into a new section at its place: full width with the spacing of a section, the ground surface, surface-alt or inverse, and with heading an h2 above it. faq turns a range of top-level blocks (from and to, IDs from the outline) into one section of leitvia/content-faq at its place: each question is a heading, a paragraph that starts with a bold question (the rest of the paragraph starts the answer) or a short paragraph of its own that ends with a question mark, and the blocks up to the next question are its answer. The answers keep their blocks with code, bold, italics and links; the summary keeps the formatting of the question without links, and the id of a heading moves to its question. heading is the h2 of the section, intro the text below it (empty for none). template switches the post to another template of the contract in the same operation, so a page with the template page gets a hero with its h1 and page-landing, which prints no title, at once and keeps its other blocks as they are. An anchor of a new section must be unique on the whole page. Read the post with leitvia/get-page-outline first and send its hash as base_hash. leitvia/remove-section takes a section out, leitvia/replace-pattern gives one another pattern.', 'leitvia-studio' ),
 			'maintain',
 			$insert,
 			array(
@@ -329,6 +341,27 @@ final class Maintain {
 							),
 						),
 						'required'             => array( 'block' ),
+						'additionalProperties' => false,
+					),
+					'faq'      => array(
+						'type'                 => 'object',
+						'description'          => __( 'A range of top-level blocks with questions and answers that becomes one section of leitvia/content-faq at its place, instead of sections, move or wrap.', 'leitvia-studio' ),
+						'properties'           => array(
+							'from'    => $place( __( 'Block ID or path ID of the first top-level block of the range, a question.', 'leitvia-studio' ) ),
+							'to'      => $place( __( 'Block ID or path ID of the last top-level block of the range, part of the last answer.', 'leitvia-studio' ) ),
+							'heading' => array(
+								'type'        => 'string',
+								'minLength'   => 1,
+								'maxLength'   => 200,
+								'description' => __( 'Text of the h2 of the section.', 'leitvia-studio' ),
+							),
+							'intro'   => array(
+								'type'        => 'string',
+								'maxLength'   => 500,
+								'description' => __( 'Text below the heading; empty or missing for none.', 'leitvia-studio' ),
+							),
+						),
+						'required'             => array( 'from', 'to', 'heading' ),
 						'additionalProperties' => false,
 					),
 					'after'    => $place( __( 'Block ID or path ID of the top-level section the new sections follow.', 'leitvia-studio' ) ),
@@ -432,11 +465,15 @@ final class Maintain {
 		$status   = isset( $input['status'] ) ? (string) $input['status'] : null;
 		$template = isset( $input['template'] ) ? (string) $input['template'] : null;
 		$parent   = isset( $input['parent'] ) ? (int) $input['parent'] : null;
+		$kind     = isset( $input['kind'] ) ? (string) $input['kind'] : null;
+		if ( null !== $kind && 'page' !== get_post_type( $post ) ) {
+			return Block_Edit::invalid( 'kind', __( 'Only pages have a kind.', 'leitvia-studio' ), array( 'post' => $post ) );
+		}
 		if ( null !== $replace && $edits ) {
 			return Block_Edit::invalid( 'change', __( 'Send either content or blocks, not both.', 'leitvia-studio' ), array( 'post' => $post ) );
 		}
-		if ( ! $fields && ! $edits && null === $replace && ! $extra && null === $status && null === $template && null === $parent ) {
-			return Block_Edit::invalid( 'change', __( 'Name what to change: title, excerpt, slug, date, status, author, terms, fields, rows, featured image, comment status, template, parent, blocks or content.', 'leitvia-studio' ), array( 'post' => $post ) );
+		if ( ! $fields && ! $edits && null === $replace && ! $extra && null === $status && null === $template && null === $parent && null === $kind ) {
+			return Block_Edit::invalid( 'change', __( 'Name what to change: title, excerpt, slug, date, status, author, terms, fields, rows, featured image, comment status, template, parent, kind, blocks or content.', 'leitvia-studio' ), array( 'post' => $post ) );
 		}
 		if ( null !== $parent ) {
 			$invalid = self::invalid_parent( $post, $parent );
@@ -448,11 +485,16 @@ final class Maintain {
 		return array(
 			'area'   => 'content',
 			'target' => array( 'post' => $post ) + ( null === $replace ? array() : array( 'replace' => true ) ),
+			// A page that becomes a legal text waits for a person like one that is one already (Autonomy).
+			'kinds'  => in_array( $kind, \LeitviaStudio\Gateway\Autonomy::LEGAL_PAGES, true ) ? array( 'legal' ) : array(),
 			'record' => true,
-			'change' => static function ( array $state ) use ( $post, $edits, $fields, $replace, $extra, $status, $template ) {
+			'change' => static function ( array $state ) use ( $post, $edits, $fields, $replace, $extra, $status, $template, $kind ) {
 				$state = null === $template ? $state : self::with_template( $state, $template, $post );
 				if ( is_wp_error( $state ) ) {
 					return $state;
+				}
+				if ( null !== $kind ) {
+					$state['meta_input']['_leitvia_page_kind'] = $kind;
 				}
 				$content = $replace ?? Build::edit( (string) $state['post_content'], $edits, array( 'post' => $post ) );
 				$state   = is_wp_error( $content ) ? $content : Content::change( array( 'post_content' => $content ) + $fields + $state, $extra, array( 'post' => $post ) );
@@ -727,9 +769,12 @@ final class Maintain {
 				continue;
 			}
 			if ( $section ) {
-				$here   = $target + array( 'block' => $id );
-				$markup = $section['carry'] ? self::carry( $block, (string) $section['content'], $here ) : (string) $section['content'];
-				$markup = is_wp_error( $markup ) ? $markup : Build::edit( $markup, (array) $section['edits'], $here );
+				$here = $target + array( 'block' => $id );
+				// The edits name blocks of the pattern outline (leitvia/get-pattern), so they apply first; carry fills
+				// the rest and leaves the blocks they changed, which keep their text and stay even without a
+				// counterpart in the old section.
+				$markup = Build::edit( (string) $section['content'], (array) $section['edits'], $here );
+				$markup = is_wp_error( $markup ) || ! $section['carry'] ? $markup : self::carry( $block, $markup, $here, self::edited( (array) $section['edits'] ) );
 				if ( is_wp_error( $markup ) ) {
 					return $markup;
 				}
@@ -737,7 +782,7 @@ final class Maintain {
 				++$replaced;
 				continue;
 			}
-			$ref     = '' !== $name ? (string) preg_replace( '/^pattern:/', '', (string) ( leitvia_studio_contract()->pattern( $name )['docs']['replacedBy'] ?? '' ) ) : '';
+			$ref     = self::replacement( $name, '' !== $only );
 			$pattern = '' !== $ref ? Build::pattern( $ref ) : null;
 			if ( ! $pattern || ( is_wp_error( $pattern ) && 'leitvia_unknown_pattern' === $pattern->get_error_code() ) ) {
 				return self::no_replacement( $target + array( 'block' => $id ), $name );
@@ -767,6 +812,21 @@ final class Maintain {
 	}
 
 	/**
+	 * The pattern that replaces a section pattern: the replacement of a deprecated one, with a single section asked
+	 * for also the successor the contract names (docs.successor: an older pattern that stays approved, such as the
+	 * numbered services before the services with icons). '' for none.
+	 *
+	 * @param string $name      Pattern name of the section.
+	 * @param bool   $successor Whether the successor counts.
+	 */
+	private static function replacement( string $name, bool $successor ): string {
+		$docs = '' !== $name ? (array) ( leitvia_studio_contract()->any_pattern( $name )['docs'] ?? array() ) : array();
+		$ref  = (string) ( $docs['replacedBy'] ?? '' );
+		$ref  = '' === $ref && $successor ? (string) ( $docs['successor'] ?? '' ) : $ref;
+		return (string) preg_replace( '/^pattern:/', '', $ref );
+	}
+
+	/**
 	 * Rejection leitvia_no_replacement.
 	 *
 	 * @param array<string, mixed> $target  Target.
@@ -788,13 +848,14 @@ final class Maintain {
 		$target   = array( 'post' => $post );
 		$move     = (string) ( $input['move'] ?? '' );
 		$wrap     = isset( $input['wrap'] ) ? (array) $input['wrap'] : null;
+		$faq      = isset( $input['faq'] ) ? (array) $input['faq'] : null;
 		$template = isset( $input['template'] ) ? (string) $input['template'] : null;
 		$place    = array_intersect_key( $input, array_flip( array( 'after', 'before', 'position' ) ) );
-		if ( 1 !== (int) isset( $input['sections'] ) + (int) ( '' !== $move ) + (int) ( null !== $wrap ) ) {
-			return Block_Edit::invalid( 'change', __( 'Send one of sections, move or wrap.', 'leitvia-studio' ), $target );
+		if ( 1 !== (int) isset( $input['sections'] ) + (int) ( '' !== $move ) + (int) ( null !== $wrap ) + (int) ( null !== $faq ) ) {
+			return Block_Edit::invalid( 'change', __( 'Send one of sections, move, wrap or faq.', 'leitvia-studio' ), $target );
 		}
-		if ( count( $place ) > 1 || ( $wrap && $place ) ) {
-			return Block_Edit::invalid( 'place', __( 'Name one place: after, before or position. wrap takes none, the section stays where the block is.', 'leitvia-studio' ), $target, 'leitvia/get-page-outline' );
+		if ( count( $place ) > 1 || ( ( $wrap || $faq ) && $place ) ) {
+			return Block_Edit::invalid( 'place', __( 'Name one place: after, before or position. wrap and faq take none, the section stays where the blocks are.', 'leitvia-studio' ), $target, 'leitvia/get-page-outline' );
 		}
 		$sections = isset( $input['sections'] ) ? Build::sections( (array) $input['sections'] ) : array();
 		if ( is_wp_error( $sections ) ) {
@@ -805,7 +866,7 @@ final class Maintain {
 			'area'   => 'content',
 			'target' => $target,
 			'record' => true,
-			'change' => static function ( array $state ) use ( $sections, $move, $wrap, $template, $place, $target, $post ) {
+			'change' => static function ( array $state ) use ( $sections, $move, $wrap, $faq, $template, $place, $target, $post ) {
 				$state = null === $template ? $state : self::with_template( $state, $template, $post );
 				if ( is_wp_error( $state ) ) {
 					return $state;
@@ -817,6 +878,24 @@ final class Maintain {
 						return self::no_section( $target, $id );
 					}
 					$markup[ $at[ $id ] ] = self::wrapped( $markup[ $at[ $id ] ], (string) ( $wrap['ground'] ?? 'surface' ), (string) ( $wrap['heading'] ?? '' ) );
+					return array( 'post_content' => implode( "\n\n", $markup ) ) + $state;
+				}
+				if ( $faq ) {
+					foreach ( array( (string) $faq['from'], (string) $faq['to'] ) as $id ) {
+						if ( ! isset( $at[ $id ] ) ) {
+							return self::no_section( $target, $id );
+						}
+					}
+					[ $first, $last ] = array( $at[ (string) $faq['from'] ], $at[ (string) $faq['to'] ] );
+					if ( $last < $first ) {
+						return Block_Edit::invalid( 'faq', __( 'to comes after from in the content. Read the outline for the order of the blocks.', 'leitvia-studio' ), $target, 'leitvia/get-page-outline' );
+					}
+					$blocks  = parse_blocks( implode( "\n\n", array_slice( $markup, $first, $last - $first + 1 ) ) );
+					$section = \LeitviaStudio\Gateway\Faq::section( $blocks, (string) $faq['heading'], (string) ( $faq['intro'] ?? '' ), $target );
+					if ( is_wp_error( $section ) ) {
+						return $section;
+					}
+					array_splice( $markup, $first, $last - $first + 1, array( Build::name_sections( $section, \LeitviaStudio\Gateway\Faq::PATTERN ) ) );
 					return array( 'post_content' => implode( "\n\n", $markup ) ) + $state;
 				}
 				$new = $sections ? Build::compose( $sections ) : '';
@@ -944,14 +1023,22 @@ final class Maintain {
 	}
 
 	/**
-	 * Replacement markup with the texts and button links of the old section, in order per block type.
+	 * Replacement markup with the content of the old section. Sections of entries on both sides (two or more groups
+	 * side by side that hold no group, such as services, steps or tiles) move over entry by entry and by role, see
+	 * carry_entries(); other sections take the texts and button links of the old one in order per block type.
 	 *
 	 * @param array<string, mixed> $old    Old section.
 	 * @param string               $markup Replacement markup.
 	 * @param array<string, mixed> $target Target for rejections.
+	 * @param string[]             $keep   Path IDs of blocks an edit changed: they keep their content and stay.
 	 * @return string|\WP_Error
 	 */
-	private static function carry( array $old, string $markup, array $target ) {
+	private static function carry( array $old, string $markup, array $target, array $keep = array() ) {
+		$from = self::slots( array( $old ) );
+		$to   = self::slots( parse_blocks( $markup ) );
+		if ( count( $from['entries'] ) > 1 && count( $to['entries'] ) > 1 ) {
+			return self::carry_entries( $from, $markup, $to, $target, $keep );
+		}
 		// ponytail: plain text only; inline formatting and links inside paragraphs do not move over.
 		$texts = array();
 		foreach ( self::texts( array( $old ), 'p:' ) as $item ) {
@@ -959,7 +1046,7 @@ final class Maintain {
 		}
 		foreach ( self::texts( parse_blocks( $markup ), 'p:' ) as $item ) {
 			$from = array_shift( $texts[ $item['name'] ] );
-			if ( ! $from || '' === $from['text'] ) {
+			if ( ! $from || '' === $from['text'] || in_array( $item['path'], $keep, true ) ) {
 				continue;
 			}
 			$change = array( 'text' => $from['text'] ) + ( 'core/button' === $item['name'] && '' !== $from['url'] ? array( 'url' => $from['url'] ) : array() );
@@ -1001,6 +1088,277 @@ final class Maintain {
 			$found = array_merge( $found, self::texts( (array) $block['innerBlocks'], $here . '.' ) );
 		}
 		return $found;
+	}
+
+	/**
+	 * The new section filled from the old one entry by entry: it gets as many entries as the old one had (copies of
+	 * its last entry, or the last ones removed), then head and each entry take the texts, links and icons of their
+	 * counterpart by role (heading level, eyebrow, link line, text, button, icon) in order. A number such as 01 has no
+	 * counterpart. An entry without a heading gives its eyebrow to the heading of the new entry, unless the eyebrow
+	 * only counts the step (Step 3), which stays the eyebrow while the heading goes. An eyebrow of the new pattern
+	 * without counterpart counts the entry (Step 1, Step 2); other texts and links of the pattern without
+	 * counterpart are removed, so no sample text and no link without an address stays, a section mark (icon and
+	 * eyebrow) as a whole. Icons of the pattern stay where the old section had none.
+	 *
+	 * @param array<string, mixed> $from   Slots of the old section (slots()).
+	 * @param string               $markup Replacement markup.
+	 * @param array<string, mixed> $to     Slots of the new section (slots()).
+	 * @param array<string, mixed> $target Target for rejections.
+	 * @param string[]             $keep   Path IDs of blocks an edit changed, see carry().
+	 * @return string|\WP_Error
+	 */
+	private static function carry_entries( array $from, string $markup, array $to, array $target, array $keep = array() ) {
+		$want = count( $from['entries'] );
+		$have = count( $to['entries'] );
+		for ( $left = $want - $have; $left > 0; $left -= 20 ) {
+			$markup = Block_Edit::structure( $markup, (string) end( $to['paths'] ), array( 'repeat' => min( 20, $left ) ), $target );
+			if ( is_wp_error( $markup ) ) {
+				return $markup;
+			}
+		}
+		for ( $at = $have - 1; $at >= $want; $at-- ) {
+			$markup = Block_Edit::structure( $markup, $to['paths'][ $at ], array( 'remove' => true ), $target );
+			if ( is_wp_error( $markup ) ) {
+				return $markup;
+			}
+		}
+		$to      = self::slots( parse_blocks( $markup ) );
+		$changes = array();
+		$remove  = array();
+		self::pair( $from['head'], $to['head'], -1, $changes, $remove );
+		foreach ( $to['entries'] as $at => $entry ) {
+			self::pair( $from['entries'][ $at ] ?? array(), $entry, $at, $changes, $remove );
+		}
+		// A copy of an entry repeats the icon of the pattern; it takes a spare icon, so no icon stands twice
+		// (leitvia/repeated-icons) until the agent sets the right ones.
+		$used = array();
+		foreach ( array_merge( $to['head'], ...$to['entries'] ) as $slot ) {
+			if ( 'icon' !== $slot['role'] ) {
+				continue;
+			}
+			$icon = (string) ( $changes[ $slot['path'] ]['attributes']['icon'] ?? $slot['icon'] );
+			if ( isset( $used[ $icon ] ) && ! isset( $changes[ $slot['path'] ] ) ) {
+				$spare                    = array_values( array_diff( self::SPARE_ICONS, array_keys( $used ) ) );
+				$icon                     = $spare[0] ?? $icon;
+				$changes[ $slot['path'] ] = array( 'attributes' => array( 'icon' => $icon ) );
+			}
+			$used[ $icon ] = true;
+		}
+		$kept    = static fn( string $path ): bool => (bool) array_filter( $keep, static fn( string $edited ): bool => $edited === $path || str_starts_with( $edited, $path . '.' ) );
+		$changes = array_diff_key( $changes, array_flip( $keep ) );
+		$remove  = array_values( array_filter( $remove, static fn( string $path ): bool => ! $kept( $path ) ) );
+		foreach ( $changes as $path => $change ) {
+			$markup = Block_Edit::apply( $markup, $path, $change, $target );
+			if ( is_wp_error( $markup ) ) {
+				return $markup;
+			}
+		}
+		// From the last block to the first, so a removal never moves a path still to come. A group whose blocks all go
+		// (a key figure the old section had none of) goes as a whole.
+		$remove = self::whole_groups( parse_blocks( $markup ), array_unique( $remove ) );
+		usort( $remove, static fn( string $a, string $b ): int => version_compare( str_replace( 'p:', '', $b ), str_replace( 'p:', '', $a ) ) );
+		foreach ( $remove as $path ) {
+			$markup = Block_Edit::structure( $markup, $path, array( 'remove' => true ), $target );
+			if ( is_wp_error( $markup ) ) {
+				return $markup;
+			}
+		}
+		return $markup;
+	}
+
+	/**
+	 * Paths to remove, where every block of a parent goes replaced by the parent, up to the blocks of the section.
+	 *
+	 * @param array<mixed> $blocks Parsed blocks of the section.
+	 * @param string[]     $remove Path IDs.
+	 * @return string[]
+	 */
+	private static function whole_groups( array $blocks, array $remove ): array {
+		$blocks = Block_Ids::blocks( $blocks );
+		do {
+			$changed = false;
+			$parents = array();
+			foreach ( $remove as $path ) {
+				$parent = substr( $path, 0, (int) strrpos( $path, '.' ) );
+				if ( str_contains( $parent, '.' ) ) {
+					$parents[ $parent ][] = $path;
+				}
+			}
+			foreach ( $parents as $parent => $paths ) {
+				$found = Outline::find( $blocks, $parent );
+				if ( $found && count( Block_Ids::blocks( (array) $found[0]['innerBlocks'] ) ) === count( $paths ) ) {
+					$remove   = array_values( array_diff( $remove, $paths ) );
+					$remove[] = $parent;
+					$changed  = true;
+				}
+			}
+		} while ( $changed );
+		return $remove;
+	}
+
+	/**
+	 * Path IDs of the blocks the edits of replace-pattern change (text, link, icon and other attributes), not those
+	 * they remove, repeat, insert or move.
+	 *
+	 * @param array<mixed> $edits Edits.
+	 * @return list<string>
+	 */
+	private static function edited( array $edits ): array {
+		$paths = array();
+		foreach ( $edits as $edit ) {
+			if ( ! array_intersect_key( (array) $edit, array_flip( array( 'remove', 'repeat', 'insert', 'move' ) ) ) ) {
+				$paths[] = (string) ( $edit['block'] ?? '' );
+			}
+		}
+		return $paths;
+	}
+
+	/**
+	 * Changes and removals for the slots of one part of the new section (head with index -1, or entry $at) from the
+	 * slots of the same part of the old one, see carry_entries().
+	 *
+	 * @param list<array<string, mixed>> $old     Old slots.
+	 * @param list<array<string, mixed>> $slots   New slots.
+	 * @param int                        $at      Index of the entry, -1 for the head.
+	 * @param array<mixed>               $changes Changes by path, filled.
+	 * @param string[]                   $remove  Paths to remove, filled.
+	 */
+	private static function pair( array $old, array $slots, int $at, array &$changes, array &$remove ): void {
+		$roles  = array_count_values( array_column( $old, 'role' ) );
+		$label  = static fn( string $text ): bool => (bool) preg_match( '/^\D{0,24}\d{1,3}\.?$/u', $text );
+		$counts = false;
+		foreach ( $slots as $slot ) {
+			if ( $at >= 0 && 'h' === $slot['role'][0] && ! isset( $roles[ $slot['role'] ] ) ) {
+				foreach ( $old as $i => $item ) {
+					if ( 'eyebrow' === $item['role'] && ! $label( $item['text'] ) ) {
+						$old[ $i ]['role'] = $slot['role'];
+						$counts            = true;
+						break;
+					}
+				}
+				break;
+			}
+		}
+		$queue = array();
+		foreach ( $old as $item ) {
+			$queue[ $item['role'] ][] = $item;
+		}
+		foreach ( $slots as $slot ) {
+			$item = isset( $queue[ $slot['role'] ] ) ? array_shift( $queue[ $slot['role'] ] ) : null;
+			if ( 'icon' === $slot['role'] ) {
+				if ( $item && '' !== $item['icon'] ) {
+					$changes[ $slot['path'] ] = array( 'attributes' => array( 'icon' => $item['icon'] ) );
+				}
+				continue;
+			}
+			if ( $item && '' !== $item['text'] ) {
+				$change = array( 'text' => $item['text'] );
+				if ( '' !== $item['url'] && ( 'core/button' === $slot['name'] || '' !== $item['link'] ) ) {
+					$change += array( 'url' => $item['url'] ) + ( 'core/button' === $slot['name'] ? array() : array( 'link_text' => $item['link'] ) );
+				}
+				$changes[ $slot['path'] ] = $change;
+				continue;
+			}
+			if ( $at >= 0 && 'eyebrow' === $slot['role'] && ( $counts || ! $item ) && preg_match( '/\d+/', $slot['text'] ) ) {
+				$changes[ $slot['path'] ] = array( 'text' => (string) preg_replace( '/\d+/', (string) ( $at + 1 ), $slot['text'], 1 ) );
+				continue;
+			}
+			$remove[] = (string) ( $slot['mark'] || $slot['only'] ? $slot['parent'] : $slot['path'] );
+		}
+	}
+
+	/**
+	 * Text, link and icon slots of a section: those of the head, those of each entry, and the path of each entry. An
+	 * entry is a group without groups inside that stands beside at least one more such group.
+	 *
+	 * @param array<mixed> $blocks Parsed blocks, the section.
+	 * @return array<string, mixed> head, entries (a list of slots each) and paths.
+	 */
+	private static function slots( array $blocks ): array {
+		$found = array(
+			'head'    => array(),
+			'entries' => array(),
+			'paths'   => array(),
+		);
+		self::walk( $blocks, 'p:', -1, false, $found );
+		return $found;
+	}
+
+	/**
+	 * Collects the slots of blocks, see slots().
+	 *
+	 * @param array<mixed>         $blocks Parsed blocks of one parent.
+	 * @param string               $path   Path prefix.
+	 * @param int                  $entry  Index of the entry they belong to, -1 for the head.
+	 * @param bool                 $mark   Whether they are the blocks of a section mark (a group of icon and eyebrow).
+	 * @param array<string, mixed> $found  Slots so far.
+	 */
+	private static function walk( array $blocks, string $path, int $entry, bool $mark, array &$found ): void {
+		$blocks = array_values( array_filter( $blocks, static fn( array $block ): bool => null !== $block['blockName'] || '' !== trim( (string) $block['innerHTML'] ) ) );
+		$leaf   = static fn( array $block ): bool => 'core/group' === $block['blockName'] && ! str_contains( serialize_blocks( (array) $block['innerBlocks'] ), '<!-- wp:group' );
+		$tiles  = $entry < 0 && count( array_filter( $blocks, $leaf ) ) > 1;
+		$parent = rtrim( $path, '.' );
+		foreach ( $blocks as $index => $block ) {
+			$here = $path . $index;
+			$name = (string) $block['blockName'];
+			if ( $tiles && $leaf( $block ) ) {
+				$found['paths'][]   = $here;
+				$found['entries'][] = array();
+				self::walk( (array) $block['innerBlocks'], $here . '.', count( $found['entries'] ) - 1, false, $found );
+				continue;
+			}
+			$slot = null;
+			if ( 'leitvia/icon' === $name ) {
+				$slot = array(
+					'role' => 'icon',
+					'text' => '',
+					'url'  => '',
+					'link' => '',
+					'icon' => (string) ( $block['attrs']['icon'] ?? '' ),
+				);
+			} elseif ( isset( Block_Edit::TEXT_BLOCKS[ $name ] ) ) {
+				$html  = implode( '', array_filter( (array) $block['innerContent'], 'is_string' ) );
+				$plain = static fn( string $markup ): string => trim( html_entity_decode( wp_strip_all_tags( $markup ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
+				$text  = $plain( $html );
+				$link  = preg_match( '#<a\b[^>]*>(.*?)</a>#s', $html, $match ) ? $plain( $match[1] ) : '';
+				$tags  = new \WP_HTML_Tag_Processor( $html );
+				$url   = $tags->next_tag( array( 'tag_name' => 'a' ) ) ? $tags->get_attribute( 'href' ) : '';
+				$class = (string) ( $block['attrs']['className'] ?? '' );
+				$role  = match ( true ) {
+					'core/heading' === $name => 'h' . (int) ( $block['attrs']['level'] ?? 2 ),
+					'core/paragraph' !== $name => $name,
+					(bool) preg_match( '/(^|\s)is-style-eyebrow(\s|$)/', $class ) => 'eyebrow',
+					(bool) preg_match( '/^\d{1,3}[.)]?$/', $text ) => 'number',
+					'' !== $link && $link === $text => 'link',
+					default => 'text',
+				};
+				$slot = array(
+					'role' => $role,
+					'text' => $text,
+					'url'  => is_string( $url ) ? $url : '',
+					'link' => $link,
+					'icon' => '',
+				);
+			}
+			if ( $slot ) {
+				$slot += array(
+					'name'   => $name,
+					'path'   => $here,
+					'parent' => $parent,
+					'mark'   => $mark,
+					'only'   => 1 === count( $blocks ) && str_contains( $parent, '.' ),
+				);
+				if ( $entry < 0 ) {
+					$found['head'][] = $slot;
+				} else {
+					$found['entries'][ $entry ][] = $slot;
+				}
+			}
+			$inner = (array) $block['innerBlocks'];
+			$names = array_column( array_filter( $inner, static fn( array $b ): bool => null !== $b['blockName'] ), 'blockName' );
+			$is    = 'core/group' === $name && $entry < 0 && $names && ! array_diff( $names, array( 'leitvia/icon', 'core/paragraph' ) ) && in_array( 'leitvia/icon', $names, true ) && str_contains( serialize_blocks( $inner ), 'is-style-eyebrow' );
+			self::walk( $inner, $here . '.', $entry, $is, $found );
+		}
 	}
 
 	/**
@@ -1229,7 +1587,7 @@ final class Maintain {
 		return array(
 			'post'      => $post->ID,
 			'post_type' => $post->post_type,
-			'title'     => $post->post_title,
+			'title'     => html_entity_decode( $post->post_title, ENT_QUOTES | ENT_HTML5, 'UTF-8' ),
 			'status'    => $post->post_status,
 			'public'    => in_array( $post->post_status, self::PUBLIC_STATUSES, true ),
 		);

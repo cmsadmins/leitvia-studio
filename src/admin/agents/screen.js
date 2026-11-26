@@ -32,9 +32,9 @@ import { AREAS, KINDS, LEVELS } from './common';
 
 const ACCESS = '/leitvia-studio/v1/gateway/access';
 const SETTINGS = '/leitvia-studio/v1/gateway/settings';
+const CONNECTIONS = `${ ACCESS }/connections`;
 
 // Product name and agent role from Admin::enqueue(), filter leitvia_studio_brand.
-const BRAND = window.leitviaStudioAdmin?.brand ?? 'Leitvia Studio';
 const AGENT_ROLE = window.leitviaStudioAdmin?.agentRole ?? 'Leitvia Agent';
 const CAN_MANAGE = window.leitviaStudioAdmin?.canManage ?? true;
 
@@ -85,7 +85,23 @@ function connection( agents ) {
 	};
 }
 
-function mcpRow( mcp ) {
+function serverRow( server ) {
+	return {
+		state: 'ok',
+		title: __( 'Built in', 'leitvia-studio' ),
+		text: sprintf(
+			/* translators: 1: address of the MCP server, 2: protocol revisions. */
+			__(
+				'AI apps connect directly at %1$s (MCP %2$s).',
+				'leitvia-studio'
+			),
+			server.url,
+			server.protocols.join( ', ' )
+		),
+	};
+}
+
+function adapterRow( mcp ) {
 	if ( mcp.compatible ) {
 		return {
 			state: 'ok',
@@ -94,37 +110,24 @@ function mcpRow( mcp ) {
 				__( 'Active, version %s', 'leitvia-studio' ),
 				mcp.version
 			),
-			text: __( 'AI apps can also connect directly.', 'leitvia-studio' ),
-		};
-	}
-	if ( mcp.active ) {
-		return {
-			state: 'warning',
-			title: sprintf(
-				/* translators: %s: installed version. */
-				__( 'Version %s does not fit', 'leitvia-studio' ),
-				mcp.version
-			),
-			text: sprintf(
-				/* translators: %s: required version. */
-				__(
-					'Leitvia Studio needs version %s. Install the matching version.',
-					'leitvia-studio'
-				),
-				mcp.required
+			text: __(
+				'Its default server offers the same abilities with the same checks.',
+				'leitvia-studio'
 			),
 		};
 	}
 	return {
 		state: 'info',
-		title: __( 'Not active', 'leitvia-studio' ),
-		text: sprintf(
-			/* translators: %s: product name. */
-			__(
-				'Agents connect without it. AI apps that want a direct connection need this extra plugin; %s does not install plugins.',
-				'leitvia-studio'
-			),
-			BRAND
+		title: mcp.active
+			? sprintf(
+					/* translators: %s: installed version. */
+					__( 'Version %s, not tested', 'leitvia-studio' ),
+					mcp.version
+				)
+			: __( 'Not needed', 'leitvia-studio' ),
+		text: __(
+			'Optional. Agents use the built-in server; the plugin adds the default MCP server of WordPress.',
+			'leitvia-studio'
 		),
 	};
 }
@@ -211,7 +214,11 @@ function Status( { access, settings } ) {
 		},
 		{
 			name: __( 'Direct connection for AI apps', 'leitvia-studio' ),
-			...mcpRow( access.mcp ),
+			...serverRow( access.server ),
+		},
+		{
+			name: __( 'MCP Adapter', 'leitvia-studio' ),
+			...adapterRow( access.mcp ),
 			link: access.mcp.url,
 			linkText: __( 'MCP Adapter on WordPress.org', 'leitvia-studio' ),
 		},
@@ -225,12 +232,12 @@ function Status( { access, settings } ) {
 			<More summary={ __( 'How agents connect', 'leitvia-studio' ) }>
 				<p>
 					{ sprintf(
-						/* translators: %s: required version of the MCP Adapter. */
+						/* translators: %s: address of the MCP server. */
 						__(
-							'Agents call the REST API of WordPress (/wp-json/) with their user name and an application password, and use the abilities of the Abilities API. MCP clients connect through the MCP Adapter plugin, version %s. Every call is checked against the autonomy settings and written to the audit log.',
+							'Agents call the REST API of WordPress (/wp-json/) with their user name and an application password, and use the abilities of the Abilities API. MCP clients connect to the built-in server at %s. Every call is checked against the autonomy settings and written to the audit log.',
 							'leitvia-studio'
 						),
-						access.mcp.required
+						access.server.url
 					) }
 				</p>
 			</More>
@@ -633,6 +640,298 @@ const pick = ( data, fields ) =>
 		fields.map( ( field ) => [ field.id, data[ field.id ] ] )
 	);
 
+const SCOPE_LABELS = {
+	'leitvia:read': __( 'read', 'leitvia-studio' ),
+	'leitvia:write': __( 'write', 'leitvia-studio' ),
+	'leitvia:approve': __( 'approve changes', 'leitvia-studio' ),
+};
+
+const OAUTH_FIELDS = [
+	{
+		id: 'oauth',
+		label: __( 'Connect over OAuth', 'leitvia-studio' ),
+		description: __(
+			'Clients such as claude.ai, Claude Desktop or ChatGPT connect after you agree on the page "Connect agent". Needs HTTPS.',
+			'leitvia-studio'
+		),
+		type: 'boolean',
+		Edit: 'toggle',
+	},
+	{
+		id: 'oauth_dcr',
+		label: __( 'Allow dynamic client registration', 'leitvia-studio' ),
+		description: __(
+			'For older clients without a client document (RFC 7591, deprecated in MCP). New clients name themselves with a client document.',
+			'leitvia-studio'
+		),
+		type: 'boolean',
+		Edit: 'toggle',
+	},
+];
+
+// Whether clients reach the OAuth metadata of the site, asked once the screen shows; the server keeps the answer 12
+// hours. Blocked: the nginx directives that let the well-known paths through, to copy.
+function Discovery() {
+	const [ discovery, setDiscovery ] = useState( null );
+	const [ copied, setCopied ] = useState( false );
+	const copy = useCopyToClipboard( discovery?.directives ?? '', () => {
+		setCopied( true );
+		notify( 'success', __( 'Directives copied.', 'leitvia-studio' ) );
+	} );
+	useEffect( () => {
+		apiFetch( { path: `${ ACCESS }/discovery` } )
+			.then( ( response ) => setDiscovery( response.discovery ) )
+			.catch( () => {} );
+	}, [] );
+	if ( ! discovery || discovery.ok ) {
+		return null;
+	}
+	return (
+		<>
+			<StatusList
+				rows={ [
+					{
+						name: __( 'OAuth discovery', 'leitvia-studio' ),
+						state: 'error',
+						title: __( 'Blocked', 'leitvia-studio' ),
+						text: sprintf(
+							/* translators: %d: HTTP status code, 0 when the site did not answer. */
+							__(
+								'Clients find no sign-in: the site answers %d at /.well-known/. An nginx rule such as location ~ /\\. stops these paths before WordPress runs. Add the directives below to the site, in ISPConfig under Website, Options, nginx Directives.',
+								'leitvia-studio'
+							),
+							discovery.status
+						),
+						link: discovery.help,
+						linkText: __(
+							'Troubleshooting in the documentation',
+							'leitvia-studio'
+						),
+					},
+				] }
+			/>
+			<pre className="leitvia-studio-agents__directives">
+				<code>{ discovery.directives }</code>
+			</pre>
+			<Button __next40pxDefaultSize variant="secondary" ref={ copy }>
+				{ copied
+					? __( 'Copied', 'leitvia-studio' )
+					: __( 'Copy directives', 'leitvia-studio' ) }
+			</Button>
+		</>
+	);
+}
+
+function Connections( { access, gateway, reload, onSaved } ) {
+	const [ closing, setClosing ] = useState( null );
+	const [ busy, setBusy ] = useState( false );
+	const [ data, setData ] = useState( () =>
+		pick( gateway.settings, OAUTH_FIELDS )
+	);
+	const [ saving, save ] = useSave(
+		( response ) => {
+			setData( pick( response.settings, OAUTH_FIELDS ) );
+			onSaved( response );
+			reload();
+		},
+		__( 'Connection settings saved.', 'leitvia-studio' )
+	);
+
+	const disconnect = async () => {
+		setBusy( true );
+		try {
+			await apiFetch( {
+				path: `${ CONNECTIONS }/${ closing.id }`,
+				method: 'DELETE',
+			} );
+			notify(
+				'success',
+				sprintf(
+					/* translators: %s: name of the client, for example Claude. */
+					__( 'Connection of %s closed.', 'leitvia-studio' ),
+					closing.client
+				)
+			);
+			setClosing( null );
+			reload();
+		} catch ( error ) {
+			notify(
+				'error',
+				errorText(
+					error,
+					__(
+						'The connection could not be closed.',
+						'leitvia-studio'
+					)
+				)
+			);
+		} finally {
+			setBusy( false );
+		}
+	};
+
+	return (
+		<section aria-labelledby="leitvia-studio-connections">
+			<h2 id="leitvia-studio-connections">
+				{ __( 'Connections', 'leitvia-studio' ) }
+			</h2>
+			<p>
+				{ __(
+					'Clients connected over OAuth. Each one works as the user shown, with the rights it was given; closing a connection stops its tokens at once.',
+					'leitvia-studio'
+				) }
+			</p>
+			{ ! access.oauth.available && (
+				<p>
+					{ __(
+						'OAuth needs HTTPS on this site. Until then agents connect with an application password.',
+						'leitvia-studio'
+					) }
+				</p>
+			) }
+			{ access.oauth.active && <Discovery /> }
+			{ access.connections.length ? (
+				<div className="leitvia-studio-agents__table">
+					<table className="widefat striped">
+						<caption>
+							<VisuallyHidden>
+								{ __( 'OAuth connections', 'leitvia-studio' ) }
+							</VisuallyHidden>
+						</caption>
+						<thead>
+							<tr>
+								<th scope="col">
+									{ __( 'Client', 'leitvia-studio' ) }
+								</th>
+								<th scope="col">
+									{ __( 'Works as', 'leitvia-studio' ) }
+								</th>
+								<th scope="col">
+									{ __( 'Last call', 'leitvia-studio' ) }
+								</th>
+								<th scope="col">
+									{ __( 'Actions', 'leitvia-studio' ) }
+								</th>
+							</tr>
+						</thead>
+						<tbody>
+							{ access.connections.map( ( item ) => (
+								<tr key={ item.id }>
+									<th scope="row">
+										{ item.client }
+										{ item.host && (
+											<>
+												<br />
+												<code>{ item.host }</code>
+											</>
+										) }
+									</th>
+									<td>
+										{ item.user.name }
+										<br />
+										{ item.scopes
+											.map(
+												( scope ) =>
+													SCOPE_LABELS[ scope ] ??
+													scope
+											)
+											.join( ', ' ) }
+									</td>
+									<td>
+										{ item.last_used
+											? sprintf(
+													/* translators: 1: date and time, 2: shortened IP address. */
+													__(
+														'%1$s from %2$s',
+														'leitvia-studio'
+													),
+													formatDate(
+														item.last_used
+													),
+													item.ip
+												)
+											: __(
+													'Not used yet',
+													'leitvia-studio'
+												) }
+									</td>
+									<td>
+										<Button
+											__next40pxDefaultSize
+											variant="tertiary"
+											isDestructive
+											onClick={ () => setClosing( item ) }
+										>
+											{ __(
+												'Close connection',
+												'leitvia-studio'
+											) }
+											<VisuallyHidden>
+												{ ' ' }
+												{ item.client }
+											</VisuallyHidden>
+										</Button>
+									</td>
+								</tr>
+							) ) }
+						</tbody>
+					</table>
+				</div>
+			) : (
+				<p>{ __( 'No connections yet.', 'leitvia-studio' ) }</p>
+			) }
+			<form
+				className="leitvia-studio-agents__panel"
+				aria-label={ __( 'OAuth settings', 'leitvia-studio' ) }
+				onSubmit={ ( event ) => {
+					event.preventDefault();
+					save( data );
+				} }
+			>
+				<DataForm
+					data={ data }
+					fields={ OAUTH_FIELDS }
+					form={ formOf( OAUTH_FIELDS ) }
+					onChange={ ( edits ) =>
+						setData( ( current ) => ( { ...current, ...edits } ) )
+					}
+				/>
+				<Button
+					__next40pxDefaultSize
+					type="submit"
+					variant="secondary"
+					isBusy={ saving }
+					disabled={ saving }
+					accessibleWhenDisabled
+				>
+					{ __( 'Save connection settings', 'leitvia-studio' ) }
+				</Button>
+			</form>
+			{ closing && (
+				<ConfirmDialog
+					title={ sprintf(
+						/* translators: %s: name of the client. */
+						__( 'Close the connection of %s?', 'leitvia-studio' ),
+						closing.client
+					) }
+					confirmLabel={ __( 'Close connection', 'leitvia-studio' ) }
+					isDestructive
+					isBusy={ busy }
+					onCancel={ () => setClosing( null ) }
+					onConfirm={ disconnect }
+				>
+					<p>
+						{ __(
+							'Its access and refresh tokens stop working at once. The client can connect again only after you agree once more.',
+							'leitvia-studio'
+						) }
+					</p>
+				</ConfirmDialog>
+			) }
+		</section>
+	);
+}
+
 function Checks( { access, gateway, onSaved } ) {
 	const [ data, setData ] = useState( () =>
 		pick( gateway.settings, CHECK_FIELDS )
@@ -1010,6 +1309,12 @@ export default function AgentsScreen() {
 			<>
 				<Status access={ access } settings={ gateway.settings } />
 				<Access access={ access } reload={ reload } />
+				<Connections
+					access={ access }
+					gateway={ gateway }
+					reload={ reload }
+					onSaved={ setGateway }
+				/>
 			</>
 		) : (
 			<>

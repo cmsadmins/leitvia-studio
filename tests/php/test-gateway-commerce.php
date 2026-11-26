@@ -49,6 +49,9 @@ class Test_Gateway_Commerce extends WP_UnitTestCase {
 	 */
 	public function set_up(): void {
 		parent::set_up();
+		if ( in_array( 'woocommerce', $this->getGroups(), true ) && ! class_exists( 'WooCommerce' ) ) {
+			$this->markTestSkipped( 'Needs WooCommerce (npm run test:php:commerce).' );
+		}
 		switch_theme( 'leitvia' );
 		$this->agent = self::factory()->user->create( array( 'role' => Gateway::ROLE ) );
 		wp_set_current_user( $this->agent );

@@ -147,7 +147,9 @@ final class Plugin {
 		add_action( 'init', array( Admin\Admin::class, 'register_status_column' ), 20 );
 		add_action( 'after_setup_theme', array( News\Image_Sizes::class, 'register' ) );
 		add_action( 'wp_head', array( News\Schema::class, 'print' ) );
+		add_filter( 'wp_insert_post_data', array( News\Modified::class, 'keep' ), 99, 2 );
 		add_filter( 'block_core_breadcrumbs_items', array( Seo\Cluster::class, 'breadcrumbs' ) );
+		add_filter( 'pre_render_block', array( Seo\Cluster::class, 'hide_breadcrumbs' ), 10, 2 );
 		add_filter( 'block_core_breadcrumbs_items', array( News\Schema::class, 'remember_breadcrumbs' ), PHP_INT_MAX );
 		// llms.txt and the AI crawlers in robots.txt, redirects of moved addresses before canonical redirects.
 		add_action( 'template_redirect', array( Seo\Llms::class, 'maybe_render' ), 0 );
@@ -184,6 +186,9 @@ final class Plugin {
 		add_filter( 'render_block_core/tab-panel', array( Blocks\Tabs::class, 'render_panel' ), 10, 2 );
 		add_filter( 'render_block', array( Blocks\Blocks::class, 'highlight_style' ) );
 		add_action( 'enqueue_block_assets', array( Blocks\Blocks::class, 'editor_highlight_style' ) );
+		add_action( 'init', array( Blocks\Blocks::class, 'register_styles' ) );
+		add_filter( 'render_block', array( Blocks\Blocks::class, 'section_style' ) );
+		add_action( 'enqueue_block_assets', array( Blocks\Blocks::class, 'editor_section_style' ) );
 		add_filter( 'register_block_type_args', array( Blocks\Animation::class, 'block_args' ), 10, 2 );
 		add_filter( 'render_block', array( Blocks\Animation::class, 'render' ), 10, 2 );
 		add_filter( 'render_block', array( Tokens\Compiler::class, 'ink_links' ), 10, 2 );
@@ -229,6 +234,8 @@ final class Plugin {
 		add_filter( 'render_block_data', array( Blocks\Table_Of_Contents::class, 'enter_content' ) );
 		add_filter( 'render_block_core/post-content', array( Blocks\Table_Of_Contents::class, 'leave_content' ) );
 		add_filter( 'render_block_core/heading', array( Blocks\Table_Of_Contents::class, 'add_id' ), 10, 2 );
+		add_filter( 'render_block_core/column', array( Blocks\Table_Of_Contents::class, 'fill' ), 10, 2 );
+		add_filter( 'render_block_core/group', array( Blocks\Table_Of_Contents::class, 'fill' ), 10, 2 );
 		add_action( 'init', array( Blocks\Code_Copy::class, 'register_module' ) );
 		add_filter( 'render_block_core/code', array( Blocks\Code_Copy::class, 'render' ), 10, 2 );
 		add_filter( 'render_block_core/group', array( Blocks\Blocks::class, 'list_group' ), 10, 2 );
@@ -247,6 +254,7 @@ final class Plugin {
 		add_action( 'enqueue_block_editor_assets', array( Blocks\Consent_Embed::class, 'editor_data' ) );
 		add_action( 'switch_blog', array( Blocks\Icon::class, 'flush' ) );
 		add_filter( 'render_block_core/navigation', array( Blocks\Mega_Menu::class, 'collapsible_overlay' ), 10, 2 );
+		add_filter( 'render_block_core/navigation', array( Blocks\Mega_Menu::class, 'menu_text' ), 10, 2 );
 		add_filter( 'query_loop_block_query_vars', array( Blocks\Query_Filter::class, 'query_vars' ), 10, 2 );
 		add_filter( 'leitvia_studio_consent_services', array( Blocks\Map::class, 'service' ) );
 		add_filter( 'render_block_leitvia/map', array( Blocks\Map::class, 'render' ), 10, 2 );

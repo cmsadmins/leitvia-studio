@@ -516,6 +516,8 @@ final class Recipes {
 		};
 		$call   = static function ( string $step, string $ability, array $input, string $plan = 'new' ) use ( &$steps, $key, $dry ): array {
 			$steps[] = $dry ? self::step( $step, $ability, $plan, self::target( $input ) ) : self::call( $step, $ability, $input + array( 'package' => $key ) );
+			/** Progress of the run, one report per step; see includes/mcp/class-progress.php. */
+			do_action( 'leitvia_studio_progress', count( $steps ), 0, $step );
 			return $steps[ count( $steps ) - 1 ];
 		};
 		if ( isset( $recipe['contentModel'] ) && $has( 'buildingBlocks' ) && $sel['contentModel'] ) {

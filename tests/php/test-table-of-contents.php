@@ -96,6 +96,28 @@ class Test_Table_Of_Contents extends WP_UnitTestCase {
 	}
 
 	/**
+	 * (2) A shortcode in a heading, such as a price, shows resolved in the list and in the generated id, never raw.
+	 */
+	public function test_shortcodes_in_headings_are_resolved(): void {
+		add_shortcode( 'leitvia_test_price', static fn(): string => '<strong>149 Euro</strong>' );
+		$html = $this->render_post( "<!-- wp:leitvia/table-of-contents /-->\n" . self::heading( 2, 'Plan from [leitvia_test_price]' ) . self::heading( 2, 'Use' ) );
+		remove_shortcode( 'leitvia_test_price' );
+		$this->assertStringContainsString( '<li><a href="#plan-from-149-euro">Plan from 149 Euro</a></li>', $html );
+		$this->assertStringContainsString( '<h2 id="plan-from-149-euro" class="wp-block-heading">', $html );
+		$this->assertStringNotContainsString( 'leitvia_test_price', (string) strstr( $html, '</nav>', true ), 'the list carries no shortcode' );
+	}
+
+	/**
+	 * (2) Non-breaking spaces of a heading (U+00A0 as entity or character, U+202F) stay in the list, so "ab 14,90 €" does
+	 * not break in a narrow column; the generated id stays the one of plain spaces.
+	 */
+	public function test_non_breaking_spaces_stay(): void {
+		$html = $this->render_post( "<!-- wp:leitvia/table-of-contents /-->\n" . self::heading( 2, "Care ab&nbsp;14,90\u{202F}€ a month" ) . self::heading( 2, "Plan  ab\u{00A0}9" ) );
+		$this->assertStringContainsString( '<a href="#' . sanitize_title( 'Care ab 14,90 € a month' ) . "\">Care ab\u{00A0}14,90\u{202F}€ a month</a>", $html );
+		$this->assertStringContainsString( "<a href=\"#plan-ab-9\">Plan ab\u{00A0}9</a>", $html, 'plain spaces still collapse' );
+	}
+
+	/**
 	 * (2) Without a table of contents in the post, headings stay as saved.
 	 */
 	public function test_no_ids_without_table_of_contents(): void {
@@ -114,6 +136,25 @@ class Test_Table_Of_Contents extends WP_UnitTestCase {
 		$this->assertStringContainsString( '<a href="#deep">Deep</a>', $html );
 		$this->assertStringContainsString( '<h2 id="usage" class="wp-block-heading">Usage</h2>', $html );
 		$this->assertStringContainsString( '<h4 id="deep" class="wp-block-heading">Deep</h4>', $html );
+	}
+
+	/**
+	 * (2) An empty column with the class leitvia-toc (theme template page-legal) takes the table of contents of the h2 in
+	 * the style Lines; a column with content of its own and one without the class stay as they are.
+	 */
+	public function test_place_in_the_template_takes_the_list(): void {
+		$this->render_post( self::heading( 2, 'Provider' ) . self::heading( 3, 'Address' ) . self::heading( 2, 'Liability' ) );
+		Table_Of_Contents::forget();
+		$html = do_blocks( '<!-- wp:column {"className":"leitvia-toc"} --><div class="wp-block-column leitvia-toc"></div><!-- /wp:column --><!-- wp:post-content /-->' );
+		// Core adds its layout classes to the column (is-layout-flow and the rest).
+		$this->assertMatchesRegularExpression( '#<div class="wp-block-column leitvia-toc[^"]*"><nav [^>]*class="[^"]*is-style-lines#', $html );
+		$this->assertStringContainsString( '<a href="#liability">Liability</a>', $html );
+		$this->assertStringNotContainsString( 'href="#address"', $html, 'h2 only' );
+		$this->assertStringContainsString( '<h2 id="provider" class="wp-block-heading">Provider</h2>', $html );
+
+		Table_Of_Contents::forget();
+		$plain = do_blocks( '<!-- wp:column --><div class="wp-block-column"></div><!-- /wp:column -->' );
+		$this->assertStringNotContainsString( '<nav', $plain );
 	}
 
 	/**

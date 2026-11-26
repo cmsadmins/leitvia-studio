@@ -39,6 +39,12 @@ final class Content_Checks {
 	private const QUERY_BLOCKS = array( 'leitvia/query-filter', 'leitvia/load-more' );
 
 	/**
+	 * Icons that work as signs rather than symbols and may repeat in a section (repeated_icons()): quote marks of
+	 * cards, check marks, arrows, plus and minus, rating stars.
+	 */
+	private const REPEATABLE_ICONS = array( 'quote', 'check', 'circle-check', 'arrow-right', 'chevron-right', 'external-link', 'plus', 'minus', 'x', 'star' );
+
+	/**
 	 * Ability to call next by the check that rejected a write.
 	 */
 	public const NEXT_ABILITY = array( 'leitvia/content-tokens' => 'leitvia/get-tokens' );
@@ -61,7 +67,14 @@ final class Content_Checks {
 		'leitvia/bindings'         => array( 'content', 'bindings' ),
 		'leitvia/page-structure'   => array( 'page', 'page' ),
 		'leitvia/template-parts'   => array( 'content', 'template_parts' ),
+		'leitvia/repeated-icons'   => array( 'content', 'repeated_icons' ),
+		'leitvia/sample-text'      => array( 'content', 'sample_text' ),
 	);
+
+	/**
+	 * Shortest sample text sample_text() reports: shorter texts such as "Contact" or "Learn more" may stay on purpose.
+	 */
+	private const SAMPLE_MIN = 20;
 
 	/**
 	 * Registers the checks. Runs on leitvia_studio_init.
@@ -84,6 +97,8 @@ final class Content_Checks {
 			'leitvia/bindings'         => __( 'Block bindings', 'leitvia-studio' ),
 			'leitvia/page-structure'   => __( 'One h1 and landmarks', 'leitvia-studio' ),
 			'leitvia/template-parts'   => __( 'Header, main and footer of a template', 'leitvia-studio' ),
+			'leitvia/repeated-icons'   => __( 'The same icon twice in a section', 'leitvia-studio' ),
+			'leitvia/sample-text'      => __( 'Sample text of a pattern left on the page', 'leitvia-studio' ),
 		);
 		foreach ( self::CHECKS as $name => [ $scope, $method ] ) {
 			$studio->registry( 'checks' )->register(
@@ -138,6 +153,31 @@ final class Content_Checks {
 		$title_h1 = self::title_is_h1( self::template( $context ) );
 		$previous = 1;
 		$findings = array();
+		foreach ( self::levels( $content ) as [ $id, $level, $inner, $rendered ] ) {
+			$text = self::heading_text( $inner );
+			if ( ! $rendered && ! self::has_text( $inner ) ) {
+				$findings[] = self::finding( 'leitvia/headings', 'error', $id, __( 'The heading is empty.', 'leitvia-studio' ), __( 'Give the heading text or remove it.', 'leitvia-studio' ) );
+			}
+			if ( 1 === $level && $title_h1 ) {
+				$findings[] = self::finding( 'leitvia/headings', 'error', $id, __( 'The template already shows the title as h1.', 'leitvia-studio' ), __( 'Use h2 for this heading.', 'leitvia-studio' ) );
+			} elseif ( $level > $previous + 1 ) {
+				/* translators: %d: heading level. */
+				$findings[] = self::finding( 'leitvia/headings', 'error', $id, self::skip_message( $level, $text, $previous ), sprintf( __( 'Use h%d or add the missing level.', 'leitvia-studio' ), $previous + 1 ) );
+			}
+			$previous = $level;
+		}
+		return $findings;
+	}
+
+	/**
+	 * Headings of a markup in order as block ID or path ID, level, inner markup and whether the server renders it.
+	 * Headings in an element with the attribute hidden do not count; blocks that render a heading on the server count
+	 * with the level of their attribute and no inner markup (the server renders the text, so it counts as given).
+	 *
+	 * @param string $content Block markup.
+	 * @return \Generator<array{0: string, 1: int, 2: string, 3: bool}>
+	 */
+	private static function levels( string $content ): \Generator {
 		/**
 		 * Filters the blocks that render a heading on the server, by block name the attribute that holds its level (1
 		 * to 6, the default of the block type when the attribute is missing). Their saved markup has no heading, so the
@@ -152,27 +192,65 @@ final class Content_Checks {
 			if ( '' !== $attribute ) {
 				$type  = \WP_Block_Type_Registry::get_instance()->get_registered( (string) $block['blockName'] );
 				$level = (int) ( $block['attrs'][ $attribute ] ?? $type->attributes[ $attribute ]['default'] ?? 0 );
-				// The server renders the text, so it counts as given.
-				array_unshift( $matches, array( '', (string) $level, 'x' ) );
+				array_unshift( $matches, array( '', (string) $level, '', true ) );
 			}
-			foreach ( $matches as [ , $level, $inner ] ) {
-				$level = (int) $level;
-				if ( $level < 1 || $level > 6 ) {
-					continue;
+			foreach ( $matches as $match ) {
+				if ( (int) $match[1] >= 1 && (int) $match[1] <= 6 ) {
+					yield array( (string) $id, (int) $match[1], (string) $match[2], ! empty( $match[3] ) );
 				}
-				if ( ! self::has_text( $inner ) ) {
-					$findings[] = self::finding( 'leitvia/headings', 'error', $id, __( 'The heading is empty.', 'leitvia-studio' ), __( 'Give the heading text or remove it.', 'leitvia-studio' ) );
-				}
-				if ( 1 === $level && $title_h1 ) {
-					$findings[] = self::finding( 'leitvia/headings', 'error', $id, __( 'The template already shows the title as h1.', 'leitvia-studio' ), __( 'Use h2 for this heading.', 'leitvia-studio' ) );
-				} elseif ( $level > $previous + 1 ) {
-					/* translators: 1: heading level, 2: previous heading level. */
-					$findings[] = self::finding( 'leitvia/headings', 'error', $id, sprintf( __( 'Heading level h%1$d follows h%2$d and skips a level.', 'leitvia-studio' ), $level, $previous ), sprintf( __( 'Use h%d or add the missing level.', 'leitvia-studio' ), $previous + 1 ) );
-				}
-				$previous = $level;
 			}
 		}
-		return $findings;
+	}
+
+	/**
+	 * Message of a heading that skips a level, with its text where it has one.
+	 *
+	 * @param int    $level    Level of the heading.
+	 * @param string $text     Text of the heading, '' for none.
+	 * @param int    $previous Level of the heading before.
+	 */
+	private static function skip_message( int $level, string $text, int $previous ): string {
+		return '' === $text
+			/* translators: 1: heading level, 2: previous heading level. */
+			? sprintf( __( 'Heading level h%1$d follows h%2$d and skips a level.', 'leitvia-studio' ), $level, $previous )
+			/* translators: 1: heading level, 2: text of the heading, 3: previous heading level. */
+			: sprintf( __( 'Heading level h%1$d "%2$s" follows h%3$d and skips a level.', 'leitvia-studio' ), $level, mb_substr( $text, 0, 60 ), $previous );
+	}
+
+	/**
+	 * Text of a heading on one line, without tags.
+	 *
+	 * @param string $inner Markup inside the heading element.
+	 */
+	private static function heading_text( string $inner ): string {
+		return Outline::one_line( wp_strip_all_tags( $inner ) );
+	}
+
+	/**
+	 * Blocks of the state after whose heading skips a level only because something above it changed: the same heading
+	 * (level and text) is in the state before as well. A section taken out above its subheadings, such as an h3 before
+	 * the h4 that follow, makes them skip; when the next steps of the same change take those out too, nothing skips at
+	 * the end. The pipeline counts these as warnings, so a change of several steps is not stopped half way.
+	 *
+	 * @param string $before Block markup before the write.
+	 * @param string $after  Block markup after the write.
+	 * @return array<string, list<string>> Messages of these skips (as in headings()) by block ID or path ID.
+	 */
+	public static function skips_from_above( string $before, string $after ): array {
+		$had = array();
+		foreach ( self::levels( $before ) as [ , $level, $inner ] ) {
+			$had[ $level . '|' . self::heading_text( $inner ) ] = true;
+		}
+		$previous = 1;
+		$blocks   = array();
+		foreach ( self::levels( $after ) as [ $id, $level, $inner ] ) {
+			$text = self::heading_text( $inner );
+			if ( $level > $previous + 1 && isset( $had[ $level . '|' . $text ] ) ) {
+				$blocks[ $id ][] = self::skip_message( $level, $text, $previous );
+			}
+			$previous = $level;
+		}
+		return $blocks;
 	}
 
 	/**
@@ -448,7 +526,9 @@ final class Content_Checks {
 			if ( in_array( $block['blockName'], array( 'core/code', 'core/preformatted' ), true ) ) {
 				continue;
 			}
-			preg_match_all( '#(?<!\[)\[(/?)([a-z][a-z0-9_-]*)(\s+[a-z_-]+\s*=|\s*/\]|\])#', self::html( $block ), $matches, PREG_SET_ORDER );
+			// Shortcodes inside <code> and <pre> are examples a text explains, not rests of a builder.
+			$html = (string) preg_replace( '#<(code|pre)\b[^>]*>.*?</\1>#is', '', self::html( $block ) );
+			preg_match_all( '#(?<!\[)\[(/?)([a-z][a-z0-9_-]*)(\s+[a-z_-]+\s*=|\s*/\]|\])#', $html, $matches, PREG_SET_ORDER );
 			foreach ( $matches as [ , $closing, $name, $rest ] ) {
 				$builder = '' !== $closing || ']' !== $rest || str_contains( $name, '_' );
 				$key     = $name . '|' . $id;
@@ -486,6 +566,96 @@ final class Content_Checks {
 					(string) $id,
 					__( 'The image has a height but no aspect ratio and may be stretched.', 'leitvia-studio' ),
 					__( 'Remove height (and width) so the image keeps its own proportions, or set aspectRatio with scale cover for a crop.', 'leitvia-studio' )
+				);
+			}
+		}
+		return $findings;
+	}
+
+	/**
+	 * Check leitvia/repeated-icons: within one top-level section every decorative icon block (leitvia/icon without a
+	 * label) shows another icon, signs such as quote marks and arrows aside (REPEATABLE_ICONS). Steps, areas and cards made with repeat copy the icon of their model, and a mark above
+	 * the steps easily shares the icon of a step; both read as the same symbol twice. A warning at the second icon.
+	 *
+	 * @param string               $content Block markup.
+	 * @param array<string, mixed> $context Context.
+	 * @return list<array<string, mixed>>
+	 */
+	public static function repeated_icons( string $content, array $context ): array {
+		if ( ! self::applies( $context ) ) {
+			return array();
+		}
+		$findings = array();
+		foreach ( Block_Ids::blocks( parse_blocks( $content ) ) as $index => $section ) {
+			$seen = array();
+			foreach ( self::walk_blocks( array( $section ), 'p:', null ) as [ $block, $id ] ) {
+				$attrs = (array) $block['attrs'];
+				$icon  = (string) ( $attrs['icon'] ?? 'star' );
+				if ( 'leitvia/icon' !== $block['blockName'] || '' !== trim( (string) ( $attrs['label'] ?? '' ) ) || in_array( $icon, self::REPEATABLE_ICONS, true ) ) {
+					continue;
+				}
+				$id = str_starts_with( (string) $id, 'p:0' ) ? 'p:' . $index . substr( (string) $id, 3 ) : (string) $id;
+				if ( isset( $seen[ $icon ] ) ) {
+					$findings[] = self::finding(
+						'leitvia/repeated-icons',
+						'warning',
+						$id,
+						/* translators: 1: icon name, 2: block ID of the first block with the icon. */
+						sprintf( __( 'The icon %1$s already stands at %2$s in the same section.', 'leitvia-studio' ), $icon, $seen[ $icon ] ),
+						__( 'Give each step, area or card an icon of its own with leitvia/update-block, attribute icon; names from leitvia/list-blocks.', 'leitvia-studio' )
+					);
+					continue;
+				}
+				$seen[ $icon ] = $id;
+			}
+		}
+		return $findings;
+	}
+
+	/**
+	 * Check leitvia/sample-text: a section composed from a pattern (metadata.patternName of its root block) still holds a
+	 * text of that pattern word for word, such as the sample name below a quote (its citation) or a sample sentence an
+	 * edit left out. Each block counts with its own text, without its inner blocks, from SAMPLE_MIN characters; texts a
+	 * binding fills do not count. A warning per block: the page may keep a sample text on purpose. Patterns that show
+	 * posts of the site (a query, such as the related news of the theme) are left out: their heading is the standard
+	 * label of what they list, not a sample to replace.
+	 *
+	 * @param string               $content Block markup.
+	 * @param array<string, mixed> $context Context.
+	 * @return list<array<string, mixed>>
+	 */
+	public static function sample_text( string $content, array $context ): array {
+		if ( ! self::applies( $context ) || ! str_contains( $content, '"patternName"' ) ) {
+			return array();
+		}
+		$plain    = static fn( array $block ): string => trim( (string) preg_replace( '/\s+/u', ' ', html_entity_decode( wp_strip_all_tags( self::html( $block ) ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) ) );
+		$registry = \WP_Block_Patterns_Registry::get_instance();
+		$findings = array();
+		foreach ( Block_Ids::blocks( parse_blocks( $content ) ) as $index => $section ) {
+			$pattern = $registry->get_registered( (string) ( $section['attrs']['metadata']['patternName'] ?? '' ) );
+			if ( ! $pattern || preg_match( '/<!-- wp:(query|latest-posts)\b/', (string) $pattern['content'] ) ) {
+				continue;
+			}
+			$samples = array();
+			foreach ( self::walk_blocks( parse_blocks( (string) $pattern['content'] ), 'p:' ) as [ $block ] ) {
+				$text = $plain( $block );
+				if ( mb_strlen( $text ) >= self::SAMPLE_MIN ) {
+					$samples[ $text ] = true;
+				}
+			}
+			foreach ( $samples ? self::walk_blocks( array( $section ), 'p:' ) : array() as [ $block, $id ] ) {
+				if ( ! empty( $block['attrs']['metadata']['bindings'] ) || ! isset( $samples[ $plain( $block ) ] ) ) {
+					continue;
+				}
+				$id         = str_starts_with( (string) $id, 'p:0' ) ? 'p:' . $index . substr( (string) $id, 3 ) : (string) $id;
+				$findings[] = self::finding(
+					'leitvia/sample-text',
+					'warning',
+					$id,
+					'core/quote' === $block['blockName']
+						? __( 'The citation below this quote is still the sample of the pattern.', 'leitvia-studio' )
+						: __( 'This text is still the sample text of the pattern.', 'leitvia-studio' ),
+					__( 'Write the real text with leitvia/update-block (text, for a quote its citation), or send text "" to empty a citation.', 'leitvia-studio' )
 				);
 			}
 		}
@@ -1408,7 +1578,8 @@ final class Content_Checks {
 
 	/**
 	 * Findings with place, a readable name of their block beside its ID: the block type and the start of its text, or
-	 * the file of its image, so a finding at p:9 says which block that is.
+	 * the file of its image, so a finding at p:9 says which block that is. The text is the one the page shows, with
+	 * prices of shortcodes such as [leitvia_price] in it.
 	 *
 	 * @param list<array<string, mixed>> $findings Findings.
 	 * @param string                     $content  Block markup the IDs belong to.
@@ -1416,9 +1587,13 @@ final class Content_Checks {
 	 */
 	public static function places( array $findings, string $content ): array {
 		$labels = array();
+		$wanted = array_flip( array_map( static fn( array $f ): string => (string) ( $f['block'] ?? '' ), $findings ) );
 		foreach ( '' === $content ? array() : self::walk( $content ) as [ $block, $id ] ) {
+			if ( ! isset( $wanted[ $id ] ) ) {
+				continue;
+			}
 			$html          = self::html( $block );
-			$text          = trim( (string) preg_replace( '/\s+/u', ' ', wp_strip_all_tags( $html ) ) );
+			$text          = Outline::plain( $html, 'core/shortcode' !== $block['blockName'] );
 			$file          = preg_match( '/<img[^>]+src="([^"]+)"/', $html, $m ) ? wp_basename( (string) wp_parse_url( $m[1], PHP_URL_PATH ) ) : '';
 			$what          = '' !== $text ? '"' . mb_substr( $text, 0, 60 ) . ( mb_strlen( $text ) > 60 ? '…' : '' ) . '"' : $file;
 			$labels[ $id ] = trim( (string) $block['blockName'] . ' ' . $what );

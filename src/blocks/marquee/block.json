@@ -18,8 +18,17 @@
 		"spacing": {
 			"margin": true,
 			"padding": true
+		},
+		"typography": {
+			"fontSize": true,
+			"__experimentalFontFamily": true
 		}
 	},
+	"styles": [
+		{ "name": "default", "label": "Plain", "isDefault": true },
+		{ "name": "lines", "label": "Between lines" },
+		{ "name": "lines-caps", "label": "Between lines, capitals" }
+	],
 	"example": {
 		"innerBlocks": [ { "name": "core/list", "innerBlocks": [ { "name": "core/list-item", "attributes": { "content": "Fast setup" } }, { "name": "core/list-item", "attributes": { "content": "Accessible" } }, { "name": "core/list-item", "attributes": { "content": "Private" } } ] } ]
 	},

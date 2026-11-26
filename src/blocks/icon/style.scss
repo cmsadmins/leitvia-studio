@@ -11,6 +11,19 @@
 		block-size: 1em;
 		vertical-align: middle;
 	}
+
+	// The attribute size: a large icon that heads an entry of a list or a card, 64, 80 or 96 px whatever the font size.
+	&.is-size-large .leitvia-icon {
+		block-size: 4rem;
+	}
+
+	&.is-size-x-large .leitvia-icon {
+		block-size: 5rem;
+	}
+
+	&.is-size-xx-large .leitvia-icon {
+		block-size: 6rem;
+	}
 }
 
 // Line width from the token iconStroke of the token set (default 2, the width of Lucide), scaled for a viewBox that

@@ -16,13 +16,15 @@ defined( 'ABSPATH' ) || exit;
 final class Status {
 
 	/**
-	 * Maturity per status. A deprecated part makes its users count as draft.
+	 * Maturity per status. A deprecated part makes its users count as draft; a registered pattern outside the
+	 * contract is unreviewed until a person approves it in the Lab.
 	 */
 	public const RANK = array(
 		'draft'      => 0,
 		'review'     => 1,
 		'approved'   => 2,
 		'deprecated' => 0,
+		'unreviewed' => 0,
 	);
 
 	/**
@@ -31,6 +33,13 @@ final class Status {
 	 * @var array<string, string>
 	 */
 	private static array $cache = array();
+
+	/**
+	 * Counts the flushes; what is kept longer than $cache compares it.
+	 *
+	 * @var int
+	 */
+	private static int $generation = 0;
 
 	/**
 	 * Label of a status, the value itself when it is unknown. The Lab shows these through its REST items.
@@ -43,18 +52,24 @@ final class Status {
 			'review'     => __( 'In review', 'leitvia-studio' ),
 			'approved'   => __( 'Approved', 'leitvia-studio' ),
 			'deprecated' => __( 'Deprecated', 'leitvia-studio' ),
+			'unreviewed' => __( 'Not reviewed', 'leitvia-studio' ),
 		);
 		return $labels[ $status ] ?? $status;
 	}
 
 	/**
-	 * Own status, without the parts. Theme patterns are approved unless the contract names a replacement.
+	 * Own status, without the parts. Theme patterns are approved unless the contract names a replacement; registered
+	 * patterns outside the contract are unreviewed until a person approves them in the Lab (Foreign_Patterns).
 	 *
 	 * @param string $ref Pattern reference.
 	 */
 	public static function own( string $ref ): string {
 		if ( str_starts_with( $ref, 'pattern:' ) ) {
-			$pattern = leitvia_studio_contract()->pattern( substr( $ref, 8 ) );
+			$slug = substr( $ref, 8 );
+			if ( Foreign_Patterns::is_foreign( $slug ) ) {
+				return Foreign_Patterns::status( $slug );
+			}
+			$pattern = leitvia_studio_contract()->pattern( $slug );
 			return empty( $pattern['docs']['replacedBy'] ) ? 'approved' : 'deprecated';
 		}
 		$id     = self::block_id( $ref );
@@ -82,21 +97,28 @@ final class Status {
 	 * registered pattern with exactly one root block is inserted (checked in the editor on 2026-10-17 with
 	 * leitvia/hero-split-image). Patterns with several root blocks and older content carry no name and are not found.
 	 *
-	 * @param string $ref Pattern reference.
+	 * @param string            $ref  Pattern reference.
+	 * @param list<string>|null $live Receives the parts that core/pattern loads live; the others sit inline.
+	 * @param-out list<string>  $live
 	 * @return list<string>
 	 */
-	public static function parts( string $ref ): array {
-		return array_values( array_diff( self::refs( self::content( $ref ) ), array( $ref ) ) );
+	public static function parts( string $ref, ?array &$live = null ): array {
+		return array_values( array_diff( self::refs( self::content( $ref ), $live ), array( $ref ) ) );
 	}
 
 	/**
 	 * Patterns used directly in block markup, without duplicates. See parts() for what is found.
 	 *
-	 * @param string $content Block markup.
+	 * @param string            $content Block markup.
+	 * @param list<string>|null $live    Receives the references that core/pattern loads live.
+	 * @param-out list<string>  $live
 	 * @return list<string>
 	 */
-	public static function refs( string $content ): array {
-		return array_values( array_unique( self::collect( parse_blocks( $content ) ) ) );
+	public static function refs( string $content, ?array &$live = null ): array {
+		$found = array();
+		$refs  = self::collect( parse_blocks( $content ), $found );
+		$live  = array_values( $found );
+		return array_values( array_unique( $refs ) );
 	}
 
 	/**
@@ -114,6 +136,15 @@ final class Status {
 	 */
 	public static function flush(): void {
 		self::$cache = array();
+		++self::$generation;
+		Foreign_Patterns::flush();
+	}
+
+	/**
+	 * Number of flushes so far.
+	 */
+	public static function generation(): int {
+		return self::$generation;
 	}
 
 	/**
@@ -138,11 +169,16 @@ final class Status {
 	private static function resolve( string $ref, array &$seen ): string {
 		$seen[ $ref ] = true;
 		$status       = self::own( $ref );
-		foreach ( self::parts( $ref ) as $part ) {
+		$live         = array();
+		foreach ( self::parts( $ref, $live ) as $part ) {
 			if ( isset( $seen[ $part ] ) ) {
 				continue;
 			}
 			$sub = self::resolve( $part, $seen );
+			// Markup inserted by metadata.patternName is in the pattern itself; only core/pattern loads another source live.
+			if ( 'unreviewed' === $sub && ! in_array( $part, $live, true ) ) {
+				continue;
+			}
 			$sub = 'deprecated' === $sub ? 'draft' : $sub;
 			if ( self::RANK[ $sub ] < self::RANK[ $status ] ) {
 				$status = $sub;
@@ -155,9 +191,10 @@ final class Status {
 	 * References in a block list. The inner blocks of an inserted pattern belong to that pattern.
 	 *
 	 * @param array<array<string, mixed>> $blocks Parsed blocks.
+	 * @param array<string>               $live   Receives the references of core/pattern blocks.
 	 * @return list<string>
 	 */
-	private static function collect( array $blocks ): array {
+	private static function collect( array $blocks, array &$live ): array {
 		$refs = array();
 		foreach ( $blocks as $block ) {
 			$attrs = (array) ( $block['attrs'] ?? array() );
@@ -165,10 +202,11 @@ final class Status {
 				$refs[] = 'block:' . (int) $attrs['ref'];
 			} elseif ( 'core/pattern' === $block['blockName'] && ! empty( $attrs['slug'] ) ) {
 				$refs[] = 'pattern:' . $attrs['slug'];
+				$live[] = 'pattern:' . $attrs['slug'];
 			} elseif ( ! empty( $attrs['metadata']['patternName'] ) ) {
 				$refs[] = self::of_name( (string) $attrs['metadata']['patternName'] );
 			} else {
-				$refs = array_merge( $refs, self::collect( (array) ( $block['innerBlocks'] ?? array() ) ) );
+				$refs = array_merge( $refs, self::collect( (array) ( $block['innerBlocks'] ?? array() ), $live ) );
 			}
 		}
 		return $refs;

@@ -142,7 +142,35 @@ final class Mega_Menu {
 				'description' => 'Name of an icon of the set (enum of the attribute icon of leitvia/icon in leitvia/list-blocks) shown before the text, decorative; at most one per item.',
 			);
 		}
+		if ( 'core/navigation' === $name ) {
+			$args['attributes']                    = (array) ( $args['attributes'] ?? array() );
+			$args['attributes']['leitviaMenuText'] = array(
+				'type'        => 'string',
+				'description' => 'Word on the menu button in place of the word Menu of core, with hasIcon false; edit text of leitvia/update-block.',
+			);
+		}
 		return $args;
+	}
+
+	/**
+	 * Puts the word of the attribute leitviaMenuText on the menu button of a navigation that shows a word (hasIcon
+	 * false) in place of the word Menu of core, such as MENU in a header of grid cells. The button names the menu by its
+	 * text, so the word is its name for screen readers too. Runs on render_block_core/navigation.
+	 *
+	 * @param string               $content Rendered navigation.
+	 * @param array<string, mixed> $block   Parsed block.
+	 */
+	public static function menu_text( string $content, array $block ): string {
+		$text = trim( (string) ( $block['attrs']['leitviaMenuText'] ?? '' ) );
+		if ( '' === $text || false !== ( $block['attrs']['hasIcon'] ?? true ) ) {
+			return $content;
+		}
+		return (string) preg_replace_callback(
+			'#(<button\b[^>]*\bwp-block-navigation__responsive-container-open\b[^>]*>)[^<]*(</button>)#',
+			static fn( array $m ): string => $m[1] . esc_html( $text ) . $m[2],
+			$content,
+			1
+		);
 	}
 
 	/**

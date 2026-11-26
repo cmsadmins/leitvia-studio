@@ -237,7 +237,10 @@ final class Icon {
 		if ( $link ) {
 			$svg = sprintf( '<a class="wp-block-leitvia-icon__link" href="%1$s" aria-label="%2$s">%3$s</a>', $url, esc_attr( $label ), $svg );
 		}
-		return sprintf( '<div %1$s>%2$s</div>', get_block_wrapper_attributes(), $svg );
+		// size draws the icon 4rem (large), 5rem (x-large) or 6rem (xx-large) high, whatever the font size, for an icon that
+		// heads an entry.
+		$size = in_array( $attributes['size'] ?? '', array( 'large', 'x-large', 'xx-large' ), true ) ? array( 'class' => 'is-size-' . $attributes['size'] ) : array();
+		return sprintf( '<div %1$s>%2$s</div>', get_block_wrapper_attributes( $size ), $svg );
 	}
 
 	/**

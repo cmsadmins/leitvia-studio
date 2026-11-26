@@ -11,6 +11,16 @@
 class Test_Product_Compare extends WP_UnitTestCase {
 
 	/**
+	 * Skips the tests of the group woocommerce without WooCommerce (npm run test:php:commerce loads it).
+	 */
+	public function set_up(): void {
+		parent::set_up();
+		if ( in_array( 'woocommerce', $this->getGroups(), true ) && ! class_exists( 'WooCommerce' ) ) {
+			$this->markTestSkipped( 'Needs WooCommerce (npm run test:php:commerce).' );
+		}
+	}
+
+	/**
 	 * Saved block with these attributes.
 	 *
 	 * @param array<string, mixed> $attrs Block attributes.

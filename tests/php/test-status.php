@@ -31,6 +31,17 @@ class Test_Status extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The Leitvia theme with its contract, so its patterns are theme patterns and not foreign ones.
+	 */
+	public function set_up(): void {
+		parent::set_up();
+		switch_theme( 'leitvia' );
+		_register_theme_block_patterns();
+		\LeitviaStudio\Plugin::forget_contract();
+		Status::flush();
+	}
+
+	/**
 	 * Drops cached contracts.
 	 */
 	public function tear_down(): void {

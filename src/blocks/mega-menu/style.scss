@@ -127,7 +127,8 @@
 
 // The card keeps a width of its own beside the columns (300 px), so its text and button never break word by word; the
 // other columns share the rest. Below 1200 px four columns and a card leave too little room for one-line entries:
-// the columns go two by two and the card takes a row of its own below them.
+// the columns go two by two, a card stays beside them, narrower (15 rem) and over both rows, so the panel stays low
+// enough for 1024 x 768 without scrolling inside; five columns without a card go two by two.
 @media (min-width: 782px) {
 	.wp-block-leitvia-mega-menu__panel .wp-block-columns > .wp-block-column:has(> .is-style-card-accent):not(:only-child) {
 		flex: 0 0 18.75rem;
@@ -141,20 +142,73 @@
 		> .wp-block-column {
 			flex: 1 1 calc(50% - var(--wp--preset--spacing--l, 2rem));
 		}
+	}
+
+	.wp-block-leitvia-mega-menu__panel .wp-block-columns:has(> .wp-block-column:nth-child(5)):has(> .wp-block-column > .is-style-card-accent) {
+		display: grid;
+		grid-template-columns: 1fr 1fr 15rem;
 
 		> .wp-block-column:has(> .is-style-card-accent) {
-			flex: 1 1 100%;
+			grid-row: 1 / span 2;
+			grid-column: 3;
 		}
 	}
 }
 
+// Columns with heads side by side: the row of columns is a grid and each column with a head a subgrid of its rows, so
+// the first row takes the tallest head and the entries of every column stand on the same lines, even when a head
+// wraps. Columns share the width, a card keeps its 300 px (fr tracks respect the minimum width). The last row takes
+// the rest of a taller card, so no row between the entries grows. The columns that go two by two below 1200 px keep
+// their own grid.
+// ponytail: 24 rows per column; a column with more children puts the rest into the last row.
+@mixin leitvia-head-rows {
+	display: grid;
+	grid-auto-flow: column;
+	grid-auto-columns: 1fr;
+	grid-template-rows: repeat(23, auto) 1fr;
+	gap: 0 var(--wp--preset--spacing--m, 1.5rem);
+
+	> .wp-block-column {
+		grid-row: 1 / -1;
+		min-inline-size: 0;
+	}
+
+	> .wp-block-column:has(> .is-style-card-accent):not(:only-child) {
+		min-inline-size: 18.75rem;
+	}
+
+	> .wp-block-column:has(> .leitvia-mega-menu-head) {
+		display: grid;
+		grid-template-rows: subgrid;
+		align-content: start;
+	}
+}
+
+$head-row: ".wp-block-leitvia-mega-menu__panel:not(.is-menu-open *) .wp-block-columns:has(> .wp-block-column > .leitvia-mega-menu-head)";
+
+@media (min-width: 782px) {
+	#{$head-row}:not(:has(> .wp-block-column:nth-child(5))) {
+		@include leitvia-head-rows;
+	}
+}
+
+@media (min-width: 75rem) {
+	#{$head-row} {
+		@include leitvia-head-rows;
+	}
+}
+
 // Column heads in capitals (class leitvia-mega-menu-head--eyebrow, pattern mega-menu-overview): stronger than the
-// entries through the accent, the ui font and the line below; the link keeps its underline on hover and focus.
+// entries through the accent, the ui font and the line below; the link keeps its underline on hover and focus. A
+// size of 12 px with a tight spacing and the gap m between the columns keep heads up to about 22 letters on one line
+// in four columns beside a card from 1280 px.
 .leitvia-mega-menu-head--eyebrow :is(h2, h3) {
+	// The pattern sets fontSize meta on the head, whose preset class is important; this selector is stronger, so the
+	// head keeps its 12 px without redefining a preset (the deactivation test compares the preset declarations).
 	font-family: var(--wp--preset--font-family--ui, inherit);
-	font-size: 0.75rem;
+	font-size: 0.75rem !important;
 	font-weight: 600;
-	letter-spacing: 0.1em;
+	letter-spacing: 0.04em;
 	line-height: 1.4;
 	text-transform: uppercase;
 
@@ -164,9 +218,18 @@
 	}
 }
 
-// Entries on one line each: the link on the left, a price an agent puts beside it on the right (below it when the
-// column is too narrow); links in the panel
-// rows are underlined on hover and focus, the link to all of a topic stays underlined.
+// Entries on one line each, in the small type of the panel (meta) whatever size their paragraphs had: the link on the
+// left, a price an agent puts beside it on the right (below it when the column is too narrow); links in the panel
+// rows are underlined on hover and focus, the link to all of a topic stays underlined. A size class set on an entry
+// on purpose (has-*-font-size) still wins.
+.wp-block-leitvia-mega-menu__panel .leitvia-mega-menu-entry {
+	font-size: var(--wp--preset--font-size--meta, 0.875rem);
+
+	> p:not([class*="-font-size"]) {
+		font-size: inherit;
+	}
+}
+
 .leitvia-mega-menu-entry {
 	align-items: baseline;
 

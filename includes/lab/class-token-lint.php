@@ -106,8 +106,10 @@ final class Token_Lint {
 	/**
 	 * Rule no-unknown-preset: preset slugs that are neither a role of the contract of the active theme nor one of its
 	 * coreAliases. The theme has no such preset, so the value renders nothing (ink text on an unknown background stays
-	 * ink on ink). Slugs that mix digits and letters are left to no-digit-preset. Without a contract nothing is known
-	 * and the rule stays silent.
+	 * ink on ink). The extra surfaces of the active token set (surface-extra-<name>) are colors of the theme as well,
+	 * in pages and in template parts alike; lintMarkup() in JavaScript knows no token set and leaves them to this side.
+	 * Slugs that mix digits and letters are left to no-digit-preset. Without a contract nothing is known and the rule
+	 * stays silent.
 	 *
 	 * @param string $content Block markup.
 	 * @return list<string> Matches.
@@ -121,6 +123,7 @@ final class Token_Lint {
 		foreach ( $contract->core_aliases() as $type => $aliases ) {
 			$known[ $type ] = array_merge( $known[ $type ] ?? array(), array_map( 'strval', array_keys( $aliases ) ) );
 		}
+		$known['color'] = array_merge( $known['color'] ?? array(), \LeitviaStudio\Gateway\Block_Edit::extra_surfaces() );
 		preg_match_all( self::PRESET, $content, $matches, PREG_SET_ORDER | PREG_UNMATCHED_AS_NULL );
 		$found = array();
 		foreach ( $matches as $m ) {

@@ -151,6 +151,8 @@ final class Recipes {
 							'openWorldHint' => false,
 						),
 						'show_in_rest' => true,
+						// A run writes many parts; MCP clients with the tasks extension get a task (Mcp\Tasks).
+						'long_running' => true,
 					),
 				),
 				'group' => 'setup',

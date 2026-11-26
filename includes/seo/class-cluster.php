@@ -51,6 +51,12 @@ final class Cluster {
 	public const OFFERINGS_META = '_leitvia_offerings';
 
 	/**
+	 * Post meta of a page that shows no breadcrumbs ('1', leitvia/set-page-structure breadcrumbs false), such as a page
+	 * whose title section stands right below the header; the BreadcrumbList goes with the block.
+	 */
+	public const NO_BREADCRUMBS_META = '_leitvia_no_breadcrumbs';
+
+	/**
 	 * Article numbers of offerings: a letter or digit, then letters, digits, dots, hyphens and underscores.
 	 */
 	public const SKU = '^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$';
@@ -69,6 +75,16 @@ final class Cluster {
 	 * Most packages (offers) per service.
 	 */
 	public const MAX_OFFERS = 10;
+
+	/**
+	 * Types of what a page offers (service type of set-page-structure): a Service or a SoftwareApplication.
+	 */
+	public const SERVICE_TYPES = array( 'service', 'software' );
+
+	/**
+	 * Fields of a service of the type software.
+	 */
+	private const SOFTWARE_FIELDS = array( 'application_category', 'operating_system', 'download_url' );
 
 	/**
 	 * The hubs above a page, the closest last: its hub, the hub of that one and so on, published pages only, without
@@ -112,6 +128,22 @@ final class Cluster {
 			$hub = (int) get_post_meta( $hub, self::HUB_META, true );
 		}
 		return false;
+	}
+
+	/**
+	 * Renders no breadcrumbs block on a page that hides them (NO_BREADCRUMBS_META): the block of the template stays,
+	 * every other page keeps its trail, and without the block no BreadcrumbList is printed either. Runs on
+	 * pre_render_block.
+	 *
+	 * @param string|null          $pre   Markup an earlier filter returned, null to render the block.
+	 * @param array<string, mixed> $block Parsed block.
+	 * @return string|null
+	 */
+	public static function hide_breadcrumbs( $pre, array $block ) {
+		if ( null !== $pre || 'core/breadcrumbs' !== ( $block['blockName'] ?? '' ) || ! is_singular() ) {
+			return $pre;
+		}
+		return '1' === get_post_meta( (int) get_queried_object_id(), self::NO_BREADCRUMBS_META, true ) ? '' : null;
 	}
 
 	/**
@@ -170,12 +202,13 @@ final class Cluster {
 
 	/**
 	 * The service of a page from SERVICE_META, cleaned: name, description, price as a number, max_price for a range,
-	 * currency (EUR unless set), vat_included, unit and offers, the packages with name, price, description and unit;
-	 * null without a name or with a broken value. With packages and no price, price is the lowest package price; a
-	 * package has max_price when its price is a range. Goes through the filter leitvia_studio_page_service.
+	 * currency (EUR unless set), vat_included, unit, setup_fee (a one-off fee above 0, else null), compare_price (a
+	 * higher price it stands against, such as its parts bought one by one, else null) and offers, the packages with
+	 * name, price, description, unit, setup_fee and compare_price; null without a name or with a broken value. With
+	 * packages and no price, price is the lowest package price; a package has max_price when its price is a range. Goes through the filter leitvia_studio_page_service.
 	 *
 	 * @param int $page Page ID.
-	 * @return array{name: string, description: string, price: float|null, max_price: float|null, price_from: bool, currency: string, vat_included: bool, unit: string, offers: list<array{name: string, price: float, max_price: float|null, price_from: bool, addon: bool, description: string, unit: string}>}|null
+	 * @return array{type: string, application_category: string, operating_system: string, download_url: string, name: string, description: string, price: float|null, max_price: float|null, price_from: bool, currency: string, vat_included: bool, unit: string, setup_fee: float|null, compare_price: float|null, offers: list<array{name: string, price: float, max_price: float|null, price_from: bool, addon: bool, description: string, unit: string, setup_fee: float|null, compare_price: float|null}>}|null
 	 */
 	public static function service( int $page ): ?array {
 		$stored = self::clean_service( get_post_meta( $page, self::SERVICE_META, true ) );
@@ -188,7 +221,12 @@ final class Cluster {
 		 * @param int                       $page    Post ID.
 		 */
 		$service = apply_filters( 'leitvia_studio_page_service', $stored, $page );
-		return $service === $stored ? $stored : self::clean_service( $service );
+		if ( $service === $stored ) {
+			return $stored;
+		}
+		// Prices from an add-on keep the type and the software fields stored with the page.
+		$kept = $stored ? array_intersect_key( $stored, array_flip( array_merge( array( 'type' ), self::SOFTWARE_FIELDS ) ) ) : array();
+		return self::clean_service( is_array( $service ) ? array_filter( $service, static fn( $value ): bool => '' !== $value ) + $kept : $service );
 	}
 
 	/**
@@ -211,7 +249,7 @@ final class Cluster {
 	 * A service as SERVICE_META stores it, cleaned, see service(); null without a name.
 	 *
 	 * @param mixed $service Stored service.
-	 * @return array{name: string, description: string, price: float|null, max_price: float|null, price_from: bool, currency: string, vat_included: bool, unit: string, offers: list<array{name: string, price: float, max_price: float|null, price_from: bool, addon: bool, description: string, unit: string}>}|null
+	 * @return array{type: string, application_category: string, operating_system: string, download_url: string, name: string, description: string, price: float|null, max_price: float|null, price_from: bool, currency: string, vat_included: bool, unit: string, setup_fee: float|null, compare_price: float|null, offers: list<array{name: string, price: float, max_price: float|null, price_from: bool, addon: bool, description: string, unit: string, setup_fee: float|null, compare_price: float|null}>}|null
 	 */
 	private static function clean_service( $service ): ?array {
 		$service = is_array( $service ) ? $service : array();
@@ -220,6 +258,7 @@ final class Cluster {
 			return null;
 		}
 		$number = static fn( $value ): ?float => is_numeric( $value ) && (float) $value >= 0 ? (float) $value : null;
+		$fee    = static fn( $value ): ?float => is_numeric( $value ) && (float) $value > 0 ? (float) $value : null;
 		$offers = array();
 		foreach ( array_slice( (array) ( $service['offers'] ?? array() ), 0, self::MAX_OFFERS ) as $offer ) {
 			$offer = (array) $offer;
@@ -228,13 +267,15 @@ final class Cluster {
 			if ( '' !== $label && null !== $cost ) {
 				$top      = $number( $offer['max_price'] ?? null );
 				$offers[] = array(
-					'name'        => $label,
-					'price'       => $cost,
-					'max_price'   => null !== $top && $top > $cost ? $top : null,
-					'price_from'  => ! empty( $offer['price_from'] ),
-					'addon'       => ! empty( $offer['addon'] ),
-					'description' => trim( (string) ( $offer['description'] ?? '' ) ),
-					'unit'        => trim( (string) ( $offer['unit'] ?? '' ) ),
+					'name'          => $label,
+					'price'         => $cost,
+					'max_price'     => null !== $top && $top > $cost ? $top : null,
+					'price_from'    => ! empty( $offer['price_from'] ),
+					'addon'         => ! empty( $offer['addon'] ),
+					'description'   => trim( (string) ( $offer['description'] ?? '' ) ),
+					'unit'          => trim( (string) ( $offer['unit'] ?? '' ) ),
+					'setup_fee'     => $fee( $offer['setup_fee'] ?? null ),
+					'compare_price' => $fee( $offer['compare_price'] ?? null ),
 				);
 			}
 		}
@@ -242,15 +283,21 @@ final class Cluster {
 		$price = null === $price && $offers ? min( array_column( $offers, 'price' ) ) : $price;
 		$max   = $number( $service['max_price'] ?? null );
 		return array(
-			'name'         => $name,
-			'description'  => trim( (string) ( $service['description'] ?? '' ) ),
-			'price'        => $price,
-			'max_price'    => null !== $price && null !== $max && $max > $price ? $max : null,
-			'price_from'   => ! empty( $service['price_from'] ),
-			'currency'     => preg_match( '/^[A-Z]{3}$/', (string) ( $service['currency'] ?? '' ) ) ? (string) $service['currency'] : 'EUR',
-			'vat_included' => ! empty( $service['vat_included'] ),
-			'unit'         => trim( (string) ( $service['unit'] ?? '' ) ),
-			'offers'       => $offers,
+			'type'                 => 'software' === ( $service['type'] ?? '' ) ? 'software' : 'service',
+			'application_category' => trim( (string) ( $service['application_category'] ?? '' ) ),
+			'operating_system'     => trim( (string) ( $service['operating_system'] ?? '' ) ),
+			'download_url'         => str_starts_with( (string) ( $service['download_url'] ?? '' ), 'https://' ) ? (string) $service['download_url'] : '',
+			'name'                 => $name,
+			'description'          => trim( (string) ( $service['description'] ?? '' ) ),
+			'price'                => $price,
+			'max_price'            => null !== $price && null !== $max && $max > $price ? $max : null,
+			'price_from'           => ! empty( $service['price_from'] ),
+			'currency'             => preg_match( '/^[A-Z]{3}$/', (string) ( $service['currency'] ?? '' ) ) ? (string) $service['currency'] : 'EUR',
+			'vat_included'         => ! empty( $service['vat_included'] ),
+			'unit'                 => trim( (string) ( $service['unit'] ?? '' ) ),
+			'setup_fee'            => $fee( $service['setup_fee'] ?? null ),
+			'compare_price'        => $fee( $service['compare_price'] ?? null ),
+			'offers'               => $offers,
 		);
 	}
 
@@ -260,7 +307,10 @@ final class Cluster {
 	 * with the lowest and highest price, with max_price an AggregateOffer for the range. highPrice is the top of every
 	 * price and range, of the service and of its packages; a package with a range carries minPrice and maxPrice in its
 	 * price specification, and so does a price from (price_from) with minPrice alone. An offer only sold with another
-	 * (addon) is an Offer of its own but leaves lowPrice and highPrice to the others. null for a page without a service.
+	 * (addon) is an Offer of its own but leaves lowPrice and highPrice to the others. A setup fee (setup_fee) adds a
+	 * second UnitPriceSpecification with priceComponentType ActivationFee, a comparison price (compare_price) one with
+	 * priceType StrikethroughPrice. A service of the type software is a SoftwareApplication with the organization as
+	 * publisher, applicationCategory, operatingSystem and downloadUrl. null for a page without a service.
 	 *
 	 * @param WP_Post              $page         Page.
 	 * @param array<string, mixed> $organization Organization node.
@@ -271,28 +321,51 @@ final class Cluster {
 		if ( ! $service ) {
 			return null;
 		}
-		$url   = (string) get_permalink( $page );
-		$node  = array(
-			'@type'    => 'Service',
-			'name'     => $service['name'],
-			'url'      => $url,
-			'provider' => $organization,
-		) + array_filter( array( 'description' => $service['description'] ) );
-		$offer = static fn( float $price, string $unit, array $extra = array(), ?float $max = null, bool $from = false ): array => $extra + array(
-			'@type'              => 'Offer',
-			'price'              => $price,
-			'priceCurrency'      => $service['currency'],
-			'url'                => $url,
-			'priceSpecification' => array(
-				'@type'                 => 'UnitPriceSpecification',
-				'price'                 => $price,
-				'priceCurrency'         => $service['currency'],
-				'valueAddedTaxIncluded' => $service['vat_included'],
-			) + ( null === $max ? array() : array(
-				'minPrice' => $price,
-				'maxPrice' => $max,
-			) ) + ( null === $max && $from ? array( 'minPrice' => $price ) : array() ) + array_filter( array( 'unitText' => $unit ) ),
+		$url      = (string) get_permalink( $page );
+		$software = 'software' === $service['type'];
+		// Software has a publisher, a service a provider.
+		$node = array(
+			'@type'                              => $software ? 'SoftwareApplication' : 'Service',
+			'name'                               => $service['name'],
+			'url'                                => $url,
+			$software ? 'publisher' : 'provider' => $organization,
+		) + array_filter(
+			array(
+				'description'         => $service['description'],
+				'applicationCategory' => $software ? $service['application_category'] : '',
+				'operatingSystem'     => $software ? $service['operating_system'] : '',
+				'downloadUrl'         => $software ? $service['download_url'] : '',
+			)
 		);
+		$spec = static fn( float $price, array $extra ): array => array(
+			'@type'                 => 'UnitPriceSpecification',
+			'price'                 => $price,
+			'priceCurrency'         => $service['currency'],
+			'valueAddedTaxIncluded' => $service['vat_included'],
+		) + $extra;
+		// A one-off setup fee is a second price specification of the type ActivationFee beside the price.
+		// A comparison price, such as the parts bought one by one, is one of the type StrikethroughPrice.
+		$offer = static function ( float $price, string $unit, array $extra = array(), ?float $max = null, bool $from = false, ?float $fee = null, ?float $compare = null ) use ( $service, $url, $spec ): array {
+			$main  = $spec(
+				$price,
+				( null === $max ? array() : array(
+					'minPrice' => $price,
+					'maxPrice' => $max,
+				) ) + ( null === $max && $from ? array( 'minPrice' => $price ) : array() ) + array_filter( array( 'unitText' => $unit ) )
+			);
+			$specs = array_merge(
+				array( $main ),
+				null === $fee ? array() : array( $spec( $fee, array( 'priceComponentType' => 'https://schema.org/ActivationFee' ) ) ),
+				null === $compare || $compare <= $price ? array() : array( $spec( $compare, array( 'priceType' => 'https://schema.org/StrikethroughPrice' ) + array_filter( array( 'unitText' => $unit ) ) ) )
+			);
+			return $extra + array(
+				'@type'              => 'Offer',
+				'price'              => $price,
+				'priceCurrency'      => $service['currency'],
+				'url'                => $url,
+				'priceSpecification' => 1 === count( $specs ) ? $main : $specs,
+			);
+		};
 		if ( $service['offers'] ) {
 			$base           = array_values( array_filter( $service['offers'], static fn( array $package ): bool => empty( $package['addon'] ) ) );
 			$base           = $base ? $base : $service['offers'];
@@ -305,7 +378,7 @@ final class Cluster {
 				'priceCurrency' => $service['currency'],
 				'offerCount'    => count( $service['offers'] ),
 				'offers'        => array_map(
-					static fn( array $package ): array => $offer( $package['price'], '' !== $package['unit'] ? $package['unit'] : $service['unit'], array( 'name' => $package['name'] ) + array_filter( array( 'description' => $package['description'] ) ), $package['max_price'], ! empty( $package['price_from'] ) ),
+					static fn( array $package ): array => $offer( $package['price'], '' !== $package['unit'] ? $package['unit'] : $service['unit'], array( 'name' => $package['name'] ) + array_filter( array( 'description' => $package['description'] ) ), $package['max_price'], ! empty( $package['price_from'] ), $package['setup_fee'] ?? null, $package['compare_price'] ?? null ),
 					$service['offers']
 				),
 			);
@@ -318,7 +391,7 @@ final class Cluster {
 				'url'           => $url,
 			);
 		} elseif ( null !== $service['price'] ) {
-			$node['offers'] = $offer( $service['price'], $service['unit'], array(), null, ! empty( $service['price_from'] ) );
+			$node['offers'] = $offer( $service['price'], $service['unit'], array(), null, ! empty( $service['price_from'] ), $service['setup_fee'] ?? null, $service['compare_price'] ?? null );
 		}
 		return $node;
 	}

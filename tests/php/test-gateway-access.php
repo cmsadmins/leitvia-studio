@@ -375,4 +375,15 @@ class Test_Gateway_Access extends WP_UnitTestCase {
 		);
 		$this->assertNull( $summary['verify'] );
 	}
+
+	/**
+	 * The own server answers without the adapter and names its revisions.
+	 */
+	public function test_access_names_own_server(): void {
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+		$access = \LeitviaStudio\Rest\Gateway_Access_Controller::access()->get_data();
+		$this->assertTrue( $access['server']['ready'] );
+		$this->assertSame( array( '2026-07-28', '2025-11-25' ), $access['server']['protocols'] );
+		$this->assertSame( '0.7.2', $access['mcp']['required'] );
+	}
 }

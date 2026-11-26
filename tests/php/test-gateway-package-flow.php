@@ -494,7 +494,8 @@ class Test_Gateway_Package_Flow extends WP_UnitTestCase {
 		$this->assertSame( 'open', Packages::state( $package ) );
 
 		$list = wp_get_ability( 'leitvia/list-packages' )->execute( array() );
-		$this->assertSame( array( $package ), array_column( $list, 'id' ) );
+		$this->assertSame( array( $package ), array_column( $list['items'], 'id' ) );
+		$this->assertSame( 1, $list['total'] );
 		$detail = wp_get_ability( 'leitvia/get-package' )->execute( array( 'id' => $package ) );
 		$this->assertSame( 'Agent text', $detail['items'][0]['diff'][0]['after_text'] );
 
@@ -506,7 +507,7 @@ class Test_Gateway_Package_Flow extends WP_UnitTestCase {
 
 		wp_set_current_user( self::factory()->user->create( array( 'role' => Gateway::ROLE ) ) );
 		$this->assertSame( 'leitvia_forbidden', wp_get_ability( 'leitvia/get-package' )->execute( array( 'id' => $package ) )->get_error_code() );
-		$this->assertSame( array(), wp_get_ability( 'leitvia/list-packages' )->execute( array() ) );
+		$this->assertSame( array(), wp_get_ability( 'leitvia/list-packages' )->execute( array() )['items'] );
 
 		wp_set_current_user( $this->agent );
 		self::settings( 'draft' );
@@ -515,6 +516,47 @@ class Test_Gateway_Package_Flow extends WP_UnitTestCase {
 		$rolled = wp_get_ability( 'leitvia/rollback' )->execute( array( 'id' => $package ) );
 		$this->assertSame( 'rolled_back', $rolled['state'] );
 		$this->assertStringContainsString( 'Old', get_post( $post )->post_content );
+	}
+
+	/**
+	 * The list of list-packages pages with total, so no open package drops out of sight; audit-site names packages left open for
+	 * more than a day (leitvia/stale-package), newer ones not.
+	 */
+	public function test_list_pages_and_stale_packages(): void {
+		$ids = array();
+		foreach ( array( 'one', 'two', 'three' ) as $key ) {
+			$ids[] = $this->queue( $this->post(), array( 'post_title' => 'New ' . $key ), $key );
+		}
+		$list = wp_get_ability( 'leitvia/list-packages' );
+		$page = $list->execute(
+			array(
+				'state'    => 'open',
+				'page'     => 2,
+				'per_page' => 2,
+			)
+		);
+		$this->assertSame( 3, $page['total'] );
+		$this->assertSame( 2, $page['pages'] );
+		$this->assertCount( 1, $page['items'] );
+		$all = array_column( $list->execute( array() )['items'], 'id' );
+		$this->assertEqualsCanonicalizing( $ids, $all );
+
+		$stale = static fn(): array => wp_list_filter( wp_get_ability( 'leitvia/audit-site' )->execute( array( 'limit' => 1 ) )['site'], array( 'check' => 'leitvia/stale-package' ) );
+		$this->assertSame( array(), $stale(), 'new packages are no finding' );
+		$old   = gmdate( 'Y-m-d H:i:s', time() - 2 * DAY_IN_SECONDS );
+		wp_update_post(
+			array(
+				'ID'            => $ids[0],
+				'post_date'     => $old,
+				'post_date_gmt' => $old,
+			)
+		);
+		$found = array_values( $stale() );
+		$this->assertCount( 1, $found );
+		$this->assertStringContainsString( (string) $ids[0], $found[0]['message'] );
+		$this->assertStringNotContainsString( (string) $ids[1], $found[0]['message'] );
+		Packages::reject( $ids[0] );
+		$this->assertSame( array(), $stale(), 'a discarded package waits no more' );
 	}
 
 	/**

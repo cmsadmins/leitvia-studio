@@ -96,7 +96,10 @@ final class Export {
 					'next'           => array( 'type' => array( 'integer', 'null' ) ),
 				),
 			),
-			array( self::class, 'export' )
+			array( self::class, 'export' ),
+			false,
+			null,
+			true
 		);
 	}
 

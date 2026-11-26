@@ -158,6 +158,9 @@ class Test_Uninstall extends WP_UnitTestCase {
 			self::switch_to( $site );
 			\LeitviaStudio\Gateway\Gateway::install();
 			update_option( 'leitvia_studio_gateway', array( 'rate_per_minute' => 10 ) );
+			update_option( 'leitvia_studio_oauth_clients', array( 'lv-x' => array( 'client_id' => 'lv-x' ) ), false );
+			set_transient( 'leitvia_oauth_client_x', array( 'client_id' => 'x' ), DAY_IN_SECONDS );
+			set_transient( 'leitvia_oauth_throttle_x', array( 'n' => 1 ), MINUTE_IN_SECONDS );
 			$packages[ $site ] = wp_insert_post(
 				array(
 					'post_type'   => 'leitvia_package',
@@ -178,7 +181,10 @@ class Test_Uninstall extends WP_UnitTestCase {
 		$this->assertCount( count( $sites ), $dropped );
 		foreach ( $sites as $site ) {
 			self::switch_to( $site );
-			$this->assertContains( "DROP TABLE IF EXISTS {$wpdb->prefix}leitvia_audit, {$wpdb->prefix}leitvia_snapshots", $dropped );
+			$this->assertContains( "DROP TABLE IF EXISTS {$wpdb->prefix}leitvia_audit, {$wpdb->prefix}leitvia_snapshots, {$wpdb->prefix}leitvia_oauth_tokens", $dropped );
+			$this->assertFalse( get_option( 'leitvia_studio_oauth_clients' ), 'registered OAuth clients go' );
+			$this->assertFalse( get_transient( 'leitvia_oauth_client_x' ), 'kept client documents go' );
+			$this->assertFalse( get_transient( 'leitvia_oauth_throttle_x' ), 'the throttle goes' );
 			$this->assertFalse( get_option( 'leitvia_studio_db' ) );
 			$this->assertFalse( get_option( 'leitvia_studio_gateway', false ) );
 			$this->assertFalse( wp_next_scheduled( 'leitvia_studio_gateway_prune' ) );
@@ -348,6 +354,26 @@ class Test_Uninstall extends WP_UnitTestCase {
 		if ( is_multisite() ) {
 			$site ? switch_to_blog( $site ) : restore_current_blog();
 		}
+	}
+
+	/**
+	 * Tasks of the MCP server with their lock and events, the prompt counter and open request states go.
+	 */
+	public function test_removes_mcp_state(): void {
+		$id = str_repeat( 'a', 32 );
+		update_option( 'leitvia_studio_mcp_task_' . $id, array( 'owner' => 1 ), false );
+		update_option( 'leitvia_studio_mcp_task_' . $id . '_lock', 1, false );
+		update_option( 'leitvia_studio_mcp_prompts', 3, false );
+		wp_schedule_single_event( time() + 60, 'leitvia_studio_mcp_task', array( $id ) );
+		wp_schedule_single_event( time() + 3600, 'leitvia_studio_mcp_task_expire', array( $id ) );
+		set_transient( 'leitvia_mcp_rs_' . str_repeat( 'b', 32 ), 1, 600 );
+		self::uninstall();
+		$this->assertFalse( get_option( 'leitvia_studio_mcp_task_' . $id ) );
+		$this->assertFalse( get_option( 'leitvia_studio_mcp_task_' . $id . '_lock' ) );
+		$this->assertFalse( get_option( 'leitvia_studio_mcp_prompts' ) );
+		$this->assertFalse( wp_next_scheduled( 'leitvia_studio_mcp_task', array( $id ) ) );
+		$this->assertFalse( wp_next_scheduled( 'leitvia_studio_mcp_task_expire', array( $id ) ) );
+		$this->assertFalse( get_transient( 'leitvia_mcp_rs_' . str_repeat( 'b', 32 ) ) );
 	}
 
 	/**

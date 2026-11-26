@@ -4,11 +4,11 @@ Tags: ai agent, mcp, abilities api, design tokens, block theme
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.59
+Stable tag: 1.3.60
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-AI agents such as Claude Code build and maintain block theme sites over MCP or REST. Every change is checked, reviewable and can be rolled back.
+AI agents such as Claude Code or claude.ai build and maintain block theme sites over MCP or REST. Every change is checked and can be rolled back.
 
 == Description ==
 
@@ -19,8 +19,8 @@ The abilities belong to the WordPress [Abilities API](https://developer.wordpres
 = What it does =
 
 * **AI agent gateway with review and rollback.** Agents read the design contract, tokens, patterns and page outlines, then build pages from patterns, change single blocks, fix links and alt text or set up navigation. Every write runs through one pipeline: identity, scope, a hash check against stale reads, content checks (headings, alt text, link text, contrast, landmarks), a snapshot and an audit entry. An autonomy level per area decides whether a change goes live, lands as a draft or waits in the inbox as a change package with a block diff, which a person applies, rejects or rolls back.
-* **MCP server for WordPress.** With the plugin [MCP Adapter](https://wordpress.org/plugins/mcp-adapter/) active, Studio adds its own MCP server "leitvia" with one tool per ability; the default server of the adapter offers the same abilities. Without the adapter, every ability runs over the REST API, and `wp leitvia` runs them from WP-CLI.
-* **Limited rights for agents.** An agent signs in as a "Leitvia Agent" user with an application password that an administrator creates and revokes on the Agents screen. It never installs or changes plugins, themes, users or code. Site settings, the content model and global styles always wait for a person.
+* **MCP server for WordPress.** Studio brings its own MCP server "leitvia" (revisions 2026-07-28 and 2025-11-25) with one tool per ability, the agent skills as prompts, resources, questions before steps that delete or roll back, and long tasks in the background. Clients sign in with OAuth (claude.ai, Claude Desktop, ChatGPT, VS Code) or with an application password (Claude Code, Codex, Cursor, Gemini CLI). The plugin [MCP Adapter](https://wordpress.org/plugins/mcp-adapter/) is optional; its default server offers the same abilities. Every ability also runs over the REST API, and `wp leitvia` runs them from WP-CLI.
+* **Limited rights for agents.** An agent signs in as a "Leitvia Agent" user with an application password or an OAuth connection that an administrator creates and revokes on the Agents screen. It never installs or changes plugins, themes, users or code. Site settings, the content model and global styles always wait for a person.
 * **Design tokens.** Token sets in the [W3C Design Tokens format (DTCG)](https://www.designtokens.org/) are imported, exported, kept with revisions and compiled into the global styles. A set whose text or control colors miss WCAG 2.2 AA contrast cannot be saved, and overlays change tokens for a scheduled period.
 * **Pattern Lab.** All patterns with live previews in every style variation at 390, 782 and 1440 px, state variants, an axe accessibility check per preview, status, version and a usage index.
 * **Content model and block bindings.** Post types, taxonomies, fields, relations and site settings declared as JSON, registered through core APIs and shown in paragraphs, headings, buttons and images through block bindings.
@@ -40,7 +40,7 @@ Leitvia Studio follows the standards WordPress sets for AI agents and will keep 
 
 * [WordPress agent skills](https://github.com/WordPress/agent-skills): an AI agent with only the official skills finds the Leitvia abilities with `GET /wp-json/wp-abilities/v1/abilities?category=leitvia`.
 * [Abilities API](https://developer.wordpress.org/apis/abilities-api/): every ability has described input fields, an output schema and annotations (readonly, destructive, idempotent), and runs under `/wp-json/wp-abilities/v1`.
-* [MCP Adapter](https://wordpress.org/plugins/mcp-adapter/) 0.7: its default server lists the Leitvia abilities through discover-abilities and execute-ability, with the same checks.
+* [MCP Adapter](https://wordpress.org/plugins/mcp-adapter/) 0.7: optional; its default server lists the Leitvia abilities through discover-abilities and execute-ability, with the same checks.
 
 The [Leitvia agent skills on GitHub](https://github.com/cmsadmins/leitvia-skills) add eleven skills for setup, design, pages, patterns, maintenance, accessibility, migration, shop catalog, news, SEO and reports, and three workflows. They work side by side with the WordPress skills. The [Leitvia developer guide](https://leitvia.com/docs/developers/) shows the calls with real answers.
 
@@ -60,9 +60,11 @@ The Contact form block sends the name, email address and message a visitor enter
 
 == External services ==
 
-This plugin does not connect to any external service by default. The check after an AI agent changed a page live loads that page from your own site (a loopback request, see the question on requests from your server); it contacts no other host.
+This plugin does not connect to any external service by default. The check after an AI agent changed a page live loads that page from your own site (a loopback request, see the question on requests from your server); it contacts no other host. With OAuth on, the Agents screen asks your own site the same way, at most twice a day, whether the sign-in addresses under /.well-known/ answer.
 
 Migration: the ability "Import post" (leitvia/import-post), called with the address of a page on another site, downloads its images from their host into the media library. That host sees your server's IP address.
+
+Connecting an AI client over OAuth: when an administrator agrees on the page "Connect agent" to connect a client such as claude.ai or ChatGPT that names itself with a Client ID Metadata Document, Leitvia Studio fetches that public JSON document from the https address the client gave, from your server and at most once a day per client. The request carries no data of visitors or users; the host of the client sees your server's IP address. Without such a connection nothing is fetched. The terms and privacy policy of the provider of the client apply.
 
 AI provider of the site owner: only when an agent or a user calls the ability "Plan page" (leitvia/plan-page) with ai set to true, Leitvia Studio sends one request through the AI client of WordPress to the AI connector an administrator set up under Settings, Connectors (for example OpenAI, Anthropic or Google). Leitvia Studio has no provider of its own and stores no keys. The request holds the goal and the content points given in that call, the page frame and composition rules of the contract, and the names and metadata of the patterns; no posts, no user data and no other content of the database. Without that call, nothing is sent. The terms and privacy policy of the provider the administrator chose apply.
 
@@ -99,7 +101,7 @@ Token sets can name [Libre Franklin](https://github.com/googlefonts/Libre-Frankl
 
 The Map block bundles [Leaflet](https://leafletjs.com/) 1.9.4 by Volodymyr Agafonkin and contributors into `build/blocks/map/leaflet.js`, loaded only after the visitor agrees to load the map, and ships its stylesheet as `build/blocks/map/leaflet.css`. Leaflet is licensed under the BSD 2-Clause License, which is compatible with the GPL; the license text is in `licenses/LEAFLET.txt`.
 
-Icons: 122 icons of [Lucide](https://lucide.dev/) 1.60.0, ISC License (some from Feather, MIT), in `assets/icons/lucide.json`, license in `licenses/LUCIDE.txt`.
+Icons: 135 icons of [Lucide](https://lucide.dev/) 1.60.0, ISC License (some from Feather, MIT), in `assets/icons/lucide.json`, license in `licenses/LUCIDE.txt`.
 
 The pattern illustration `assets/images/landscape.webp` was drawn for Leitvia by CMS ADMINS and is licensed under the GPL, version 2 or later, like the plugin.
 
@@ -111,9 +113,8 @@ The `src/` folder contains the source code of the files in `build/`, and `webpac
 
 1. Install the plugin on the Plugins screen (search for Leitvia Studio), or upload the `leitvia-studio` folder to `/wp-content/plugins/`. With WP-CLI: `wp plugin install leitvia-studio --activate`.
 2. Activate the plugin. The menu Leitvia Studio appears with Pattern Lab, Tokens, Content Model, Recipes, Agents and Settings.
-3. Optional, to connect an AI agent over MCP: install and activate [MCP Adapter](https://wordpress.org/plugins/mcp-adapter/). Without it, agents use the REST API.
-4. Under Leitvia Studio, Agents, create an agent user, copy its application password (it is shown once) and set the autonomy level per area.
-5. Point the agent at `https://your-site.example/wp-json/leitvia-studio/v1/mcp` with that password. The [getting started guide](https://leitvia.com/docs/getting-started/) has the configuration for Claude Code, Codex CLI, Gemini CLI and Cursor.
+3. Under Leitvia Studio, Agents, create an agent user, copy its application password (it is shown once) and set the autonomy level per area.
+4. Connect the agent: as an OAuth connector with the address `https://your-site.example/wp-json/leitvia-studio/v1/mcp`, or with that address and the password as a header. The [getting started guide](https://leitvia.com/docs/getting-started/) has the configuration for claude.ai, ChatGPT, VS Code, Claude Code, Codex CLI, Gemini CLI and Cursor.
 
 == Frequently Asked Questions ==
 
@@ -123,11 +124,11 @@ Leitvia Studio is a free WordPress plugin that lets AI agents build and maintain
 
 = Does Leitvia Studio work with Claude, ChatGPT or Cursor? =
 
-Leitvia Studio works with any MCP client that connects over HTTP and can send an Authorization header. The AI agent signs in with the application password of a Leitvia Agent user. Studio offers no OAuth sign-in, so a client that connects to MCP servers only through OAuth cannot reach the server "leitvia" directly. Any tool that can call a REST API with Basic auth can use the same abilities under `/wp-json/wp-abilities/v1`.
+Yes. Leitvia Studio works with any MCP client that connects over streamable HTTP, in one of two ways. Clients such as claude.ai, Claude Desktop, ChatGPT and VS Code connect with OAuth: you add the address of the MCP server as a custom connector, and an administrator agrees on the page "Connect agent" of the site and chooses the agent user the client works as. Clients that send an Authorization header, such as Claude Code, Codex CLI, Cursor and Gemini CLI, sign in with the application password of a Leitvia Agent user. OAuth needs HTTPS and the setting "Connect over OAuth" on the Agents screen, which is on by default. Any tool that can call a REST API with Basic auth can use the same abilities under `/wp-json/wp-abilities/v1`.
 
 = How do AI agents use Leitvia? =
 
-An AI agent such as Claude Code, Codex or Cursor connects to your site over MCP or the REST API with the application password of an agent user from Leitvia Studio, Agents. It reads the design contract and the outline of a page first, then calls the Leitvia abilities, and every change runs through the gateway checks and your autonomy levels. No service of ours sits in between: the agent signs in as a user of your site that an administrator created, with the role Leitvia Agent and without administrator rights. It works on content, media, navigation, template parts and token set drafts. It cannot install, activate, update or remove plugins or themes, manage users, log in to wp-admin or edit code. The role itself stores no capability: Studio gives an agent the rights for content, media and theme options only while it runs. Deactivate Studio or remove its folder and the agent has the rights of a user without a role: it can sign in and change its own profile, as any WordPress user can, and nothing on the site. Its application password stays and works again when you activate Studio. Deleting Studio in the admin removes the application passwords of agents and the role; the users and their content stay. Application passwords come into being only when an administrator creates an agent or a new password on the Agents screen, and the password is shown there once. Changes to site settings (such as the front page or the comment defaults), the content model, the active token set or the global styles only ever reach the inbox as a suggestion that a person applies or rejects, whatever the autonomy profile. Ready-made agent skills for setup, design, pages, patterns, maintenance, accessibility and migration, with the full reference of all abilities, are described in the [Leitvia documentation](https://leitvia.com/docs/).
+An AI agent such as Claude Code, Codex or Cursor connects to your site over MCP or the REST API with the application password of an agent user from Leitvia Studio, Agents, and a chat app such as claude.ai over an OAuth connection to such a user. It reads the design contract and the outline of a page first, then calls the Leitvia abilities, and every change runs through the gateway checks and your autonomy levels. No service of ours sits in between: the agent signs in as a user of your site that an administrator created, with the role Leitvia Agent and without administrator rights. It works on content, media, navigation, template parts and token set drafts. It cannot install, activate, update or remove plugins or themes, manage users, log in to wp-admin or edit code. The role itself stores no capability: Studio gives an agent the rights for content, media and theme options only while it runs. Deactivate Studio or remove its folder and the agent has the rights of a user without a role: it can sign in and change its own profile, as any WordPress user can, and nothing on the site. Its application password stays and works again when you activate Studio. Deleting Studio in the admin removes the application passwords of agents and the role; the users and their content stay. Application passwords come into being only when an administrator creates an agent or a new password on the Agents screen, and the password is shown there once. Changes to site settings (such as the front page or the comment defaults), the content model, the active token set or the global styles only ever reach the inbox as a suggestion that a person applies or rejects, whatever the autonomy profile. Ready-made agent skills for setup, design, pages, patterns, maintenance, accessibility and migration, with the full reference of all abilities, are described in the [Leitvia documentation](https://leitvia.com/docs/).
 
 = Does Leitvia Studio need an API key or an account? =
 
@@ -139,7 +140,7 @@ Yes. Leitvia Studio is free under the GPL, version 2 or later, with no locked fe
 
 = Is Leitvia Studio GDPR compliant? =
 
-Leitvia Studio sends no visitor data to other hosts and sets no cookies, which makes a GDPR compliant site easier to run; compliance itself depends on your whole site and how you run it. Embeds and map tiles load only after the visitor agrees, Gravatar and the emoji images of WordPress stay off unless an administrator switches them on, and fonts come from your own site. Apart from the optional AI planning call described under External services, its only server side request goes to your own site. Every exception is listed under Privacy and External services.
+Leitvia Studio sends no visitor data to other hosts and sets no cookies, which makes a GDPR compliant site easier to run; compliance itself depends on your whole site and how you run it. Embeds and map tiles load only after the visitor agrees, Gravatar and the emoji images of WordPress stay off unless an administrator switches them on, and fonts come from your own site. Apart from the optional AI planning call and the client document of an OAuth connection, both described under External services, its only server side request goes to your own site. Every exception is listed under Privacy and External services.
 
 When Gravity Forms is active, the site audit of the agents (leitvia/audit-site) warns about a captcha add-on or a reCAPTCHA field, because such a captcha sends the visitor's IP address to its provider before any consent. Leitvia Studio reads only the list of active plugins and the forms for this, on your server.
 
@@ -222,9 +223,17 @@ Yes. With WP-CLI, `wp leitvia tokens|patterns|model|audit|package|recipe` lists,
 
 = Can AI agents connect over MCP? =
 
-Yes, when the plugin MCP Adapter (version 0.7.x) is installed and active; Leitvia Studio neither bundles nor requires it. Studio then adds its own MCP server "leitvia" at `/wp-json/leitvia-studio/v1/mcp` (HTTP) that offers exactly the Leitvia abilities as tools, with read only, destructive and idempotent hints. The default server of the adapter (`/wp-json/mcp/mcp-adapter-default-server`) offers the same abilities through its tools discover-abilities and execute-ability, for AI agents that only know the WordPress agent skills. Agents sign in with an application password of a user with the role "Leitvia Agent"; the adapter checks the capability and every write still runs through the gateway pipeline. Rejections carry their code and data as JSON in the error text, on both servers. Over WP-CLI the same server runs as `wp mcp-adapter serve --server=leitvia --user=<agent>`. Without the adapter all abilities stay available over the REST API.
+Yes, without another plugin. Leitvia Studio runs the MCP server "leitvia" at `/wp-json/leitvia-studio/v1/mcp` (streamable HTTP) under the revisions 2026-07-28 and 2025-11-25. It offers the Leitvia abilities as tools with read only, destructive and idempotent hints, every skill and workflow of the Leitvia agent skills as a prompt, the design contract, tokens, patterns and inbox as resources, a question before a step that deletes, removes, rejects or rolls back (for clients with form elicitation), and recipes, the site audit and the export as tasks in the background (for clients with the tasks extension). Every write still runs through the gateway pipeline, and rejections carry their code and data as JSON. The plugin MCP Adapter is optional: its default server (`/wp-json/mcp/mcp-adapter-default-server`) offers the same abilities through discover-abilities and execute-ability, for AI agents that only know the WordPress agent skills. Without MCP all abilities stay available over the REST API.
 
 Users with the role "Leitvia Agent" read through any REST route, but they change the site only through the Leitvia abilities and the MCP server; other REST routes refuse their writes and XML-RPC refuses them completely.
+
+= What does "Myself" on the page Connect agent mean? =
+
+The administrator who agrees connects the client as themselves instead of an agent user. Such a connection never writes. Without an add-on it only reads. An add-on can show change packages for approval in the chat (a view of MCP Apps); then you decide there step by step as a person, and the model never approves anything. To let a client write, connect it as an agent user and allow writing.
+
+= The connection fails with 401, or answers arrive late =
+
+401 although the password is right: the web server drops the Authorization header. Add `CGIPassAuth On` (Apache 2.4.13 or later) or `SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1` to `.htaccess` above the rules of WordPress. Answers that arrive all at once at the end: a proxy buffers the stream. nginx follows the header `X-Accel-Buffering: no`, which Studio sends; with Apache and PHP-FPM, turn on flushing for the FastCGI proxy and turn off `mod_deflate` and `zlib.output_compression` for the route of the MCP server. A background task that never finishes: WP-Cron cannot reach the site; run the system cron or Action Scheduler.
 
 = How are images protected that wait in a change package? =
 
@@ -253,20 +262,11 @@ Deleting the plugin always removes its settings, change packages, audit log, sna
 
 "Show Avatars" under Settings, Discussion stays off if Studio switched it off: without Studio, WordPress loads avatars from Gravatar, which sends the IP address of every visitor to Automattic. Switch it on only if you want that or use another avatar plugin.
 
-== Screenshots ==
-
-1. Agents: connection status, application passwords, checks and the MCP Adapter at a glance, plus the AI agents with access to the site.
-2. Pattern Lab: a block pattern in the preview at three viewport widths, with variants, checks and usage.
-3. Token set editor: WCAG contrast check for every color pair, scheduling as an overlay and a live preview of theme patterns.
-4. Change package of an AI agent: check result and the block diff per operation, ready to apply or reject.
-5. Applied change package with Roll back.
-6. Checks before and after every write: the list of checks, the results of the last 30 days and verify after writing.
-
-== Support ==
+= Where do I get support? =
 
 Leitvia Studio is developed and maintained by [CMS ADMINS](https://www.cms-admins.de/). Ask questions in the support forum of the plugin on WordPress.org or write to support@cms-admins.de. Report security issues and accessibility barriers to the same address; we answer within five working days.
 
-== Legal ==
+= Who makes Leitvia Studio? =
 
 Leitvia Studio is a product of CMS ADMINS, a brand of Patrick Schlesinger, Parkstraße 19, 80339 München, Germany. Contact: support@cms-admins.de.
 
@@ -275,7 +275,35 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * [Imprint](https://leitvia.com/legal-notice/) ([German original](https://leitvia.com/de/impressum/))
 * [Privacy policy of leitvia.com](https://leitvia.com/privacy-policy/)
 
+== Screenshots ==
+
+1. Agents: the built-in MCP server, OAuth connections, application passwords and checks at a glance, plus the AI agents with access to the site.
+2. Pattern Lab: a block pattern in the preview at three viewport widths, with variants, checks and usage.
+3. Token set editor: WCAG contrast check for every color pair, scheduling as an overlay and a live preview of theme patterns.
+4. Change package of an AI agent: check result and the block diff per operation, ready to apply or reject.
+5. Applied change package with Roll back.
+6. Checks before and after every write: the list of checks, the results of the last 30 days and verify after writing.
+
 == Changelog ==
+
+= 1.3.60 =
+* New: Own MCP server "leitvia" at /wp-json/leitvia-studio/v1/mcp, without MCP Adapter. It speaks the revisions 2026-07-28 (stateless, with server/discover and cacheable lists) and 2025-11-25 (with initialize and sessions, also 2025-06-18 and 2025-03-26). The default server of MCP Adapter 0.7.2 still lists the Leitvia abilities.
+* New: Sign-in over OAuth 2.1 for clients such as claude.ai, Claude Desktop, ChatGPT and VS Code. An administrator agrees on the page Connect agent and picks an agent user, with PKCE, client documents (CIMD) and dynamic registration as fallback; access tokens last an hour, refresh tokens 30 days and rotate. A connection as yourself reads only, unless an add-on offers decisions in its views. The Agents screen lists the connections and closes them. Application passwords keep working.
+* New: Resources (contract, tokens, patterns, inbox, page outline, pattern, skill files), completion for pattern slugs, page IDs, recipes and prompt arguments, and subscriptions/listen for changes of patterns and prompts.
+* New: Every skill and workflow of the Leitvia agent skills is a prompt of the server, in the version of the plugin; add-ons add theirs through the registry mcp_prompts.
+* New: Questions before a step that deletes, removes, rejects or rolls back, for clients with form elicitation. leitvia/apply-recipe, leitvia/audit-site and leitvia/export run as tasks for clients with the tasks extension, with progress as notifications/progress or statusMessage.
+* New: leitvia/list-patterns lists the patterns of the child theme, the theme, core and other plugins as unreviewed and untrusted; pages take them only after a person approves them in the Lab.
+* New: Extension API 2 with the registries mcp_prompts and mcp_apps (views for MCP Apps), the ability meta mcp.visibility and long_running, and the filters leitvia_studio_mcp_tool_meta, leitvia_studio_mcp_tool_result, leitvia_studio_mcp_approve_tools and leitvia_studio_mcp_confirm.
+* New: Open Graph and Twitter Card tags without an SEO plugin (filter leitvia_studio_open_graph); leitvia/update-seo takes og_title, og_description and og_image. leitvia/set-organization takes people, one Person with its own @id for founder, author and profile page, and every organization gets a ContactPoint. Service type software gives a SoftwareApplication, the page kinds about and contact an AboutPage and a ContactPage.
+* New: Five patterns with an icon per entry (teaser-icon-areas, content-process-icons, content-process-timeline, teaser-link-cards, content-scope-grid), the block styles field, field-accent and field-filled for icons, steps-line, link-card, grid-net and grid-rows for groups, and 13 more Lucide icons (135). leitvia/audit-site warns about the same icon twice in a section and names the successor of older patterns, which leitvia/replace-pattern takes over entry by entry.
+* New: Block edits take replace_text, fontFamily, textAlign, emphasis, strike, mark, verticalAlignment, the width of a column, the font size of a button and the word of the menu button; null resets an attribute; insert takes core/image and leitvia/marquee. leitvia/replace-pattern applies edits first, and leitvia/get-pattern returns its outline.
+* New: leitvia/list-packages pages with page and per_page and returns items with total and pages. leitvia/audit-site reports open or partly applied change packages older than 24 hours (leitvia/stale-package).
+* New: leitvia/set-organization takes description, logo (a raster image from 112 px, else the site logo) and editorial_page. leitvia/set-llms takes news, the latest posts with title and excerpt, and disallow, paths for the group User-agent: * of robots.txt.
+* New: leitvia/insert-section with faq turns the questions a page already has (a heading, a bold lead or a paragraph with a question mark) into content-faq; answers keep code, bold, italics and links.
+* Change: The modified date of a published post stays when title, excerpt and words do not change (filter leitvia_studio_keep_modified). Redirects with a query match further parameters and pass them on. The link to the cookie settings always shows, with a note when no service waits for consent. leitvia/get-seo names why a news sitemap is held back. A heading that jumps a level only after a section was removed above it is a warning, no longer a rejection, and the message quotes the heading. A ProfilePage shows only on the page of a person who has one. A table without its own caption in a pattern section loses the sample caption.
+* Fix: The contact form fills its column, and a cell of a grid of grids fills only itself on hover and focus.
+* Fix: Table of contents, page outline, FAQ, llms.txt and the places of findings keep non-breaking spaces, and the outline shows shortcodes resolved as on the page.
+* Fix: Under multisite the global styles count as unchanged when KSES strips only unsafe parts. The Agents screen lists the connections under SQLite (Playground) and recognizes a blocked OAuth discovery, with the two nginx directives to copy.
 
 = 1.3.59 =
 * New: Pattern mega-menu-overview, the standard panel of a mega menu: four columns headed by an icon and a linked title in capitals above a fine line, one-line entries, a link to all of each topic, a card of 300 px and a footer row. Wide panels line up with the header row, keep their type small and fit 1440 x 900 without scrolling; below 1200 px the columns go two by two.
@@ -300,8 +328,3 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * New: Related news of a page without a topic of its own lists the posts with the page as hub, then the posts in a category or tag with the slug of the page or of its product line, and only then the latest posts (theme filter leitvia_related_fallback). leitvia/audit-site reports such a page as leitvia/related-news, leitvia/check-composition as newsTopic without points.
 * New: leitvia/set-page-structure takes hub for entries with a page of their own, such as documentation, which show the card of the service below the text.
 * New: leitvia/import-post turns the FAQ part of a post into the block leitvia/faq with FAQPage data (faq, on by default) and counts the questions in report.faq.
-
-= 1.3.55 =
-* New: leitvia/set-page-structure accepts package for posts with hub, so many posts fit in one package.
-* New: leitvia/update-seo takes archive (post type key) to set title and description of an archive without an SEO plugin; the change waits as a setting in a package.
-* Change: New fields a building block declares after an update join the stored content model on the next request; add-building-block need not run again.

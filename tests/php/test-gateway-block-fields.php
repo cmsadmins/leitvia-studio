@@ -687,6 +687,202 @@ trailer
 	}
 
 	/**
+	 * The field replace_text changes words in a text with two links and inline formatting: links, targets and formatting stay,
+	 * inside a link or a strong too. Words that stand twice, nowhere, only in an attribute or across a tag are refused
+	 * with a pointer to what to send; text on such a paragraph names replace_text. update-content takes it as well.
+	 */
+	public function test_replace_text_keeps_links_and_formatting(): void {
+		$page = self::page( "<!-- wp:paragraph -->\n<p>Plans start at <strong>129 €</strong> per month. See <a href=\"/pricing/\">all plans</a> or <a href=\"/contact/\">ask us</a>, Tom &amp; Jerry.</p>\n<!-- /wp:paragraph -->" );
+
+		$refused = self::edit( $page, array( 'text' => 'Plans start at 149 € per month.' ) );
+		$this->assert_rejected( 'leitvia_static_markup', $refused );
+		$this->assertStringContainsString( 'replace_text', $refused->get_error_message() );
+
+		$steps = array(
+			array( 'per month', 'a month' ),
+			array( '129 €', '149 €' ),
+			array( 'all plans', 'every plan' ),
+			array( 'Tom & Jerry', 'Tom & Friends' ),
+		);
+		foreach ( $steps as $step ) {
+			$content = self::edit(
+				$page,
+				array(
+					'replace_text' => array(
+						'find' => $step[0],
+						'with' => $step[1],
+					),
+				)
+			);
+			$this->assertIsString( $content, is_wp_error( $content ) ? $content->get_error_message() : '' );
+		}
+		$this->assertStringContainsString( '<p>Plans start at <strong>149 €</strong> a month. See <a href="/pricing/">every plan</a> or <a href="/contact/">ask us</a>, Tom &amp; Friends.</p>', get_post( $page )->post_content );
+
+		$refused = array(
+			'at 149 € a' => 'across',
+			'a'          => 'times',
+			'yearly'     => 'does not contain',
+			'pricing'    => 'does not contain',
+		);
+		foreach ( $refused as $find => $reason ) {
+			$result = self::edit(
+				$page,
+				array(
+					'replace_text' => array(
+						'find' => $find,
+						'with' => 'x',
+					),
+				)
+			);
+			$this->assert_rejected( 'leitvia_invalid_input', $result );
+			$this->assertSame( 'replace_text', $result->get_error_data()['reason'] );
+			$this->assertStringContainsString( $reason, $result->get_error_message(), $find );
+		}
+		$this->assert_rejected(
+			'leitvia_invalid_input',
+			self::edit(
+				$page,
+				array(
+					'text'         => 'New',
+					'replace_text' => array(
+						'find' => 'ask us',
+						'with' => 'write to us',
+					),
+				)
+			)
+		);
+		$this->assertStringContainsString( 'href="/pricing/"', get_post( $page )->post_content );
+
+		$result = self::call(
+			'leitvia/update-content',
+			array(
+				'post'      => $page,
+				'blocks'    => array(
+					array(
+						'block'        => 'p:0',
+						'replace_text' => array(
+							'find' => 'ask us',
+							'with' => 'write to us',
+						),
+					),
+				),
+				'base_hash' => Hashes::document( $page ),
+			)
+		);
+		$this->assert_done( $result );
+		$this->assertStringContainsString( '<a href="/contact/">write to us</a>', get_post( $page )->post_content );
+	}
+
+	/**
+	 * A find with normal spaces finds protected ones (&nbsp;, U+00A0, U+202F) and replaces the place as it stands. A
+	 * repeated run into the same open package is checked against the state of that package, and the rejection says so.
+	 */
+	public function test_replace_text_protected_spaces_and_package_state(): void {
+		$page = self::page( "<!-- wp:paragraph -->\n<p>Care from&nbsp;89\u{202F}€ a month, <a href=\"/plans/\">all plans</a>.</p>\n<!-- /wp:paragraph -->" );
+		$done = self::edit(
+			$page,
+			array(
+				'replace_text' => array(
+					'find' => 'from 89 €',
+					'with' => 'from 99 €',
+				),
+			)
+		);
+		$this->assertIsString( $done, is_wp_error( $done ) ? $done->get_error_message() : '' );
+		$this->assertStringContainsString( '<p>Care from 99 € a month, <a href="/plans/">all plans</a>.</p>', $done );
+
+		$input = array(
+			'post'      => $page,
+			'blocks'    => array(
+				array(
+					'block'        => 'p:0',
+					'replace_text' => array(
+						'find' => 'a month',
+						'with' => 'per month',
+					),
+				),
+			),
+			'package'   => 'q1-replace-twice',
+			'base_hash' => Hashes::document( $page ),
+		);
+		$this->assert_done( self::call( 'leitvia/update-content', $input ) );
+		$again = self::call( 'leitvia/update-content', $input );
+		$this->assert_rejected( 'leitvia_invalid_input', $again );
+		$this->assertStringContainsString( 'q1-replace-twice', $again->get_error_message() );
+		$this->assertSame( 'q1-replace-twice', $again->get_error_data()['package_key'] );
+	}
+
+	/**
+	 * The ability update-content sets and clears the kind of a page; a legal kind waits in a package, other post types refuse it.
+	 */
+	public function test_update_content_sets_kind(): void {
+		$page = self::page( "<!-- wp:paragraph -->\n<p>Our rules.</p>\n<!-- /wp:paragraph -->" );
+		$set  = static fn( string $kind, int $post ): mixed => self::call(
+			'leitvia/update-content',
+			array(
+				'post'      => $post,
+				'kind'      => $kind,
+				'base_hash' => Hashes::document( $post ),
+			)
+		);
+		$this->assert_done( $set( 'editorial', $page ) );
+		$this->assertSame( 'editorial', get_post_meta( $page, '_leitvia_page_kind', true ) );
+		$legal = $set( 'imprint', $page );
+		$this->assert_done( $legal );
+		$this->assertSame( 'package', $legal['mode'] );
+		$this->assertSame( 'editorial', get_post_meta( $page, '_leitvia_page_kind', true ) );
+		$this->assert_done( $set( '', $page ) );
+		$this->assertSame( '', get_post_meta( $page, '_leitvia_page_kind', true ) );
+		$this->assert_rejected( 'leitvia_invalid_input', $set( 'editorial', self::factory()->post->create() ) );
+	}
+
+	/**
+	 * An attribute null goes back to its default on every block: an attribute of the comment leaves it, also on a new
+	 * block of insert and on one outside the catalog, the level of a heading goes back to h2.
+	 */
+	public function test_null_resets_an_attribute(): void {
+		$icon    = self::page( '<!-- wp:leitvia/icon {"icon":"phone","label":"Call us"} /-->' );
+		$content = self::edit( $icon, array( 'attributes' => array( 'label' => null ) ) );
+		$this->assertIsString( $content, is_wp_error( $content ) ? $content->get_error_message() : '' );
+		$this->assertSame( array( 'icon' => 'phone' ), array_diff_key( parse_blocks( $content )[0]['attrs'], array( 'metadata' => true ) ) );
+		$content = self::edit( $icon, array( 'attributes' => array( 'icon' => null ) ) );
+		$this->assertIsString( $content, is_wp_error( $content ) ? $content->get_error_message() : '' );
+		$this->assertSame( array(), array_diff_key( parse_blocks( $content )[0]['attrs'], array( 'metadata' => true ) ) );
+
+		$heading = self::page( '<!-- wp:heading {"level":3} --><h3 class="wp-block-heading">Title</h3><!-- /wp:heading -->' );
+		$content = self::edit( $heading, array( 'attributes' => array( 'level' => null ) ) );
+		$this->assertIsString( $content, is_wp_error( $content ) ? $content->get_error_message() : '' );
+		$this->assertSame( '<h2 class="wp-block-heading">Title</h2>', parse_blocks( $content )[0]['innerHTML'] );
+		$this->assertArrayNotHasKey( 'level', parse_blocks( $content )[0]['attrs'] );
+
+		$built = LeitviaStudio\Gateway\Block_Edit::build(
+			array(
+				'block'      => 'leitvia/icon',
+				'attributes' => array(
+					'icon'  => 'mail',
+					'label' => null,
+				),
+			),
+			array(),
+			'core/group'
+		);
+		$this->assertIsArray( $built, is_wp_error( $built ) ? $built->get_error_message() : '' );
+		$this->assertSame( 'mail', $built['attrs']['icon'] );
+		$this->assertArrayNotHasKey( 'label', $built['attrs'] );
+
+		$logo = LeitviaStudio\Gateway\Block_Edit::build(
+			array(
+				'block'      => 'core/site-logo',
+				'attributes' => array( 'width' => null ),
+			),
+			array(),
+			'core/group'
+		);
+		$this->assertIsArray( $logo, is_wp_error( $logo ) ? $logo->get_error_message() : '' );
+		$this->assertArrayNotHasKey( 'width', $logo['attrs'] );
+	}
+
+	/**
 	 * The markup of every catalog example passes the gateway as saved; the counter is the block that showed the gap.
 	 */
 	public function test_catalog_examples_are_writable(): void {
@@ -1161,6 +1357,16 @@ trailer
 		$this->assertStringNotContainsString( 'columns-4', $content );
 		// The input schema of the ability stops a count outside 1 to 6 before the edit runs.
 		$this->assert_rejected( 'ability_invalid_input', self::edit( $gallery, array( 'columns' => 9 ) ) );
+
+		// The count caps the minimum column width at a share of 64rem, so three fit where two of 31rem did.
+		$markup  = '<!-- wp:group {"layout":{"type":"grid","columnCount":2,"minimumColumnWidth":"31rem"}} --><div class="wp-block-group"><!-- wp:paragraph --><p>A</p><!-- /wp:paragraph --></div><!-- /wp:group -->';
+		$content = self::edit( self::page( $markup ), array( 'columns' => 3 ) );
+		$this->assertIsString( $content, is_wp_error( $content ) ? $content->get_error_message() : '' );
+		$this->assertSame( 3, parse_blocks( $content )[0]['attrs']['layout']['columnCount'] );
+		$this->assertSame( '21.33rem', parse_blocks( $content )[0]['attrs']['layout']['minimumColumnWidth'] );
+		// A minimum below the cap stays; a fresh page, as the edit above stored 21.33rem.
+		$content = self::edit( self::page( $markup ), array( 'columns' => 2 ) );
+		$this->assertSame( '31rem', parse_blocks( $content )[0]['attrs']['layout']['minimumColumnWidth'] );
 
 		$bar     = self::page( '<!-- wp:leitvia/announcement-bar --><section class="wp-block-leitvia-announcement-bar alignfull" aria-label="Announcement"><p class="wp-block-leitvia-announcement-bar__text">New prices</p></section><!-- /wp:leitvia/announcement-bar -->' );
 		$content = self::edit( $bar, array( 'attributes' => array( 'label' => 'Hinweis' ) ) );

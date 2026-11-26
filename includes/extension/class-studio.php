@@ -10,7 +10,7 @@ namespace LeitviaStudio\Extension;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Holds the add-on list and the nine registries. Studio uses the same registries as its add-ons.
+ * Holds the add-on list and the eleven registries. Studio uses the same registries as its add-ons.
  */
 final class Studio {
 
@@ -56,6 +56,11 @@ final class Studio {
 			'title'       => 'string',
 			'description' => 'string',
 			'model'       => 'array',
+		),
+		'mcp_prompts'     => array( 'path' => 'string' ),
+		'mcp_apps'        => array(
+			'title' => 'string',
+			'path'  => 'string',
 		),
 	);
 
@@ -134,6 +139,8 @@ final class Studio {
 	public function reset_for_tests(): void {
 		$this->reset();
 		$this->initialize();
+		// Add-ons and registry entries changed; what Status and Foreign_Patterns keep is out of date.
+		\LeitviaStudio\Lab\Status::flush();
 	}
 
 	/**
@@ -216,6 +223,8 @@ final class Studio {
 					'abilities'       => self::ability_error( $item ),
 					'building_blocks' => \LeitviaStudio\Gateway\Building_Blocks::invalid( $item ),
 					'patterns'        => isset( $item['needs'] ) ? \LeitviaStudio\Gateway\Building_Blocks::invalid_needs( $item['needs'] ) : '',
+					'mcp_prompts'     => \LeitviaStudio\Mcp\Prompts::invalid( $item ),
+					'mcp_apps'        => \LeitviaStudio\Mcp\Apps::invalid( $item ),
 					default           => '',
 				};
 			};

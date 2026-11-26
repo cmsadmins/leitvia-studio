@@ -23,7 +23,13 @@ export const statusLabel = ( value, label ) =>
 	( STATUSES.find( ( status ) => status.value === value )?.label ?? value );
 
 // Rank of a status, as Status::RANK: a pattern is at most as mature as its least mature part.
-export const STATUS_RANK = { draft: 0, review: 1, approved: 2, deprecated: 0 };
+export const STATUS_RANK = {
+	draft: 0,
+	review: 1,
+	approved: 2,
+	deprecated: 0,
+	unreviewed: 0,
+};
 
 // Kinds of test content (states) in the order the Variants panel offers them; labels match Pattern_Meta::state_label().
 export const STATES = [

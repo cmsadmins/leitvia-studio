@@ -36,10 +36,12 @@ final class Abilities {
 	 * @param bool                 $open_world    Whether the ability may reach a service outside the site.
 	 * @param callable|null        $permission    Permission callback for an ability that needs more than can_use(); it
 	 *                                            answers yes or no like can_use().
+	 * @param bool                 $long_running  Whether MCP clients with the tasks extension get a task for a call
+	 *                                            (see Mcp\Tasks).
 	 * @return bool Whether the registry accepted the ability.
 	 * @phpstan-param lowercase-string&non-falsy-string $name
 	 */
-	public static function read( string $name, string $label, string $description, array $input_schema, array $output_schema, callable $callback, bool $open_world = false, ?callable $permission = null ): bool {
+	public static function read( string $name, string $label, string $description, array $input_schema, array $output_schema, callable $callback, bool $open_world = false, ?callable $permission = null, bool $long_running = false ): bool {
 		$args = array(
 			'label'               => $label,
 			'description'         => $description,
@@ -57,6 +59,9 @@ final class Abilities {
 				'show_in_rest' => true,
 			),
 		);
+		if ( $long_running ) {
+			$args['meta']['long_running'] = true;
+		}
 		if ( $input_schema ) {
 			// Without a required input a call without any (GET with no query arguments) reads with the defaults. An empty
 			// object, not an empty array: core validates the default against type object, and [] encodes as a list.

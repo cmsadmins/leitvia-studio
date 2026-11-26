@@ -13,6 +13,8 @@ use LeitviaStudio\Gateway\Gateway;
 use LeitviaStudio\Gateway\Mcp;
 use LeitviaStudio\Gateway\Scope;
 use LeitviaStudio\Gateway\Store;
+use LeitviaStudio\Mcp\OAuth\OAuth;
+use LeitviaStudio\Mcp\OAuth\Tokens;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -27,13 +29,17 @@ defined( 'ABSPATH' ) || exit;
  * In a multisite network users belong to the network, application passwords to the user. So a new agent needs
  * create_users, as any new user of the network; a site administrator manages only agents that work on no other site;
  * and every password created here is bound to its site and refused on the others (SITES_META, other_site()).
+ *
+ * OAuth connections (Mcp\OAuth\Tokens) appear per family with client, user, rights and last use; closing one revokes
+ * its tokens, revoking an agent closes its connections too.
  */
 final class Gateway_Access_Controller {
 
 	/**
-	 * MCP Adapter versions the MCP server of Studio is built for: from this version up to the next minor version.
+	 * MCP Adapter versions whose default server Studio is tested with: from this version up to the next minor version.
+	 * The server leitvia needs no adapter.
 	 */
-	public const MCP_ADAPTER = '0.7.1';
+	public const MCP_ADAPTER = '0.7.2';
 
 	/**
 	 * User meta of an agent in a network: UUID of an application password => ID of the site it works on.
@@ -80,6 +86,29 @@ final class Gateway_Access_Controller {
 		);
 		register_rest_route(
 			$base,
+			'/gateway/access/discovery',
+			array(
+				array(
+					'methods'             => \WP_REST_Server::READABLE,
+					'callback'            => static fn() => rest_ensure_response( array( 'discovery' => OAuth::discovery() ) ),
+					'permission_callback' => $can,
+				),
+				'schema' => static fn(): array => array(
+					'$schema'    => 'http://json-schema.org/draft-04/schema#',
+					'title'      => 'leitvia-studio-gateway-discovery',
+					'type'       => 'object',
+					'properties' => array(
+						'discovery' => array(
+							'description' => __( 'Whether clients reach the OAuth metadata of this site, the status of the last address asked and the nginx directives that let it through; null without OAuth.', 'leitvia-studio' ),
+							'type'        => array( 'object', 'null' ),
+							'readonly'    => true,
+						),
+					),
+				),
+			)
+		);
+		register_rest_route(
+			$base,
 			'/gateway/access/(?P<id>\d+)',
 			array(
 				array(
@@ -103,6 +132,18 @@ final class Gateway_Access_Controller {
 				),
 				// Agent and password, as after POST /gateway/access.
 				'schema' => array( self::class, 'access_schema' ),
+			)
+		);
+		register_rest_route(
+			$base,
+			'/gateway/access/connections/(?P<family>[0-9a-f]{32})',
+			array(
+				array(
+					'methods'             => \WP_REST_Server::DELETABLE,
+					'callback'            => array( self::class, 'disconnect' ),
+					'permission_callback' => $can,
+				),
+				'schema' => array( self::class, 'revoke_schema' ),
 			)
 		);
 		register_rest_route(
@@ -146,30 +187,38 @@ final class Gateway_Access_Controller {
 			'title'      => 'leitvia-studio-gateway-access',
 			'type'       => 'object',
 			'properties' => array(
-				'agents'    => array(
+				'agents'      => array(
 					'description' => __( 'Agent users with id, name, login, number of application passwords and last use in UTC.', 'leitvia-studio' ),
 					'type'        => 'array',
 					'items'       => array( 'type' => 'object' ),
 					'readonly'    => true,
 				),
-				'passwords' => array(
+				'passwords'   => array(
 					'description' => __( 'Whether application passwords work on this site.', 'leitvia-studio' ),
 					'type'        => 'boolean',
 					'readonly'    => true,
 				),
-				'mcp'       => array( 'description' => __( 'State of the MCP Adapter.', 'leitvia-studio' ) ) + $object,
-				'checks'    => array(
+				'server'      => array( 'description' => __( 'State of the own MCP server: address and protocol revisions.', 'leitvia-studio' ) ) + $object,
+				'mcp'         => array( 'description' => __( 'State of the MCP Adapter.', 'leitvia-studio' ) ) + $object,
+				'checks'      => array(
 					'type'     => 'array',
 					'items'    => array( 'type' => 'string' ),
 					'readonly' => true,
 				),
-				'verify'    => $object,
-				'agent'     => array( 'description' => __( 'The new agent, after POST.', 'leitvia-studio' ) ) + $object,
-				'password'  => array(
+				'verify'      => $object,
+				'agent'       => array( 'description' => __( 'The new agent, after POST.', 'leitvia-studio' ) ) + $object,
+				'password'    => array(
 					'description' => __( 'The application password, after POST and nowhere else.', 'leitvia-studio' ),
 					'type'        => 'string',
 					'readonly'    => true,
 				),
+				'connections' => array(
+					'description' => __( 'OAuth connections: id, client, host, user, scopes, created, last_used and the shortened IP address of the last call.', 'leitvia-studio' ),
+					'type'        => 'array',
+					'items'       => array( 'type' => 'object' ),
+					'readonly'    => true,
+				),
+				'oauth'       => array( 'description' => __( 'Whether OAuth can run (HTTPS) and runs, and the address of its metadata.', 'leitvia-studio' ) ) + $object,
 			),
 		);
 	}
@@ -185,13 +234,18 @@ final class Gateway_Access_Controller {
 			'title'      => 'leitvia-studio-gateway-revoke',
 			'type'       => 'object',
 			'properties' => array(
-				'agent'   => array(
+				'agent'       => array(
 					'description' => __( 'The agent; the user and its content stay.', 'leitvia-studio' ),
 					'type'        => 'object',
 					'readonly'    => true,
 				),
-				'revoked' => array(
+				'revoked'     => array(
 					'description' => __( 'Number of application passwords deleted.', 'leitvia-studio' ),
+					'type'        => 'integer',
+					'readonly'    => true,
+				),
+				'connections' => array(
+					'description' => __( 'Number of OAuth connections closed.', 'leitvia-studio' ),
 					'type'        => 'integer',
 					'readonly'    => true,
 				),
@@ -235,9 +289,10 @@ final class Gateway_Access_Controller {
 		$version = defined( 'WP_MCP_VERSION' ) ? (string) constant( 'WP_MCP_VERSION' ) : '';
 		return rest_ensure_response(
 			array(
-				'agents'    => array_map( array( self::class, 'agent' ), get_users( array( 'role' => Gateway::ROLE ) ) ),
-				'passwords' => wp_is_application_passwords_available(),
-				'mcp'       => array(
+				'agents'      => array_map( array( self::class, 'agent' ), get_users( array( 'role' => Gateway::ROLE ) ) ),
+				'passwords'   => wp_is_application_passwords_available(),
+				'server'      => \LeitviaStudio\Gateway\Mcp::status(),
+				'mcp'         => array(
 					'active'     => '' !== $version,
 					'version'    => $version,
 					'required'   => self::MCP_ADAPTER,
@@ -245,7 +300,7 @@ final class Gateway_Access_Controller {
 					'url'        => 'https://wordpress.org/plugins/mcp-adapter/',
 				),
 				// Checks the pipeline runs before every write, add-on checks included, and the checks after writing.
-				'checks'    => array_values(
+				'checks'      => array_values(
 					array_map(
 						static fn( array $check ): string => (string) $check['label'],
 						array_merge(
@@ -254,7 +309,13 @@ final class Gateway_Access_Controller {
 						)
 					)
 				),
-				'verify'    => Store::verify_summary(),
+				'verify'      => Store::verify_summary(),
+				'connections' => Tokens::connections(),
+				'oauth'       => array(
+					'available' => OAuth::available(),
+					'active'    => OAuth::enabled(),
+					'metadata'  => OAuth::metadata_url(),
+				),
 			)
 		);
 	}
@@ -320,7 +381,7 @@ final class Gateway_Access_Controller {
 	}
 
 	/**
-	 * Revokes the access of an agent: deletes all its application passwords. The user and its content stay.
+	 * Revokes the access of an agent: deletes its application passwords of this site and closes its OAuth connections. The user and its content stay.
 	 *
 	 * @param \WP_REST_Request $request Request with id.
 	 * @phpstan-param \WP_REST_Request<array<string, mixed>> $request
@@ -339,13 +400,37 @@ final class Gateway_Access_Controller {
 				++$deleted;
 			}
 		}
-		self::log( 'access/revoke', $user->ID, array( 'passwords' => $deleted ) );
-		return rest_ensure_response(
+		$connections = Tokens::revoke_user( $user->ID );
+		self::log(
+			'access/revoke',
+			$user->ID,
 			array(
-				'agent'   => self::agent( $user ),
-				'revoked' => $deleted,
+				'passwords'   => $deleted,
+				'connections' => $connections,
 			)
 		);
+		return rest_ensure_response(
+			array(
+				'agent'       => self::agent( $user ),
+				'revoked'     => $deleted,
+				'connections' => $connections,
+			)
+		);
+	}
+
+	/**
+	 * Closes an OAuth connection: revokes every token of its family.
+	 *
+	 * @param \WP_REST_Request $request Request with family.
+	 * @phpstan-param \WP_REST_Request<array<string, mixed>> $request
+	 * @return \WP_REST_Response|\WP_Error Number of tokens revoked.
+	 */
+	public static function disconnect( \WP_REST_Request $request ) {
+		$revoked = Tokens::revoke_family( (string) $request['family'] );
+		if ( ! $revoked ) {
+			return new \WP_Error( 'leitvia_unknown_connection', __( 'There is no open connection with this ID.', 'leitvia-studio' ), array( 'status' => 404 ) );
+		}
+		return rest_ensure_response( array( 'revoked' => $revoked ) );
 	}
 
 	/**
@@ -435,12 +520,13 @@ final class Gateway_Access_Controller {
 	}
 
 	/**
-	 * The agent user with this ID, or leitvia_unknown_agent for any other user.
+	 * The agent user with this ID, or leitvia_unknown_agent for any other user; leitvia_agent_other_sites when a site
+	 * administrator may not change it. The page "Connect agent" offers only agents this returns.
 	 *
 	 * @param int $id User ID.
 	 * @return \WP_User|\WP_Error
 	 */
-	private static function find( int $id ) {
+	public static function find( int $id ) {
 		$user = get_userdata( $id );
 		if ( ! $user || ! in_array( Gateway::ROLE, (array) $user->roles, true ) ) {
 			return new \WP_Error( 'leitvia_unknown_agent', __( 'There is no agent with this ID.', 'leitvia-studio' ), array( 'status' => 404 ) );

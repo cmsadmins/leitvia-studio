@@ -247,7 +247,7 @@ final class Pipeline {
 		$before  = $follows ? (array) $follows['state'] : $before;
 		$after   = self::after( $op, $before );
 		if ( is_wp_error( $after ) ) {
-			return $after;
+			return $follows ? self::in_package( $after, $op->package ) : $after;
 		}
 		if ( $legacy && isset( $after['meta_input']['_wp_page_template'] ) && ! self::matches( $op, $op->base_hash, (string) $after['meta_input']['_wp_page_template'] ) ) {
 			return $stale();
@@ -361,6 +361,7 @@ final class Pipeline {
 		$findings = $rollback ? array() : self::check( $op, $after );
 		$findings = $findings && ! $op->creates() ? self::introduced( $findings, self::check( $op, $before ) ) : $findings;
 		$findings = $findings ? Content_Checks::places( $findings, (string) ( $after['post_content'] ?? '' ) ) : $findings;
+		$findings = $findings && ! $op->creates() ? self::skips_from_above( $findings, $before, $after ) : $findings;
 		$errors   = array_values( array_filter( $findings, static fn( array $finding ): bool => 'warning' !== ( $finding['severity'] ?? 'error' ) ) );
 		if ( $errors ) {
 			return Rejection::make( 'leitvia_check_failed', __( 'Checks found problems. Fix them as each finding suggests and try again.', 'leitvia-studio' ), 422, 'checks', $target, Content_Checks::NEXT_ABILITY[ $errors[0]['check'] ?? '' ] ?? '', 'once', array( 'findings' => $findings ) );
@@ -374,11 +375,13 @@ final class Pipeline {
 		$mode   = match ( true ) {
 			$package > 0            => 'live',
 			$follows > 0 || $strict => 'package',
-			default                 => self::mode( $op, $level, $before, $after, (bool) $findings ),
+			// Sample text left from a pattern is reported but holds nothing back: recipe pages carry it on purpose until
+			// the person replaces it.
+			default                 => self::mode( $op, $level, $before, $after, (bool) array_filter( $findings, static fn( array $finding ): bool => 'leitvia/sample-text' !== ( $finding['check'] ?? '' ) ) ),
 		};
 		// The warnings of a token set come after the mode: they are reported but hold nothing back, since the set has to
 		// exist before a person uploads its fonts and activates it again.
-		$findings = $rollback ? $findings : array_merge( $findings, self::token_warnings( $op, $after ) );
+		$findings = $rollback ? $findings : array_merge( $findings, self::token_warnings( $op, $after ), self::addon_warnings( $op, $before, $after ) );
 		$result   = array(
 			'mode'     => $mode,
 			'level'    => $level,
@@ -451,6 +454,29 @@ final class Pipeline {
 				'slug'      => $slug,
 			),
 		);
+	}
+
+	/**
+	 * Skipped heading levels the write did not bring itself (Content_Checks::skips_from_above(): the heading is the same
+	 * as before, something above it went) as warnings: removing an h3 before its h4 in one step of a change does not
+	 * stop the change half way, and the warning names the heading and its level. A write with a warning waits in a
+	 * change package, and audit-site reports what is left at the end.
+	 *
+	 * @param list<array<string, mixed>> $findings Findings of the state after.
+	 * @param array<string, mixed>       $before   State before.
+	 * @param array<string, mixed>       $after    State after.
+	 * @return list<array<string, mixed>>
+	 */
+	private static function skips_from_above( array $findings, array $before, array $after ): array {
+		$from_above = Content_Checks::skips_from_above( (string) ( $before['post_content'] ?? '' ), (string) ( $after['post_content'] ?? '' ) );
+		foreach ( $findings as &$finding ) {
+			if ( 'leitvia/headings' === ( $finding['check'] ?? '' ) && in_array( (string) ( $finding['message'] ?? '' ), $from_above[ (string) ( $finding['block'] ?? '' ) ] ?? array(), true ) ) {
+				$finding['severity'] = 'warning';
+				$finding['fix']      = (string) $finding['fix'] . ' ' . __( 'The heading was there before; a section above it went. Take out its subsections as well, from the last to the first, or change its level with leitvia/update-block.', 'leitvia-studio' );
+			}
+		}
+		unset( $finding );
+		return $findings;
 	}
 
 	/**
@@ -1137,6 +1163,44 @@ final class Pipeline {
 	}
 
 	/**
+	 * Warnings an add-on reports for a write, such as an article number another entry had. Like the token set warnings
+	 * they come after the mode: reported in findings (and with the package), but they hold nothing back.
+	 *
+	 * @param Operation            $op     Operation.
+	 * @param array<string, mixed> $before State before.
+	 * @param array<string, mixed> $after  State after.
+	 * @return list<array<string, mixed>>
+	 */
+	private static function addon_warnings( Operation $op, array $before, array $after ): array {
+		/**
+		 * Filters the warnings of a write. Return findings with check, severity warning and message; others are dropped.
+		 *
+		 * @param array<mixed>         $warnings Warnings, empty.
+		 * @param Operation            $op       Operation.
+		 * @param array<string, mixed> $before   State before.
+		 * @param array<string, mixed> $after    State after.
+		 */
+		$warnings = (array) apply_filters( 'leitvia_studio_gateway_warnings', array(), $op, $before, $after );
+		return array_values( array_filter( $warnings, static fn( $warning ): bool => is_array( $warning ) && 'warning' === ( $warning['severity'] ?? '' ) && '' !== (string) ( $warning['message'] ?? '' ) ) );
+	}
+
+	/**
+	 * A rejection of a change that was checked against the state an open change package leaves for its target, not
+	 * against the saved post: the message says so, data.package_key names the package. A repeated run of the same
+	 * edits into that package then explains why find or a block is gone.
+	 *
+	 * @param \WP_Error $error Rejection of the change.
+	 * @param string    $key   Package key.
+	 */
+	private static function in_package( \WP_Error $error, string $key ): \WP_Error {
+		$data = $error->get_error_data();
+		$data = ( is_array( $data ) ? $data : array() ) + array( 'package_key' => $key );
+		/* translators: %s: key of the change package. */
+		$note = sprintf( __( 'Checked against the state of the open change package %s, not against the saved post: an earlier operation of that package already changed it. Read that state with leitvia/get-package, or apply or discard the package before you repeat the change.', 'leitvia-studio' ), $key );
+		return new \WP_Error( $error->get_error_code(), $error->get_error_message() . ' ' . $note, $data );
+	}
+
+	/**
 	 * How the operation is carried out: package for "suggest" and for settings changes of users without
 	 * manage_options; for "draft" new posts and changes to unpublished posts as drafts, everything public and new
 	 * posts of NO_DRAFT as a package;
@@ -1593,8 +1657,13 @@ final class Pipeline {
 		};
 		$plain = static function ( array $state ) use ( $strip ): array {
 			// Theme.json content compares as data: core re-encodes it on save for users without unfiltered_html (key order,
-			// escaped slashes), which every site admin of a multisite network is.
-			$json = self::json( $state ) && is_string( $state['post_content'] ?? null ) ? json_decode( $state['post_content'], true ) : null;
+			// escaped slashes), which every site admin of a multisite network is. It also drops what it holds insecure
+			// (shadow presets, block style variations), so both sides go through that filter before they compare.
+			$json = self::json( $state ) && is_string( $state['post_content'] ?? null ) ? $state['post_content'] : null;
+			if ( null !== $json && false !== has_filter( 'content_save_pre', 'wp_filter_global_styles_post' ) ) {
+				$json = wp_unslash( wp_filter_global_styles_post( wp_slash( $json ) ) );
+			}
+			$json = null === $json ? null : json_decode( $json, true );
 			if ( is_array( $json ) ) {
 				$state['post_content'] = $json;
 			} elseif ( is_string( $state['post_content'] ?? null ) && str_contains( $state['post_content'], '<!-- wp:' ) ) {

@@ -18,11 +18,13 @@ defined( 'ABSPATH' ) || exit;
  * Prints one JSON-LD block in the head, always an @graph: on single posts the article (NewsArticle for news posts, see
  * is_news(), else BlogPosting) with author and publisher plus a BreadcrumbList; on the posts page and on category and
  * tag archives a CollectionPage listing the posts of the page, on the archives with a BreadcrumbList; on pages a
- * BreadcrumbList through their parents or hubs and the Service they offer (Seo\Cluster); a ProfilePage on
+ * BreadcrumbList through their parents or hubs, the Service or SoftwareApplication they offer (Seo\Cluster) and, by
+ * their kind, an AboutPage or ContactPage, or a ProfilePage on the page about a person (page_node()); a ProfilePage on
  * author archives; on the front page a WebSite that names the organization by @id and the organization as a node of
  * its own, an Organization or a LocalBusiness with address, opening hours and profiles from the settings
  * (Organization). Off with the setting news_schema and whenever an SEO plugin is active, so a page never carries two
- * article nodes. No Open Graph tags: that stays the job of SEO plugins. The news sitemap is Sitemap.
+ * article nodes. Every Person carries the @id of Organization::person_id(), so founder, author and profile name one
+ * person. Open Graph is Head, the news sitemap Sitemap.
  */
 final class Schema {
 
@@ -81,7 +83,7 @@ final class Schema {
 		} elseif ( ( is_category() || is_tag() ) && $object instanceof WP_Term ) {
 			$nodes = array( self::collection_page( $object ), self::breadcrumbs( $object ) );
 		} elseif ( is_page() && $object instanceof WP_Post ) {
-			$nodes = array_values( array_filter( array( self::is_article_page( $object ) ? self::article( $object ) : null, \LeitviaStudio\Seo\Cluster::trail( $object ), \LeitviaStudio\Seo\Cluster::service_node( $object, self::organization() ) ) ) );
+			$nodes = array_values( array_filter( array( self::page_node( $object ), self::is_article_page( $object ) ? self::article( $object ) : null, \LeitviaStudio\Seo\Cluster::trail( $object ), \LeitviaStudio\Seo\Cluster::service_node( $object, self::organization() ) ) ) );
 		}
 		// The trail the page shows wins over the computed one and gives pages and entries of other types theirs.
 		$visible = is_front_page() ? null : self::visible_breadcrumbs();
@@ -317,14 +319,30 @@ final class Schema {
 	}
 
 	/**
-	 * Address of the page of the setting editorial_page (its translation under Polylang), '' when none is set or it is
-	 * not published. The theme reads it through the filter leitvia_editorial_url.
+	 * Address of the page of the setting editorial_page (its translation under Polylang), '' when it is not published.
+	 * Without the setting the only published page with the page kind editorial (in the current language under
+	 * Polylang); with none or several, ''. The theme reads it through the filter leitvia_editorial_url.
 	 */
 	public static function editorial_url(): string {
-		$page       = (int) leitvia_studio_setting( 'editorial_page' );
-		$translated = $page && function_exists( 'pll_get_post' ) ? (int) pll_get_post( $page ) : 0;
+		$page = (int) leitvia_studio_setting( 'editorial_page' );
+		if ( ! $page ) {
+			$kinds = get_posts(
+				array(
+					'post_type'        => 'page',
+					'post_status'      => 'publish',
+					'posts_per_page'   => 2,
+					'fields'           => 'ids',
+					'no_found_rows'    => true,
+					'meta_key'         => '_leitvia_page_kind', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Few pages carry a kind.
+					'meta_value'       => 'editorial', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- Same.
+					'suppress_filters' => false,
+				)
+			);
+			return 1 === count( $kinds ) ? (string) get_permalink( (int) $kinds[0] ) : '';
+		}
+		$translated = function_exists( 'pll_get_post' ) ? (int) pll_get_post( $page ) : 0;
 		$page       = $translated ? $translated : $page;
-		return $page && 'publish' === get_post_status( $page ) ? (string) get_permalink( $page ) : '';
+		return 'publish' === get_post_status( $page ) ? (string) get_permalink( $page ) : '';
 	}
 
 	/**
@@ -380,6 +398,38 @@ final class Schema {
 		return array(
 			'@type'      => 'ProfilePage',
 			'mainEntity' => self::person( $user->ID ),
+		);
+	}
+
+	/**
+	 * Page types of the page kinds of set-page-structure that schema.org has a type of WebPage for.
+	 */
+	public const KIND_TYPES = array(
+		'about'   => 'AboutPage',
+		'contact' => 'ContactPage',
+	);
+
+	/**
+	 * WebPage node of a page that is about someone or something: a ProfilePage with the Person as main entity on the
+	 * page about a person (Organization::person_of_page()), else an AboutPage or ContactPage by its kind (KIND_TYPES)
+	 * with the organization as main entity; null for other pages.
+	 *
+	 * @param WP_Post $page Page.
+	 * @return array<string, mixed>|null
+	 */
+	public static function page_node( WP_Post $page ): ?array {
+		$url    = (string) get_permalink( $page );
+		$person = Organization::person_of_page( $page->ID );
+		$type   = '' !== $person ? 'ProfilePage' : ( self::KIND_TYPES[ (string) get_post_meta( $page->ID, '_leitvia_page_kind', true ) ] ?? '' );
+		if ( '' === $type ) {
+			return null;
+		}
+		return array(
+			'@type'      => $type,
+			'url'        => $url,
+			'name'       => self::text( get_the_title( $page ) ),
+			'inLanguage' => self::language( self::locale( $page ) ),
+			'mainEntity' => '' !== $person ? Organization::person( $person, $url ) : self::organization(),
 		);
 	}
 
@@ -463,11 +513,7 @@ final class Schema {
 	 */
 	private static function author( WP_Post $post ): array {
 		$name = self::text( (string) get_post_meta( $post->ID, self::AUTHOR_NAME_META, true ) );
-		$page = '' !== $name ? self::author_page_url( $post ) : '';
-		return '' !== $name ? array(
-			'@type' => 'Person',
-			'name'  => $name,
-		) + ( '' !== $page ? array( 'url' => $page ) : array() ) : self::person( (int) $post->post_author );
+		return '' !== $name ? Organization::person( $name, self::author_page_url( $post ) ) : self::person( (int) $post->post_author );
 	}
 
 	/**
@@ -488,26 +534,22 @@ final class Schema {
 	}
 
 	/**
-	 * Person with name, author page, biography and the website of the profile (sameAs) when there are some.
+	 * Person of a user account: the profile of the same name (Organization::person()) with the author archive as url,
+	 * the biography and the website of the account (sameAs) where the profile has none.
 	 *
 	 * @param int $user_id User ID.
 	 * @return array<string, mixed>
 	 */
 	private static function person( int $user_id ): array {
-		$person      = array(
-			'@type' => 'Person',
-			'name'  => self::text( get_the_author_meta( 'display_name', $user_id ) ),
-			'url'   => get_author_posts_url( $user_id ),
-		);
-		$description = self::text( get_the_author_meta( 'description', $user_id ) );
-		if ( '' !== $description ) {
-			$person['description'] = $description;
-		}
 		$website = esc_url_raw( (string) get_the_author_meta( 'user_url', $user_id ) );
-		if ( '' !== $website ) {
-			$person['sameAs'] = array( $website );
-		}
-		return $person;
+		return Organization::person(
+			self::text( get_the_author_meta( 'display_name', $user_id ) ),
+			get_author_posts_url( $user_id ),
+			array(
+				'description' => self::text( get_the_author_meta( 'description', $user_id ) ),
+				'sameAs'      => '' !== $website ? array( $website ) : array(),
+			)
+		);
 	}
 
 	/**
@@ -526,11 +568,13 @@ final class Schema {
 	}
 
 	/**
-	 * Plain text as readers see it: no tags, entities decoded, no soft hyphens.
+	 * Plain text as readers see it: shortcodes resolved (a price in a sentence), no tags, entities decoded, no soft
+	 * hyphens.
 	 *
-	 * @param string $html Text that may contain markup or entities.
+	 * @param string $html Text that may contain markup, shortcodes or entities.
 	 */
 	public static function text( string $html ): string {
+		$html = str_contains( $html, '[' ) ? do_shortcode( $html ) : $html;
 		return trim( str_replace( "\u{AD}", '', html_entity_decode( wp_strip_all_tags( $html ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) ) );
 	}
 }

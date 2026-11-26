@@ -429,7 +429,12 @@ class Test_Gateway_Maintain extends WP_UnitTestCase {
 		$this->assertSame( 'package', $result['mode'] );
 		$this->assertStringContainsString( 'Placeholder', get_post_field( 'post_content', $page ) );
 
-		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+		// In a network core maps manage_privacy_options to manage_network: only a super admin edits the privacy page.
+		$admin = self::factory()->user->create( array( 'role' => 'administrator' ) );
+		if ( is_multisite() ) {
+			grant_super_admin( $admin );
+		}
+		wp_set_current_user( $admin );
 		$report = Packages::apply( $result['package'] );
 		$this->assertSame( 'applied', $report['state'], wp_json_encode( $report ) );
 		$this->assertStringContainsString( '<p>We keep no logs.</p>', get_post_field( 'post_content', $page ) );
@@ -1077,6 +1082,142 @@ class Test_Gateway_Maintain extends WP_UnitTestCase {
 	}
 
 	/**
+	 * An older pattern with a successor in the contract (teaser-services, content-steps) switches with block and
+	 * without pattern: the new section gets as many entries as the old one, head and entries take headings, texts,
+	 * links with their address and the number of the step by role; sample texts of the successor without a
+	 * counterpart go (section mark, closing line), numbers such as 01 have none. With pattern the same happens for an
+	 * old section whose steps carry their title as eyebrow: it becomes the h3, an eyebrow that only counts stays and
+	 * the h3 of that step goes. Audit-site names the successor in a notice.
+	 */
+	public function test_replace_pattern_moves_entries_to_the_successor(): void {
+		update_option( Gateway::OPTION, array( 'profile' => 'full' ) + Gateway::DEFAULTS );
+		$edits = array(
+			array(
+				'block' => 'p:0.0.0',
+				'text'  => 'Our services',
+			),
+			array(
+				'block' => 'p:0.0.1',
+				'text'  => 'Four things we do.',
+			),
+		);
+		foreach ( array( 'A', 'B', 'C', 'D' ) as $i => $letter ) {
+			$entry   = 'p:0.1.' . intdiv( $i, 2 ) . '.' . ( $i % 2 );
+			$edits[] = array(
+				'block' => $entry . '.1',
+				'text'  => 'Service ' . $letter,
+			);
+			$edits[] = array(
+				'block' => $entry . '.2',
+				'text'  => 'About service ' . $letter . '.',
+			);
+			$edits[] = array(
+				'block'     => $entry . '.3',
+				'text'      => 'More about ' . $letter,
+				'link_text' => 'More about ' . $letter,
+				'url'       => '/service-' . strtolower( $letter ) . '/',
+			);
+		}
+		$services = Build::edit( Build::pattern( 'leitvia/teaser-services' )['content'], $edits, array() );
+		$this->assertIsString( $services );
+		$page = $this->page( self::paragraph( 'Intro text' ) . "\n\n" . Build::name_sections( $services, 'leitvia/teaser-services' ) );
+
+		$audit = \LeitviaStudio\Gateway\Abilities\Read_Audit::audit( 0, 50 );
+		$this->assertContains( 'leitvia/successor-pattern', array_column( array_merge( ...array_column( $audit['items'], 'findings' ) ), 'check' ) );
+		$this->assert_rejected( 'leitvia_no_replacement', self::call( 'leitvia/replace-pattern', $page, array( 'post' => $page ) ), 'all sections: only deprecated ones' );
+		$this->assert_ok(
+			self::call(
+				'leitvia/replace-pattern',
+				$page,
+				array(
+					'post'  => $page,
+					'block' => 'p:1',
+				)
+			)
+		);
+		$blocks = array_values( array_filter( parse_blocks( get_post_field( 'post_content', $page ) ), static fn( array $block ): bool => null !== $block['blockName'] ) );
+		$this->assertSame( 'leitvia-studio/teaser-icon-areas', $blocks[1]['attrs']['metadata']['patternName'] );
+		$markup = serialize_block( $blocks[1] );
+		$this->assertStringContainsString( 'Our services</h2>', $markup );
+		$this->assertStringContainsString( 'Four things we do.</p>', $markup );
+		foreach ( array( 'A', 'B', 'C', 'D' ) as $letter ) {
+			$this->assertStringContainsString( 'Service ' . $letter . '</h3>', $markup );
+			$this->assertStringContainsString( 'About service ' . $letter . '.</p>', $markup );
+			$this->assertStringContainsString( '<a href="/service-' . strtolower( $letter ) . '/">More about ' . $letter . '</a>', $markup );
+		}
+		$this->assertSame( 4, substr_count( $markup, '<!-- wp:leitvia/icon {"icon"' ), 'an icon per entry, no section mark' );
+		$this->assertStringNotContainsString( 'is-style-eyebrow', $markup, 'the sample eyebrow of the section mark went' );
+		$this->assertStringNotContainsString( '>01<', $markup );
+
+		// Four numbered steps into the three of content-process-icons: a fourth one, counted labels, no closing line.
+		$edits = array(
+			array(
+				'block' => 'p:0.0',
+				'text'  => 'How we work',
+			),
+		);
+		foreach ( array( 1, 2, 3, 4 ) as $i => $n ) {
+			$entry   = 'p:0.1.' . intdiv( $i, 2 ) . '.' . ( $i % 2 );
+			$edits[] = array(
+				'block' => $entry . '.1',
+				'text'  => 'Stage ' . $n,
+			);
+			$edits[] = array(
+				'block' => $entry . '.2',
+				'text'  => 'What stage ' . $n . ' does.',
+			);
+		}
+		$steps = Build::edit( Build::pattern( 'leitvia/content-steps' )['content'], $edits, array() );
+		$this->assertIsString( $steps );
+		$page   = $this->page( Build::name_sections( $steps, 'leitvia/content-steps' ) );
+		$result = $this->assert_ok(
+			self::call(
+				'leitvia/replace-pattern',
+				$page,
+				array(
+					'post'  => $page,
+					'block' => 'p:0',
+				)
+			)
+		);
+		$this->assertSame( 'live', $result['mode'], 'the copied step takes a spare icon, no repeated icon holds the write' );
+		$markup = get_post_field( 'post_content', $page );
+		$this->assertStringContainsString( '"patternName":"leitvia-studio/content-process-icons"', $markup );
+		$this->assertStringContainsString( '"icon":"circle-check"', $markup );
+		$this->assertStringContainsString( 'How we work</h2>', $markup );
+		foreach ( array( 1, 2, 3, 4 ) as $n ) {
+			$this->assertStringContainsString( '>Step ' . $n . '</p>', $markup );
+			$this->assertStringContainsString( 'Stage ' . $n . '</h3>', $markup );
+			$this->assertStringContainsString( 'What stage ' . $n . ' does.</p>', $markup );
+		}
+		$this->assertSame( 4, substr_count( $markup, 'is-style-field-filled' ) );
+		$this->assertStringNotContainsString( 'Ask for free advice', $markup, 'the closing line with a sample link went' );
+
+		// Steps that carry their title as eyebrow, with pattern given.
+		$entry = static fn( string $eyebrow, string $text ): string => '<!-- wp:group --><div class="wp-block-group"><!-- wp:paragraph {"className":"is-style-eyebrow"} --><p class="is-style-eyebrow">' . $eyebrow . '</p><!-- /wp:paragraph --><!-- wp:paragraph --><p>' . $text . '</p><!-- /wp:paragraph --></div><!-- /wp:group -->';
+		$old   = '<!-- wp:group {"align":"full","layout":{"type":"constrained"}} --><div class="wp-block-group alignfull"><!-- wp:heading --><h2 class="wp-block-heading">Our way</h2><!-- /wp:heading --><!-- wp:group {"layout":{"type":"grid"}} --><div class="wp-block-group">' . $entry( 'Call us', 'We listen.' ) . $entry( 'Plan', 'We plan.' ) . $entry( 'Schritt 3', 'We build.' ) . '</div><!-- /wp:group --></div><!-- /wp:group -->';
+		$page  = $this->page( $old );
+		$this->assert_ok(
+			self::call(
+				'leitvia/replace-pattern',
+				$page,
+				array(
+					'post'    => $page,
+					'block'   => 'p:0',
+					'pattern' => 'leitvia-studio/content-process-icons',
+				)
+			)
+		);
+		$markup = get_post_field( 'post_content', $page );
+		$this->assertStringContainsString( 'Call us</h3>', $markup );
+		$this->assertStringContainsString( 'Plan</h3>', $markup );
+		$this->assertStringContainsString( '>Step 1</p>', $markup );
+		$this->assertStringContainsString( '>Schritt 3</p>', $markup, 'a label that only counts stays the eyebrow' );
+		$this->assertSame( 2, substr_count( $markup, '</h3>' ), 'the step without a title has no h3' );
+		$this->assertStringContainsString( 'We build.</p>', $markup );
+	}
+
+	/**
 	 * A write whose save drops block attributes (here a filter in place of core's KSES reading broken JSON) fails with
 	 * leitvia_attributes_lost, names block, position and keys, and leaves the page as it was; inner blocks count, added
 	 * attributes such as the block IDs do not.
@@ -1305,6 +1446,70 @@ class Test_Gateway_Maintain extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A section back into its own pattern with carry: a group of the pattern the old section has no counterpart for
+	 * (the key figure of the timeline) goes as a whole instead of a rejection, and stays with the texts of edits that
+	 * name its blocks by the path IDs of the pattern outline (leitvia/get-pattern).
+	 */
+	public function test_replace_pattern_restores_a_group_with_edits(): void {
+		update_option( Gateway::OPTION, array( 'profile' => 'full' ) + Gateway::DEFAULTS );
+		$slug    = 'leitvia-studio/content-process-timeline';
+		$outline = \LeitviaStudio\Gateway\Abilities\Read_Design::pattern( $slug )['outline'];
+		$this->assertSame( 'p:0.0.1.0', $outline[0]['children'][0]['children'][1]['children'][0]['id'], 'outline with the path IDs of the pattern' );
+		$old = Build::edit(
+			Build::pattern( $slug )['content'],
+			array(
+				array(
+					'block' => 'p:0.0.0.1',
+					'text'  => 'How the switch works',
+				),
+				array(
+					'block'  => 'p:0.0.1',
+					'remove' => true,
+				),
+			),
+			array()
+		);
+		$this->assertIsString( $old );
+		$this->assertStringNotContainsString( 'from review to switch-over', $old );
+		$page  = $this->page( Build::name_sections( $old, $slug ) );
+		$input = array(
+			'post'    => $page,
+			'block'   => 'p:0',
+			'pattern' => $slug,
+		);
+
+		$result = $this->assert_ok( self::call( 'leitvia/replace-pattern', $page, $input ) );
+		$markup = get_post_field( 'post_content', $page );
+		$this->assertStringContainsString( 'How the switch works</h2>', $markup );
+		$this->assertStringNotContainsString( 'from review to switch-over', $markup, 'the key figure without counterpart goes as a whole' );
+		$this->assertStringNotContainsString( '"name":"Key figure"', $markup );
+		$this->roll_back( $result );
+
+		$this->assert_ok(
+			self::call(
+				'leitvia/replace-pattern',
+				$page,
+				$input + array(
+					'edits' => array(
+						array(
+							'block' => 'p:0.0.1.0',
+							'text'  => '19 €',
+						),
+						array(
+							'block' => 'p:0.0.1.1',
+							'text'  => 'per mailbox for the move',
+						),
+					),
+				)
+			)
+		);
+		$markup = get_post_field( 'post_content', $page );
+		$this->assertStringContainsString( 'How the switch works</h2>', $markup, 'carry still moves the heading' );
+		$this->assertStringContainsString( '>19 €</p>', $markup );
+		$this->assertStringContainsString( '>per mailbox for the move</p>', $markup );
+	}
+
+	/**
 	 * Insert-section puts a new section before, after, at the start or (without a place) at the end of the top-level
 	 * sections and moves one of them; remove-section takes one out, but never the last. The rest of the content stays.
 	 * Sections with move, two places and unknown IDs are refused.
@@ -1427,6 +1632,85 @@ class Test_Gateway_Maintain extends WP_UnitTestCase {
 		);
 		$blocks = array_values( array_filter( parse_blocks( get_post_field( 'post_content', $single ) ), static fn( array $block ): bool => null !== $block['blockName'] ) );
 		$this->assertSame( 'leitvia/content-quote', $blocks[1]['attrs']['metadata']['patternName'] );
+	}
+
+	/**
+	 * The faq of insert-section turns questions as heading, bold start or paragraph with a question mark and the blocks after
+	 * them into one content-faq section at their place; answers keep code, italics and links, the id of a heading moves
+	 * to its question, the sample texts of the pattern are gone. A range that starts with an answer is refused.
+	 */
+	public function test_insert_section_faq_from_blocks(): void {
+		update_option( Gateway::OPTION, array( 'profile' => 'full' ) + Gateway::DEFAULTS );
+		$page = $this->page(
+			implode(
+				"\n\n",
+				array(
+					self::paragraph( 'Intro' ),
+					'<!-- wp:heading {"level":3} --><h3 class="wp-block-heading" id="how-long">How long does it take?</h3><!-- /wp:heading -->',
+					self::paragraph( 'About <code>two</code> weeks, see <a href="/plan/">the plan</a>.' ),
+					self::paragraph( '<strong>Can I pay later?</strong> Yes, <em>within 14 days</em>.' ),
+					self::paragraph( 'What about support?' ),
+					'<!-- wp:list --><ul class="wp-block-list"><!-- wp:list-item --><li>Mail</li><!-- /wp:list-item --></ul><!-- /wp:list -->',
+					self::paragraph( 'Outro' ),
+				)
+			)
+		);
+		$faq  = static fn( string $from ): array => array(
+			'post' => $page,
+			'faq'  => array(
+				'from'    => $from,
+				'to'      => 'p:5',
+				'heading' => 'Questions',
+			),
+		);
+		$this->assert_rejected( 'leitvia_invalid_input', self::call( 'leitvia/insert-section', $page, $faq( 'p:2' ) ) );
+		$this->assert_ok( self::call( 'leitvia/insert-section', $page, $faq( 'p:1' ) ) );
+		$content = (string) get_post_field( 'post_content', $page );
+		$blocks  = array_values( array_filter( parse_blocks( $content ), static fn( array $block ): bool => null !== $block['blockName'] ) );
+		$this->assertCount( 3, $blocks );
+		$this->assertSame( 'leitvia/content-faq', $blocks[1]['attrs']['metadata']['patternName'] );
+		$this->assertSame( 3, substr_count( $content, '<!-- wp:details' ) );
+		$this->assertStringContainsString( '<summary>How long does it take?</summary>', $content );
+		$this->assertStringContainsString( '<summary>Can I pay later?</summary>', $content );
+		$this->assertStringContainsString( '<summary>What about support?</summary>', $content );
+		$this->assertStringContainsString( 'About <code>two</code> weeks, see <a href="/plan/">the plan</a>.', $content );
+		$this->assertStringContainsString( '>Yes, <em>within 14 days</em>.</p>', $content );
+		if ( block_has_support( WP_Block_Type_Registry::get_instance()->get_registered( 'core/details' ), 'anchor' ) ) {
+			$this->assertStringContainsString( 'id="how-long"', $content );
+		}
+		$this->assertStringContainsString( '<h2 class="wp-block-heading has-heading-m-font-size">Questions</h2>', $content );
+		$this->assertStringNotContainsString( 'How long does a typical project take', $content );
+		$this->assertSame( 1, substr_count( $content, ' open>' ), 'the first question is open' );
+		$this->assertStringContainsString( 'has-ink-muted-color', (string) $blocks[1]['innerBlocks'][0]['innerBlocks'][1]['innerBlocks'][0]['innerBlocks'][0]['innerHTML'] );
+	}
+
+	/**
+	 * Taking out an h3 before its h4 does not stop the change half way: the h4 was there before, so its skipped level
+	 * is a warning that names the heading and its level. A heading new in the write is no skip from above.
+	 */
+	public function test_remove_section_above_subheadings(): void {
+		update_option( Gateway::OPTION, array( 'profile' => 'full' ) + Gateway::DEFAULTS );
+		$heading = static fn( int $level, string $text ): string => '<!-- wp:heading {"level":' . $level . '} --><h' . $level . ' class="wp-block-heading">' . $text . '</h' . $level . '><!-- /wp:heading -->';
+		$page    = $this->page( $heading( 2, 'Questions' ) . "\n\n" . $heading( 3, 'Billing' ) . "\n\n" . $heading( 4, 'Invoices' ) . "\n\n" . self::paragraph( 'Answer' ) );
+		$removed = $this->assert_ok(
+			self::call(
+				'leitvia/remove-section',
+				$page,
+				array(
+					'post'  => $page,
+					'block' => 'p:1',
+				)
+			)
+		);
+		$this->assertSame( array( 'warning' ), array_column( $removed['findings'], 'severity' ) );
+		$this->assertStringContainsString( 'h4 "Invoices" follows h2', $removed['findings'][0]['message'] );
+		$this->assertNotSame( '', $removed['findings'][0]['block'], 'the finding names the block' );
+		$this->assertStringContainsString( 'from the last to the first', $removed['findings'][0]['fix'] );
+		$this->assertSame(
+			array(),
+			\LeitviaStudio\Gateway\Content_Checks::skips_from_above( '', $heading( 2, 'A' ) . $heading( 4, 'New' ) ),
+			'a heading that was not there before is no skip from above'
+		);
 	}
 
 	/**

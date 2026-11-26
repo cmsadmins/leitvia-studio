@@ -481,6 +481,113 @@ class Test_Seo_Cluster extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The ability set-llms lists the latest posts with title and excerpt (news) and closes paths to every crawler in the group
+	 * User-agent: * of robots.txt (disallow); a path without a leading slash or with a line break is refused.
+	 */
+	public function test_llms_news_and_robots_disallow(): void {
+		$old = self::factory()->post->create(
+			array(
+				'post_title' => 'Older news',
+				'post_date'  => '2026-01-01 10:00:00',
+			)
+		);
+		$new = self::factory()->post->create(
+			array(
+				'post_title'   => 'Newer news',
+				'post_excerpt' => '',
+				'post_content' => '<!-- wp:paragraph --><p>What changed this week.</p><!-- /wp:paragraph -->',
+				'post_date'    => '2026-02-01 10:00:00',
+			)
+		);
+		$this->assertStringNotContainsString( 'Newer news', Llms::text(), 'no posts by default' );
+		$this->assert_rejected(
+			'disallow',
+			wp_get_ability( 'leitvia/set-llms' )->execute(
+				array(
+					'disallow'  => array( '/downloads/', '/downloads/' ),
+					'base_hash' => '',
+				)
+			)
+		);
+		$this->assertWPError(
+			wp_get_ability( 'leitvia/set-llms' )->execute(
+				array(
+					'disallow'  => array( "/a/\nUser-agent: *" ),
+					'base_hash' => '',
+				)
+			)
+		);
+		$this->apply(
+			wp_get_ability( 'leitvia/set-llms' )->execute(
+				array(
+					'news'      => 1,
+					'disallow'  => array( '/downloads/', '/*.pdf$' ),
+					'base_hash' => '',
+				)
+			)
+		);
+		$text = Llms::text();
+		$this->assertStringContainsString( "## Latest posts\n\n- [Newer news](" . get_permalink( $new ) . '): What changed this week.', $text );
+		$this->assertStringNotContainsString( get_permalink( $old ), $text );
+		$this->assertStringStartsWith( "User-agent: *\nDisallow: /downloads/\nDisallow: /*.pdf$\nDisallow: /wp-admin/\n", Llms::robots( "User-agent: *\nDisallow: /wp-admin/\n", true ) );
+		$this->assertStringStartsWith( "Sitemap: x\n\nUser-agent: *\nDisallow: /downloads/\n", Llms::robots( "Sitemap: x\n", true ) );
+		$llms = wp_get_ability( 'leitvia/get-seo' )->execute( array( 'posts' => array( $new ) ) )['llms'];
+		$this->assertSame( array( 1, array( '/downloads/', '/*.pdf$' ) ), array( $llms['news'], $llms['disallow'] ) );
+	}
+
+	/**
+	 * The ability set-organization takes a description and a logo for structured data apart from the logo of the header; a logo
+	 * that is no image is refused. editorial_page sets the page of the editorial guidelines; without it the only page
+	 * with the kind editorial counts.
+	 */
+	public function test_organization_description_logo_and_editorial_page(): void {
+		$header = self::factory()->attachment->create_upload_object( DIR_TESTDATA . '/images/canola.jpg' );
+		$schema = self::factory()->attachment->create_upload_object( DIR_TESTDATA . '/images/2004-07-22-DSC_0008.jpg' );
+		set_theme_mod( 'custom_logo', $header );
+		$this->assert_rejected(
+			'logo',
+			wp_get_ability( 'leitvia/set-organization' )->execute(
+				array(
+					'logo'      => $this->page( 'Not an image' ),
+					'base_hash' => '',
+				)
+			)
+		);
+		$this->apply(
+			wp_get_ability( 'leitvia/set-organization' )->execute(
+				array(
+					'description' => 'Builds and looks after websites for small companies.',
+					'logo'        => $schema,
+					'base_hash'   => '',
+				)
+			)
+		);
+		$node = Organization::node();
+		$this->assertSame( 'Builds and looks after websites for small companies.', $node['description'] );
+		$this->assertStringContainsString( '2004-07-22-DSC_0008', $node['logo']['url'] );
+		$this->assertSame( $header, (int) get_theme_mod( 'custom_logo' ), 'the header keeps its logo' );
+		remove_theme_mod( 'custom_logo' );
+
+		$this->assertSame( '', Schema::editorial_url() );
+		$policy = $this->page( 'How we work' );
+		update_post_meta( $policy, '_leitvia_page_kind', 'editorial' );
+		$this->assertSame( get_permalink( $policy ), Schema::editorial_url(), 'the only editorial page' );
+		$second = $this->page( 'Guidelines' );
+		update_post_meta( $second, '_leitvia_page_kind', 'editorial' );
+		$this->assertSame( '', Schema::editorial_url(), 'two editorial pages, none chosen' );
+		$this->apply(
+			wp_get_ability( 'leitvia/set-organization' )->execute(
+				array(
+					'editorial_page' => $second,
+					'base_hash'      => '',
+				)
+			)
+		);
+		$this->assertSame( get_permalink( $second ), Schema::editorial_url() );
+		$this->remove_added_uploads();
+	}
+
+	/**
 	 * The ability set-permalinks waits for a person, warns when published posts move and sets the structure and the bases; a
 	 * structure without a post tag is refused.
 	 */
@@ -510,6 +617,37 @@ class Test_Seo_Cluster extends WP_UnitTestCase {
 				)
 			)
 		);
+	}
+
+	/**
+	 * A row with a query matches requests that have its parameters with the same values; further parameters go along
+	 * to the target, the row with the most parameters wins, and the exact query and the bare path work as before.
+	 */
+	public function test_redirect_query_subset(): void {
+		$rows = Redirects::sanitize(
+			array(
+				array(
+					'from' => '/order/?paket=OLD-1',
+					'to'   => '/order/?paket=NEW-1',
+				),
+				array(
+					'from' => '/order/?paket=OLD-1&von=hero',
+					'to'   => '/thanks/',
+				),
+				array(
+					'from' => '/moved/',
+					'to'   => '/new/',
+				),
+			)
+		);
+		$to   = static fn( string $path, string $query ): ?string => Redirects::find( $rows, Redirects::path( $path ), Redirects::query( $query ) )['to'] ?? null;
+		$this->assertSame( '/order/?paket=NEW-1', $to( '/order/', 'paket=OLD-1' ) );
+		$this->assertSame( '/order/?paket=NEW-1&von=cards', $to( '/order/', 'von=cards&paket=OLD-1' ), 'von goes along' );
+		$this->assertSame( '/thanks/', $to( '/order/', 'von=hero&paket=OLD-1' ), 'exact query' );
+		$this->assertSame( '/thanks/?x=1', $to( '/order/', 'von=hero&paket=OLD-1&x=1' ), 'most parameters win' );
+		$this->assertNull( $to( '/order/', 'paket=OLD-2&von=cards' ), 'another value' );
+		$this->assertNull( $to( '/order/', '' ) );
+		$this->assertSame( '/new/', $to( '/moved/', 'utm_source=x' ), 'a bare path matches any query' );
 	}
 
 	/**
@@ -862,6 +1000,133 @@ class Test_Seo_Cluster extends WP_UnitTestCase {
 		update_post_meta( $other, Composition::FRAME_META, 'article' );
 		$this->go_to( get_permalink( $other ) );
 		$this->assertSame( 'page-article.php', apply_filters( 'page_template_hierarchy', array( 'page.php' ) )[0] );
+	}
+
+	/**
+	 * A service of the type software prints a SoftwareApplication with category, system, download and the
+	 * organization as publisher; software fields on a plain service are refused.
+	 */
+	public function test_software_application(): void {
+		$page = $this->page( 'Security plugin' );
+		$done = self::structure(
+			$page,
+			array(
+				'service' => array(
+					'type'                 => 'software',
+					'name'                 => 'Security plugin',
+					'application_category' => 'SecurityApplication',
+					'operating_system'     => 'WordPress',
+					'download_url'         => 'https://wordpress.org/plugins/example/',
+					'price'                => 0,
+				),
+			)
+		);
+		$this->assertSame( 'live', $done['mode'], wp_json_encode( $done ) );
+		$this->assertSame( 'software', Cluster::service( $page )['type'] );
+		$this->go_to( get_permalink( $page ) );
+		$nodes = wp_list_filter( Schema::current()['@graph'], array( '@type' => 'SoftwareApplication' ) );
+		$this->assertCount( 1, $nodes );
+		$node = reset( $nodes );
+		$this->assertSame( array( 'SecurityApplication', 'WordPress', 'https://wordpress.org/plugins/example/', 0.0 ), array( $node['applicationCategory'], $node['operatingSystem'], $node['downloadUrl'], $node['offers']['price'] ) );
+		$this->assertSame( 'Bike Shop', $node['publisher']['name'] );
+		$this->assertArrayNotHasKey( 'provider', $node );
+		$this->assert_rejected(
+			'service',
+			self::structure(
+				$page,
+				array(
+					'service' => array(
+						'name'             => 'Care',
+						'operating_system' => 'WordPress',
+					),
+				)
+			)
+		);
+	}
+
+	/**
+	 * The kinds about and contact give a page an AboutPage or a ContactPage with the organization as main entity.
+	 */
+	public function test_about_and_contact_pages(): void {
+		foreach ( array(
+			'about'   => 'AboutPage',
+			'contact' => 'ContactPage',
+		) as $kind => $type ) {
+			$page = $this->page( ucfirst( $kind ) );
+			$this->assertSame( 'live', self::structure( $page, array( 'kind' => $kind ) )['mode'] );
+			$this->go_to( get_permalink( $page ) );
+			$nodes = wp_list_filter( Schema::current()['@graph'] ?? array(), array( '@type' => $type ) );
+			$this->assertCount( 1, $nodes, $kind );
+			$this->assertSame( 'Bike Shop', reset( $nodes )['mainEntity']['name'] );
+		}
+	}
+
+	/**
+	 * A profile of set-organization (people) makes the founder, the author of an article without an account and the
+	 * main entity of the ProfilePage on its page one Person with the same @id, job title, image, profiles and topics.
+	 */
+	public function test_person_profile(): void {
+		$about = $this->page( 'Ada Example' );
+		$image = self::factory()->attachment->create_upload_object( DIR_TESTDATA . '/images/canola.jpg' );
+		$this->apply(
+			wp_get_ability( 'leitvia/set-organization' )->execute(
+				array(
+					'founder'   => 'Ada Example',
+					'people'    => array(
+						array(
+							'name'        => 'Ada Example',
+							'job_title'   => 'Founder',
+							'description' => 'Builds websites since 2009.',
+							'image'       => $image,
+							'same_as'     => array( 'https://www.linkedin.com/in/ada-example', 'https://github.com/ada-example' ),
+							'knows_about' => array( 'WordPress', 'Accessibility' ),
+							'page'        => $about,
+						),
+					),
+					'base_hash' => '',
+				)
+			)
+		);
+		$this->assertSame( 'Founder', leitvia_studio_organization_details()['people'][0]['job_title'] );
+		$this->assert_rejected(
+			'people',
+			wp_get_ability( 'leitvia/set-organization' )->execute(
+				array(
+					'people'    => array(
+						array(
+							'name'  => 'Ada Example',
+							'image' => $about,
+						),
+					),
+					'base_hash' => '',
+				)
+			)
+		);
+		$id = home_url( '/#person-ada-example' );
+		$this->assertSame( $id, Organization::node()['founder']['@id'] );
+
+		$this->go_to( get_permalink( $about ) );
+		$profile = wp_list_filter( Schema::current()['@graph'], array( '@type' => 'ProfilePage' ) );
+		$this->assertCount( 1, $profile );
+		$person = reset( $profile )['mainEntity'];
+		$this->assertSame( array( $id, 'Founder', get_permalink( $about ), 2, array( 'WordPress', 'Accessibility' ) ), array( $person['@id'], $person['jobTitle'], $person['url'], count( $person['sameAs'] ), $person['knowsAbout'] ) );
+		$this->assertStringContainsString( 'canola', $person['image'] );
+
+		$post = self::factory()->post->create( array( 'post_title' => 'News' ) );
+		update_post_meta( $post, Schema::AUTHOR_NAME_META, 'Ada Example' );
+		$this->go_to( get_permalink( $post ) );
+		$article = wp_list_filter( Schema::current()['@graph'], array( '@type' => 'NewsArticle' ) );
+		$this->assertSame( $id, reset( $article )['author'][0]['@id'] );
+
+		// A post that names another page as author page, such as a booking page, makes no second ProfilePage while
+		// the person has a profile page; an author without one gets it there.
+		$booking = $this->page( 'Book a call' );
+		update_post_meta( $post, Schema::AUTHOR_PAGE_META, (string) $booking );
+		$this->assertSame( '', Organization::person_of_page( $booking ) );
+		$this->go_to( get_permalink( $booking ) );
+		$this->assertSame( array(), wp_list_filter( Schema::current()['@graph'], array( '@type' => 'ProfilePage' ) ) );
+		update_post_meta( $post, Schema::AUTHOR_NAME_META, 'Bea Guest' );
+		$this->assertSame( 'Bea Guest', Organization::person_of_page( $booking ) );
 	}
 
 	/**

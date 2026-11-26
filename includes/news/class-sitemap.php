@@ -94,6 +94,20 @@ final class Sitemap {
 	}
 
 	/**
+	 * Why the news sitemap is not served, as a sentence, or '' while it is: the setting news_sitemap is off, the site
+	 * is closed to search engines, another plugin serves a news sitemap, or a filter switched it off.
+	 */
+	public static function held_back(): string {
+		return match ( true ) {
+			self::enabled()                           => '',
+			! leitvia_studio_setting( 'news_sitemap' ) => __( 'The news sitemap is switched off in the settings of Leitvia Studio.', 'leitvia-studio' ),
+			! get_option( 'blog_public' )             => __( 'The news sitemap takes effect once the site is open to search engines (Settings, Reading); until then /news.xml answers 404. On a site that is not live yet this is no finding.', 'leitvia-studio' ),
+			class_exists( 'WPSEO_News' ) || class_exists( '\RankMathPro\Sitemap\News_Sitemap' ) || defined( 'XMLSF_VERSION' ) => __( 'Another plugin serves the news sitemap, so Leitvia Studio serves none.', 'leitvia-studio' ),
+			default                                   => __( 'A filter of a plugin or the theme (leitvia_studio_news_sitemap_enabled) switched the news sitemap off.', 'leitvia-studio' ),
+		};
+	}
+
+	/**
 	 * Address of the sitemap. The option home, not home_url(): under Polylang that carries a language prefix, and one
 	 * sitemap lists all languages.
 	 */

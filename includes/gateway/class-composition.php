@@ -7,6 +7,7 @@
 
 namespace LeitviaStudio\Gateway;
 
+use LeitviaStudio\Lab\Foreign_Patterns;
 use LeitviaStudio\Lab\Status;
 
 defined( 'ABSPATH' ) || exit;
@@ -122,6 +123,8 @@ final class Composition {
 				}
 			}
 		}
+		// The dark twin of a template (page-dark, page-landing-dark) lays out the page as its light one does.
+		$template = (string) preg_replace( '/-dark$/', '', $template );
 		$titled   = ! in_array( $template, $hero_templates, true );
 		$lead     = true;
 		$fresh    = false;
@@ -376,8 +379,9 @@ final class Composition {
 
 	/**
 	 * Contract data with labPatterns: the approved Lab patterns among the slugs, each with area and composition of the
-	 * theme pattern it varies, itself or through the Lab pattern it is a variant of. Drafts, patterns in review and
-	 * deprecated ones stay unknown.
+	 * theme pattern it varies, itself or through the Lab pattern it is a variant of, and the approved patterns outside
+	 * the contract whose approval set a composition, with that composition and provides. Drafts, patterns in review,
+	 * unreviewed and deprecated ones stay unknown.
 	 *
 	 * @param string[]             $slugs    Pattern slugs.
 	 * @param array<string, mixed> $contract Contract data.
@@ -386,9 +390,20 @@ final class Composition {
 	public static function lab( array $slugs, array $contract ): array {
 		$lab = array();
 		foreach ( array_unique( $slugs ) as $slug ) {
-			$id = preg_match( '/^block:([1-9]\d*)$/D', (string) $slug, $match ) ? (int) $match[1] : 0;
+			$slug = (string) $slug;
+			$id   = preg_match( '/^block:([1-9]\d*)$/D', $slug, $match ) ? (int) $match[1] : 0;
 			if ( $id && 'wp_block' === get_post_type( $id ) && 'approved' === Status::effective( $slug ) ) {
 				$lab[] = array( 'slug' => $slug ) + self::source( $id, $contract );
+			} elseif ( ! $id && Foreign_Patterns::is_foreign( $slug ) && 'approved' === Status::effective( 'pattern:' . $slug ) ) {
+				$review = Foreign_Patterns::review( $slug );
+				if ( null !== $review && $review['composition'] ) {
+					$lab[] = array(
+						'slug'        => $slug,
+						'area'        => '', // The check reads area of every section.
+						'composition' => $review['composition'],
+						'provides'    => $review['provides'],
+					);
+				}
 			}
 		}
 		$contract['labPatterns'] = $lab;

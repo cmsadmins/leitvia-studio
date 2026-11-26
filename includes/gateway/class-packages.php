@@ -278,19 +278,38 @@ final class Packages {
 	}
 
 	/**
-	 * Packages for a list, newest first.
+	 * Packages for a list, newest first: the newest 100, see page() for more.
 	 *
 	 * @param int    $author Only packages of this user, 0 for all.
 	 * @param string $state  Only packages in this state, '' for all.
 	 * @return list<array<string, mixed>> See summary().
 	 */
 	public static function all( int $author = 0, string $state = '' ): array {
-		$args = array(
+		return self::page( $author, $state )['items'];
+	}
+
+	/**
+	 * One page of packages, newest first, with the number of all packages that match.
+	 *
+	 * @param int    $author   Only packages of this user, 0 for all.
+	 * @param string $state    Only packages in this state, '' for all.
+	 * @param int    $page     Page, from 1.
+	 * @param int    $per_page Packages per page.
+	 * @return array{items: list<array<string, mixed>>, total: int, page: int, per_page: int, pages: int} Items see summary().
+	 */
+	public static function page( int $author = 0, string $state = '', int $page = 1, int $per_page = 100 ): array {
+		$page     = max( 1, $page );
+		$per_page = max( 1, $per_page );
+		$args     = array(
 			'post_type'      => self::POST_TYPE,
 			'post_status'    => 'private',
 			'fields'         => 'ids',
-			'posts_per_page' => 100,
-			'no_found_rows'  => true,
+			'posts_per_page' => $per_page,
+			'paged'          => $page,
+			'orderby'        => array(
+				'date' => 'DESC',
+				'ID'   => 'DESC',
+			),
 		);
 		if ( $author ) {
 			$args['author'] = $author;
@@ -299,27 +318,69 @@ final class Packages {
 			$args['meta_key']   = self::STATE_META; // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Few packages.
 			$args['meta_value'] = $state; // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- Same.
 		}
-		// ponytail: the newest 100; paging comes with the inbox when a site keeps more.
+		$query = new \WP_Query( $args );
+		return array(
+			'items'    => array_values( array_map( array( self::class, 'summary' ), wp_parse_id_list( (array) $query->posts ) ) ),
+			'total'    => (int) $query->found_posts,
+			'page'     => $page,
+			'per_page' => $per_page,
+			'pages'    => (int) $query->max_num_pages,
+		);
+	}
+
+	/**
+	 * Open or partly applied packages created more than a day ago, oldest first: work an agent left behind.
+	 * audit-site reports them (leitvia/stale-package).
+	 *
+	 * @param int $author Only packages of this user, 0 for all.
+	 * @return list<array<string, mixed>> See summary().
+	 */
+	public static function stale( int $author = 0 ): array {
+		$args = array(
+			'post_type'      => self::POST_TYPE,
+			'post_status'    => 'private',
+			'fields'         => 'ids',
+			'posts_per_page' => 50,
+			'no_found_rows'  => true,
+			'order'          => 'ASC',
+			'date_query'     => array(
+				array(
+					'column' => 'post_date_gmt',
+					'before' => gmdate( 'Y-m-d H:i:s', time() - DAY_IN_SECONDS ),
+				),
+			),
+			'meta_query'     => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- Few packages.
+				array(
+					'key'     => self::STATE_META,
+					'value'   => array( 'open', 'partial' ),
+					'compare' => 'IN',
+				),
+			),
+		);
+		if ( $author ) {
+			$args['author'] = $author;
+		}
 		return array_values( array_map( array( self::class, 'summary' ), array_map( 'intval', get_posts( $args ) ) ) );
 	}
 
 	/**
-	 * Number of open packages, for the count next to "Agents" in the menu; at most 100.
+	 * Number of open packages, for the count next to "Agents" in the menu and the MCP instructions.
+	 *
+	 * @param int $author Only packages of this user, 0 for all.
 	 */
-	public static function count_open(): int {
-		return count(
-			get_posts(
-				array(
-					'post_type'      => self::POST_TYPE,
-					'post_status'    => 'private',
-					'fields'         => 'ids',
-					'posts_per_page' => 100,
-					'no_found_rows'  => true,
-					'meta_key'       => self::STATE_META, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Few packages.
-					'meta_value'     => 'open', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- Same.
-				)
+	public static function count_open( int $author = 0 ): int {
+		$query = new \WP_Query(
+			array(
+				'post_type'      => self::POST_TYPE,
+				'post_status'    => 'private',
+				'author'         => $author ? $author : null,
+				'fields'         => 'ids',
+				'posts_per_page' => 1,
+				'meta_key'       => self::STATE_META, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Few packages.
+				'meta_value'     => 'open', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value -- Same.
 			)
 		);
+		return (int) $query->found_posts;
 	}
 
 	/**

@@ -7,6 +7,7 @@
 
 namespace LeitviaStudio\Seo;
 
+use LeitviaStudio\Gateway\Outline;
 use LeitviaStudio\News\Schema;
 use WP_Post;
 
@@ -15,13 +16,15 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Serves /llms.txt (llmstxt.org) from what the site knows, so it never goes stale: the site name as title, the summary
  * of the setting llms_summary or else the tagline as quote, then the hubs (pages of the page frame hub), the pages with
- * a service and price (Cluster) and the pages of the setting llms_pages, each a Markdown link with its excerpt. Built on
+ * a service and price (Cluster), the pages of the setting llms_pages and, with the setting llms_news, the latest posts,
+ * each a Markdown link with its excerpt. Built on
  * request, no file and no rewrite rule: the address answers like a 404 of WordPress would, before the template loads.
  * Off with the setting llms_txt, on a site closed to search engines and while an SEO plugin is active, which may serve
  * its own.
  *
  * The robots.txt keeps the crawlers of AI search and assistants allowed, as WordPress does for every crawler; with the
- * setting ai_crawlers off it disallows the agents of AI_CRAWLERS for the whole site.
+ * setting ai_crawlers off it disallows the agents of AI_CRAWLERS for the whole site. The paths of the setting
+ * robots_disallow are closed to every crawler (group User-agent: *).
  */
 final class Llms {
 
@@ -34,6 +37,22 @@ final class Llms {
 	 * Most pages listed per section.
 	 */
 	public const MAX_PAGES = 50;
+
+	/**
+	 * Most latest posts llms.txt lists (setting llms_news, field news of set-llms).
+	 */
+	public const MAX_NEWS = 50;
+
+	/**
+	 * Most Disallow paths of the setting robots_disallow.
+	 */
+	public const MAX_DISALLOW = 20;
+
+	/**
+	 * A Disallow path of robots.txt: a leading slash, at most 200 characters, no spaces, line breaks or #, as JSON
+	 * Schema pattern (no delimiters). * and $ are wildcards for the crawlers that know them.
+	 */
+	public const DISALLOW_PATTERN = '^/[^\s#]{0,199}$';
 
 	/**
 	 * Whether the site serves llms.txt.
@@ -97,14 +116,15 @@ final class Llms {
 		 * at most MAX_PAGES per section. An add-on adds a section of its own, for example the sections of a
 		 * documentation: $sections[ __( 'Guides', 'my-addon' ) ] = $pages.
 		 *
-		 * @param array<string, mixed> $sections Lists of WP_Post by heading: Topics, Services and prices, Pages.
+		 * @param array<string, mixed> $sections Lists of WP_Post by heading: Topics, Services and prices, Pages, Latest posts.
 		 */
 		$sections = (array) apply_filters(
 			'leitvia_studio_llms_sections',
 			array(
-				__( 'Topics', 'leitvia-studio' ) => Cluster::hub_pages(),
+				__( 'Topics', 'leitvia-studio' )       => Cluster::hub_pages(),
 				__( 'Services and prices', 'leitvia-studio' ) => Cluster::service_pages(),
-				__( 'Pages', 'leitvia-studio' )  => $extra,
+				__( 'Pages', 'leitvia-studio' )        => $extra,
+				__( 'Latest posts', 'leitvia-studio' ) => self::news(),
 			)
 		);
 		foreach ( $sections as $heading => $pages ) {
@@ -125,13 +145,56 @@ final class Llms {
 	}
 
 	/**
-	 * A Markdown link to a page with its excerpt and, for a service, its price.
+	 * The latest published posts without a password, as many as the setting llms_news asks for (at most MAX_NEWS),
+	 * none by default.
+	 *
+	 * @return list<WP_Post>
+	 */
+	private static function news(): array {
+		$count = min( self::MAX_NEWS, (int) leitvia_studio_setting( 'llms_news' ) );
+		if ( $count < 1 ) {
+			return array();
+		}
+		return array_values(
+			get_posts(
+				array(
+					'post_type'      => 'post',
+					'post_status'    => 'publish',
+					'posts_per_page' => $count,
+					'has_password'   => false,
+				)
+			)
+		);
+	}
+
+	/**
+	 * The Disallow paths of the setting robots_disallow that fit DISALLOW_PATTERN, once each, at most MAX_DISALLOW.
+	 *
+	 * @param mixed $paths Submitted paths.
+	 * @return list<string>
+	 */
+	public static function disallow_paths( $paths ): array {
+		$kept = array();
+		foreach ( (array) $paths as $path ) {
+			if ( is_string( $path ) && preg_match( '#' . str_replace( '#', '\#', self::DISALLOW_PATTERN ) . '#u', $path ) ) {
+				$kept[] = $path;
+			}
+		}
+		return array_slice( array_values( array_unique( $kept ) ), 0, self::MAX_DISALLOW );
+	}
+
+	/**
+	 * A Markdown link to a page with its excerpt and, for a service, its price. A post without an excerpt gets the
+	 * first 40 words of its text.
 	 *
 	 * @param WP_Post $page Page.
 	 */
 	private static function link( WP_Post $page ): string {
 		$service = Cluster::service( $page->ID );
 		$note    = Schema::text( (string) $page->post_excerpt );
+		if ( '' === $note && 'post' === $page->post_type ) {
+			$note = wp_trim_words( Schema::text( strip_shortcodes( excerpt_remove_blocks( $page->post_content ) ) ), 40 );
+		}
 		if ( $service && null !== $service['price'] ) {
 			$note .= ' ' . sprintf(
 				/* translators: 1: price, 2: currency code, 3: what the price is for such as per month, may be empty, 4: plus VAT or VAT included. */
@@ -153,11 +216,12 @@ final class Llms {
 	 * @param string $text Text.
 	 */
 	private static function line( string $text ): string {
-		return trim( (string) preg_replace( '/\s+/u', ' ', str_replace( array( '[', ']' ), array( '(', ')' ), $text ) ) );
+		return Outline::one_line( str_replace( array( '[', ']' ), array( '(', ')' ), $text ) );
 	}
 
 	/**
-	 * The robots.txt with the AI crawlers disallowed while the setting ai_crawlers is off, and the address of llms.txt
+	 * The robots.txt with the paths of the setting robots_disallow closed in the group User-agent: * (a new group when
+	 * the file has none), the AI crawlers disallowed while the setting ai_crawlers is off, and the address of llms.txt
 	 * while it is served. Runs on robots_txt.
 	 *
 	 * @param string $output    robots.txt so far.
@@ -167,6 +231,17 @@ final class Llms {
 		$output = (string) $output;
 		if ( ! $is_public ) {
 			return $output;
+		}
+		$paths = self::disallow_paths( leitvia_studio_setting( 'robots_disallow' ) );
+		if ( $paths ) {
+			$lines = implode( "\n", array_map( static fn( string $path ): string => 'Disallow: ' . $path, $paths ) );
+			// Right below the first User-agent: * line, so the paths join the group core writes; else a group of their own.
+			if ( preg_match( '/^User-agent:[ \t]*\*[ \t]*$/mi', $output, $match, PREG_OFFSET_CAPTURE ) ) {
+				$end    = (int) $match[0][1] + strlen( $match[0][0] );
+				$output = substr( $output, 0, $end ) . "\n" . $lines . substr( $output, $end );
+			} else {
+				$output = ( '' === trim( $output ) ? '' : rtrim( $output ) . "\n\n" ) . "User-agent: *\n" . $lines . "\n";
+			}
 		}
 		if ( ! leitvia_studio_setting( 'ai_crawlers' ) ) {
 			$rules = array();

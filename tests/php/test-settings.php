@@ -120,7 +120,7 @@ class Test_Settings extends WP_UnitTestCase {
 	public function test_schema_of_lists_and_organization(): void {
 		$properties = get_registered_settings()['leitvia_studio_settings']['show_in_rest']['schema']['properties'];
 		$this->assertSame(
-			array( 'consent_providers', 'organization_type', 'organization_founding_date', 'organization_founder', 'organization_copyright_since', 'organization_copyright_holder', 'organization_area_served', 'organization_opening_hours', 'organization_same_as', 'organization_rating_value', 'organization_rating_count', 'organization_rating_source', 'organization_rating_confirmed', 'ai_crawlers', 'llms_txt', 'llms_summary', 'llms_pages', 'redirects' ),
+			array( 'organization_contact_type', 'consent_providers', 'organization_type', 'organization_founding_date', 'organization_founder', 'organization_copyright_since', 'organization_copyright_holder', 'organization_area_served', 'organization_opening_hours', 'organization_same_as', 'organization_people', 'organization_rating_value', 'organization_rating_count', 'organization_rating_source', 'organization_rating_confirmed', 'ai_crawlers', 'llms_txt', 'llms_summary', 'llms_pages', 'redirects', 'organization_description', 'organization_logo', 'robots_disallow', 'llms_news' ),
 			array_keys( array_slice( $properties, 20 ) )
 		);
 		$this->assertSame( 'array', $properties['consent_providers']['type'] );
@@ -246,6 +246,7 @@ class Test_Settings extends WP_UnitTestCase {
 				'organization_country'          => '',
 				'organization_phone'            => '',
 				'organization_email'            => '',
+				'organization_contact_type'     => '',
 				'consent_providers'             => array(),
 				'organization_type'             => 'Organization',
 				'organization_founding_date'    => '',
@@ -255,6 +256,7 @@ class Test_Settings extends WP_UnitTestCase {
 				'organization_area_served'      => array(),
 				'organization_opening_hours'    => array(),
 				'organization_same_as'          => array(),
+				'organization_people'           => array(),
 				'organization_rating_value'     => '',
 				'organization_rating_count'     => 0,
 				'organization_rating_source'    => '',
@@ -264,6 +266,10 @@ class Test_Settings extends WP_UnitTestCase {
 				'llms_summary'                  => '',
 				'llms_pages'                    => array(),
 				'redirects'                     => array(),
+				'organization_description'      => '',
+				'organization_logo'             => 0,
+				'robots_disallow'               => array(),
+				'llms_news'                     => 0,
 			),
 			get_option( 'leitvia_studio_settings' )
 		);
@@ -359,6 +365,7 @@ class Test_Settings extends WP_UnitTestCase {
 				'organization_country'          => '',
 				'organization_phone'            => '',
 				'organization_email'            => '',
+				'organization_contact_type'     => '',
 				'consent_providers'             => array(),
 				'organization_type'             => 'Organization',
 				'organization_founding_date'    => '',
@@ -368,6 +375,7 @@ class Test_Settings extends WP_UnitTestCase {
 				'organization_area_served'      => array(),
 				'organization_opening_hours'    => array(),
 				'organization_same_as'          => array(),
+				'organization_people'           => array(),
 				'organization_rating_value'     => '',
 				'organization_rating_count'     => 0,
 				'organization_rating_source'    => '',
@@ -377,6 +385,10 @@ class Test_Settings extends WP_UnitTestCase {
 				'llms_summary'                  => '',
 				'llms_pages'                    => array(),
 				'redirects'                     => array(),
+				'organization_description'      => '',
+				'organization_logo'             => 0,
+				'robots_disallow'               => array(),
+				'llms_news'                     => 0,
 			),
 			$response->get_data()['leitvia_studio_settings']
 		);
@@ -406,6 +418,7 @@ class Test_Settings extends WP_UnitTestCase {
 				'organization_country'          => '',
 				'organization_phone'            => '',
 				'organization_email'            => '',
+				'organization_contact_type'     => '',
 				'consent_providers'             => array(),
 				'organization_type'             => 'Organization',
 				'organization_founding_date'    => '',
@@ -415,6 +428,7 @@ class Test_Settings extends WP_UnitTestCase {
 				'organization_area_served'      => array(),
 				'organization_opening_hours'    => array(),
 				'organization_same_as'          => array(),
+				'organization_people'           => array(),
 				'organization_rating_value'     => '',
 				'organization_rating_count'     => 0,
 				'organization_rating_source'    => '',
@@ -424,6 +438,10 @@ class Test_Settings extends WP_UnitTestCase {
 				'llms_summary'                  => '',
 				'llms_pages'                    => array(),
 				'redirects'                     => array(),
+				'organization_description'      => '',
+				'organization_logo'             => 0,
+				'robots_disallow'               => array(),
+				'llms_news'                     => 0,
 			),
 			rest_do_request( $request )->get_data()['leitvia_studio_settings']
 		);

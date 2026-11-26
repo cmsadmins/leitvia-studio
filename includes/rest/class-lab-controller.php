@@ -8,6 +8,7 @@
 namespace LeitviaStudio\Rest;
 
 use LeitviaStudio\Admin\Admin;
+use LeitviaStudio\Lab\Foreign_Patterns;
 use LeitviaStudio\Lab\Pattern_Dates;
 use LeitviaStudio\Lab\Pattern_IO;
 use LeitviaStudio\Lab\Pattern_Meta;
@@ -127,6 +128,52 @@ final class Lab_Controller extends \WP_REST_Controller {
 					),
 				),
 				'schema' => array( $this, 'get_public_item_schema' ),
+			)
+		);
+		register_rest_route(
+			'leitvia-studio/v1',
+			'/patterns/reviews',
+			array(
+				array(
+					'methods'             => \WP_REST_Server::CREATABLE,
+					'callback'            => array( $this, 'save_review' ),
+					// Agents hold edit_theme_options for the pipeline; an approval is always a person's.
+					'permission_callback' => static fn(): bool => current_user_can( 'edit_theme_options' ) && ! \LeitviaStudio\Gateway\Gateway::is_agent() && null === rest_get_authenticated_app_password(),
+					'args'                => array(
+						'slug'        => array(
+							'type'     => 'string',
+							'pattern'  => '^[A-Za-z0-9_.-]+/[A-Za-z0-9_./-]+$',
+							'required' => true,
+						),
+						'status'      => array(
+							'type'     => 'string',
+							'enum'     => array( 'approved', 'unreviewed' ),
+							'required' => true,
+						),
+						'composition' => array(
+							'type'                 => 'object',
+							'properties'           => array_fill_keys(
+								Foreign_Patterns::KEYS,
+								array(
+									'type'      => 'string',
+									'maxLength' => 40,
+								)
+							),
+							'additionalProperties' => false,
+							'default'              => array(),
+						),
+						'provides'    => array(
+							'type'     => 'array',
+							'items'    => array(
+								'type'      => 'string',
+								'maxLength' => 40,
+							),
+							'maxItems' => 20,
+							'default'  => array(),
+						),
+					),
+				),
+				'schema' => array( self::class, 'review_schema' ),
 			)
 		);
 		$id = array(
@@ -409,6 +456,28 @@ final class Lab_Controller extends \WP_REST_Controller {
 	}
 
 	/**
+	 * Approves a registered pattern outside the contract for agents, or withdraws the approval.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 * @phpstan-param \WP_REST_Request<array<string, mixed>> $request
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function save_review( $request ) {
+		$slug   = (string) $request['slug'];
+		$review = Foreign_Patterns::save( $slug, (string) $request['status'], (array) $request['composition'], (array) $request['provides'] );
+		if ( is_wp_error( $review ) ) {
+			return $review;
+		}
+		return rest_ensure_response(
+			array(
+				'ref'    => 'pattern:' . $slug,
+				'status' => Status::own( 'pattern:' . $slug ),
+				'review' => $review,
+			)
+		);
+	}
+
+	/**
 	 * Stores the accessibility results of the Lab in _leitvia_lab_checks.axe. They are shown only; the binding check
 	 * stays the Playwright suite.
 	 *
@@ -518,22 +587,16 @@ final class Lab_Controller extends \WP_REST_Controller {
 
 	/**
 	 * Registered patterns: every pattern of the active theme, hidden ones included, and other patterns shown in the
-	 * inserter.
-	 *
-	 * Core drops filePath once a pattern's content is loaded, which may already have happened in this request; a name
-	 * prefixed with the theme slug counts as a theme pattern too.
+	 * inserter. Foreign_Patterns::in_theme() tells them apart.
 	 *
 	 * @return array{0: list<array<string, mixed>>, 1: list<array<string, mixed>>} Patterns of the active theme, then those
 	 *         of core, plugins and add-ons.
 	 */
 	private function theme_items(): array {
 		$states = $this->theme_states();
-		$dirs   = array( wp_normalize_path( get_stylesheet_directory() ) . '/', wp_normalize_path( get_template_directory() ) . '/' );
 		$items  = array( array(), array() );
 		foreach ( \WP_Block_Patterns_Registry::get_instance()->get_all_registered() as $pattern ) {
-			$file     = wp_normalize_path( (string) ( $pattern['filePath'] ?? '' ) );
-			$in_theme = str_starts_with( $file, $dirs[0] ) || str_starts_with( $file, $dirs[1] )
-				|| str_starts_with( $pattern['name'], get_stylesheet() . '/' ) || str_starts_with( $pattern['name'], get_template() . '/' );
+			$in_theme = Foreign_Patterns::in_theme( $pattern );
 			if ( ! $in_theme && false === ( $pattern['inserter'] ?? true ) ) {
 				continue;
 			}
@@ -556,6 +619,8 @@ final class Lab_Controller extends \WP_REST_Controller {
 					'added'            => self::day( $dates['added'] ),
 					'modified'         => max( self::day( $dates['updated'] ), $states[ $pattern['name'] ]['modified'] ?? '' ),
 					'edit_url'         => '',
+					'reviewable'       => Foreign_Patterns::is_foreign_pattern( $pattern ),
+					'review'           => Foreign_Patterns::review( (string) $pattern['name'] ),
 				)
 			);
 		}
@@ -707,6 +772,8 @@ final class Lab_Controller extends \WP_REST_Controller {
 				'added'            => str_starts_with( (string) get_post_field( 'post_date_gmt', $id ), '0000' ) ? '' : gmdate( 'c', (int) strtotime( get_post_field( 'post_date_gmt', $id ) . ' UTC' ) ),
 				'modified'         => max( self::modified( $id ), $modified ),
 				'edit_url'         => (string) get_edit_post_link( $id, 'raw' ),
+				'reviewable'       => false,
+				'review'           => null,
 			)
 		);
 	}
@@ -791,6 +858,36 @@ final class Lab_Controller extends \WP_REST_Controller {
 			'$schema' => 'http://json-schema.org/draft-04/schema#',
 			'title'   => 'leitvia-studio-pattern-checks',
 		) + array_diff_key( Pattern_Meta::schema()['_leitvia_lab_checks'], array( 'default' => true ) );
+	}
+
+	/**
+	 * Schema of the answer of /patterns/reviews.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function review_schema(): array {
+		return array(
+			'$schema'    => 'http://json-schema.org/draft-04/schema#',
+			'title'      => 'leitvia-studio-pattern-review',
+			'type'       => 'object',
+			'properties' => array(
+				'ref'    => array(
+					'description' => __( 'pattern:<slug> of the registered pattern.', 'leitvia-studio' ),
+					'type'        => 'string',
+					'readonly'    => true,
+				),
+				'status' => array(
+					'description' => __( 'Own status of the pattern after the review: approved or unreviewed.', 'leitvia-studio' ),
+					'type'        => 'string',
+					'readonly'    => true,
+				),
+				'review' => array(
+					'description' => __( 'The stored approval with composition and provides, null after a withdrawal.', 'leitvia-studio' ),
+					'type'        => array( 'object', 'null' ),
+					'readonly'    => true,
+				),
+			),
+		);
 	}
 
 	/**
@@ -905,8 +1002,8 @@ final class Lab_Controller extends \WP_REST_Controller {
 						'items'    => array( 'type' => 'string' ),
 						'readonly' => true,
 					),
-					'status'                 => array( 'enum' => $meta['_leitvia_lab_status']['enum'] ) + $string,
-					'effective_status'       => array( 'enum' => $meta['_leitvia_lab_status']['enum'] ) + $string,
+					'status'                 => array( 'enum' => array_merge( $meta['_leitvia_lab_status']['enum'], array( 'unreviewed' ) ) ) + $string,
+					'effective_status'       => array( 'enum' => array_merge( $meta['_leitvia_lab_status']['enum'], array( 'unreviewed' ) ) ) + $string,
 					'status_label'           => $string,
 					'effective_status_label' => $string,
 					'version'                => $string,
@@ -920,6 +1017,16 @@ final class Lab_Controller extends \WP_REST_Controller {
 					'added'                  => array( 'description' => __( 'When the pattern was added, ISO 8601 in UTC, empty when unknown. Registered patterns take the day from patterns/dates.json.', 'leitvia-studio' ) ) + $string,
 					'modified'               => array( 'description' => __( 'Latest change of the pattern file, the pattern and its states, ISO 8601 in UTC, empty when unknown. Accessibility results older than this are outdated.', 'leitvia-studio' ) ) + $string,
 					'edit_url'               => $string,
+					'reviewable'             => array(
+						'description' => __( 'Whether the pattern is registered without an entry in the design contract and needs an approval before agents use it.', 'leitvia-studio' ),
+						'type'        => 'boolean',
+						'readonly'    => true,
+					),
+					'review'                 => array(
+						'description' => __( 'Approval of such a pattern: status, composition, provides and its date; null without one.', 'leitvia-studio' ),
+						'type'        => array( 'object', 'null' ),
+						'readonly'    => true,
+					),
 				),
 			);
 		}

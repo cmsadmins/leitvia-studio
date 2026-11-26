@@ -19,6 +19,18 @@
 		"added": "2026-11-04",
 		"updated": "2026-11-05"
 	},
+	"leitvia-studio/content-process-icons": {
+		"added": "2026-11-25",
+		"updated": "2026-11-26"
+	},
+	"leitvia-studio/content-process-timeline": {
+		"added": "2026-11-25",
+		"updated": "2026-11-26"
+	},
+	"leitvia-studio/content-scope-grid": {
+		"added": "2026-11-25",
+		"updated": "2026-11-25"
+	},
 	"leitvia-studio/content-share-post": {
 		"added": "2026-11-04",
 		"updated": "2026-11-04"
@@ -70,6 +82,14 @@
 	"leitvia-studio/offer-pricing-plans": {
 		"added": "2026-10-18",
 		"updated": "2026-10-28"
+	},
+	"leitvia-studio/teaser-icon-areas": {
+		"added": "2026-11-25",
+		"updated": "2026-11-25"
+	},
+	"leitvia-studio/teaser-link-cards": {
+		"added": "2026-11-25",
+		"updated": "2026-11-25"
 	},
 	"leitvia-studio/teaser-type-entries": {
 		"added": "2026-10-24",

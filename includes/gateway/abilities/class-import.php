@@ -218,6 +218,11 @@ final class Import {
 								'description' => __( 'Old address of the parent, imported before with leitvia/import-post or waiting in the open package with the same package key; instead of parent. Without such a parent the import is rejected, never placed at the top level. A second import with it moves the post under that parent.', 'leitvia-studio' ),
 							),
 							'terms'          => Content::terms_schema(),
+							'kind'           => array(
+								'type'        => 'string',
+								'enum'        => Build::PAGE_KINDS,
+								'description' => __( 'Kind of an imported page, such as imprint or privacy for a legal text, as leitvia/compose-page sets it. A legal kind keeps the page at suggest: the import waits in a change package for a person.', 'leitvia-studio' ),
+							),
 							'featured_image' => array(
 								'type'                 => 'object',
 								'properties'           => array(
@@ -333,6 +338,11 @@ final class Import {
 			);
 		}
 		$write = array_intersect_key( $input, array_flip( array( 'title', 'excerpt', 'date', 'terms', 'package' ) ) );
+		$kind  = (string) ( $input['kind'] ?? '' );
+		if ( '' !== $kind && 'page' !== ( $input['post_type'] ?? '' ) ) {
+			$error = Rejection::make( 'leitvia_invalid_input', __( 'Only pages have a kind.', 'leitvia-studio' ), 422, 'kind', array( 'post' => 0 ), '', 'never' );
+			return Abilities::run( self::NAME, static fn() => $error, $input );
+		}
 		if ( '' !== trim( $content ) ) {
 			$write['content'] = $content;
 		}
@@ -381,8 +391,11 @@ final class Import {
 					$parts['target']['parent_source'] = $pending;
 				}
 				$parts['base_hash'] = Hashes::document( $found );
-				$parts['change']    = $self->with_seo( $parts['change'], (array) ( $input['seo'] ?? array() ), $found );
-				$self->report      += array(
+				if ( '' !== $kind ) {
+					$parts = self::with_kind( $parts, $kind );
+				}
+				$parts['change'] = $self->with_seo( $parts['change'], (array) ( $input['seo'] ?? array() ), $found );
+				$self->report   += array(
 					'action' => 'updated',
 					'post'   => $found,
 				);
@@ -392,6 +405,7 @@ final class Import {
 				$write + array_filter(
 					array(
 						'post_type' => (string) ( $input['post_type'] ?? '' ),
+						'kind'      => $kind,
 						'slug'      => (string) ( $input['slug'] ?? '' ),
 						'status'    => (string) ( $input['status'] ?? '' ),
 						'parent'    => $parent,
@@ -419,6 +433,29 @@ final class Import {
 			$parts['report'] = $report;
 		}
 		return Abilities::execute_write( self::NAME, static fn() => $parts, $input );
+	}
+
+	/**
+	 * Parts of an update of an imported page with a page kind: the meta _leitvia_page_kind, and the kind legal for a
+	 * legal text, so the update waits for a person as compose-page and create-content do (Autonomy::LEGAL_PAGES).
+	 *
+	 * @param array<string, mixed> $parts Parts of leitvia/update-content.
+	 * @param string               $kind  Page kind of Build::PAGE_KINDS.
+	 * @return array<string, mixed>
+	 */
+	private static function with_kind( array $parts, string $kind ): array {
+		$change          = $parts['change'];
+		$parts['change'] = static function ( array $state ) use ( $change, $kind ) {
+			$state = $change( $state );
+			if ( is_array( $state ) ) {
+				$state['meta_input'] = array( '_leitvia_page_kind' => $kind ) + (array) ( $state['meta_input'] ?? array() );
+			}
+			return $state;
+		};
+		if ( in_array( $kind, \LeitviaStudio\Gateway\Autonomy::LEGAL_PAGES, true ) ) {
+			$parts['kinds'] = array_values( array_unique( array_merge( (array) ( $parts['kinds'] ?? array() ), array( 'legal' ) ) ) );
+		}
+		return $parts;
 	}
 
 	/**

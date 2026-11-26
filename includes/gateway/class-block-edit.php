@@ -53,6 +53,21 @@ final class Block_Edit {
 	public const IMAGE_BLOCKS = array( 'core/image', 'core/cover' );
 
 	/**
+	 * Regex class of the spaces replace_text treats as one: space, no-break space, figure space and narrow no-break
+	 * space.
+	 */
+	private const SPACES = '[ \x{00A0}\x{2007}\x{202F}]';
+
+	/**
+	 * Items of a navigation, which render on the server: text and url change their attributes label and url, see
+	 * menu_item(). Block name => attribute of the text.
+	 */
+	public const MENU_ITEMS = array(
+		'core/navigation-link'    => 'label',
+		'core/navigation-submenu' => 'label',
+	);
+
+	/**
 	 * Attributes of core blocks outside the block catalog that may change, as JSON schema; their markup is rebuilt
 	 * from the new value. The level of a heading is the tag name of its element, the tracks of a video are its track
 	 * elements. A query keeps its markup: its settings live in the block comment, and query merges into what is set.
@@ -60,14 +75,14 @@ final class Block_Edit {
 	 * through className like that of every core block, also in the edits of a template part.
 	 */
 	public const CORE_ATTRIBUTES = array(
-		'core/heading'   => array(
+		'core/heading'    => array(
 			'level' => array(
 				'type'    => 'integer',
 				'minimum' => 1,
 				'maximum' => 6,
 			),
 		),
-		'core/query'     => array(
+		'core/query'      => array(
 			'query'   => array(
 				'type'                 => 'object',
 				'properties'           => array(
@@ -100,14 +115,55 @@ final class Block_Edit {
 				'minimum' => 1,
 			),
 		),
-		'core/site-logo' => array(
+		'core/site-logo'  => array(
 			'width' => array(
 				'type'    => 'integer',
 				'minimum' => 20,
 				'maximum' => 600,
 			),
 		),
-		'core/video'     => array(
+		// The width of one column of a columns block, in percent of the row as the editor saves it (flex-basis); null
+		// lets it share the rest with the other columns. Set the widths of all columns of a row together.
+		'core/column'     => array(
+			'width'             => array(
+				'type'    => 'string',
+				'pattern' => '^(100|[1-9][0-9]?)(\.[0-9]{1,2})?%$',
+			),
+			'verticalAlignment' => array(
+				'type' => 'string',
+				'enum' => array( 'top', 'center', 'bottom', 'stretch' ),
+			),
+		),
+		// Where the columns of a row stand when they differ in height: top, center or bottom, saved as class
+		// are-vertically-aligned-<value> of the row (is-vertically-aligned-<value> of a column, stretch on a column only).
+		'core/columns'    => array(
+			'verticalAlignment' => array(
+				'type' => 'string',
+				'enum' => array( 'top', 'center', 'bottom' ),
+			),
+		),
+		// The menu of a header: when the items collapse behind the menu button (always for a menu button on every
+		// width), the colors of the open menu (color roles and extra surfaces) and the button with an icon or the word Menu.
+		'core/navigation' => array(
+			'overlayMenu'            => array(
+				'type' => 'string',
+				'enum' => array( 'never', 'mobile', 'always' ),
+			),
+			'overlayBackgroundColor' => array(
+				'type'    => 'string',
+				'pattern' => '^(surface|surface-alt|ink|accent|on-accent|surface-extra-[a-z0-9-]+)$',
+			),
+			'overlayTextColor'       => array(
+				'type'    => 'string',
+				'pattern' => '^(surface|surface-alt|ink|accent|on-accent|surface-extra-[a-z0-9-]+)$',
+			),
+			'hasIcon'                => array( 'type' => 'boolean' ),
+			'icon'                   => array(
+				'type' => 'string',
+				'enum' => array( 'handle', 'menu' ),
+			),
+		),
+		'core/video'      => array(
 			'tracks' => array(
 				'type'     => 'array',
 				'maxItems' => 10,
@@ -172,9 +228,14 @@ final class Block_Edit {
 		'core/heading'   => '<!-- wp:heading --><h2 class="wp-block-heading"></h2><!-- /wp:heading -->',
 		'core/separator' => '<!-- wp:separator --><hr class="wp-block-separator has-alpha-channel-opacity"/><!-- /wp:separator -->',
 		'core/site-logo' => '',
+		// An image of the media library (image with id and alt, or decorative), such as the logo mark in the foot of a menu.
+		'core/image'     => '<!-- wp:image {"sizeSlug":"full","linkDestination":"none"} --><figure class="wp-block-image size-full"><img alt=""/></figure><!-- /wp:image -->',
 		// A row of buttons takes its buttons as inner blocks, each with text and url (BUTTON_FIELDS).
 		'core/buttons'   => '<!-- wp:buttons --><div class="wp-block-buttons"><!-- wp:button --><div class="wp-block-button"><a class="wp-block-button__link wp-element-button"></a></div><!-- /wp:button --></div><!-- /wp:buttons -->',
 		'core/button'    => '<!-- wp:button --><div class="wp-block-button"><a class="wp-block-button__link wp-element-button"></a></div><!-- /wp:button -->',
+		// A list takes its items as inner blocks, each with text, such as the statements of a marquee.
+		'core/list'      => '<!-- wp:list --><ul class="wp-block-list"><!-- wp:list-item --><li></li><!-- /wp:list-item --></ul><!-- /wp:list -->',
+		'core/list-item' => '<!-- wp:list-item --><li></li><!-- /wp:list-item -->',
 	);
 
 	/**
@@ -203,8 +264,8 @@ final class Block_Edit {
 	 *
 	 * @param string               $content Block markup.
 	 * @param string               $id      leitviaId or path ID such as p:0.2.1.
-	 * @param array<string, mixed> $change  attributes, text, url, add_link (text, url), caption and image (id, alt,
-	 *                                      decorative); each optional.
+	 * @param array<string, mixed> $change  attributes, text, url, add_link (text, url), emphasis, replace_text (find, with),
+	 *                                      caption and image (id, alt, decorative); each optional.
 	 * @param array<string, mixed> $target  Target for rejections, for example array( 'post' => 12 ).
 	 * @return string|\WP_Error
 	 */
@@ -353,8 +414,12 @@ final class Block_Edit {
 				'anchor'    => true,
 				'link_text' => true,
 				'url'       => true,
+				'emphasis'  => true,
+				'strike'    => true,
+				'mark'      => true,
 				'table'     => true,
 				'caption'   => true,
+				'image'     => true,
 			)
 		);
 		$attrs  = (array) ( $spec['attributes'] ?? array() );
@@ -372,18 +437,25 @@ final class Block_Edit {
 					/* translators: %s: attribute name. */
 					return self::invalid( 'attributes', sprintf( __( 'The block has no attribute %s.', 'leitvia-studio' ), $key ), $target );
 				}
-				$valid = rest_validate_value_from_schema( $value, array_diff_key( $schema, array( 'default' => true ) ), (string) $key );
+				// null keeps the default, as in update-block.
+				$valid = null === $value ? true : rest_validate_value_from_schema( $value, array_diff_key( $schema, array( 'default' => true ) ), (string) $key );
 				if ( is_wp_error( $valid ) ) {
 					return self::invalid( 'attributes', $valid->get_error_message(), $target );
 				}
 			}
-			$block['attrs'] = $attrs + (array) $block['attrs'];
+			$block['attrs'] = self::merged( (array) $block['attrs'], $attrs );
 		} elseif ( $attrs ) {
 			$change['attributes'] = $attrs;
 		}
 		// A new button without text or link would be an empty control; a new row of buttons needs its buttons.
 		if ( 'core/button' === $name && ( '' === trim( (string) ( $spec['text'] ?? '' ) ) || '' === trim( (string) ( $spec['url'] ?? '' ) ) ) ) {
 			return self::invalid( 'insert', __( 'A new button needs text and url.', 'leitvia-studio' ), $target );
+		}
+		if ( 'core/image' === $name && empty( $spec['image'] ) ) {
+			return self::invalid( 'insert', __( 'A new core/image needs image: the id of an image of the media library with alt, or decorative true.', 'leitvia-studio' ), $target, 'leitvia/list-media' );
+		}
+		if ( 'core/list' === $name && empty( $spec['inner'] ) ) {
+			return self::invalid( 'insert', __( 'A new core/list needs inner: one core/list-item with text per item.', 'leitvia-studio' ), $target );
 		}
 		if ( 'core/buttons' === $name && empty( $spec['inner'] ) ) {
 			return self::invalid( 'insert', __( 'A new core/buttons needs inner: one or two core/button, each with text and url.', 'leitvia-studio' ), $target );
@@ -679,7 +751,16 @@ final class Block_Edit {
 				return self::invalid( 'columns', __( 'A grid has 1 to 6 columns.', 'leitvia-studio' ), $target );
 			}
 			if ( 'core/gallery' !== $name ) {
-				// Core renders the grid from the layout in the comment; the saved markup holds none of it.
+				// Core renders the grid from the layout in the comment; the saved markup holds none of it. A grid with
+				// a minimum column width shows its count only where that many columns of the minimum fit, so the count
+				// caps the minimum at a share of 64rem (1024px): three columns of teaser-services (31rem for two) take
+				// 21.33rem and stand side by side in a row of 64rem and the gaps. Smaller minimums stay.
+				if ( preg_match( '/^(\d+(?:\.\d+)?)(rem|em|px)$/', (string) ( $layout['minimumColumnWidth'] ?? '' ), $min ) ) {
+					$cap = ( 'px' === $min[2] ? 1024 : 64 ) / $columns;
+					if ( (float) $min[1] > $cap ) {
+						$layout['minimumColumnWidth'] = round( $cap, 2 ) . $min[2];
+					}
+				}
 				$block['attrs']['layout'] = array(
 					'type'        => 'grid',
 					'columnCount' => $columns,
@@ -714,9 +795,9 @@ final class Block_Edit {
 		if ( 'leitvia/comparison-table' === $name && ( isset( $change['table'] ) || array_intersect_key( (array) ( $change['attributes'] ?? array() ), array_flip( self::COMPARISON_ATTRIBUTES ) ) || isset( $change['caption'] ) ) ) {
 			$own = array_intersect_key( (array) ( $change['attributes'] ?? array() ), array_flip( self::COMPARISON_ATTRIBUTES ) );
 			if ( isset( $change['table'] ) ) {
-				$own = array(
-					'columns' => array_values( (array) ( $change['table']['head'] ?? array() ) ),
-					'rows'    => array_values( (array) ( $change['table']['rows'] ?? array() ) ),
+				// Without head the comparison table keeps its column names.
+				$own = ( isset( $change['table']['head'] ) ? array( 'columns' => array_values( (array) $change['table']['head'] ) ) : array() ) + array(
+					'rows' => array_values( (array) ( $change['table']['rows'] ?? array() ) ),
 				) + ( isset( $change['table']['caption'] ) ? array( 'caption' => (string) $change['table']['caption'] ) : array() ) + $own;
 			}
 			if ( isset( $change['caption'] ) ) {
@@ -740,6 +821,25 @@ final class Block_Edit {
 				return $block;
 			}
 		}
+		if ( isset( $change['replace_text'], $change['text'] ) ) {
+			return self::invalid( 'replace_text', __( 'Send either text for the whole text or replace_text for words in it, not both.', 'leitvia-studio' ), $target );
+		}
+		// A navigation link or submenu keeps its text and link in its comment only (label, url).
+		if ( isset( self::MENU_ITEMS[ $name ] ) && ( isset( $change['text'] ) || isset( $change['url'] ) ) ) {
+			$block = self::menu_item( $block, $change, $target );
+			if ( is_wp_error( $block ) ) {
+				return $block;
+			}
+			unset( $change['text'], $change['url'] );
+		}
+		// The word on the menu button of a navigation lives in its comment (leitviaMenuText), see navigation().
+		if ( 'core/navigation' === $name && isset( $change['text'] ) ) {
+			$block = self::navigation( $block, array( 'text' => $change['text'] ), $target );
+			if ( is_wp_error( $block ) ) {
+				return $block;
+			}
+			unset( $change['text'] );
+		}
 		$link = isset( $change['url'] ) && 'core/button' !== $name;
 		if ( isset( $change['text'] ) || $link ) {
 			// The link of a button is the text element itself; it follows below.
@@ -748,10 +848,24 @@ final class Block_Edit {
 				return $block;
 			}
 		}
+		if ( isset( $change['replace_text'] ) ) {
+			$block = self::replace_text( $block, (array) $change['replace_text'], $target, $rebuild );
+			if ( is_wp_error( $block ) ) {
+				return $block;
+			}
+		}
 		if ( isset( $change['add_link'] ) ) {
 			$block = self::add_link( $block, (array) $change['add_link'], $target, $rebuild );
 			if ( is_wp_error( $block ) ) {
 				return $block;
+			}
+		}
+		foreach ( array_keys( self::INLINE ) as $kind ) {
+			if ( isset( $change[ $kind ] ) ) {
+				$block = self::inline( $block, $kind, $change[ $kind ], $target, $rebuild );
+				if ( is_wp_error( $block ) ) {
+					return $block;
+				}
 			}
 		}
 		if ( isset( $change['caption'] ) ) {
@@ -862,10 +976,10 @@ final class Block_Edit {
 			'core/button'  => 'text',
 			'core/quote'   => 'citation',
 			'core/details' => 'summary',
-		)[ (string) $block['blockName'] ] ?? 'content';
+		)[ (string) $block['blockName'] ] ?? self::MENU_ITEMS[ (string) $block['blockName'] ] ?? 'content';
 		$touched  = array_keys( $change['attributes'] );
-		$touched += isset( $change['text'] ) ? array( 'text' => $text ) : array();
-		$touched += isset( $change['url'] ) && 'core/button' === $block['blockName'] ? array( 'url' => 'url' ) : array();
+		$touched += isset( $change['text'] ) || isset( $change['replace_text'] ) ? array( 'text' => $text ) : array();
+		$touched += isset( $change['url'] ) && ( 'core/button' === $block['blockName'] || isset( self::MENU_ITEMS[ (string) $block['blockName'] ] ) ) ? array( 'url' => 'url' ) : array();
 		$touched += isset( $change['caption'] ) ? array( 'caption' => 'caption' ) : array();
 		$touched  = array_merge( array_values( $touched ), isset( $change['image'] ) ? array( 'id', 'url', 'alt' ) : array(), isset( $change['video'] ) ? array( 'id', 'src', 'poster' ) : array() );
 		foreach ( $touched as $attribute ) {
@@ -971,40 +1085,232 @@ final class Block_Edit {
 		if ( '' === $url ) {
 			return self::invalid( 'url', __( 'The link is not a valid URL.', 'leitvia-studio' ), $target );
 		}
+		return self::wrap( $block, $found, (string) ( $link['text'] ?? '' ), '<a href="' . esc_url( $url ) . '">', '</a>', 'a' )
+			?? self::invalid( 'add_link', __( 'The block has no such passage outside a link. Send the exact words of one run of text, without markup.', 'leitvia-studio' ), $target, 'leitvia/get-block' );
+	}
+
+	/**
+	 * Inline formats of a passage, with their element and the elements whose content does not count on the first try:
+	 * emphasis in italics (em), strike struck through (s, such as a phrase the text takes back), mark in another font
+	 * role, text color or size (mark, as the text color format of the editor saves it, such as a number 01 in mono and
+	 * accent before the words of a heading, or quotation marks in accent).
+	 */
+	private const INLINE = array(
+		'emphasis' => 'em',
+		'strike'   => 's',
+		'mark'     => 'mark',
+	);
+
+	/**
+	 * Block with a passage of its text in an inline format of INLINE, such as one word of a claim or of a button label:
+	 * links and other inline formatting stay, so emphasis and strike on the same words give both. The first place
+	 * outside a link and outside the same format counts, else the first inside a link (the whole linked title), and the
+	 * passage must lie in one run of text. text replaces the whole text with plain text, so in one edit text comes first
+	 * and the formats follow. emphasis takes the words or text with font, the font role of the italic words (such as the
+	 * italic of the ui font in a serif heading); mark takes text with font, color (TEXT_COLORS) and size, at least one.
+	 *
+	 * @param array<string, mixed> $block   Parsed block.
+	 * @param string               $kind    emphasis, strike or mark.
+	 * @param mixed                $spec    The exact words, or text with font, color and size.
+	 * @param array<string, mixed> $target  Target.
+	 * @param \WP_Error            $rebuild Rejection for static markup.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private static function inline( array $block, string $kind, $spec, array $target, \WP_Error $rebuild ) {
+		if ( ! isset( self::TEXT_BLOCKS[ (string) $block['blockName'] ] ) ) {
+			/* translators: %s: name of the edit, such as emphasis. */
+			return self::invalid( $kind, sprintf( __( '%s goes with a paragraph, heading, list item, button, quote citation or details summary only.', 'leitvia-studio' ), $kind ), $target, 'leitvia/get-block' );
+		}
+		$found = self::element( $block, self::TEXT_BLOCKS[ (string) $block['blockName'] ] );
+		if ( ! $found ) {
+			return $rebuild;
+		}
+		$spec  = is_array( $spec ) ? $spec : array( 'text' => (string) $spec );
+		$words = (string) ( $spec['text'] ?? '' );
+		if ( '' === trim( $words ) ) {
+			/* translators: %s: name of the edit, such as emphasis. */
+			return self::invalid( $kind, sprintf( __( '%s names the exact words of the passage; they cannot be empty.', 'leitvia-studio' ), $kind ), $target );
+		}
+		$allowed = self::presets( array( 'blockName' => 'core/paragraph' ) );
+		$classes = array();
+		foreach ( array(
+			'color' => array( 'textColor', 'has-%s-color' ),
+			'font'  => array( 'fontFamily', 'has-%s-font-family' ),
+			'size'  => array( 'fontSize', 'has-%s-font-size' ),
+		) as $key => [ $preset, $class ] ) {
+			if ( ! isset( $spec[ $key ] ) ) {
+				continue;
+			}
+			if ( ( 'emphasis' === $kind && 'font' !== $key ) || 'strike' === $kind || ! in_array( (string) $spec[ $key ], $allowed[ $preset ], true ) ) {
+				/* translators: 1: name of the edit, 2: key such as font, 3: allowed values. */
+				return self::invalid( $kind, sprintf( __( '%1$s takes no such %2$s. Allowed: %3$s.', 'leitvia-studio' ), $kind, $key, 'emphasis' === $kind && 'font' !== $key ? 'font' : implode( ', ', $allowed[ $preset ] ) ), $target, 'leitvia/get-tokens' );
+			}
+			$classes[] = sprintf( $class, sanitize_html_class( (string) $spec[ $key ] ) );
+		}
+		if ( 'mark' === $kind && ! $classes ) {
+			return self::invalid( $kind, __( 'mark needs font, color or size besides text; italics are emphasis.', 'leitvia-studio' ), $target );
+		}
+		$tag   = self::INLINE[ $kind ];
+		$class = $classes ? ' class="' . esc_attr( implode( ' ', $classes ) ) . '"' : '';
+		// A mark without a ground of its own, as the text color format of the editor saves it.
+		$open = 'mark' === $tag ? '<mark style="background-color:rgba(0, 0, 0, 0)" class="has-inline-color ' . esc_attr( implode( ' ', $classes ) ) . '">' : '<' . $tag . $class . '>';
+		// Words outside a link first; then inside one, such as a title that is linked as a whole (em in the a).
+		return self::wrap( $block, $found, $words, $open, '</' . $tag . '>', 'a|' . $tag )
+			?? self::wrap( $block, $found, $words, $open, '</' . $tag . '>', $tag )
+			/* translators: %s: name of the edit, such as emphasis. */
+			?? self::invalid( $kind, sprintf( __( 'The text has no such words outside this format (%s). Send the exact words of one run of text, without markup.', 'leitvia-studio' ), $kind ), $target, 'leitvia/get-block' );
+	}
+
+	/**
+	 * Block with the first place of words in its element wrapped in an open and a close tag; text inside the tags of
+	 * skip (such as a link) does not count. Null when the words stand nowhere else in one run of text.
+	 *
+	 * @param array<string, mixed>                 $block Parsed block.
+	 * @param array{0: int|string, 1: int, 2: int} $found Where the element content lies, see element().
+	 * @param string                               $text  The exact words, plain text.
+	 * @param string                               $open  Opening tag.
+	 * @param string                               $close Closing tag.
+	 * @param string                               $skip  Tag names whose content does not count, as a regex alternation.
+	 * @return array<string, mixed>|null
+	 */
+	private static function wrap( array $block, array $found, string $text, string $open, string $close, string $skip ): ?array {
 		[ $key, $start, $length ] = $found;
 		$html                     = (string) $block['innerContent'][ $key ];
-		$text                     = (string) ( $link['text'] ?? '' );
 		// Saved text keeps quotes as they are, text this class wrote has them as entities.
 		$forms = array_unique( array( htmlspecialchars( $text, ENT_NOQUOTES, 'UTF-8' ), esc_html( $text ) ) );
 		$parts = (array) preg_split( '/(<[^>]*>)/', substr( $html, $start, $length ), -1, PREG_SPLIT_DELIM_CAPTURE );
-		$open  = false;
+		$depth = 0;
 		foreach ( $parts as $index => $part ) {
 			$part = (string) $part;
 			if ( 1 === $index % 2 ) {
-				$open = preg_match( '#^<a[\s>]#i', $part ) ? true : ( preg_match( '#^</a\s*>#i', $part ) ? false : $open );
+				$depth += preg_match( '#^<(' . $skip . ')[\s>]#i', $part ) ? 1 : ( preg_match( '#^</(' . $skip . ')\s*>#i', $part ) ? -1 : 0 );
 				continue;
 			}
-			foreach ( $open ? array() : $forms as $form ) {
+			foreach ( $depth > 0 ? array() : $forms as $form ) {
 				$at = strpos( $part, $form );
 				if ( false !== $at ) {
-					$parts[ $index ]               = substr_replace( $part, '<a href="' . esc_url( $url ) . '">' . $form . '</a>', $at, strlen( $form ) );
+					$parts[ $index ]               = substr_replace( $part, $open . $form . $close, $at, strlen( $form ) );
 					$block['innerContent'][ $key ] = substr_replace( $html, implode( '', $parts ), $start, $length );
 					return $block;
 				}
 			}
 		}
-		return self::invalid( 'add_link', __( 'The block has no such passage outside a link. Send the exact words of one run of text, without markup.', 'leitvia-studio' ), $target, 'leitvia/get-block' );
+		return null;
 	}
 
 	/**
-	 * Checks the cells of a table edit: head and every row of the same length, within the limits.
+	 * Navigation link or submenu with a new text (label) and link (url) in its comment, as the editor saves them: the
+	 * label as rich text, with &, < and > as entities; a new url makes the item a custom link (kind custom, without
+	 * the ID and type of a post it pointed to).
 	 *
-	 * @param array<mixed>         $head   Column headers.
+	 * @param array<string, mixed> $block  Parsed block.
+	 * @param array<string, mixed> $change text and url.
+	 * @param array<string, mixed> $target Target.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private static function menu_item( array $block, array $change, array $target ) {
+		$name  = (string) $block['blockName'];
+		$attrs = (array) $block['attrs'];
+		if ( isset( $change['text'] ) ) {
+			$text = trim( (string) $change['text'] );
+			if ( '' === $text ) {
+				return self::invalid( 'text', __( 'A menu item needs a text that names its target.', 'leitvia-studio' ), $target );
+			}
+			$attrs = self::place( $name, $attrs, self::MENU_ITEMS[ $name ], htmlspecialchars( $text, ENT_NOQUOTES, 'UTF-8' ) );
+		}
+		if ( isset( $change['url'] ) ) {
+			$url = self::url( (string) $change['url'] );
+			if ( '' === $url ) {
+				return self::invalid( 'url', __( 'The link is not a valid URL.', 'leitvia-studio' ), $target );
+			}
+			unset( $attrs['id'], $attrs['type'] );
+			$attrs = self::place( $name, $attrs, 'url', $url );
+			$attrs = self::place( $name, $attrs, 'kind', 'custom' );
+		}
+		$block['attrs'] = $attrs;
+		return $block;
+	}
+
+	/**
+	 * Block with words of its text replaced (find, with): only text between tags changes, so every link with its target
+	 * and inline formatting such as strong and em stay, inside a link too. find must stand once in the text and in one
+	 * run of text. Words across a tag, such as "from <strong>129 €</strong> per", are refused: which formatting the new
+	 * words would take is open, and the part inside the tag can change on its own.
+	 *
+	 * @param array<string, mixed> $block   Parsed block.
+	 * @param array<string, mixed> $replace find and with.
+	 * @param array<string, mixed> $target  Target.
+	 * @param \WP_Error            $rebuild Rejection for static markup.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private static function replace_text( array $block, array $replace, array $target, \WP_Error $rebuild ) {
+		$query = self::TEXT_BLOCKS[ (string) $block['blockName'] ] ?? null;
+		if ( null === $query ) {
+			return self::invalid( 'replace_text', __( 'replace_text goes with a paragraph, heading, list item, button, quote citation or details summary only.', 'leitvia-studio' ), $target, 'leitvia/get-block' );
+		}
+		$found = self::element( $block, $query );
+		$find  = (string) ( $replace['find'] ?? '' );
+		if ( ! $found || '' === $find ) {
+			return '' === $find ? self::invalid( 'replace_text', __( 'find names the words to replace; it cannot be empty.', 'leitvia-studio' ), $target ) : $rebuild;
+		}
+		[ $key, $start, $length ] = $found;
+		$html                     = (string) $block['innerContent'][ $key ];
+		$inner                    = substr( $html, $start, $length );
+		$with                     = (string) ( $replace['with'] ?? '' );
+		$parts                    = (array) preg_split( '/(<[^>]*>)/', $inner, -1, PREG_SPLIT_DELIM_CAPTURE );
+		$decode                   = static fn( string $text ): string => html_entity_decode( $text, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+		// A space in find also finds a protected one (no-break, narrow no-break, figure space), as sites keep them
+		// before a currency sign or after "from" and get-block shows them as spaces.
+		$words   = preg_split( '/' . self::SPACES . '/u', $find );
+		$pattern = '/' . implode( self::SPACES, array_map( static fn( string $word ): string => preg_quote( $word, '/' ), is_array( $words ) ? $words : array( $find ) ) ) . '/u';
+		$hits    = array();
+		$exact   = $find;
+		foreach ( $parts as $index => $part ) {
+			$text = 1 === $index % 2 ? '' : $decode( (string) $part );
+			if ( preg_match_all( $pattern, $text, $matches ) ) {
+				array_push( $hits, ...array_fill( 0, count( $matches[0] ), $index ) );
+				$exact = $matches[0][0];
+			}
+		}
+		if ( 1 === count( $hits ) ) {
+			$find = $exact;
+			$part = (string) $parts[ $hits[0] ];
+			$new  = str_replace( $find, $with, $decode( $part ) );
+			// Saved text keeps quotes as they are, text this class wrote has them as entities (as in add_link()); the
+			// rest of the run stays byte for byte. Words written with other entities rebuild their run of text.
+			$parts[ $hits[0] ] = esc_html( $new );
+			foreach ( array_unique( array( htmlspecialchars( $find, ENT_NOQUOTES, 'UTF-8' ), esc_html( $find ) ) ) as $form ) {
+				$at = strpos( $part, $form );
+				$in = false === $at ? '' : substr_replace( $part, esc_html( $with ), $at, strlen( $form ) );
+				if ( '' !== $in && $decode( $in ) === $new ) {
+					$parts[ $hits[0] ] = $in;
+					break;
+				}
+			}
+			$block['innerContent'][ $key ] = substr_replace( $html, implode( '', $parts ), $start, $length );
+			return $block;
+		}
+		if ( $hits ) {
+			/* translators: %d: how often the words stand in the text. */
+			return self::invalid( 'replace_text', sprintf( __( 'find stands %d times in the text. Send more of the words around it, so that it stands there once.', 'leitvia-studio' ), count( $hits ) ), $target, 'leitvia/get-block' );
+		}
+		$plain = html_entity_decode( wp_strip_all_tags( $inner ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+		return preg_match( $pattern, $plain )
+			? self::invalid( 'replace_text', __( 'find runs across a link or inline formatting such as strong or em. Replace the words before, inside and after it in edits of their own, each within one run of text; links and formatting stay.', 'leitvia-studio' ), $target, 'leitvia/get-block' )
+			: self::invalid( 'replace_text', __( 'The text does not contain find. Send the words exactly as leitvia/get-block shows them, without markup.', 'leitvia-studio' ), $target, 'leitvia/get-block' );
+	}
+
+	/**
+	 * Checks the cells of a table edit: head and every row of the same length, within the limits. A core/table without
+	 * head takes the width of its first row.
+	 *
+	 * @param array<mixed>         $head   Column headers, empty for a table without a header row.
 	 * @param array<mixed>         $rows   Rows.
 	 * @param array<string, mixed> $target Target.
+	 * @param bool                 $bare   Whether the table may go without head.
 	 */
-	private static function cells( array $head, array $rows, array $target ): ?\WP_Error {
-		$width = count( $head );
+	private static function cells( array $head, array $rows, array $target, bool $bare = false ): ?\WP_Error {
+		$width = $bare && ! $head ? count( (array) ( $rows[0] ?? array() ) ) : count( $head );
 		if ( $width < 1 || $width > self::TABLE_MAX_COLUMNS || ! $rows || count( $rows ) > self::TABLE_MAX_ROWS ) {
 			/* translators: 1: most columns, 2: most rows. */
 			return self::invalid( 'table', sprintf( __( 'A table has 1 to %1$d columns in head and 1 to %2$d rows.', 'leitvia-studio' ), self::TABLE_MAX_COLUMNS, self::TABLE_MAX_ROWS ), $target );
@@ -1018,7 +1324,7 @@ final class Block_Edit {
 	}
 
 	/**
-	 * A core/table with new cells: thead with column headers (scope col), tbody whose first cell is a row header
+	 * A core/table with new cells: thead with column headers (scope col, left out without head), tbody whose first cell is a row header
 	 * (scope row, unless row_headers is false) and an optional tfoot, as plain text, in the markup core saves. The
 	 * figure, the table element with its classes and the caption stay.
 	 *
@@ -1032,7 +1338,8 @@ final class Block_Edit {
 		$head  = array_values( (array) ( $table['head'] ?? array() ) );
 		$rows  = array_values( (array) ( $table['rows'] ?? array() ) );
 		$foot  = array_values( (array) ( $table['foot'] ?? array() ) );
-		$error = self::cells( $head, $rows, $target ) ?? ( $foot ? self::cells( $head, $foot, $target ) : null );
+		$width = $head ? $head : (array) ( $rows[0] ?? array() );
+		$error = self::cells( $head, $rows, $target, true ) ?? ( $foot ? self::cells( $width, $foot, $target ) : null );
 		if ( $error ) {
 			return $error;
 		}
@@ -1051,7 +1358,7 @@ final class Block_Edit {
 			}
 			return $out . '</tr>';
 		};
-		$body    = '<thead>' . $row( $head, true ) . '</thead><tbody>';
+		$body    = ( $head ? '<thead>' . $row( $head, true ) . '</thead>' : '' ) . '<tbody>';
 		foreach ( $rows as $cells ) {
 			$body .= $row( (array) $cells, false );
 		}
@@ -1083,12 +1390,13 @@ final class Block_Edit {
 		$type = \WP_Block_Type_Registry::get_instance()->get_registered( 'leitvia/comparison-table' );
 		foreach ( $attrs as $key => $value ) {
 			$schema = array_diff_key( (array) ( $type->attributes[ $key ] ?? array() ), array( 'default' => true ) );
-			$valid  = rest_validate_value_from_schema( $value, $schema, (string) $key );
+			$valid  = null === $value ? true : rest_validate_value_from_schema( $value, $schema, (string) $key );
 			if ( is_wp_error( $valid ) ) {
 				return self::invalid( 'attributes', $valid->get_error_message(), $target );
 			}
 		}
-		$all = $attrs + (array) $block['attrs'] + array(
+		// null puts an attribute back to its default: the markup is built from the default, the comment leaves it out.
+		$all = self::merged( (array) $block['attrs'], $attrs ) + array(
 			'caption'      => '',
 			'columns'      => array( '', '', '' ),
 			'rows'         => array( array( '', '', '' ), array( '', '', '' ) ),
@@ -1255,7 +1563,9 @@ final class Block_Edit {
 	 * @return string|\WP_Error
 	 */
 	private static function inner( string $inner, array $change, array $target, \WP_Error $rebuild ) {
-		$plain = static fn( string $html ): string => html_entity_decode( wp_strip_all_tags( $html ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+		// A line break is the one piece of markup a text keeps: <br> and a new line in, br out, as the editor saves Shift+Enter.
+		$plain = static fn( string $html ): string => html_entity_decode( wp_strip_all_tags( (string) preg_replace( '#<br\s*/?>#i', "\n", $html ) ), ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+		$esc   = static fn( string $text ): string => str_replace( "\n", '<br>', esc_html( $text ) );
 		$tags  = self::processor( $inner );
 		$links = 0;
 		$open  = '';
@@ -1267,10 +1577,10 @@ final class Block_Edit {
 				$old  = $plain( substr( $inner, $range[0], $range[1] ) );
 			}
 		}
-		$text = isset( $change['text'] ) ? (string) $change['text'] : $plain( $inner );
+		$text = isset( $change['text'] ) ? (string) preg_replace( array( '#\r\n?#', '#[ \t]*<br\s*/?>[ \t]*#i' ), "\n", (string) $change['text'] ) : $plain( $inner );
 		if ( 0 === $links ) {
 			if ( ! isset( $change['url'] ) ) {
-				return esc_html( $text );
+				return $esc( $text );
 			}
 			if ( ! isset( $change['link_text'] ) ) {
 				return $rebuild;
@@ -1285,9 +1595,12 @@ final class Block_Edit {
 			if ( '' === $url ) {
 				return self::invalid( 'url', __( 'The link is not a valid URL.', 'leitvia-studio' ), $target );
 			}
-			return esc_html( substr( $text, 0, $at ) ) . '<a href="' . esc_url( $url ) . '">' . esc_html( $label ) . '</a>' . esc_html( substr( $text, $at + strlen( $label ) ) );
+			return $esc( substr( $text, 0, $at ) ) . '<a href="' . esc_url( $url ) . '">' . $esc( $label ) . '</a>' . $esc( substr( $text, $at + strlen( $label ) ) );
 		}
-		if ( 1 !== $links || '' === $open ) {
+		if ( $links > 1 ) {
+			return Rejection::make( 'leitvia_static_markup', __( 'The text holds more than one link, so text cannot keep them. Change words in it with replace_text (find and with), which keeps links and inline formatting, or set a new link on a passage with add_link.', 'leitvia-studio' ), 422, 'static_markup', $target, 'leitvia/get-block' );
+		}
+		if ( '' === $open ) {
 			return $rebuild;
 		}
 		$label = (string) ( $change['link_text'] ?? $old );
@@ -1296,7 +1609,7 @@ final class Block_Edit {
 		$href->next_tag();
 		// A sample link without an address (or to "#") leads nowhere; plain text may replace it.
 		if ( false === $at && ! isset( $change['link_text'] ) && ! isset( $change['url'] ) && in_array( trim( (string) $href->get_attribute( 'href' ) ), array( '', '#' ), true ) ) {
-			return esc_html( $text );
+			return $esc( $text );
 		}
 		if ( false === $at ) {
 			return self::invalid( 'link_text', __( 'The text has a link that the new text would drop. Send link_text, the part of the text that stays linked, and url for where it points.', 'leitvia-studio' ), $target );
@@ -1311,15 +1624,15 @@ final class Block_Edit {
 			$tag->set_attribute( 'href', $url );
 			$open = $tag->get_updated_html();
 		}
-		return esc_html( substr( $text, 0, $at ) ) . $open . esc_html( $label ) . '</a>' . esc_html( substr( $text, $at + strlen( $label ) ) );
+		return $esc( substr( $text, 0, $at ) ) . $open . $esc( $label ) . '</a>' . $esc( substr( $text, $at + strlen( $label ) ) );
 	}
 
 	/**
 	 * Block with new attributes. Allowed are attributes of the block catalog that live in the block comment, on blocks
 	 * that render on the server or save no markup of their own, the CORE_ATTRIBUTES whose markup is rebuilt here, text
 	 * attributes whose element the block has (sourced()), and leitviaAnimation and leitviaMotion on every block that has them, static markup included: the server adds their
-	 * classes on render, the saved markup stays (animation()). className takes a registered block style on every core
-	 * block that has one (style()), a heading, paragraph or light group a preset of presets(). Anything else would leave the saved markup behind.
+	 * classes on render, the saved markup stays (animation()). className takes a registered block style on every block
+	 * that has one, core blocks and blocks of Studio and add-ons with styles in their block.json (style()), a heading, paragraph or light group a preset of presets(). Anything else would leave the saved markup behind.
 	 *
 	 * @param array<string, mixed> $block  Parsed block.
 	 * @param array<string, mixed> $attrs  New attribute values.
@@ -1332,11 +1645,11 @@ final class Block_Edit {
 		// null removes an attribute. One the block neither has nor registers is gone already, so its null changes
 		// nothing instead of failing the call; any other value of an unknown attribute is still refused below.
 		$known = (array) ( \WP_Block_Type_Registry::get_instance()->get_registered( $name )->attributes ?? array() );
-		$attrs = array_filter( $attrs, static fn( $value, $key ): bool => null !== $value || array_key_exists( $key, (array) $block['attrs'] ) || isset( $known[ $key ] ), ARRAY_FILTER_USE_BOTH );
+		$attrs = array_filter( $attrs, static fn( $value, $key ): bool => null !== $value || array_key_exists( $key, (array) $block['attrs'] ) || isset( $known[ $key ] ) || ( 'textAlign' === $key && isset( $block['attrs']['style']['typography']['textAlign'] ) ), ARRAY_FILTER_USE_BOTH );
 		if ( ! $attrs ) {
 			return $block;
 		}
-		if ( array_key_exists( 'className', $attrs ) && str_starts_with( $name, 'core/' ) && ! in_array( $name, self::MEDIA_BLOCKS, true ) && self::styles( $name ) ) {
+		if ( array_key_exists( 'className', $attrs ) && ! in_array( $name, self::MEDIA_BLOCKS, true ) && self::styles( $name ) ) {
 			$block = self::style( $block, $attrs['className'], $target, $rebuild );
 			$attrs = array_diff_key( $attrs, array( 'className' => true ) );
 			if ( is_wp_error( $block ) || ! $attrs ) {
@@ -1368,6 +1681,14 @@ final class Block_Edit {
 				return $block;
 			}
 		}
+		// The alignment of a heading or paragraph, see text_align().
+		if ( array_key_exists( 'textAlign', $attrs ) && in_array( $name, array( 'core/heading', 'core/paragraph' ), true ) ) {
+			$block = self::text_align( $block, $attrs['textAlign'], $target, $rebuild );
+			$attrs = array_diff_key( $attrs, array( 'textAlign' => true ) );
+			if ( is_wp_error( $block ) || ! $attrs ) {
+				return $block;
+			}
+		}
 		// Presets of a support with a class on the element of the block, see preset().
 		foreach ( array_intersect_key( self::presets( $block ), $attrs ) as $key => $allowed ) {
 			$block = self::preset( $block, $key, $attrs[ $key ], $allowed, $target, $rebuild );
@@ -1381,12 +1702,27 @@ final class Block_Edit {
 		if ( ! $entry ) {
 			return self::invalid( 'attributes', __( 'This block is not in the block catalog; its attributes cannot be set.', 'leitvia-studio' ), $target, 'leitvia/list-blocks' );
 		}
-		$texts = array();
+		$texts    = array();
+		$position = self::POSITION_ATTRIBUTES[ $name ] ?? array();
 		foreach ( $attrs as $key => $value ) {
 			$schema = $entry['attributes']['properties'][ $key ] ?? null;
 			if ( ! is_array( $schema ) ) {
 				/* translators: %s: attribute name. */
 				return self::invalid( 'attributes', sprintf( __( 'The block has no attribute %s in the catalog.', 'leitvia-studio' ), $key ), $target, 'leitvia/list-blocks' );
+			}
+			if ( null === $value ) {
+				// null puts an attribute back to its default: one of the block comment leaves it (merged(), as the
+				// editor saves a default), one whose markup is rebuilt takes the default of its block type, a text
+				// without one the empty text.
+				$default = $known[ $key ]['default'] ?? null;
+				if ( ( ! $core && ! isset( $schema['source'] ) && ! isset( $position[ $key ] ) ) || ( $core && null === $default ) ) {
+					continue;
+				}
+				$value         = $default ?? ( isset( $schema['source'] ) ? '' : null );
+				$attrs[ $key ] = $value;
+				if ( null !== $default && ! isset( $schema['source'] ) ) {
+					continue;
+				}
 			}
 			if ( isset( $schema['source'] ) ) {
 				$date = 'leitvia/timeline-item' === $name && 'date' === $key;
@@ -1404,12 +1740,21 @@ final class Block_Edit {
 				return self::invalid( 'attributes', $valid->get_error_message(), $target, 'leitvia/list-blocks' );
 			}
 		}
+		if ( $core && array_key_exists( 'verticalAlignment', $attrs ) ) {
+			$block = self::vertical( $block, $attrs['verticalAlignment'], $rebuild );
+			$attrs = array_diff_key( $attrs, array( 'verticalAlignment' => true ) );
+			if ( is_wp_error( $block ) || ! $attrs ) {
+				return $block;
+			}
+		}
 		if ( $core ) {
 			return match ( true ) {
 				isset( $attrs['level'] )  => self::level( $block, (int) $attrs['level'], $rebuild ),
 				isset( $attrs['tracks'] ) => self::tracks( $block, array_values( (array) $attrs['tracks'] ), $target, $rebuild ),
 				'core/query' === $name    => self::query( $block, $attrs ),
-				'core/site-logo' === $name => self::logo_width( $block, (int) $attrs['width'] ),
+				'core/site-logo' === $name => null === $attrs['width'] ? array( 'attrs' => self::merged( (array) $block['attrs'], $attrs ) ) + $block : self::logo_width( $block, (int) $attrs['width'] ),
+				'core/navigation' === $name => self::navigation( $block, $attrs, $target ),
+				'core/column' === $name    => self::column_width( $block, $attrs['width'] ?? null, $rebuild ),
 				default                   => $block,
 			};
 		}
@@ -1423,7 +1768,6 @@ final class Block_Edit {
 				return $block;
 			}
 		}
-		$position = self::POSITION_ATTRIBUTES[ $name ] ?? array();
 		if ( $position && ! array_diff_key( $attrs, $position ) ) {
 			return self::position( $block, $attrs, $position, $target, $rebuild );
 		}
@@ -1432,8 +1776,19 @@ final class Block_Edit {
 		if ( ! $type || ( ! $type->is_dynamic() && '' !== trim( $own ) ) ) {
 			return $rebuild;
 		}
-		$block['attrs'] = $attrs + (array) $block['attrs'];
+		$block['attrs'] = self::merged( (array) $block['attrs'], $attrs );
 		return $block;
+	}
+
+	/**
+	 * Attributes of a block comment with new values; null leaves an attribute out, so the block takes its default.
+	 *
+	 * @param array<string, mixed> $old   Attributes of the comment.
+	 * @param array<string, mixed> $attrs New values, null for none.
+	 * @return array<string, mixed>
+	 */
+	private static function merged( array $old, array $attrs ): array {
+		return array_diff_key( $attrs + $old, array_filter( $attrs, 'is_null' ) );
 	}
 
 	/**
@@ -1468,7 +1823,7 @@ final class Block_Edit {
 		}
 		$heading = self::element( $block, array( 'class_name' => 'wp-block-leitvia-map__heading' ) );
 		$heading = array_key_exists( 'heading', $attrs ) ? esc_html( (string) $attrs['heading'] ) : ( $heading ? substr( $html, $heading[1], $heading[2] ) : '' );
-		$saved   = array_diff_key( $attrs, array( 'heading' => true ) ) + (array) $block['attrs'];
+		$saved   = self::merged( (array) $block['attrs'], array_diff_key( $attrs, array( 'heading' => true ) ) );
 		$inner   = \LeitviaStudio\Blocks\Map::places( $heading, $saved );
 		$html    = substr_replace( $html, $inner, $range[0], $range[1] );
 		$tags    = new \WP_HTML_Tag_Processor( $html );
@@ -1497,6 +1852,101 @@ final class Block_Edit {
 			$names[] = is_array( $style ) ? ( $style['name'] ?? '' ) : '';
 		}
 		return array_values( array_filter( array_map( 'strval', $names ) ) );
+	}
+
+	/**
+	 * Navigation with new settings of CORE_ATTRIBUTES in its block comment, each where the editor saves it; the
+	 * default of an attribute (or null) leaves it out. A color takes an extra surface only when the token set has it.
+	 *
+	 * @param array<string, mixed> $block  Parsed navigation block.
+	 * @param array<string, mixed> $attrs  New values, checked against CORE_ATTRIBUTES.
+	 * @param array<string, mixed> $target Target.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private static function navigation( array $block, array $attrs, array $target ) {
+		$known = (array) ( \WP_Block_Type_Registry::get_instance()->get_registered( 'core/navigation' )->attributes ?? array() );
+		// With a template part as its open menu (attribute overlay) core leaves the overlay colors out: the part paints
+		// its own ground, so a color here would change nothing.
+		if ( ! empty( $block['attrs']['overlay'] ) && array_filter( array_intersect_key( $attrs, array_flip( array( 'overlayBackgroundColor', 'overlayTextColor' ) ) ) ) ) {
+			return self::invalid( 'attributes', __( 'This menu opens the template part navigation-overlay, which paints its own ground; core ignores overlayBackgroundColor and overlayTextColor here. Set backgroundColor (surface, surface-alt or surface-extra-<name>) on the outer group of the part with leitvia/update-template-part, part navigation-overlay.', 'leitvia-studio' ), $target, 'leitvia/update-template-part' );
+		}
+		if ( isset( $attrs['text'] ) ) {
+			$text = trim( (string) $attrs['text'] );
+			if ( '' === $text || mb_strlen( $text ) > 30 ) {
+				return self::invalid( 'text', __( 'The text of the menu button is one short word or two, up to 30 characters, such as Menu.', 'leitvia-studio' ), $target );
+			}
+			// The word replaces the icon: the button shows text (hasIcon false), see Mega_Menu::menu_text().
+			unset( $attrs['text'] );
+			$attrs = array(
+				'hasIcon'         => false,
+				'leitviaMenuText' => $text,
+			) + $attrs;
+		}
+		foreach ( $attrs as $key => $value ) {
+			if ( is_string( $value ) && str_starts_with( $value, 'surface-extra-' ) && ! in_array( $value, self::extra_surfaces(), true ) ) {
+				/* translators: %s: palette slug, for example surface-extra-mint. */
+				return self::invalid( 'attributes', sprintf( __( 'The token set has no extra surface %s.', 'leitvia-studio' ), $value ), $target, 'leitvia/get-tokens' );
+			}
+			$default        = $known[ $key ]['default'] ?? null;
+			$block['attrs'] = self::place( 'core/navigation', (array) $block['attrs'], (string) $key, $value === $default ? null : $value );
+		}
+		return $block;
+	}
+
+	/**
+	 * Column with a new width: the attribute width in its comment and flex-basis in the style of its element, as the
+	 * editor saves them; null removes both, and the column shares the free space.
+	 *
+	 * @param array<string, mixed> $block   Parsed column.
+	 * @param string|null          $width   Width in percent, such as 66.66%, or null.
+	 * @param \WP_Error            $rebuild Rejection for static markup.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private static function column_width( array $block, ?string $width, \WP_Error $rebuild ) {
+		$tags = new \WP_HTML_Tag_Processor( (string) ( $block['innerContent'][0] ?? '' ) );
+		if ( ! $tags->next_tag() ) {
+			return $rebuild;
+		}
+		$style = trim( (string) preg_replace( '/(^|;)\s*flex-basis\s*:[^;]*/', '', (string) $tags->get_attribute( 'style' ) ), "; \t" );
+		$style = null === $width ? $style : ( '' === $style ? '' : $style . ';' ) . 'flex-basis:' . $width;
+		if ( '' === $style ) {
+			$tags->remove_attribute( 'style' );
+		} else {
+			$tags->set_attribute( 'style', $style );
+		}
+		// A new style attribute goes after class, where the editor saves it.
+		$block['innerContent'][0] = (string) preg_replace( '#^(\s*<\w+) (style="[^"]*") (class="[^"]*")#', '$1 $3 $2', $tags->get_updated_html(), 1 );
+		$block['attrs']           = self::place( 'core/column', (array) $block['attrs'], 'width', $width );
+		return $block;
+	}
+
+	/**
+	 * Columns or column with a new vertical alignment: the class are-vertically-aligned-<value> of the row or
+	 * is-vertically-aligned-<value> of the column on its element, the attribute in its comment; null removes both.
+	 *
+	 * @param array<string, mixed> $block   Parsed core/columns or core/column.
+	 * @param string|null          $value   top, center, bottom (stretch on a column), null for none.
+	 * @param \WP_Error            $rebuild Rejection for static markup.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private static function vertical( array $block, ?string $value, \WP_Error $rebuild ) {
+		$name   = (string) $block['blockName'];
+		$prefix = 'core/columns' === $name ? 'are-vertically-aligned-' : 'is-vertically-aligned-';
+		$tags   = new \WP_HTML_Tag_Processor( (string) ( $block['innerContent'][0] ?? '' ) );
+		if ( ! $tags->next_tag() ) {
+			return $rebuild;
+		}
+		foreach ( iterator_to_array( $tags->class_list(), false ) as $class ) {
+			if ( str_starts_with( (string) $class, $prefix ) ) {
+				$tags->remove_class( (string) $class );
+			}
+		}
+		if ( null !== $value ) {
+			$tags->add_class( $prefix . $value );
+		}
+		$block['innerContent'][0] = $tags->get_updated_html();
+		$block['attrs']           = self::place( $name, (array) $block['attrs'], 'verticalAlignment', $value );
+		return $block;
 	}
 
 	/**
@@ -1846,7 +2296,7 @@ final class Block_Edit {
 			$default         = \WP_Block_Type_Registry::get_instance()->get_registered( 'core/query' )->attributes['query']['default'] ?? array();
 			$attrs['query'] += (array) ( $block['attrs']['query'] ?? $default );
 		}
-		$block['attrs'] = $attrs + (array) $block['attrs'];
+		$block['attrs'] = self::merged( (array) $block['attrs'], $attrs );
 		return $block;
 	}
 
@@ -2047,8 +2497,9 @@ final class Block_Edit {
 	 * textColor with the text roles of TEXT_COLORS on a heading or paragraph, fontSize on a quote, backgroundColor surface or surface-alt on a
 	 * group whose ground is light already. A dark or accent ground carries text colors of its own; such a band comes
 	 * from the block style Inverse or from another pattern. A block of Studio or an add-on whose supports name
-	 * color.text or typography.fontSize, such as leitvia/icon and leitvia/icon-list, takes textColor with the color roles
-	 * of the contract and fontSize with the font sizes.
+	 * color.text, typography.fontSize or typography.__experimentalFontFamily, such as leitvia/icon, leitvia/icon-list and
+	 * leitvia/marquee, takes textColor with the color roles of the contract, fontSize with the font sizes and fontFamily
+	 * with the font roles.
 	 *
 	 * @param array<string, mixed> $block Parsed block.
 	 * @return array<string, list<string>>
@@ -2061,14 +2512,22 @@ final class Block_Edit {
 			$sizes = isset( $sizes[0] ) ? $sizes : array_merge( array(), ...array_values( array_map( 'array_values', array_filter( $sizes, 'is_array' ) ) ) );
 			return array_values( array_unique( array_map( 'strval', array_column( $sizes, 'slug' ) ) ) );
 		};
+		// The font roles of the theme (body, heading, mono, ui), as for a number in mono or a word in the ui font.
+		$families = static function (): array {
+			$families = (array) wp_get_global_settings( array( 'typography', 'fontFamilies' ) );
+			$families = isset( $families[0] ) ? $families : array_merge( array(), ...array_values( array_map( 'array_values', array_filter( $families, 'is_array' ) ) ) );
+			return array_values( array_unique( array_map( 'strval', array_column( $families, 'slug' ) ) ) );
+		};
 		if ( in_array( $name, array( 'core/heading', 'core/paragraph' ), true ) ) {
 			return array(
-				'textColor' => self::TEXT_COLORS,
-				'fontSize'  => $sizes(),
+				'textColor'  => self::TEXT_COLORS,
+				'fontSize'   => $sizes(),
+				'fontFamily' => $families(),
 			);
 		}
-		// A quote of a row of quotes takes the size of the others, or none (null) for the size of the theme.
-		if ( 'core/quote' === $name ) {
+		// A quote of a row of quotes takes the size of the others, or none (null) for the size of the theme; a button
+		// a size of its label, such as a larger shape button (block styles shape-circle and shape-triangle).
+		if ( in_array( $name, array( 'core/quote', 'core/button' ), true ) ) {
 			return array( 'fontSize' => $sizes() );
 		}
 		$type = \WP_Block_Type_Registry::get_instance()->get_registered( $name );
@@ -2076,17 +2535,74 @@ final class Block_Edit {
 			$roles = array_map( 'strval', array_column( (array) ( leitvia_studio_contract()->data()['roles']['color'] ?? array() ), 'slug' ) );
 			return array_filter(
 				array(
-					'textColor' => ! empty( $type->supports['color']['text'] ) ? $roles : array(),
-					'fontSize'  => ! empty( $type->supports['typography']['fontSize'] ) ? $sizes() : array(),
+					'textColor'  => ! empty( $type->supports['color']['text'] ) ? $roles : array(),
+					'fontSize'   => ! empty( $type->supports['typography']['fontSize'] ) ? $sizes() : array(),
+					'fontFamily' => ! empty( $type->supports['typography']['__experimentalFontFamily'] ) ? $families() : array(),
 				)
 			);
 		}
-		$light = array( 'surface', 'surface-alt' );
+		// The extra surfaces of the token set are light grounds too: ink passes on each by the rules of the set, and links
+		// on a weak one turn ink when the block renders (Tokens\Compiler::ink_links()).
+		$light = array_merge( array( 'surface', 'surface-alt' ), self::extra_surfaces() );
 		$color = (array) ( $block['attrs']['style']['color'] ?? array() );
 		if ( 'core/group' === $name && in_array( $block['attrs']['backgroundColor'] ?? 'surface', $light, true ) && ! isset( $block['attrs']['gradient'] ) && ! isset( $color['background'] ) && ! isset( $color['gradient'] ) ) {
 			return array( 'backgroundColor' => $light );
 		}
 		return array();
+	}
+
+	/**
+	 * Palette slugs of the extra surfaces of the token set (color.surface-extra), such as surface-extra-mint.
+	 *
+	 * @return list<string>
+	 */
+	public static function extra_surfaces(): array {
+		$slugs = array();
+		foreach ( (array) wp_get_global_settings( array( 'color', 'palette' ) ) as $origin ) {
+			foreach ( (array) $origin as $preset ) {
+				$slug = is_array( $preset ) ? (string) ( $preset['slug'] ?? '' ) : '';
+				if ( str_starts_with( $slug, 'surface-extra-' ) ) {
+					$slugs[] = $slug;
+				}
+			}
+		}
+		return array_values( array_unique( $slugs ) );
+	}
+
+	/**
+	 * Heading or paragraph with a new text alignment (left, center, right; null removes it): style.typography.textAlign
+	 * in the comment and the class has-text-align-<value> on its element, as the editor saves the support textAlign.
+	 *
+	 * @param array<string, mixed> $block   Parsed block.
+	 * @param mixed                $align   New alignment or null.
+	 * @param array<string, mixed> $target  Target.
+	 * @param \WP_Error            $rebuild Rejection for static markup.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private static function text_align( array $block, $align, array $target, \WP_Error $rebuild ) {
+		$aligns = array( 'left', 'center', 'right' );
+		if ( null !== $align && ! in_array( $align, $aligns, true ) ) {
+			return self::invalid( 'attributes', __( 'textAlign takes left, center or right, or null to remove it.', 'leitvia-studio' ), $target, 'leitvia/list-blocks' );
+		}
+		$tags = new \WP_HTML_Tag_Processor( (string) ( $block['innerContent'][0] ?? '' ) );
+		if ( 1 !== count( (array) $block['innerContent'] ) || ! $tags->next_tag() ) {
+			return $rebuild;
+		}
+		foreach ( $aligns as $old ) {
+			$tags->remove_class( 'has-text-align-' . $old );
+		}
+		if ( null !== $align ) {
+			$tags->add_class( 'has-text-align-' . $align );
+		}
+		$block['innerContent'][0] = $tags->get_updated_html();
+		$style                    = (array) ( $block['attrs']['style'] ?? array() );
+		$type                     = (array) ( $style['typography'] ?? array() );
+		unset( $type['textAlign'] );
+		$type += null === $align ? array() : array( 'textAlign' => $align );
+		unset( $style['typography'] );
+		$style         += $type ? array( 'typography' => $type ) : array();
+		$block['attrs'] = self::place( (string) $block['blockName'], (array) $block['attrs'], 'style', $style ? $style : null );
+		return $block;
 	}
 
 	/**
@@ -2110,6 +2626,7 @@ final class Block_Edit {
 		}
 		$suffix = array(
 			'fontSize'        => '-font-size',
+			'fontFamily'      => '-font-family',
 			'backgroundColor' => '-background-color',
 			'textColor'       => '-color',
 		)[ $key ];
@@ -2118,7 +2635,20 @@ final class Block_Edit {
 			'textColor'       => 'has-text-color',
 		)[ $key ] ?? '';
 		$tags   = new \WP_HTML_Tag_Processor( (string) ( $block['innerContent'][0] ?? '' ) );
-		if ( ! $tags->next_tag() ) {
+		// A button saves the size class on its link and has-custom-font-size on its wrapper (typography skips
+		// serialization on the wrapper), as the editor does.
+		if ( 'core/button' === $block['blockName'] ) {
+			if ( ! $tags->next_tag() ) {
+				return $rebuild;
+			}
+			$tags->remove_class( 'has-custom-font-size' );
+			if ( null !== $value ) {
+				$tags->add_class( 'has-custom-font-size' );
+			}
+			if ( ! $tags->next_tag( array( 'class_name' => 'wp-block-button__link' ) ) ) {
+				return $rebuild;
+			}
+		} elseif ( ! $tags->next_tag() ) {
 			$type = \WP_Block_Type_Registry::get_instance()->get_registered( (string) $block['blockName'] );
 			if ( ! $type || ! $type->is_dynamic() || '' !== trim( implode( '', array_filter( (array) $block['innerContent'], 'is_string' ) ) ) ) {
 				return $rebuild;
