@@ -106,6 +106,8 @@ final class Plugin {
 		// Core adds the admin hooks of the emoji loader after init, so admin_init removes those.
 		add_action( 'init', array( Admin\Settings::class, 'remove_emoji_loader' ) );
 		add_action( 'admin_init', array( Admin\Settings::class, 'remove_emoji_loader' ) );
+		add_action( 'init', array( Admin\Settings::class, 'register_page_tags' ), 11 );
+		add_action( 'pre_get_posts', array( Admin\Settings::class, 'page_tag_archive' ) );
 		add_action( 'rest_api_init', array( Admin\Admin::class, 'register_routes' ) );
 		add_action( 'leitvia_studio_screen_notes', array( Admin\Admin::class, 'pro_note' ) );
 		Avatars\Avatars::boot();
@@ -179,6 +181,7 @@ final class Plugin {
 		add_filter( 'leitvia_post_aside', array( News\Aside::class, 'top' ) );
 		add_filter( 'leitvia_post_aside_end', array( News\Aside::class, 'end' ) );
 		add_filter( 'leitvia_post_end', array( News\Aside::class, 'post_end' ) );
+		add_filter( 'leitvia_post_details', array( Gateway\Abilities\Setup::class, 'post_details' ) );
 		add_action( 'init', array( Date_Formats::class, 'maybe_apply' ) );
 		add_action( 'leitvia_studio_init', array( Blocks\Blocks::class, 'register' ) );
 		add_filter( 'block_categories_all', array( Blocks\Blocks::class, 'category' ) );

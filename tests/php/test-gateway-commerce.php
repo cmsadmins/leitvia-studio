@@ -219,7 +219,7 @@ class Test_Gateway_Commerce extends WP_UnitTestCase {
 			$this->assertFalse( wp_has_ability( $name ), $name );
 		}
 		$this->assertNotContains( 'product', Scope::post_types() );
-		$this->assertSame( array(), Scope::taxonomies() );
+		$this->assertSame( Scope::POST_TAXONOMIES, Scope::taxonomies() );
 	}
 
 	/**
@@ -409,8 +409,9 @@ class Test_Gateway_Commerce extends WP_UnitTestCase {
 			);
 		}
 		$this->assert_rejected( 'leitvia_out_of_scope', wp_get_ability( 'leitvia/get-page-outline' )->execute( array( 'post' => $order->get_id() ) ) );
+		// A post category is no product category: the rejection points to leitvia/update-term.
 		$this->assert_rejected(
-			'leitvia_out_of_scope',
+			'leitvia_invalid_input',
 			wp_get_ability( 'leitvia/update-product-category' )->execute(
 				array(
 					'term'      => self::factory()->category->create(),

@@ -11,6 +11,7 @@ namespace LeitviaStudio\Gateway\Abilities;
 
 use LeitviaStudio\Gateway\Abilities;
 use LeitviaStudio\Gateway\Hashes;
+use LeitviaStudio\Gateway\Outline;
 use LeitviaStudio\Gateway\Rejection;
 
 defined( 'ABSPATH' ) || exit;
@@ -601,7 +602,7 @@ final class Import {
 			return $markup;
 		}
 		$blocks = array_values( array_filter( parse_blocks( $markup ), static fn( array $b ): bool => null !== $b['blockName'] ) );
-		$text   = static fn( array $b ): string => trim( html_entity_decode( wp_strip_all_tags( (string) $b['innerHTML'] ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
+		$text   = static fn( array $b ): string => Outline::decoded( (string) $b['innerHTML'] );
 		$level  = static fn( array $b ): int => 'core/heading' === $b['blockName'] ? (int) ( $b['attrs']['level'] ?? 2 ) : 0;
 		$out    = array();
 		$count  = 0;
@@ -625,7 +626,7 @@ final class Import {
 					$answers[]   = array();
 				} elseif ( 'core/paragraph' === $block['blockName'] && preg_match( '#^<p>\s*<(strong|b)>(.+?)</\1>\s*(?:<br\s*/?>(.*))?</p>$#is', $html, $m ) ) {
 					$rest        = trim( (string) ( $m[3] ?? '' ) );
-					$questions[] = trim( html_entity_decode( wp_strip_all_tags( $m[2] ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
+					$questions[] = Outline::decoded( $m[2] );
 					$answers[]   = '' === $rest ? array() : array( '<!-- wp:paragraph --><p>' . $rest . '</p><!-- /wp:paragraph -->' );
 				} elseif ( $questions && in_array( $block['blockName'], array( 'core/paragraph', 'core/list' ), true ) ) {
 					$answers[ count( $answers ) - 1 ][] = serialize_block( $block );

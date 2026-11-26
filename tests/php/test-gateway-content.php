@@ -758,6 +758,61 @@ class Test_Gateway_Content extends WP_UnitTestCase {
 	}
 
 	/**
+	 * The ability list-content with terms_of names every term of the taxonomy with ID, slug, plain name, count and parent, empty
+	 * ones included; a taxonomy outside the listed types is refused, and without terms_of there is no term_list.
+	 */
+	public function test_list_content_terms_of(): void {
+		$parent = self::factory()->category->create(
+			array(
+				'name' => 'Harbour & Docks',
+				'slug' => 'harbour',
+			)
+		);
+		$child  = self::factory()->category->create(
+			array(
+				'name'   => 'Ferries',
+				'parent' => $parent,
+			)
+		);
+		$post   = self::factory()->post->create();
+		wp_set_object_terms( $post, array( $child ), 'category' );
+
+		$list  = self::call(
+			'leitvia/list-content',
+			array(
+				'terms_of' => 'category',
+				'limit'    => 1,
+			)
+		);
+		$terms = array_column( $list['term_list'], null, 'id' );
+		$this->assertSame(
+			array(
+				'id'          => $parent,
+				'slug'        => 'harbour',
+				'name'        => 'Harbour & Docks',
+				'count'       => 0,
+				'parent'      => 0,
+				'description' => get_term( $parent )->description,
+				'hash'        => Hashes::term( $parent ),
+			),
+			$terms[ $parent ]
+		);
+		$this->assertSame( array( 1, $parent ), array( $terms[ $child ]['count'], $terms[ $child ]['parent'] ) );
+		$this->assertArrayNotHasKey( 'term_list', self::call( 'leitvia/list-content', array( 'limit' => 1 ) ) );
+		$this->assert_rejected( 'leitvia_invalid_input', self::call( 'leitvia/list-content', array( 'terms_of' => 'nav_menu' ) ) );
+		$this->assert_rejected(
+			'leitvia_invalid_input',
+			self::call(
+				'leitvia/list-content',
+				array(
+					'post_type' => 'page',
+					'terms_of'  => 'category',
+				)
+			)
+		);
+	}
+
+	/**
 	 * The ability list-media: images with file name, MIME type, file size, alt text, size and the hash for set-alt-text; MIME filter.
 	 */
 	public function test_list_media(): void {

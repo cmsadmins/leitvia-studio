@@ -62,4 +62,3 @@ In the language of the person:
 3. **Plan confirmed** and **Facts from the person** of leitvia-shop (step 3), only on a shop.
 4. **Package applied** (step 4), before the audit after.
 5. **Rollback confirmed**, only when the person asks to undo a package (leitvia-maintain, Rollback).
-6. **Second rejection** of the same call, or a rejection with `retry: never`, in any step.

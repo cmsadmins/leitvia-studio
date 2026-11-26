@@ -287,6 +287,50 @@ final class Read_Design {
 			static fn( $input ) => self::pattern( (string) ( $input['slug'] ?? '' ) )
 		);
 
+		Gateway\Abilities::read(
+			'leitvia/get-template',
+			__( 'Get template', 'leitvia-studio' ),
+			__( 'Returns the block markup of a template (template, such as single, archive or page-landing) or a template part (part, such as header, footer or post-aside) as the site shows it: the saved version, or the file of the theme while none is saved (source theme). hash is the base_hash of leitvia/update-template and leitvia/update-template-part ("" while only the file exists), outline the block tree with path IDs, and patterns the patterns the markup places (core/pattern), which leitvia/get-pattern reads. For the template single, post_details holds the texts and choices of leitvia/set-post-details in effect. Change a template by sending the changed markup as content of leitvia/update-template; keep the core/pattern blocks you do not change, so they follow updates of the theme.', 'leitvia-studio' ),
+			array(
+				'type'                 => 'object',
+				'properties'           => array(
+					'template' => array(
+						'type'        => 'string',
+						'pattern'     => '^[a-z0-9_-]+$',
+						'description' => __( 'Template slug from leitvia/get-contract or of the theme, such as single.', 'leitvia-studio' ),
+					),
+					'part'     => array(
+						'type'        => 'string',
+						'pattern'     => '^[a-z0-9_-]+$',
+						'description' => __( 'Template part from templateParts of leitvia/get-contract, such as header.', 'leitvia-studio' ),
+					),
+				),
+				'additionalProperties' => false,
+			),
+			array(
+				'type'       => 'object',
+				'required'   => array( 'slug', 'type', 'source', 'hash', 'content', 'outline', 'patterns' ),
+				'properties' => array(
+					'slug'         => $string,
+					'type'         => $string + array( 'description' => __( 'template or part.', 'leitvia-studio' ) ),
+					'source'       => $string + array( 'description' => __( 'theme while only the file of the theme exists, custom once a version is saved.', 'leitvia-studio' ) ),
+					'area'         => $string,
+					'hash'         => $string,
+					'content'      => $string,
+					'outline'      => $objects,
+					'patterns'     => array(
+						'type'  => 'array',
+						'items' => $string,
+					),
+					'post_details' => array(
+						'type'        => 'object',
+						'description' => __( 'Only for the template single: published_label, updated_label, related_heading, related_by and image_ratio in effect.', 'leitvia-studio' ),
+					),
+				),
+			),
+			static fn( $input ) => self::template( is_array( $input ) ? $input : array() )
+		);
+
 		$names = array(
 			'type'  => 'array',
 			'items' => $string,
@@ -439,6 +483,41 @@ final class Read_Design {
 			'panels'   => $panels,
 			'patterns' => Mega_Menu::panel_patterns(),
 		);
+	}
+
+	/**
+	 * Markup of a template or template part as the site shows it, for get-template: the saved version or the file of the
+	 * theme, its hash (as hashes() computes it), outline and the patterns it places.
+	 *
+	 * @param array<string, mixed> $input Input with template or part.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public static function template( array $input ) {
+		$part = isset( $input['part'] );
+		$slug = (string) ( $input['part'] ?? $input['template'] ?? '' );
+		if ( '' === $slug || isset( $input['part'], $input['template'] ) ) {
+			return Gateway\Block_Edit::invalid( 'template', __( 'Send either template or part.', 'leitvia-studio' ), array() );
+		}
+		$found = get_block_template( get_stylesheet() . '//' . $slug, $part ? 'wp_template_part' : 'wp_template' );
+		if ( ! $found ) {
+			return Gateway\Rejection::make( 'leitvia_not_found', __( 'The site has no template or template part with this slug. leitvia/get-contract lists them.', 'leitvia-studio' ), 404, 'template', array( 'template' => $slug ), 'leitvia/get-contract' );
+		}
+		$content  = (string) $found->content;
+		$patterns = array();
+		preg_match_all( '/<!-- wp:pattern \{"slug":"([^"]+)"/', $content, $matches );
+		foreach ( $matches[1] as $name ) {
+			$patterns[] = (string) $name;
+		}
+		return array(
+			'slug'     => $slug,
+			'type'     => $part ? 'part' : 'template',
+			'source'   => $found->wp_id ? 'custom' : 'theme',
+			'hash'     => $found->wp_id ? Gateway\Hashes::document( (int) $found->wp_id ) : '',
+			'content'  => $content,
+			'outline'  => Gateway\Outline::markup( $content ),
+			'patterns' => array_values( array_unique( $patterns ) ),
+		) + ( $part ? array( 'area' => (string) $found->area ) : array() )
+			+ ( 'single' === $slug && function_exists( 'Leitvia\post_details' ) ? array( 'post_details' => \Leitvia\post_details() ) : array() );
 	}
 
 	/**

@@ -248,8 +248,13 @@ final class Verify {
 		if ( is_wp_error( $response ) ) {
 			return self::report( 'unverifiable', 'leitvia_verify_unreachable', $url );
 		}
+		$status = (int) $response['response']['code'];
+		// A site behind a password (HTTP Basic Auth of a staging site) or a firewall answers the request with 401 or 403
+		// and its own error page, which has no landmarks of the theme: nothing can be checked, so nothing failed.
+		if ( in_array( $status, array( 401, 403 ), true ) ) {
+			return self::report( 'unverifiable', 'leitvia_verify_forbidden', $url );
+		}
 		$findings = array();
-		$status   = (int) $response['response']['code'];
 		if ( 200 !== $status ) {
 			$findings[] = array(
 				'code'   => 'http_status',

@@ -1,16 +1,18 @@
 # Leitvia agent handbook
 
-Generated from Leitvia Studio 1.3.61. Do not edit.
+Generated from Leitvia Studio 1.3.62. Do not edit.
 
-What an agent needs on a WordPress site with Leitvia Studio through its 74 abilities. Read this file before the first call, with Leitvia Pro also [pro.md](https://leitvia.com/docs/pro/).
+What an agent needs on a WordPress site with Leitvia Studio through its 77 abilities. Read this file before the first call, with Leitvia Pro also [pro.md](https://leitvia.com/docs/pro/).
 
 ## Rules for every task
 
 - **Site check:** call `leitvia/get-contract` first and compare `site.url` with the address of your task; when they differ, write nothing and ask the person.
 - **Abilities only:** no SQL, no WP-CLI, no REST routes of WordPress core (`/wp-json/wp/v2/...`), not even to read; public pages are fine. On a Leitvia site the abilities come before the WordPress skills `wp-patterns`, `wp-block-themes` and `wp-wpcli-and-ops`. Never write files in the theme `leitvia`; files no ability can replace go only into the child theme `leitvia-child`, whose patterns follow the contract; a person switches to it (Studio carries the design over).
 - **WP-Cron:** the checks after a write (links, contrast) run as a WP-Cron event. Where WP-Cron does not run by itself (WordPress Playground), call `GET /wp-cron.php` after writes.
-- **Retry:** follow the [retry rule](#rejections) of every rejection.
-- **Approval:** what waits for a person is applied or rolled back by a person, in the inbox or, with Leitvia Pro, in a chat view as themselves ([pro.md](https://leitvia.com/docs/pro/)). The agent applies or rolls back only `autonomous` operations and discards only its own package with `leitvia/reject-package`. Over MCP a call that deletes, removes, rejects or rolls back without a `package` key may first ask the person; a no ends with `leitvia_cancelled`: stop and ask.
+- **Retry:** follow the [retry rule](#rejections) of every rejection. A second rejection of the same call, or `retry: never`, stops that part of the task (a page, post, fix or source): report code and message, and ask the person when one is present.
+- **Facts are never guessed.** Organization data, prices, legal texts, figures, quotes and people come only from a source you can name: the person (in an unattended run the briefing), a page of the site or a read ability, with the source in your report. Without one, stop at a checkpoint; never write a placeholder that looks like a fact.
+- **Unattended:** when no person answers (a scheduled or hosted run), do not wait at a checkpoint; the section Unattended of the skill answers each one. Send the `package` key on every write, even when the briefing says nobody visits the site (mode `direct` needs a person who is present); never apply, roll back or publish anything. A fact without a source stays out and becomes an open question. End with the package ID, what it holds and the open questions; a skill that writes nothing ends with its report.
+- **Approval:** what waits for a person is applied or rolled back by a person, in the inbox or, with Leitvia Pro, in a chat view as themselves ([pro.md](https://leitvia.com/docs/pro/)). The agent applies (`leitvia/apply-package`) or rolls back (`leitvia/rollback`) only `autonomous` operations, everything else is `leitvia_needs_human`, and discards only its own package with `leitvia/reject-package`. Over MCP a call that deletes, removes, rejects or rolls back without a `package` key may first ask the person; a no ends with `leitvia_cancelled`: stop and ask.
 
 ## Access over MCP and REST
 
@@ -18,11 +20,9 @@ Sign in as a WordPress user of its own for the agent, one that may edit posts; e
 
 **Which site.** Every path starts at the address of the site, not at the host: on the network site `https://example.org/club/` the MCP server is `https://example.org/club/wp-json/leitvia-studio/v1/mcp`; `/wp-json/` straight after the host reaches another site. `site.url` of `leitvia/get-contract` is the site of the connection, `site.rest` its REST base. An application password Studio created in a network works on its own site only (401 elsewhere).
 
-**MCP.** The server `leitvia` of Leitvia Studio answers at `POST /wp-json/leitvia-studio/v1/mcp`, revisions `2026-07-28` and `2025-11-25`. `tools/list` lists the abilities, named with a hyphen for the slash (`leitvia-get-contract`). `tools/call` takes the input of the ability as `arguments`. A rejection comes back as a tool result with `isError` true whose text is JSON with `code`, `message` and `data`. `leitvia-apply-recipe`, `leitvia-audit-site` and `leitvia-export` may answer `resultType` `task`: poll `tasks/get` until `status` is no longer `working`; the last state holds the result. Details: [mcp.md](mcp.md).
+**MCP.** The server `leitvia` of Leitvia Studio answers at `POST /wp-json/leitvia-studio/v1/mcp`, revisions `2026-07-28` and `2025-11-25`. `tools/list` lists the abilities, named with a hyphen for the slash (`leitvia-get-contract`). `tools/call` takes the input of the ability as `arguments`. A rejection comes back as a tool result with `isError` true whose text is JSON with `code`, `message` and `data`. Tasks, questions and the connection check: [mcp.md](mcp.md).
 
-**REST.** Every ability runs at `/wp-json/wp-abilities/v1/abilities/<name>/run`. The HTTP method follows the annotations: read only abilities take GET, abilities that are destructive and idempotent take DELETE, all others POST. GET and DELETE send the input as query arguments (`?input[post]=12`, lists as `input[upsells][]=4&input[upsells][]=7`), POST sends it as JSON body `{"input": {…}}`. Long texts make long URLs under DELETE; send them over MCP instead. A rejection is an error response with `code`, `message` and `data`; the HTTP status is `data.status`. Without the MCP server `leitvia`: [core REST](core-rest.md).
-
-**Check the MCP connection.** The server is the whole route `<address of the site>/wp-json/leitvia-studio/v1/mcp`, and its tools hold `leitvia-get-contract`. No endpoint or 404: the path is missing or Leitvia Studio is not active; do not retry at the host or guess paths. 401 with `WWW-Authenticate: Bearer` (sign-in expired) or 403 `insufficient_scope` (reads only): ask the person. With an application password, when `GET <address of the site>/wp-json/wp-abilities/v1/abilities/leitvia/get-contract/run` answers, work over REST and report the broken MCP connection; otherwise stop and ask. Files go over MCP with `leitvia-add-media`, over REST only with the application password.
+**REST.** Every ability runs at `/wp-json/wp-abilities/v1/abilities/<name>/run`. The HTTP method follows the annotations: read only abilities take GET, abilities that are destructive and idempotent take DELETE, all others POST. GET and DELETE send the input as query arguments (`?input[post]=12`, lists as `input[upsells][]=4&input[upsells][]=7`), POST sends it as JSON body `{"input": {…}}`. Long texts make long URLs under DELETE; send them over MCP instead. A rejection is an error response with `code`, `message` and `data`; the HTTP status is `data.status`. `GET /wp-json/wp-abilities/v1/abilities?category=leitvia` lists the abilities with their schemas and annotations, also without the MCP server `leitvia`.
 
 ## Read before write
 
@@ -96,9 +96,9 @@ Changes of site options land in a change package unless the user may manage opti
 
 ## Mode package
 
-Every write ability takes `package`, a key of the task (up to 64 characters). A write with a key always lands in the change package of that key, even where its level would let it go live; the result returns the package ID, and a person applies it in the inbox of Leitvia Studio. Send the same key on every write of one task, for example `homepage-2026-10`, so the person gets one package. Without a key the levels decide, and every write they hold back gets a package of its own. The same change sent twice is stored once. Writes of one task to the same target build on each other (send the hash you read) and are applied in order.
+Every write ability takes `package`, a key of the task (up to 64 characters). A write with a key always lands in the change package of that key, even where its level would let it go live; the result returns the package ID, and a person applies it in the inbox of Leitvia Studio. Send the same key on every write of one task, for example `homepage-2026-10`, so the person gets one package. In mode `direct` send no key. Without a key the levels decide, and every write they hold back gets a package of its own. The same change sent twice is stored once. Writes of one task to the same target build on each other (send the hash you read) and are applied in order.
 
-`leitvia/list-packages` lists your packages, `leitvia/get-package` shows the diff per operation. Agents may apply (`leitvia/apply-package`) and roll back (`leitvia/rollback`) only operations whose level is `autonomous`; everything else is `leitvia_needs_human` and waits for a person.
+`leitvia/list-packages` lists your packages, `leitvia/get-package` shows the diff per operation.
 
 ## Rejections
 
@@ -135,6 +135,7 @@ Read abilities change nothing.
 | [`leitvia/get-product`](abilities/leitvia-get-product.md) | Returns one product or variation. |
 | [`leitvia/get-seo`](abilities/leitvia-get-seo.md) | Returns the SEO data of posts, pages and entries from the active SEO plugin. |
 | [`leitvia/get-site-health`](abilities/leitvia-get-site-health.md) | Returns the versions of WordPress, PHP, the theme and the plugins and the updates WordPress knows of, read from its last update check; nothing is requested. |
+| [`leitvia/get-template`](abilities/leitvia-get-template.md) | Returns the block markup of a template or a template part as the site shows it. |
 | [`leitvia/get-tokens`](abilities/leitvia-get-tokens.md) | Returns the active design tokens as a DTCG document, the token sets with their status, the active style variations, whether the global styles drifted from the active set, the contrast findings of the current palette and the hash of the global styles, the base_hash of leitvia/activate-token-set and leitvia/set-variation. |
 | [`leitvia/list-blocks`](abilities/leitvia-list-blocks.md) | Returns the block catalog of Leitvia Studio and its add-ons with attribute schema and usage rules, and the registered block styles of every block, core blocks included, by block name; a style is set as the class is-style-\<name>. |
 | [`leitvia/list-building-blocks`](abilities/leitvia-list-building-blocks.md) | Lists the building blocks of add-ons. |
@@ -166,6 +167,7 @@ Content model, design tokens, style variation, template parts, navigation and re
 | [`leitvia/set-motion`](abilities/leitvia-set-motion.md) | Sets the motion of the whole site: off, subtle or bold. |
 | [`leitvia/set-organization`](abilities/leitvia-set-organization.md) | Sets the details of the organization behind the site. |
 | [`leitvia/set-permalinks`](abilities/leitvia-set-permalinks.md) | Sets the permalink structure of posts and the bases of category and tag addresses, as in Settings, Permalinks, for a migration that keeps the addresses of the old site. |
+| [`leitvia/set-post-details`](abilities/leitvia-set-post-details.md) | Sets texts and choices of every single post in the theme Leitvia. |
 | [`leitvia/set-posts-page`](abilities/leitvia-set-posts-page.md) | Makes an existing page the posts page of the reading settings, the address that lists all posts; 0 clears it. |
 | [`leitvia/set-privacy-page`](abilities/leitvia-set-privacy-page.md) | Makes an existing page the privacy policy page of the site; 0 clears it. |
 | [`leitvia/set-redirects`](abilities/leitvia-set-redirects.md) | Sets the redirects of moved and removed addresses, for a migration or a new structure. |
@@ -217,3 +219,4 @@ Texts, links, alt text, patterns of sections, trash, media deletion, products an
 | [`leitvia/update-product-category`](abilities/leitvia-update-product-category.md) | Updates name, description, parent and image of a product category, or name and description of a product tag. |
 | [`leitvia/update-product-review`](abilities/leitvia-update-product-review.md) | Sets rating, verified flag or status of a product review. |
 | [`leitvia/update-seo`](abilities/leitvia-update-seo.md) | Writes SEO title, meta description, robots and Open Graph of one post through the active SEO plugin. |
+| [`leitvia/update-term`](abilities/leitvia-update-term.md) | Changes name and description of a category, a tag or a term of a taxonomy of the content model, such as the intro of a topic archive. |

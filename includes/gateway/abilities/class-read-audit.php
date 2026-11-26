@@ -339,6 +339,11 @@ final class Read_Audit {
 			$findings[] = self::finding( 'leitvia/empty-link', sprintf( __( 'The template part %1$s has links that lead nowhere (empty href or # without target): %2$s.', 'leitvia-studio' ), $part, implode( ', ', $texts ) ), __( 'Give each link its target with leitvia/update-template-part, or remove it.', 'leitvia-studio' ), 'error' );
 		}
 		array_push( $findings, ...self::mega_menus() );
+		$terms = self::term_h1();
+		if ( $terms ) {
+			/* translators: %s: names of terms with their taxonomy, separated by commas. */
+			$findings[] = self::finding( 'leitvia/term-heading', sprintf( __( 'The description of these terms holds an h1: %s. Their archive has its title as the h1 already; the theme Leitvia shows the description h1 as an h2, other themes and feeds do not.', 'leitvia-studio' ), implode( ', ', $terms ) ), __( 'Make each h1 of the description an h2 with leitvia/update-term.', 'leitvia-studio' ) );
+		}
 		$stale = Gateway\Packages::stale( current_user_can( 'manage_options' ) ? 0 : get_current_user_id() );
 		if ( $stale ) {
 			$findings[] = self::finding(
@@ -504,6 +509,29 @@ final class Read_Audit {
 			}
 		}
 		return $findings;
+	}
+
+	/**
+	 * Terms of the taxonomies agents may read whose description holds an h1, as "name (taxonomy)", at most 20; their
+	 * archive prints the description below its title, the h1 of the page.
+	 *
+	 * @return list<string>
+	 */
+	private static function term_h1(): array {
+		global $wpdb;
+		$taxonomies = Gateway\Scope::taxonomies();
+		if ( ! $taxonomies ) {
+			return array();
+		}
+		// One query over all descriptions instead of loading every term of a site with hundreds of categories.
+		$rows = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- One read for the audit.
+			$wpdb->prepare(
+				"SELECT t.name, tt.taxonomy FROM {$wpdb->term_taxonomy} tt INNER JOIN {$wpdb->terms} t ON t.term_id = tt.term_id WHERE tt.description LIKE %s AND tt.taxonomy IN (" . implode( ',', array_fill( 0, count( $taxonomies ), '%s' ) ) . ') ORDER BY t.name LIMIT 20', // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- Placeholders for the taxonomies.
+				array_merge( array( '%' . $wpdb->esc_like( '<h1' ) . '%' ), $taxonomies )
+			),
+			ARRAY_A
+		);
+		return array_values( array_map( static fn( array $row ): string => html_entity_decode( (string) $row['name'], ENT_QUOTES | ENT_HTML5, 'UTF-8' ) . ' (' . $row['taxonomy'] . ')', (array) $rows ) );
 	}
 
 	/**

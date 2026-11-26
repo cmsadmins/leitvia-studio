@@ -47,7 +47,7 @@ class Test_Contract extends WP_UnitTestCase {
 		$this->assertStringStartsWith( '1.', $contract->version() );
 		$this->assertSame(
 			array( 'surface', 'surface-alt', 'ink', 'ink-muted', 'accent', 'on-accent', 'stroke', 'focus', 'success', 'warning', 'danger' ),
-			$contract->color_roles()
+			$contract->preset_roles()['color']
 		);
 		$this->assertCount( 16, $contract->pairs() );
 		$ring = wp_list_filter(
@@ -77,7 +77,7 @@ class Test_Contract extends WP_UnitTestCase {
 	public function test_valid_fixture_with_newer_minor(): void {
 		$contract = Contract::from_file( self::FIXTURES . 'valid.json' );
 		$this->assertTrue( $contract->is_valid(), $contract->error() );
-		$this->assertSame( array( 'surface', 'ink' ), $contract->color_roles() );
+		$this->assertSame( array( 'surface', 'ink' ), $contract->preset_roles()['color'] );
 	}
 
 	/**
@@ -110,7 +110,7 @@ class Test_Contract extends WP_UnitTestCase {
 		$contract = Contract::for_active_theme();
 		$this->assertFalse( $contract->exists() );
 		$this->assertFalse( $contract->is_valid() );
-		$this->assertSame( array(), $contract->color_roles() );
+		$this->assertSame( array(), $contract->preset_roles()['color'] ?? array() );
 	}
 
 	/**

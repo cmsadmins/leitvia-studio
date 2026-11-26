@@ -67,6 +67,7 @@ final class Settings {
 		'organization_logo'             => 0,
 		'robots_disallow'               => array(),
 		'llms_news'                     => 0,
+		'page_tags'                     => false,
 	);
 
 	/**
@@ -407,6 +408,29 @@ final class Settings {
 		remove_filter( 'the_content_feed', 'wp_staticize_emoji' );
 		remove_filter( 'comment_text_rss', 'wp_staticize_emoji' );
 		remove_filter( 'wp_mail', 'wp_staticize_emoji_for_email' );
+	}
+
+	/**
+	 * With the setting page_tags pages take tags as posts do: the tag panel shows in the editor of a page (post_tag is
+	 * in REST already) and the tag column in the list of pages. Off by default. Runs on init after core registered the
+	 * taxonomy.
+	 */
+	public static function register_page_tags(): void {
+		if ( self::get( 'page_tags' ) ) {
+			register_taxonomy_for_object_type( 'post_tag', 'page' );
+		}
+	}
+
+	/**
+	 * A tag archive lists the posts and pages with the tag while page_tags is on. Core lists posts only there, so the
+	 * main query of the archive takes both types; a post type set by a plugin or a query variable stays.
+	 *
+	 * @param \WP_Query $query Query.
+	 */
+	public static function page_tag_archive( \WP_Query $query ): void {
+		if ( ! is_admin() && $query->is_main_query() && $query->is_tag() && ! $query->get( 'post_type' ) && self::get( 'page_tags' ) ) {
+			$query->set( 'post_type', array( 'post', 'page' ) );
+		}
 	}
 
 	/**

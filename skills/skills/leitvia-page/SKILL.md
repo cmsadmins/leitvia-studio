@@ -15,23 +15,17 @@ You turn a goal and a few content points into a page that reads as designed: a c
 
 ## Inputs required
 
-- Access as the agent user: [handbook, Access over MCP and REST](../../handbook/README.md#access-over-mcp-and-rest).
 - The brief of step 1.
 - Read before the first call: the [agent handbook](../../handbook/README.md). Read the page of each ability before you first call it (the handbook index links them): `get-contract`, `list-patterns`, `plan-page`, `check-composition`, `get-pattern`, `add-media`, `compose-page`, `get-page-outline`, `insert-section`, `audit-site`. Composition, templates, edits, later changes: [composition details](references/composition.md); several photos of people, trips or groups: [photo collage](references/photo-collage.md). Texts, links, images: [content rules](references/content.md). Entries of a content type and their overview: [entries](references/entries.md). A blog or journal: [blog](references/blog.md). Effects on scroll come with the patterns, one motion per site (`set-motion`): [animation](../leitvia-pattern/references/animation.md). Businesses with a history, sub-brands, samples: [business pages](references/business.md).
 
 ## Modes
 
-- **direct:** The autonomy levels of the site decide. With the default levels a new page is created as a draft; the person publishes it (no ability does), or the owner sets the area `content` to `autonomous`. Only with a person present. Send no `package` key: a key always means a package.
-- **package:** send the same `package` key on every write of the task (for example `landing-bike-repair`), so a person reviews one change package in the inbox of Leitvia Studio. Use it on live sites unless the person asked for direct work. With a key nothing goes live, whatever the autonomy levels allow.
-
-The result of every write says what happened in `mode`: `live`, `draft`, `package` or `unchanged`. Report it as it is; never claim a page is live when the result says `draft` or `package`.
+- **direct:** only with a person present. With the default levels a new page is created as a draft; the person publishes it (no ability does), or the owner sets the area `content` to `autonomous`.
+- **package:** one key for the task, for example `landing-bike-repair`. Use it on live sites unless the person asked for direct work.
 
 ## Ground rules
 
-- Follow the [rules for every task](../../handbook/README.md#rules-for-every-task).
 - Custom blocks go into a plugin from `leitvia-block-starter` (WordPress skill `wp-block-development`), never into a theme.
-- **Facts are never guessed.** Organization data, prices, legal texts, figures, quotes and people come only from a source you can name: the person, a page of the site or a read ability, with the source in your report. Without one, stop at a checkpoint; never write a placeholder that looks like a fact.
-- Here that covers prices, legal texts (imprint, privacy, terms, withdrawal, accessibility statement), company name, address, phone, e-mail, register numbers, opening hours, figures, testimonials and team members. Missing facts are a visible question in your report, not a placeholder on the page.
 - Blocks that keep their content in HTML, steps, image sizes, rows, sections and a section under every post: [page rules](references/page-rules.md); icon per entry: [icon sections](references/icon-sections.md). Fonts, alignment and italics per edit, menu links: [block edits](references/block-edits.md); marquee and leftover sample text: [page rules](references/page-rules.md).
 - Texts of about 1500 words or more: [long texts](references/long-texts.md).
 - **A design that differs from the pattern:** pattern, block style or edit first; a difference of look alone is a site style finding for the child theme, never CSS of yours: [deviations](references/deviations.md).
@@ -86,8 +80,6 @@ A post or an entry of a post type of the content model is no page: `leitvia/comp
 
 ## Failure modes / debugging
 
-Every code with its retry rule: [rejections](../../handbook/rejections.md).
-
 - `leitvia_pattern_not_approved`: a Lab or `unreviewed` pattern waits for approval; take an approved one of the same role.
 - `leitvia_unknown_pattern` or `leitvia_not_found`: slug or path ID is wrong; read `leitvia/list-patterns` or the markup again.
 - `leitvia_check_failed` with `leitvia/bindings`, or a bound block shows its saved text: [bindings](references/entries.md#values-of-fields-on-the-front-end).
@@ -96,7 +88,7 @@ Every code with its retry rule: [rejections](../../handbook/rejections.md).
 
 ## Report
 
-Page ID, URL, `mode` of the write, score, open findings, the open questions from your texts and the package ID if there is one. Later changes to the page: [after the page exists](references/composition.md#after-the-page-exists).
+Page ID, URL, `mode` of the write as the result says it (never live when it says `draft` or `package`), score, open findings, the open questions from your texts and the package ID if there is one. Later changes to the page: [after the page exists](references/composition.md#after-the-page-exists).
 
 ## Escalation
 
@@ -104,14 +96,11 @@ Stop and ask the person at these checkpoints, then continue with the answer:
 
 - **Brief unclear:** goal, audience, language or link targets are missing.
 - **Outline confirmed:** show the sections with pattern and content before `leitvia/compose-page`.
-- **Facts from the person:** prices, legal texts, organization data, figures, quotes and team members. The pipeline also holds writes of the content kinds `prices`, `legal` and `organization` at least as suggestions for a person.
+- **Facts from the person:** prices, legal texts (imprint, privacy, terms, withdrawal, accessibility statement), company name, address, phone, e-mail, register numbers, opening hours, figures, testimonials and team members; a missing fact is a question in your report, never a placeholder. The pipeline also holds writes of the content kinds `prices`, `legal` and `organization` at least as suggestions for a person.
 - **Score still too low:** below `min_score` after the one revision.
-- **Second rejection** of the same call, or a rejection with `retry: never`.
 - **Held for a person:** the result says `package` or `draft` and the person expected a live page. Give the package ID; a person applies it in the inbox.
 
 ## Unattended
-
-When no person answers (a scheduled or hosted run), do not wait at a checkpoint. Send the `package` key on every write, even when the briefing says nobody visits the site (mode `direct` needs a person who is present); never apply, roll back or publish anything. Take facts only from a source you name in the report (briefing, a page of the site, a read ability); without one the fact stays out and becomes an open question. A second rejection, or `retry: never`, stops that part. End with the package ID, what it holds and the open questions. Each checkpoint gets this answer:
 
 | Checkpoint | Answer without a person |
 |---|---|
@@ -119,7 +108,6 @@ When no person answers (a scheduled or hosted run), do not wait at a checkpoint.
 | Outline confirmed | Build the outline at or above `min_score` without waiting; list it in the report. |
 | Facts from the person | Choose patterns without the missing facts; list each missing fact as a question. On an invented site the briefing allows invented facts, except operator and legal facts. |
 | Score still too low | Build nothing; report both outlines with their findings. |
-| Second rejection | Build nothing for this page; report code and message. |
 | Held for a person | Expected: the page waits in the package; report its ID. |
 | New images | An image added with `leitvia/add-media` waits in the package and has no ID before a person applies it: choose a pattern without an image slot, or leave the page for the next run. |
 | New content type | Entries of a type that waits in the package come in the next run, after a person applied it. |

@@ -15,21 +15,19 @@ You make each page say clearly, in its title, description and first lines, what 
 
 ## Inputs required
 
-- Access as the agent user: [handbook, Access over MCP and REST](../../handbook/README.md#access-over-mcp-and-rest).
 - The pages that matter and who should find them (step 1).
 - Read before the first call: the [agent handbook](../../handbook/README.md). Read the page of each ability before you first call it (the handbook index links them): `list-content`, `get-seo`, `update-seo`, `get-page-outline`, `update-content`, `list-packages`, `get-package`. Rules for site visibility, titles, descriptions, structure, structured data, Google News and llms.txt: [SEO and GEO details](references/seo.md).
 
 ## Modes
 
-- **package** (default): send the same `package` key on every write, for example `seo-2026-10`, so a person reviews one change package.
-- **direct:** Only when the person asks for it; the autonomy levels decide. Send no `package` key: a key always means a package. SEO data belongs to the area `content`, so changes of published pages still wait in a package at the default level.
+- **package** (default): one key, for example `seo-2026-10`.
+- **direct:** only when the person asks. SEO data belongs to the area `content`, so changes of published pages still wait in a package at the default level.
 
 ## Ground rules
 
-- Follow the [rules for every task](../../handbook/README.md#rules-for-every-task). Reading `robots.txt` and `llms.txt` is part of the work.
+- Reading `robots.txt` and `llms.txt` is part of the work.
 - **No tricks.** No keyword lists, no repeated phrases, no hidden text, no texts written for machines rather than people, no structured data for content the page does not show, no fake reviews, ratings or FAQ. They do not help and they can cost the site its place in search.
 - **Say only what the page says.** A title or description summarizes the page; `leitvia/update-seo` rejects numbers the post does not contain (`unsupported_fact`). Do not promise what the page does not offer.
-- **Facts are never guessed.** Organization data, prices, legal texts, figures, quotes and people come only from a source you can name: the person, a page of the site or a read ability, with the source in your report. Without one, stop at a checkpoint; never write a placeholder that looks like a fact.
 - **noindex is the person's decision.** Never set `noindex` or `nofollow` on your own; legal pages and thank-you pages are the usual cases, and the person confirms each (checkpoint **Indexing**).
 - **Without an SEO plugin** `plugin.key` is `leitvia`: `leitvia/update-seo` stores title, description and robots and prints them, the title plus " | " and the site name where the whole keeps to 60 characters (Studio setting `title_site_name`, on by default). Write the title without the site name. Never change the title of a page to change its `<title>`: it is the `h1`. Whether titles end with the site name: `leitvia/set-seo-titles` (`site_name`), waits in a package. With an SEO plugin Studio cannot write to, the write is rejected with `leitvia_no_seo_plugin`; list the titles and descriptions you would write.
 
@@ -70,8 +68,6 @@ The person applies your package (its ID comes with every write) in the inbox (ch
 
 ## Failure modes / debugging
 
-Every code with its retry rule: [rejections](../../handbook/rejections.md).
-
 - `leitvia_invalid_input`, reason `unsupported_fact`: the title or description names a number the post does not hold; write it from the page.
 - `leitvia_no_seo_plugin`: no plugin Studio can write to; list what you would write.
 - `unsupported_fact` with a star rating: the title names a rating that is not the confirmed `aggregate_rating`; leave the star out or ask the person (checkpoint **Rating**).
@@ -98,11 +94,8 @@ Stop and ask the person at these checkpoints, then continue with the answer:
 - **AI crawlers:** whether AI crawlers may read the site.
 - **Rating:** value, count and source of a rating, before `aggregate_rating` with `confirmed` true.
 - **Package applied:** the person reviews and applies the package in the inbox.
-- **Second rejection** of the same call, or a rejection with `retry: never`.
 
 ## Unattended
-
-When no person answers (a scheduled or hosted run), do not wait at a checkpoint. Send the `package` key on every write, even when the briefing says nobody visits the site (mode `direct` needs a person who is present); never apply, roll back or publish anything. Take facts only from a source you name in the report (briefing, a page of the site, a read ability); without one the fact stays out and becomes an open question. A second rejection, or `retry: never`, stops that part. End with the package ID, what it holds and the open questions. Each checkpoint gets this answer:
 
 | Checkpoint | Answer without a person |
 |---|---|
@@ -112,4 +105,3 @@ When no person answers (a scheduled or hosted run), do not wait at a checkpoint.
 | AI crawlers | Change nothing; report what robots.txt says. |
 | Rating | No rating and no star; list the rating with its source as an open question. |
 | Package applied | Stop after step 6; the check after belongs to the next run. |
-| Second rejection | Stop that page; report code and message. |

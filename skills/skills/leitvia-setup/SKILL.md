@@ -15,16 +15,14 @@ Turn a briefing into a working site: recipe, style variation, header, footer, na
 
 ## Inputs required
 
-- Access as the agent user: [handbook, Access over MCP and REST](../../handbook/README.md#access-over-mcp-and-rest).
 - The answers of step 1. For a shop, WooCommerce is active.
 - Read before the first call: the [agent handbook](../../handbook/README.md). Read the page of each ability before you first call it (the handbook index links them): `get-contract`, `list-recipes`, `get-content-model`, `define-content-type`, `apply-recipe`, `compose-page`, `get-package`, `get-page-outline`, `update-content`, `audit-site`, `list-packages`, `get-seo`, for a shop `create-product`. Statuses of a recipe run, shop sites and what a recipe does not cover: [recipe details](references/recipe.md). Format of own content types: [content model](references/content-model.md). Header and footer in grid cells and the menu overlay: [grid header](references/grid-header.md).
 
 ## Ground rules
 
-- Follow the [rules for every task](../../handbook/README.md#rules-for-every-task). Reading the operator's other sites is allowed.
+- Reading the operator's other sites is allowed.
 - Mode `package` is the default for a live site: send the same `package` key on every write of the task, for example `setup-2026-10`. Use mode `direct` only when a person is present and says the site is not live yet; the drafts it leaves are theirs to publish.
-- **Facts are never guessed.** Organization data, prices, legal texts, figures, quotes and people come only from a source you can name: the person, a page of the site or a read ability, with the source in your report. Without one, stop at a checkpoint; never write a placeholder that looks like a fact.
-- Here that covers company name, address, register entries, VAT ID, managing directors, data protection officer, server location and retention periods.
+- Facts here include company name, address, register entries, VAT ID, managing directors, data protection officer, server location and retention periods.
 - Take numbers about the site (patterns, page frames, variations, template parts) from `leitvia/get-contract` and `leitvia/list-patterns` (`total`), never from prose, marketing pages or memory.
 - The round of an empty `base_hash` with `leitvia_stale_hash` is protocol, not a rejection.
 
@@ -104,8 +102,6 @@ Checkpoint "Legal texts supplied by the human".
 
 ## Failure modes / debugging
 
-Every code with its retry rule: [rejections](../../handbook/rejections.md).
-
 - `leitvia_recipe_unavailable`: the recipe needs a plugin; `leitvia/list-recipes` names it in `reason`. Tell the person.
 - `leitvia_forbidden_field` from `leitvia/define-content-type`: drop `showInAbilities`; opening a type to agents is the decision of a person.
 - `leitvia_page_missing`: a setting points to a page that still waits in the package. It works once the person applied it.
@@ -121,11 +117,9 @@ Stop and wait for the person at each of these checkpoints. Report what you did, 
 4. **Package applied:** the person reviewed and applied the change package in the inbox. Confirm the setup afterwards (step 5); the package of the legal texts is the same checkpoint.
 5. **Shop settings** (recipe `leitvia/shop`): the person set up WooCommerce as [shop sites](references/recipe.md#shop-sites) lists it. No ability does it; until then the checkout cannot take an order.
 
-Also stop after the second rejection of the same call, and whenever two sources of the operator contradict each other.
+Also stop whenever two sources of the operator contradict each other.
 
 ## Unattended
-
-When no person answers (a scheduled or hosted run), do not wait at a checkpoint. Send the `package` key on every write, even when the briefing says nobody visits the site (mode `direct` needs a person who is present); never apply, roll back or publish anything. Take facts only from a source you name in the report (briefing, a page of the site, a read ability); without one the fact stays out and becomes an open question. A second rejection, or `retry: never`, stops that part. End with the package ID, what it holds and the open questions. Each checkpoint gets this answer:
 
 | Checkpoint | Answer without a person |
 |---|---|

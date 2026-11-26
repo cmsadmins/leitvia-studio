@@ -588,8 +588,8 @@ class Test_Seo_Cluster extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The ability set-permalinks waits for a person, warns when published posts move and sets the structure and the bases; a
-	 * structure without a post tag is refused.
+	 * The ability set-permalinks waits for a person, warns when published posts move and sets the structure, the bases and
+	 * tags for pages; a structure without a post tag is refused.
 	 */
 	public function test_set_permalinks(): void {
 		self::factory()->post->create( array( 'post_status' => 'publish' ) );
@@ -598,6 +598,7 @@ class Test_Seo_Cluster extends WP_UnitTestCase {
 			array(
 				'structure'     => '/news/%postname%/',
 				'category_base' => 'topic',
+				'page_tags'     => true,
 				'base_hash'     => '',
 			)
 		);
@@ -607,6 +608,7 @@ class Test_Seo_Cluster extends WP_UnitTestCase {
 		$this->apply( $result );
 		$this->assertSame( '/news/%postname%/', get_option( 'permalink_structure' ) );
 		$this->assertSame( 'topic', get_option( 'category_base' ) );
+		$this->assertTrue( leitvia_studio_setting( 'page_tags' ), 'pages take tags' );
 		$this->assertFalse( get_option( 'rewrite_rules' ), 'the rules are rebuilt on the next request' );
 		$this->assert_rejected(
 			'structure',

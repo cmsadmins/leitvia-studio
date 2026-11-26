@@ -294,16 +294,6 @@ final class Contract {
 	}
 
 	/**
-	 * Color role slugs in contract order.
-	 *
-	 * @return list<string>
-	 */
-	public function color_roles(): array {
-		$roles = $this->data['roles']['color'] ?? array();
-		return is_array( $roles ) ? array_map( 'strval', array_column( $roles, 'slug' ) ) : array();
-	}
-
-	/**
 	 * Role slugs by preset type (color, spacing, font-size, font-family, shadow, border-radius), in contract order.
 	 *
 	 * @return array<string, list<string>>

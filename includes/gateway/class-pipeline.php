@@ -73,9 +73,10 @@ final class Pipeline {
 	 * Options an operation may target: the organization data of the site, the reading settings, the pages a recipe
 	 * connects and the options a recipe may turn off (see schemas/recipe.schema.json). Every option counts as
 	 * organization data. The site settings of the content model are open as well, see model_setting(), and the options
-	 * of add-ons, see addon_options(). The SEO texts of archives (Abilities\Seo::ARCHIVE_OPTION) count as well.
+	 * of add-ons, see addon_options(). The SEO texts of archives (Abilities\Seo::ARCHIVE_OPTION) and the details of the
+	 * single post (Abilities\Setup::POST_DETAILS_OPTION) count as well.
 	 */
-	public const OPTIONS = array( 'blogname', 'blogdescription', 'site_logo', 'site_icon', 'show_on_front', 'page_on_front', 'page_for_posts', 'leitvia_studio_settings', 'default_pingback_flag', 'default_ping_status', 'default_comment_status', 'show_avatars', 'wp_page_for_privacy_policy', 'permalink_structure', 'category_base', 'tag_base', 'woocommerce_terms_page_id', 'woocommerce_feature_order_attribution_enabled', 'woocommerce_allow_tracking', 'woocommerce_show_marketplace_suggestions', 'woocommerce_feature_remote_logging_enabled', Abilities\Seo::ARCHIVE_OPTION );
+	public const OPTIONS = array( 'blogname', 'blogdescription', 'site_logo', 'site_icon', 'show_on_front', 'page_on_front', 'page_for_posts', 'leitvia_studio_settings', 'default_pingback_flag', 'default_ping_status', 'default_comment_status', 'show_avatars', 'wp_page_for_privacy_policy', 'permalink_structure', 'category_base', 'tag_base', 'woocommerce_terms_page_id', 'woocommerce_feature_order_attribution_enabled', 'woocommerce_allow_tracking', 'woocommerce_show_marketplace_suggestions', 'woocommerce_feature_remote_logging_enabled', Abilities\Seo::ARCHIVE_OPTION, Abilities\Setup::POST_DETAILS_OPTION );
 
 	/**
 	 * Core options that stay closed to add-ons, see protected_option().
@@ -1520,7 +1521,23 @@ final class Pipeline {
 			return false;
 		}
 		$args = array_intersect_key( $fields, array_flip( self::TERM_FIELDS ) );
-		if ( is_wp_error( wp_update_term( $id, $term->taxonomy, wp_slash( $args ) ) ) ) {
+		// A description is the intro of an archive with paragraphs, headings and lists. For a user without unfiltered_html
+		// core cuts it to the short list of comment tags; it gets the list of post content instead, which unsafe()
+		// checked it against before.
+		$kses = has_filter( 'pre_term_description', 'wp_filter_kses' );
+		if ( false !== $kses ) {
+			remove_filter( 'pre_term_description', 'wp_filter_kses', $kses );
+			add_filter( 'pre_term_description', 'wp_filter_post_kses', $kses );
+		}
+		try {
+			$updated = wp_update_term( $id, $term->taxonomy, wp_slash( $args ) );
+		} finally {
+			if ( false !== $kses ) {
+				remove_filter( 'pre_term_description', 'wp_filter_post_kses', $kses );
+				add_filter( 'pre_term_description', 'wp_filter_kses', $kses );
+			}
+		}
+		if ( is_wp_error( $updated ) ) {
 			return false;
 		}
 		foreach ( self::term_meta( $term->taxonomy ) as $key ) {

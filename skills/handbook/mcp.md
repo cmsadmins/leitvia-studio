@@ -1,8 +1,12 @@
 # MCP server leitvia
 
-Generated from Leitvia Studio 1.3.61. Do not edit. Hashes, autonomy and rejections: [agent handbook](README.md).
+Generated from Leitvia Studio 1.3.62. Do not edit. Hashes, autonomy and rejections: [agent handbook](README.md).
 
 The MCP server `leitvia` is part of Leitvia Studio. It answers at `POST <address of the site>/wp-json/leitvia-studio/v1/mcp` over streamable HTTP and speaks the revisions `2026-07-28` and `2025-11-25` of MCP. Its tools are the abilities of the [handbook](README.md#abilities), with the same checks, autonomy levels and change packages as over REST.
+
+## Check the connection
+
+The server is the whole route `<address of the site>/wp-json/leitvia-studio/v1/mcp`, and its tools hold `leitvia-get-contract`. No endpoint or 404: the path is missing or Leitvia Studio is not active; do not retry at the host or guess paths. 401 with `WWW-Authenticate: Bearer` (sign-in expired) or 403 `insufficient_scope` (reads only): ask the person. With an application password, when `GET <address of the site>/wp-json/wp-abilities/v1/abilities/leitvia/get-contract/run` answers, work over REST and report the broken MCP connection; otherwise stop and ask. Files go over MCP with `leitvia-add-media`, over REST only with the application password.
 
 ## Revisions
 

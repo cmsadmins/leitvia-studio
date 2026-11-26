@@ -4,28 +4,37 @@
 // window gets data-leitvia-header-tall on html, and the theme lets it scroll away (WCAG 1.4.10). The height does not
 // depend on whether the header sticks, so nothing moves on the page. A service bar on top of the header (class
 // leitvia-service-bar) hands its height in as --leitvia-service-bar-height: on phones the theme lets it scroll away
-// and only the row below it sticks. An address with an anchor (a link from another page) scrolls to its target before
-// the height is known, with the padding of the theme for an unmeasured header (a quarter of the window): once the
-// first height is set, the target scrolls into view again with the measured padding, so it stops right below the
-// header. Only on a fresh visit, never after a reload or back and forward, where the browser restores where the
-// visitor was.
+// and only the row below it sticks. The first row of a header in two rows (class leitvia-header-top) hands its height
+// in as --leitvia-header-top-height: the theme lets it scroll away at every width, and only the bar below it counts
+// for a header taller than a quarter of the window. An address with an anchor (a link from another page) scrolls to
+// its target before the height is known, with the padding of the theme for an unmeasured header (a quarter of the
+// window): once the first height is set, the target scrolls into view again with the measured padding, so it stops
+// right below the header. Only on a fresh visit, never after a reload or back and forward, where the browser restores
+// where the visitor was.
 const root = document.documentElement;
 const header = document.querySelector( '.wp-site-blocks > header' );
 const bar = header?.querySelector(
 	':scope > * > .leitvia-service-bar:first-child'
+);
+const top = header?.querySelector(
+	':scope > * > .leitvia-header-top:first-child'
 );
 
 if ( header ) {
 	let jumped = false;
 	const update = () => {
 		const height = header.getBoundingClientRect().height;
+		// The first row of a header in two rows scrolls away: only the bar below it covers the page.
+		const first = top
+			? Math.floor( top.getBoundingClientRect().height )
+			: 0;
 		root.style.setProperty(
 			'--leitvia-sticky-header-height',
 			`${ Math.ceil( height ) }px`
 		);
 		root.toggleAttribute(
 			'data-leitvia-header-tall',
-			height > window.innerHeight / 4
+			height - first > window.innerHeight / 4
 		);
 		if ( bar ) {
 			// Rounded like the header: the offset (header minus bar) is the visible row rounded up, never a pixel
@@ -36,6 +45,12 @@ if ( header ) {
 			root.style.setProperty(
 				'--leitvia-service-bar-height',
 				`${ Math.ceil( height ) - row }px`
+			);
+		}
+		if ( top ) {
+			root.style.setProperty(
+				'--leitvia-header-top-height',
+				`${ first }px`
 			);
 		}
 		if ( ! jumped ) {

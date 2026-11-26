@@ -43,6 +43,12 @@ final class Scope {
 	public const TAXONOMIES = array( 'product_cat', 'product_tag' );
 
 	/**
+	 * Taxonomies of posts whose names and descriptions agents may change (leitvia/update-term), the intros of their
+	 * archives.
+	 */
+	public const POST_TAXONOMIES = array( 'category', 'post_tag' );
+
+	/**
 	 * Statuses in scope. Token sets are always private and only readable with edit_theme_options, so private counts
 	 * for them alone.
 	 */
@@ -87,13 +93,13 @@ final class Scope {
 	}
 
 	/**
-	 * Taxonomies in scope: TAXONOMIES while WooCommerce is active, none otherwise, plus taxonomies of the content model
+	 * Taxonomies in scope: POST_TAXONOMIES, TAXONOMIES while WooCommerce is active, plus taxonomies of the content model
 	 * a filter adds.
 	 *
 	 * @return list<string>
 	 */
 	public static function taxonomies(): array {
-		$default = self::commerce() ? self::TAXONOMIES : array();
+		$default = array_merge( self::POST_TAXONOMIES, self::commerce() ? self::TAXONOMIES : array() );
 		/**
 		 * Filters the taxonomies whose terms agents may change through the pipeline. A filter can add taxonomies of the
 		 * content model, for example the lines of an add-on whose terms carry an icon; any other taxonomy is dropped.

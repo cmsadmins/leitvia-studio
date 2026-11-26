@@ -68,6 +68,29 @@ class Test_Dtcg extends WP_UnitTestCase {
 	}
 
 	/**
+	 * An hsl() color exports its sRGB components instead of black and comes back as hex.
+	 */
+	public function test_export_hsl_color(): void {
+		$c       = leitvia_studio_contract();
+		$palette = array(
+			array(
+				'slug'  => 'surface-extra-red',
+				'name'  => 'Red',
+				'color' => 'hsl(0, 100%, 50%)',
+			),
+			array(
+				'slug'  => 'surface-extra-green',
+				'name'  => 'Green',
+				'color' => 'hsl(120deg 100% 25%)',
+			),
+		);
+		$export  = Dtcg::from_settings( array( 'color' => array( 'palette' => array( 'theme' => $palette ) ) ) + wp_get_global_settings(), $c );
+		$this->assertSame( array( 1, 0, 0 ), $export['color']['surface-extra']['red']['$value']['components'] );
+		$this->assertSame( array( 0, 0.5, 0 ), $export['color']['surface-extra']['green']['$value']['components'] );
+		$this->assertSame( '#ff0000', Dtcg::hex( $export['color']['surface-extra']['red']['$value'] ) );
+	}
+
+	/**
 	 * Aliases resolve recursively; a cycle is an error.
 	 */
 	public function test_alias_resolution_and_cycle(): void {

@@ -155,7 +155,7 @@ final class Catalog {
 				$entry = self::entry( $type, 'core', $extension['usage'] ) + array( 'extension' => $extension['extension'] );
 				// A core block whose attributes change through a schema of their own lists that schema, so the catalog
 				// names what leitvia/update-block takes.
-				$core                              = \LeitviaStudio\Gateway\Block_Edit::CORE_ATTRIBUTES[ $name ] ?? null;
+				$core                              = \LeitviaStudio\Gateway\Block_Edit::core_attributes( $name );
 				$entry['attributes']['properties'] = $core ?? $entry['attributes']['properties'];
 				$catalog[]                         = $entry;
 			}

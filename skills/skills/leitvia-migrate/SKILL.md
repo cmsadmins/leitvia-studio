@@ -15,7 +15,6 @@ A migration takes a site built with a classic theme and the classic editor and l
 
 ## Inputs required
 
-- Access as the agent user: [handbook, Access over MCP and REST](../../handbook/README.md#access-over-mcp-and-rest).
 - The person who switches the theme, and the source site when it is another one.
 - Read before the first call: the [agent handbook](../../handbook/README.md). Read the page of each ability before you first call it (the handbook index links them): `audit-site`, `get-page-outline`, `get-block`, `get-contract`, `get-content-model`, `compose-page`, `update-content`, `add-media`, `update-navigation`, `update-template-part`, `list-packages`, `get-package`. Tag to block, images, the comparison and rejections of step 4: [translation details](references/translate.md); markup examples: [block markup](references/block-markup.md).
 
@@ -25,18 +24,17 @@ When the source is another site (any system, for example Wix), read only its pub
 
 ## Modes
 
-- **package** (default): send the same `package` key on every write of the migration, for example `migrate-2026-10`, so a person reviews one change package.
-- **direct:** Only when the person asks for it; the autonomy levels decide. Pages and posts are in the area `content` (`draft` by default), so changes to published content wait in the package either way. Send no `package` key: a key always means a package.
+- **package** (default): one key for the migration, for example `migrate-2026-10`.
+- **direct:** only when the person asks. Pages and posts are in the area `content` (`draft` by default), so changes to published content wait in a package either way.
 
 ## Ground rules
 
-- While the classic theme is active, `leitvia/get-contract` answers `leitvia_no_contract`; compare the address of your task with `home` of the public `GET /wp-json/` instead, after the switch with `site.url` of `leitvia/get-contract`. When they differ, write nothing and ask. Public pages are part of the inventory. Otherwise follow the [rules for every task](../../handbook/README.md#rules-for-every-task).
+- While the classic theme is active, `leitvia/get-contract` answers `leitvia_no_contract`; compare the address of your task with `home` of the public `GET /wp-json/` instead, after the switch with `site.url` of `leitvia/get-contract`. When they differ, write nothing and ask. Public pages are part of the inventory.
 - **Nothing gets lost.** Every sentence, list item, table cell, link and image of a post is in its block version, word for word; only the form is new. When you cannot place something, stop and ask; never drop it quietly.
 - **No classic block and no Custom HTML.** The pipeline refuses `core/freeform` and `core/html` from agents (`leitvia_unsafe_content`). Every piece of HTML becomes a registered block; the [translation details](references/translate.md#tag-to-block) name the block for each tag.
 - **Themes and plugins belong to people.** The area `admin` is locked for agents. The theme switch, activating Leitvia Studio and every plugin change are checkpoints.
 - **Same URLs.** Keep titles, slugs, parent pages and post dates; a slug change is no part of a migration. New addresses, the permalink structure of the old site and redirects: [addresses](references/addresses.md).
 - **One write per post.** Send the whole new content of a post in one `leitvia/update-content` call. A later write to the same post in the same package builds on it and is applied after it.
-- **Facts are never guessed.** Organization data, prices, legal texts, figures, quotes and people come only from a source you can name: the person, a page of the site or a read ability, with the source in your report. Without one, stop at a checkpoint; never write a placeholder that looks like a fact.
 - Never write review notes or HTML comments into content. Open questions go into the report.
 - Texts you write (alt texts, titles, excerpts, menu labels) pass the [text gates](../leitvia-page/references/text-gates.md); moved wording stays as it was, its findings go into the report.
 
@@ -100,7 +98,7 @@ The person applies your package (its ID comes with every write) in the inbox (ch
 
 ## Failure modes / debugging
 
-Every code with its retry rule: [rejections](../../handbook/rejections.md); those of the translation: [translation details](references/translate.md#rejections).
+Codes of the translation: [translation details](references/translate.md#rejections).
 
 - `leitvia_no_contract` before the switch: expected; compare the address with `home` of `GET /wp-json/`.
 - `leitvia_unsafe_content`: a classic block or Custom HTML is left; translate it with the [tag to block table](references/translate.md#tag-to-block).
@@ -124,11 +122,8 @@ Stop and ask the person at these checkpoints, then continue with the answer:
 - **Sample of three:** the person checked three translated posts before you write the rest.
 - **Open items:** content without a block in this skill, images from other hosts, menus deeper than one sub level, widgets.
 - **Package applied:** the person reviews and applies the package in the inbox.
-- **Second rejection** of the same call, or a rejection with `retry: never`.
 
 ## Unattended
-
-When no person answers (a scheduled or hosted run), do not wait at a checkpoint. Send the `package` key on every write, even when the briefing says nobody visits the site (mode `direct` needs a person who is present); never apply, roll back or publish anything. Take facts only from a source you name in the report (briefing, a page of the site, a read ability); without one the fact stays out and becomes an open question. A second rejection, or `retry: never`, stops that part. End with the package ID, what it holds and the open questions. Each checkpoint gets this answer:
 
 | Checkpoint | Answer without a person |
 |---|---|
@@ -137,4 +132,3 @@ When no person answers (a scheduled or hosted run), do not wait at a checkpoint.
 | Sample of three | Write the three posts into the package and stop; the rest belongs to the next run. |
 | Open items | Skip the whole post that holds the item, so nothing gets lost; list post and item. |
 | Package applied | Stop; the checks of step 7 belong to the next run. |
-| Second rejection | Skip that post; report code and message. |

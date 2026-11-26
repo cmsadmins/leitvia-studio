@@ -8,6 +8,7 @@
 namespace LeitviaStudio\News;
 
 use LeitviaStudio\Gateway\Abilities\Seo;
+use LeitviaStudio\Gateway\Outline;
 use WP_Post;
 use WP_Post_Type;
 use WP_Term;
@@ -179,9 +180,8 @@ final class Head {
 		$object  = get_queried_object();
 		$post    = is_singular() && $object instanceof WP_Post ? $object : null;
 		$article = $post && ( 'post' === $post->post_type || Schema::is_article_page( $post ) );
-		$plain   = static fn( string $text ): string => trim( html_entity_decode( wp_strip_all_tags( $text ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
-		$title   = self::first( self::stored( 'og_title' ), self::stored( 'title' ), $post && ! is_front_page() ? Schema::text( get_the_title( $post ) ) : $plain( wp_get_document_title() ) );
-		$text    = self::first( self::stored( 'og_description' ), self::stored( 'description' ), $post ? Seo::suggested_description( $post ) : '', $plain( (string) get_bloginfo( 'description' ) ) );
+		$title   = self::first( self::stored( 'og_title' ), self::stored( 'title' ), $post && ! is_front_page() ? Schema::text( get_the_title( $post ) ) : Outline::decoded( wp_get_document_title() ) );
+		$text    = self::first( self::stored( 'og_description' ), self::stored( 'description' ), $post ? Seo::suggested_description( $post ) : '', Outline::decoded( (string) get_bloginfo( 'description' ) ) );
 		$url     = $post ? (string) wp_get_canonical_url( $post ) : self::canonical();
 		$locale  = $post ? Schema::locale( $post ) : get_locale();
 		$tags    = array(
@@ -189,7 +189,7 @@ final class Head {
 			array( 'og:title', $title ),
 			array( 'og:description', $text ),
 			array( 'og:url', $url ),
-			array( 'og:site_name', $plain( (string) get_bloginfo( 'name' ) ) ),
+			array( 'og:site_name', Outline::decoded( (string) get_bloginfo( 'name' ) ) ),
 			array( 'og:locale', $locale ),
 		);
 		$image   = self::image( $post );
@@ -213,12 +213,7 @@ final class Head {
 	 * @param string ...$texts Candidates in order.
 	 */
 	private static function first( string ...$texts ): string {
-		foreach ( $texts as $text ) {
-			if ( '' !== trim( $text ) ) {
-				return trim( $text );
-			}
-		}
-		return '';
+		return (string) current( array_filter( array_map( 'trim', $texts ), static fn( string $text ): bool => '' !== $text ) );
 	}
 
 	/**

@@ -7,6 +7,8 @@
 
 namespace LeitviaStudio\Blocks;
 
+use LeitviaStudio\Gateway\Outline;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -133,20 +135,11 @@ final class Share {
 	public static function target( int $post_id ): array {
 		$post = $post_id ? get_post( $post_id ) : null;
 		if ( $post && is_post_publicly_viewable( $post ) ) {
-			return array( (string) get_permalink( $post ), self::plain( get_the_title( $post ) ) );
+			return array( (string) get_permalink( $post ), Outline::decoded( get_the_title( $post ) ) );
 		}
 		global $wp;
 		$path = $wp instanceof \WP ? (string) $wp->request : '';
-		return array( home_url( '' === $path ? '/' : user_trailingslashit( $path ) ), self::plain( wp_get_document_title() ) );
-	}
-
-	/**
-	 * Text without tags and entities.
-	 *
-	 * @param string $html Title HTML.
-	 */
-	private static function plain( string $html ): string {
-		return trim( html_entity_decode( wp_strip_all_tags( $html ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
+		return array( home_url( '' === $path ? '/' : user_trailingslashit( $path ) ), Outline::decoded( wp_get_document_title() ) );
 	}
 
 	/**

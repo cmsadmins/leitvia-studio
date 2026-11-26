@@ -54,6 +54,8 @@ $leitvia_studio_uninstall_site = static function (): void {
 		}
 		// SEO title and description of archives (update-seo with archive).
 		delete_option( 'leitvia_studio_archive_seo' );
+		// Texts and choices of the single post (set-post-details).
+		delete_option( 'leitvia_studio_post_details' );
 		// Profile picture assignments of this site (user option, key with the site's table prefix).
 		delete_metadata( 'user', 0, $wpdb->get_blog_prefix() . 'leitvia_avatar', '', true );
 		// The declaration of the Model screen; posts, terms, meta and leitvia_site_* options created with it stay.

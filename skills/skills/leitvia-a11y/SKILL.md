@@ -15,24 +15,19 @@ You check a site for barriers, remove the ones the abilities can remove and say 
 
 ## Inputs required
 
-- Access as the agent user: [handbook, Access over MCP and REST](../../handbook/README.md#access-over-mcp-and-rest).
 - The scope of step 1 and the language of each page.
 - Read before the first call: the [agent handbook](../../handbook/README.md). Read the page of each ability before you first call it (the handbook index links them): `audit-site`, `get-tokens`, `get-page-outline`, `get-block`, `set-alt-text`, `update-block`, `update-content`, `list-packages`, `get-package`. Fixes, manual tests and the accessibility statement: [check details](references/checks.md).
 
 ## Modes
 
-- **package** (default): send the same `package` key on every write of the check, for example `a11y-2026-10`, so a person reviews one change package.
-- **direct:** Only when the person asks for it; the autonomy levels decide. Send no `package` key: a key always means a package.
-
-In mode `package` every fix waits in the package, alt text included. In mode `direct` you send no key: alt text belongs to the area `corrections` (`autonomous` by default) and goes live with its own recorded package, text changes on published pages wait in a package. Report both.
+- **package** (default): one key for the check, for example `a11y-2026-10`; every fix waits in the package, alt text included.
+- **direct:** only when the person asks. Alt text (area `corrections`, `autonomous` by default) goes live with its own recorded package; text changes on published pages wait in a package. Report both.
 
 ## Ground rules
 
-- Follow the [rules for every task](../../handbook/README.md#rules-for-every-task).
 - **Never call a site accessible, barrier free or compliant.** Automated checks find a part of the barriers. Without the tests of a person (see step 6) the report says "no automatically detectable barriers on the checked pages", nothing more.
 - **Several text fixes of one post** fit into one `leitvia/update-content` call; writes to one post in one package build on each other ([mode package](../../handbook/README.md#mode-package)).
 - **Only what a write brings counts:** findings the post already had do not block a write; one that adds a finding or makes one worse is rejected with `leitvia_check_failed`, which names it.
-- **Facts are never guessed.** Organization data, prices, legal texts, figures, quotes and people come only from a source you can name: the person, a page of the site or a read ability, with the source in your report. Without one, stop at a checkpoint; never write a placeholder that looks like a fact.
 - The theme comes with its own test report; it covers the theme, not the content of this site. Judge the site by what you find on the site.
 
 ## Procedure
@@ -85,8 +80,6 @@ The page kind `accessibility` is a legal text; its content and legal statements 
 
 ## Failure modes / debugging
 
-Every code with its retry rule: [rejections](../../handbook/rejections.md).
-
 - `leitvia_check_failed`: the write adds a finding or makes one worse; the message names it. Correct once.
 - `leitvia_stale_hash` on a second write to the same post: read `leitvia/get-page-outline` again and send its `hash`.
 - `leitvia_needs_human` from `leitvia/apply-package`: expected; `data.inbox` is the link for the person.
@@ -110,12 +103,9 @@ Stop and ask the person at these checkpoints, then continue with the answer:
 - **Link targets:** a link to `#` or a vague link whose target you cannot tell.
 - **AI for alt text:** before images go to the AI provider of the site.
 - **Package applied:** the person reviews and applies the package in the inbox.
-- **Second rejection** of the same call, or a rejection with `retry: never`.
 - **Accessibility statement:** facts and legal statements come from the person.
 
 ## Unattended
-
-When no person answers (a scheduled or hosted run), do not wait at a checkpoint. Send the `package` key on every write, even when the briefing says nobody visits the site (mode `direct` needs a person who is present); never apply, roll back or publish anything. Take facts only from a source you name in the report (briefing, a page of the site, a read ability); without one the fact stays out and becomes an open question. A second rejection, or `retry: never`, stops that part. End with the package ID, what it holds and the open questions. Each checkpoint gets this answer:
 
 | Checkpoint | Answer without a person |
 |---|---|
@@ -123,5 +113,4 @@ When no person answers (a scheduled or hosted run), do not wait at a checkpoint.
 | Link targets | Fix only links whose target is clear on the site; list the others with page and link text. |
 | AI for alt text | No: images go to no AI provider. Write alt texts yourself or list the image as open. |
 | Package applied | Stop after step 4; the audit after belongs to the next run. |
-| Second rejection | Stop that fix; report code and message. |
 | Accessibility statement | Do not change it; list what it should say as a question. |

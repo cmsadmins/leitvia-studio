@@ -230,6 +230,26 @@ class Test_Gateway_Verify extends WP_UnitTestCase {
 	}
 
 	/**
+	 * A site behind Basic Auth or a firewall answers 401 or 403 with a page of its own: unverifiable, no failed
+	 * landmarks. Other error statuses still fail.
+	 */
+	public function test_password_protected_site_is_unverifiable(): void {
+		foreach ( array( 401, 403 ) as $status ) {
+			remove_all_filters( 'pre_http_request' );
+			$this->respond( '<html><body><h1>Unauthorized</h1></body></html>', $status, null );
+			$report = Verify::check( home_url( '/' ) );
+			$this->assertSame( 'unverifiable', $report['status'], (string) $status );
+			$this->assertSame( 'leitvia_verify_forbidden', $report['code'] );
+			$this->assertSame( array(), $report['findings'] );
+		}
+		remove_all_filters( 'pre_http_request' );
+		$this->respond( self::GOOD, 500 );
+		$report = Verify::check( home_url( '/' ) );
+		$this->assertSame( 'failed', $report['status'] );
+		$this->assertSame( 'http_status', $report['findings'][0]['code'] );
+	}
+
+	/**
 	 * PHP messages reported by the checked request fail the check; a response without a report is unverifiable.
 	 */
 	public function test_php_messages_fail_and_missing_report_is_unverifiable(): void {
@@ -415,7 +435,7 @@ class Test_Gateway_Verify extends WP_UnitTestCase {
 	public function test_contrast_failing_before_the_write_is_known(): void {
 		$gray = static function ( WP_Theme_JSON_Data $data ): WP_Theme_JSON_Data {
 			$palette = array();
-			foreach ( leitvia_studio_contract()->color_roles() as $slug ) {
+			foreach ( leitvia_studio_contract()->preset_roles()['color'] as $slug ) {
 				$palette[] = array(
 					'slug'  => $slug,
 					'name'  => $slug,

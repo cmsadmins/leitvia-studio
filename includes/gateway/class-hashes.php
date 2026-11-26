@@ -91,36 +91,28 @@ final class Hashes {
 			$parts[] = Abilities\Commerce::props( $post->ID );
 		}
 		$content = Abilities\Content::state( $post->ID, $post->post_type );
-		// An author name that is not set does not count, as before Studio 1.3.52, so hashes read before stay valid.
-		if ( '' === ( $content['meta_input'][ \LeitviaStudio\News\Schema::AUTHOR_NAME_META ] ?? null ) ) {
-			unset( $content['meta_input'][ \LeitviaStudio\News\Schema::AUTHOR_NAME_META ] );
+		// Meta that is not set does not count, so hashes read before it existed stay valid: the author name (Studio
+		// 1.3.52) and the page of such an author, the lead symbol of a page, the kind of a page (before
+		// set-page-structure took kind), breadcrumbs a page shows (the default), offerings and a topic of news a page
+		// does not name; the hub of a post or entry, while pages have always counted their hub.
+		$unset = array(
+			\LeitviaStudio\News\Schema::AUTHOR_NAME_META,
+			\LeitviaStudio\News\Schema::AUTHOR_PAGE_META,
+			\LeitviaStudio\Seo\Cluster::ICON_META,
+			'_leitvia_page_kind',
+			\LeitviaStudio\Seo\Cluster::NO_BREADCRUMBS_META,
+			\LeitviaStudio\Seo\Cluster::OFFERINGS_META,
+			\LeitviaStudio\Seo\Related_News::META,
+		);
+		if ( 'page' !== $post->post_type ) {
+			$unset[] = \LeitviaStudio\Seo\Cluster::HUB_META;
 		}
-		// The same for the page of such an author, so hashes read before it existed stay valid.
-		if ( '' === ( $content['meta_input'][ \LeitviaStudio\News\Schema::AUTHOR_PAGE_META ] ?? null ) ) {
-			unset( $content['meta_input'][ \LeitviaStudio\News\Schema::AUTHOR_PAGE_META ] );
-		}
-		// The same for the lead symbol of a page and the hub of a post or entry (pages have always counted their hub).
-		if ( '' === ( $content['meta_input'][ \LeitviaStudio\Seo\Cluster::ICON_META ] ?? null ) ) {
-			unset( $content['meta_input'][ \LeitviaStudio\Seo\Cluster::ICON_META ] );
-		}
-		if ( 'page' !== $post->post_type && '' === ( $content['meta_input'][ \LeitviaStudio\Seo\Cluster::HUB_META ] ?? null ) ) {
-			unset( $content['meta_input'][ \LeitviaStudio\Seo\Cluster::HUB_META ] );
-		}
-		// Nor does the kind of a page that has none, so hashes read before set-page-structure took kind stay valid.
-		if ( '' === ( $content['meta_input']['_leitvia_page_kind'] ?? null ) ) {
-			unset( $content['meta_input']['_leitvia_page_kind'] );
-		}
-		// Nor do breadcrumbs a page shows, the default.
-		if ( '' === ( $content['meta_input'][ \LeitviaStudio\Seo\Cluster::NO_BREADCRUMBS_META ] ?? null ) ) {
-			unset( $content['meta_input'][ \LeitviaStudio\Seo\Cluster::NO_BREADCRUMBS_META ] );
-		}
-		// Offerings a page does not name do not count either.
-		if ( '' === ( $content['meta_input'][ \LeitviaStudio\Seo\Cluster::OFFERINGS_META ] ?? null ) ) {
-			unset( $content['meta_input'][ \LeitviaStudio\Seo\Cluster::OFFERINGS_META ] );
-		}
-		// Nor does a topic of news a page does not name.
-		if ( '' === ( $content['meta_input'][ \LeitviaStudio\Seo\Related_News::META ] ?? null ) ) {
-			unset( $content['meta_input'][ \LeitviaStudio\Seo\Related_News::META ] );
+		// Meta of add-ons (leitvia_studio_post_meta) counts only once it is set, as the keys above.
+		$unset = array_merge( $unset, Abilities\Content::addon_meta( $post->post_type ) );
+		foreach ( $unset as $key ) {
+			if ( '' === ( $content['meta_input'][ $key ] ?? null ) ) {
+				unset( $content['meta_input'][ $key ] );
+			}
 		}
 		if ( $legacy && isset( $content['meta_input'] ) ) {
 			unset( $content['meta_input']['_wp_page_template'] );

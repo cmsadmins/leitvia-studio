@@ -1,6 +1,6 @@
 # Rejections
 
-Generated from Leitvia Studio 1.3.61. Do not edit. What a retry rule means: [agent handbook](README.md#rejections).
+Generated from Leitvia Studio 1.3.62. Do not edit. What a retry rule means: [agent handbook](README.md#rejections).
 
 Every rejection of Leitvia Studio with its retry rule and next ability. Messages with `%s` or `%d` get a value at run time; codes with several rows come from several places.
 
@@ -43,6 +43,7 @@ Leitvia uses one code per kind of failure, not one per field as in the error voc
 | `leitvia_forbidden_field` | 403 | `once` | none | Agents may not set showInAbilities. Whether content is open to AI abilities is the decision of a person; remove the field and try again. |
 | `leitvia_foreign_host` | 422 | `once` | none | Media from other hosts is not fetched. Send the file as Base64 data instead. |
 | `leitvia_import_conflict` | 409 | `never` | none | Targets changed on this site since the package was made. Nothing was imported; compare and export again. |
+| `leitvia_invalid_input` | 422 | `never` | set at run time | Built at run time; read the message. |
 | `leitvia_invalid_input` | 422 | `once` | set at run time | Built at run time; read the message. |
 | `leitvia_invalid_input` | 422 | `never` | none | Built at run time; read the message. |
 | `leitvia_invalid_input` | 422 | `never` | `leitvia/list-content` | Built at run time; read the message. |
@@ -57,11 +58,13 @@ Leitvia uses one code per kind of failure, not one per field as in the error voc
 | `leitvia_invalid_input` | 422 | `never` | none | Only pages have a kind. |
 | `leitvia_invalid_input` | 400 | `once` | `leitvia/list-patterns` | Pass pattern slugs, or a post whose sections come from patterns. |
 | `leitvia_invalid_input` | 422 | `once` | none | Send a package key: a migration always goes into a change package. |
+| `leitvia_invalid_input` | 422 | `never` | none | Send at least one item. |
 | `leitvia_invalid_input` | 422 | `never` | none | Send at least one of vat, prenotice, retention, legal and legal_note. |
 | `leitvia_invalid_input` | 422 | `never` | none | Send at least one product. A product left out goes back to draft. |
 | `leitvia_invalid_input` | 400 | `once` | `leitvia/get-contract` | The contract has no page frame of this type. |
 | `leitvia_invalid_input` | 400 | `once` | `leitvia/get-contract` | The contract has no page frame of this type. |
 | `leitvia_invalid_input` | 422 | `never` | `leitvia/update-content` | The post holds no WPBakery or Impreza shortcodes, ACF blocks or ACF fields. Classic content moves with leitvia/update-content. |
+| `leitvia_invalid_input` | 422 | `never` | none | The publisher ID of AdSense is ca-pub- followed by 10 to 20 digits. |
 | `leitvia_invalid_input` | 422 | `never` | none | The value is not valid for this option. |
 | `leitvia_invalid_input` | 400 | `never` | none | This decision is not known. |
 | `leitvia_invalid_input` | 422 | `never` | `leitvia/add-building-block` | This site has no documentation yet. Add the building block Documentation from leitvia/list-building-blocks with leitvia/add-building-block first. |
@@ -83,6 +86,7 @@ Leitvia uses one code per kind of failure, not one per field as in the error voc
 | `leitvia_no_seo_plugin` | 422 | `never` | `leitvia/update-content` | No SEO plugin Leitvia Studio can write to is active (Yoast SEO, Rank Math, SEOPress or The SEO Framework). Change the excerpt with leitvia/update-content instead, or ask a person to install one. |
 | `leitvia_no_seo_plugin` | 422 | `never` | none | The SEO plugin keeps the titles of archives in its own settings; report the wish to the person. |
 | `leitvia_not_found` | 404 | `once` | `leitvia/get-page-outline` | The page has no block with this ID. Read the page outline for the current IDs. |
+| `leitvia_not_found` | 404 | `once` | `leitvia/get-contract` | The site has no template or template part with this slug. leitvia/get-contract lists them. |
 | `leitvia_not_found` | 404 | `once` | `leitvia/get-page-outline` | There is no block with this ID. Read the outline for the current IDs. |
 | `leitvia_not_found` | 404 | `once` | `leitvia/list-media` | There is no file with this ID in the media library. List the media for the current IDs. |
 | `leitvia_not_found` | 404 | `once` | `leitvia/list-patterns` | There is no pattern with this slug. List the patterns for the current slugs. |
@@ -91,6 +95,7 @@ Leitvia uses one code per kind of failure, not one per field as in the error voc
 | `leitvia_not_found` | 404 | `never` | none | There is no stored order or quote request with this number. Handed-over orders are deleted after the retention period; the number stands in the confirmation and the ticket, such as 2026-00042. |
 | `leitvia_not_found` | 404 | `once` | `leitvia/get-page-outline` | There is no top-level section with this ID. Read the outline for the current IDs. |
 | `leitvia_out_of_scope` | 403 | `never` | none | Agents may not change this object. Only published or draft content of the allowed post types is open to them. |
+| `leitvia_out_of_scope` | 403 | `never` | `leitvia/list-content` | Agents may not change this term. Categories, tags and taxonomies of the content model are open to them. |
 | `leitvia_out_of_scope` | 403 | `never` | none | Agents may not read this object. Only published or draft content of the allowed post types is open to them. |
 | `leitvia_out_of_scope` | 403 | `never` | none | Agents may not see or change this object. Only products, product categories and tags are open to them, never orders, refunds, coupons or customers. |
 | `leitvia_out_of_scope` | 403 | `once` | none | Agents may not set this status. Use draft, pending or publish. |

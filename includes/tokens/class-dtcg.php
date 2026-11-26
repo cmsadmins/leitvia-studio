@@ -970,7 +970,7 @@ final class Dtcg {
 	}
 
 	/**
-	 * DTCG color of a CSS hex or rgb() color. Other notations become black.
+	 * DTCG color of a CSS hex, rgb() or hsl() color. Other notations become black.
 	 *
 	 * @param string $css CSS color.
 	 * @return array<string, mixed>
@@ -985,14 +985,17 @@ final class Dtcg {
 				'hex'        => '#' . $hex,
 			);
 		}
-		// ponytail: hex and rgb() only; named colors, hsl() and var() export as black. Add parsers when a theme uses them.
+		// ponytail: hex, rgb() and opaque hsl() only; named colors, var() and hsl() with alpha below 1 export as black.
 		preg_match_all( '/-?\d*\.?\d+/', $css, $numbers );
 		$numbers = array_map( 'floatval', $numbers[0] );
+		$hsl     = str_starts_with( $css, 'hsl' ) ? Contrast::parse( $css ) : null;
 		$color   = array(
 			'colorSpace' => 'srgb',
-			'components' => str_starts_with( $css, 'rgb' ) && count( $numbers ) >= 3
-				? array_map( static fn( float $n ) => self::number( (string) round( min( max( $n, 0 ), 255 ) / 255, 3 ) ), array_slice( $numbers, 0, 3 ) )
-				: array( 0, 0, 0 ),
+			'components' => match ( true ) {
+				null !== $hsl => array_map( static fn( float $n ) => self::number( (string) round( $n / 255, 3 ) ), $hsl ),
+				str_starts_with( $css, 'rgb' ) && count( $numbers ) >= 3 => array_map( static fn( float $n ) => self::number( (string) round( min( max( $n, 0 ), 255 ) / 255, 3 ) ), array_slice( $numbers, 0, 3 ) ),
+				default => array( 0, 0, 0 ),
+			},
 		);
 		if ( isset( $numbers[3] ) ) {
 			$color['alpha'] = $numbers[3];

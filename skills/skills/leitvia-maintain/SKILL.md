@@ -15,23 +15,18 @@ A maintenance run takes a site that already works and leaves it in a better stat
 
 ## Inputs required
 
-- Access as the agent user: [handbook, Access over MCP and REST](../../handbook/README.md#access-over-mcp-and-rest).
 - The package key of the run; for outdated content, the sources the person names.
 - Read before the first call: the [agent handbook](../../handbook/README.md). Read the page of each ability before you first call it (the handbook index links them): `audit-site`, `get-page-outline`, `get-block`, `repair-links`, `set-alt-text`, `update-block`, `update-content`, `replace-pattern`, `list-packages`, `get-package`, `rollback`. How to fix each area and how to roll back: [fix details](references/fixes.md).
 
 ## Modes
 
-- **package** (default for maintenance): send the same `package` key on every write of the run, for example `maintenance-2026-10`. One run, one key, one package for a person.
-- **direct:** Only when the person asks for it. The autonomy levels decide what goes live. Send no `package` key: a key always means a package.
-
-Corrections (links, alt text) belong to the area `corrections`, which is `autonomous` by default. With a `package` key every write waits in the package, corrections included. In mode `direct` you send no key: a correction the level lets go live goes live, and Studio records it as an applied package of its own (the `package` of the result), so it can be rolled back; a write the level holds back waits in a package of its own. Report both: the open packages and the corrections that went live.
+- **package** (default): one key per run, for example `maintenance-2026-10`; every write waits in the package, corrections included.
+- **direct:** only when the person asks. Corrections (links, alt text) are in the area `corrections`, `autonomous` by default: they go live, each recorded as an applied package of its own (the `package` of the result) that can be rolled back; a write the level holds back waits in a package of its own. Report both: the open packages and the corrections that went live.
 
 ## Ground rules
 
-- Follow the [rules for every task](../../handbook/README.md#rules-for-every-task).
 - **Combine the changes of one post** in one call where the ability allows it (`leitvia/update-content` takes up to 50 blocks; `leitvia/repair-links` repairs all links of a post at once); writes to one post in one package build on each other ([mode package](../../handbook/README.md#mode-package)).
 - **Only what a write brings counts:** findings the post already had do not block a write; one that adds a finding or makes one worse is rejected with `leitvia_check_failed`, which names it.
-- **Facts are never guessed.** Organization data, prices, legal texts, figures, quotes and people come only from a source you can name: the person, a page of the site or a read ability, with the source in your report. Without one, stop at a checkpoint; never write a placeholder that looks like a fact.
 - Never change prices, legal texts or organization data on your own, and never write review notes or HTML comments into content; open questions go into the report.
 
 ## Procedure
@@ -103,8 +98,6 @@ After the person applied the package:
 
 ## Failure modes / debugging
 
-Every code with its retry rule: [rejections](../../handbook/rejections.md).
-
 - Every write ends with 403 and the abilities answer 404: Leitvia Studio is not active. The role stores no capability, so without Studio the agent can change nothing on the site. Tell the person and stop; do not try core routes. The password works again once a person activates Studio. After Studio was deleted the password is gone and a person creates a new one.
 - `leitvia_check_failed`: the write adds a finding or makes one worse; the message names it. Correct once.
 - `leitvia_needs_human` from `leitvia/apply-package`: expected; `data.inbox` is the link for the person.
@@ -128,11 +121,8 @@ Stop and ask the person at these checkpoints, then continue with the answer:
 - **Facts from the person:** prices, legal texts, organization data or figures without a source.
 - **Package applied:** the person reviews and applies the package in the inbox before you audit again.
 - **Rollback confirmed:** the person names the package to roll back.
-- **Second rejection** of the same call, or a rejection with `retry: never`.
 
 ## Unattended
-
-When no person answers (a scheduled or hosted run), do not wait at a checkpoint. Send the `package` key on every write, even when the briefing says nobody visits the site (mode `direct` needs a person who is present); never apply, roll back or publish anything. Take facts only from a source you name in the report (briefing, a page of the site, a read ability); without one the fact stays out and becomes an open question. A second rejection, or `retry: never`, stops that part. End with the package ID, what it holds and the open questions. Each checkpoint gets this answer:
 
 | Checkpoint | Answer without a person |
 |---|---|
@@ -141,4 +131,3 @@ When no person answers (a scheduled or hosted run), do not wait at a checkpoint.
 | Facts from the person | Leave the text as it is; list it with the value you could not confirm. |
 | Package applied | Stop after step 6; the audit after belongs to the next run. Report the "before" only. |
 | Rollback confirmed | Never roll back without a person. |
-| Second rejection | Stop that fix; report code and message. |

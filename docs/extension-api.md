@@ -539,6 +539,40 @@ add_filter(
 
 The filter also runs for entries of other types, for example a page of one offering, when an add-on calls `Cluster::service_node()` for them.
 
+## Post meta in the pipeline
+
+The state of a post of a content type (post, page and the types of the content model) holds the fields of the content model and the meta Studio writes itself. An add-on with meta of its own on such posts names the keys per post type with `leitvia_studio_post_meta`; writes of its abilities then go through the pipeline like `leitvia/update-content`: the autonomy level of the area decides between live, draft and change package, rollbacks restore the old values and the hash of the post covers them once they are set:
+
+```php
+add_filter(
+	'leitvia_studio_post_meta',
+	static function ( array $keys ): array {
+		$keys['post'][] = '_my_addon_date';
+		return $keys;
+	}
+);
+```
+
+The change callback of the operation sets the value under `meta_input`, for example `static fn( array $state ): array => array_replace_recursive( $state, array( 'meta_input' => array( '_my_addon_date' => '2027-03-01' ) ) )`.
+
+## Query keys of add-ons
+
+`leitvia/update-block` changes the `query` of a `core/query` only with the keys of core and `taxQuery`. An add-on whose query loop reads keys of its own from the query attribute (in `query_loop_block_query_vars`) names them with `leitvia_studio_query_attribute_keys` as JSON schema; update-block, the edits of compose-page and insert-pattern and `leitvia/list-blocks` then take them. Keys of core and `taxQuery` stay as Studio defines them:
+
+```php
+add_filter(
+	'leitvia_studio_query_attribute_keys',
+	static function ( array $keys ): array {
+		$keys['myAddonList'] = array(
+			'type'        => 'string',
+			'enum'        => array( 'new', 'popular' ),
+			'description' => 'Which posts the list shows.',
+		);
+		return $keys;
+	}
+);
+```
+
 ## Term meta in the pipeline
 
 The state of a term that the pipeline writes holds its name, description and parent, plus the meta keys `leitvia_studio_term_meta` names for its taxonomy; writes set them, rollbacks restore them and the hash of the term covers them. An add-on with fields on its own terms adds their keys:

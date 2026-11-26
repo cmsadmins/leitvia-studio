@@ -65,6 +65,38 @@ class Test_Theme_Post_Head extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Rank Math names the primary category as well; a primary category the post has left counts as none. The related
+	 * posts take all categories, the primary one or the tags, by post_details().
+	 */
+	public function test_primary_category_of_rank_math_and_related_source(): void {
+		$alpha = self::factory()->category->create( array( 'name' => 'Alpha' ) );
+		$beta  = self::factory()->category->create( array( 'name' => 'Beta' ) );
+		$tag   = self::factory()->tag->create( array( 'name' => 'Gamma' ) );
+		$post  = self::factory()->post->create( array( 'post_category' => array( $alpha, $beta ) ) );
+		wp_set_post_tags( $post, array( $tag ) );
+		update_post_meta( $post, 'rank_math_primary_category', $beta );
+		$this->assertSame( $beta, Leitvia\primary_category( $post ) );
+		$this->assertStringContainsString( '>Beta</a>', $this->render( $post, '<!-- wp:post-terms {"term":"category","className":"leitvia-primary-term"} /-->' ) );
+		update_post_meta( $post, 'rank_math_primary_category', self::factory()->category->create() );
+		$this->assertSame( 0, Leitvia\primary_category( $post ) );
+		update_post_meta( $post, 'rank_math_primary_category', $beta );
+
+		$this->go_to( get_permalink( $post ) );
+		$query   = new WP_Block( parse_blocks( '<!-- wp:query {"namespace":"leitvia/related-posts","query":{}} --><!-- /wp:query -->' )[0] );
+		$context = static fn(): array => Leitvia\related_query_context( array( 'query' => array() ), array(), $query )['query']['taxQuery'] ?? array();
+		$this->assertEqualsCanonicalizing( array( 'category' => array( $alpha, $beta ) ), $context() );
+		foreach ( array(
+			'primary' => array( 'category' => array( $beta ) ),
+			'tags'    => array( 'post_tag' => array( $tag ) ),
+		) as $by => $expected ) {
+			$set = static fn( array $details ): array => array( 'related_by' => $by ) + $details;
+			add_filter( 'leitvia_post_details', $set );
+			$this->assertSame( $expected, $context(), $by );
+			remove_filter( 'leitvia_post_details', $set );
+		}
+	}
+
+	/**
 	 * The lead only shows an excerpt the author wrote, not the one WordPress makes from the text.
 	 */
 	public function test_lead_needs_an_own_excerpt(): void {

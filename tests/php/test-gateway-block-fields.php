@@ -7,6 +7,7 @@
  */
 
 use LeitviaStudio\Blocks\Catalog;
+use LeitviaStudio\Gateway\Block_Edit;
 use LeitviaStudio\Gateway\Gateway;
 use LeitviaStudio\Gateway\Hashes;
 use LeitviaStudio\Gateway\Packages;
@@ -1158,6 +1159,53 @@ trailer
 	}
 
 	/**
+	 * The filters taxQuery in both formats of core, replaced as a whole; keys of add-ons only with the filter
+	 * leitvia_studio_query_attribute_keys and as its schema says; the catalog names both.
+	 */
+	public function test_update_block_query_terms_and_addon_keys(): void {
+		$inner = '<div class="wp-block-query"><!-- wp:post-template --><!-- wp:post-title /--><!-- /wp:post-template --></div>';
+		$page  = self::page( '<!-- wp:query {"queryId":3,"query":{"perPage":3,"postType":"post","inherit":false,"taxQuery":{"post_tag":[9]}}} -->' . $inner . '<!-- /wp:query -->' );
+
+		$content = self::edit( $page, array( 'attributes' => array( 'query' => array( 'taxQuery' => array( 'category' => array( 12 ) ) ) ) ) );
+		$this->assertIsString( $content, is_wp_error( $content ) ? $content->get_error_message() : '' );
+		$query = parse_blocks( $content )[0]['attrs']['query'];
+		$this->assertSame( array( 'category' => array( 12 ) ), $query['taxQuery'] );
+		$this->assertSame( 3, $query['perPage'] );
+
+		$new     = array(
+			'include' => array( 'category' => array( 12 ) ),
+			'exclude' => array( 'post_tag' => array( 34 ) ),
+		);
+		$content = self::edit( $page, array( 'attributes' => array( 'query' => array( 'taxQuery' => $new ) ) ) );
+		$this->assertIsString( $content, is_wp_error( $content ) ? $content->get_error_message() : '' );
+		$this->assertSame( $new, parse_blocks( $content )[0]['attrs']['query']['taxQuery'] );
+
+		$this->assert_rejected( 'leitvia_invalid_input', self::edit( $page, array( 'attributes' => array( 'query' => array( 'taxQuery' => array( 'category' => array( 'news' ) ) ) ) ) ) );
+		$this->assert_rejected( 'leitvia_invalid_input', self::edit( $page, array( 'attributes' => array( 'query' => array( 'taxQuery' => array( 'include' => array( 'category' => array( 0 ) ) ) ) ) ) ) );
+		$this->assert_rejected( 'leitvia_invalid_input', self::edit( $page, array( 'attributes' => array( 'query' => array( 'myAddonList' => 'a' ) ) ) ) );
+
+		$keys = static fn( array $keys ): array => $keys + array(
+			'myAddonList' => array(
+				'type' => 'string',
+				'enum' => array( 'a', 'b' ),
+			),
+			'perPage'     => array( 'type' => 'string' ),
+		);
+		add_filter( 'leitvia_studio_query_attribute_keys', $keys );
+		try {
+			$content = self::edit( $page, array( 'attributes' => array( 'query' => array( 'myAddonList' => 'b' ) ) ) );
+			$this->assertIsString( $content, is_wp_error( $content ) ? $content->get_error_message() : '' );
+			$this->assertSame( 'b', parse_blocks( $content )[0]['attrs']['query']['myAddonList'] );
+			$this->assert_rejected( 'leitvia_invalid_input', self::edit( $page, array( 'attributes' => array( 'query' => array( 'myAddonList' => 'c' ) ) ) ) );
+			$this->assert_rejected( 'leitvia_invalid_input', self::edit( $page, array( 'attributes' => array( 'query' => array( 'perPage' => 'six' ) ) ) ), 'an add-on cannot replace a key of core' );
+			$this->assertArrayHasKey( 'myAddonList', Block_Edit::core_attributes( 'core/query' )['query']['properties'] );
+		} finally {
+			remove_filter( 'leitvia_studio_query_attribute_keys', $keys );
+		}
+		$this->assertArrayHasKey( 'taxQuery', array_column( Catalog::get(), null, 'name' )['core/query']['attributes']['properties']['query']['properties'] );
+	}
+
+	/**
 	 * Status of update-content at suggest waits in a package like any change; applied by a person the draft is public
 	 * with today's date. Future needs a future date.
 	 */
@@ -1449,5 +1497,30 @@ trailer
 		$this->assertIsString( $content, is_wp_error( $content ) ? $content->get_error_message() : '' );
 		$this->assertStringNotContainsString( 'object-position', $content );
 		$this->assertArrayNotHasKey( 'focalPoint', parse_blocks( $content )[0]['attrs'] );
+	}
+
+	/**
+	 * An empty url ("") without link_text takes the one link out of a heading and keeps its words, such as the head of a mega menu
+	 * column without a page; a new text without the old words still needs link_text, two links stay refused.
+	 */
+	public function test_empty_url_removes_the_link_of_a_text(): void {
+		$head    = '<!-- wp:heading {"fontSize":"meta"} -->' . "\n" . '<h2 class="wp-block-heading has-meta-font-size"><a href="/services/">Services</a></h2>' . "\n" . '<!-- /wp:heading -->';
+		$content = Block_Edit::apply( $head, 'p:0', array( 'url' => '' ) );
+		$this->assertIsString( $content, is_wp_error( $content ) ? $content->get_error_message() : '' );
+		$this->assertStringContainsString( '<h2 class="wp-block-heading has-meta-font-size">Services</h2>', $content );
+		$content = Block_Edit::apply(
+			$head,
+			'p:0',
+			array(
+				'text' => 'Exhibitions',
+				'url'  => '',
+			)
+		);
+		$this->assertIsString( $content );
+		$this->assertStringContainsString( '>Exhibitions</h2>', $content );
+		$this->assertStringNotContainsString( '<a', $content );
+		$this->assert_rejected( 'leitvia_invalid_input', Block_Edit::apply( $head, 'p:0', array( 'text' => 'Exhibitions' ) ) );
+		$two = '<!-- wp:paragraph -->' . "\n" . '<p><a href="/a/">A</a> and <a href="/b/">B</a></p>' . "\n" . '<!-- /wp:paragraph -->';
+		$this->assertWPError( Block_Edit::apply( $two, 'p:0', array( 'url' => '' ) ) );
 	}
 }

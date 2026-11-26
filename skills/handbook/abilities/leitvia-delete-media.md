@@ -1,6 +1,6 @@
 # leitvia/delete-media
 
-Generated from Leitvia Studio 1.3.61. Do not edit. Group: Maintain. How to call abilities, hashes, autonomy and rejections: [agent handbook](../README.md).
+Generated from Leitvia Studio 1.3.62. Do not edit. Group: Maintain. How to call abilities, hashes, autonomy and rejections: [agent handbook](../README.md).
 
 **Delete media.** Deletes a file of the media library for good, with all its sizes; there is no way back. First it looks where the file is used: in blocks and links of content, templates, patterns and navigation, as featured image, as site logo or site icon. While published content or the site uses it, the call is refused with leitvia_media_in_use and the places in data.usage: replace the image there with leitvia/update-block, or send force to delete it anyway, and those places show no image. Places in drafts come as notice and report.usage. Removing content is the decision of a person: the change always waits in a change package, and applying it needs the right to delete the file. base_hash is the hash of the attachment from leitvia/get-page-outline with its ID as post.
 

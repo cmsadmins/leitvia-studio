@@ -196,6 +196,54 @@ final class Block_Edit {
 	);
 
 	/**
+	 * Schema of CORE_ATTRIBUTES of a block, null for a block without. The query of core/query also takes taxQuery as
+	 * core saves it, term IDs by taxonomy ({"category":[12]}) or under include and exclude, and the keys add-ons read
+	 * from it (filter leitvia_studio_query_attribute_keys); the keys of core stay as they are.
+	 *
+	 * @param string $name Block name.
+	 * @return array<string, mixed>|null
+	 */
+	public static function core_attributes( string $name ): ?array {
+		$core = self::CORE_ATTRIBUTES[ $name ] ?? null;
+		if ( 'core/query' !== $name || ! isset( $core['query']['properties'] ) ) {
+			return $core;
+		}
+		$ids   = array(
+			'type'     => 'array',
+			'items'    => array(
+				'type'    => 'integer',
+				'minimum' => 1,
+			),
+			'maxItems' => 100,
+		);
+		$terms = array(
+			'type'                 => 'object',
+			'additionalProperties' => $ids,
+		);
+		/**
+		 * Filters the keys an add-on reads from the query attribute of core/query, as JSON schema by key, so
+		 * leitvia/update-block and the edits of compose-page and insert-pattern take them; the keys of core and taxQuery
+		 * cannot be replaced. For example $keys['myAddonList'] = array( 'type' => 'string', 'enum' => array( 'a', 'b' ) ).
+		 *
+		 * @param array<string, array<string, mixed>> $keys JSON schema by key.
+		 */
+		$extra = array_filter( (array) apply_filters( 'leitvia_studio_query_attribute_keys', array() ), 'is_array' );
+
+		$core['query']['properties'] += array(
+			'taxQuery' => array(
+				'type'                 => 'object',
+				'description'          => __( 'Term IDs by taxonomy, such as {"category":[12]}, or under include and exclude, such as {"include":{"category":[12]},"exclude":{"post_tag":[34]}}; {} for none. leitvia/list-content with terms_of lists the IDs.', 'leitvia-studio' ),
+				'properties'           => array(
+					'include' => $terms,
+					'exclude' => $terms, // phpcs:ignore WordPressVIPMinimum.Performance.WPQueryParams.PostNotIn_exclude -- JSON schema of taxQuery, no query.
+				),
+				'additionalProperties' => $ids,
+			),
+		) + $extra;
+		return $core;
+	}
+
+	/**
 	 * Core media blocks whose layout attributes may change, see media(): align and a block style (className) on all of
 	 * them, size, crop, link and lightbox on an image as well. Video, audio and embed change their other attributes
 	 * as before (tracks of a video, the catalog entry of an embed), see PLAYER_BLOCKS.
@@ -1554,7 +1602,8 @@ final class Block_Edit {
 
 	/**
 	 * New content of a text element: the escaped text, with its one link around the linked part; the opening tag of the
-	 * link stays as it was, only href changes with url. Plain text may replace a sample link without an address or to "#".
+	 * link stays as it was, only href changes with url; url "" without link_text removes the link. Plain text may replace
+	 * a sample link without an address or to "#".
 	 *
 	 * @param string               $inner   Old content of the element.
 	 * @param array<string, mixed> $change  text, link_text and url.
@@ -1578,6 +1627,11 @@ final class Block_Edit {
 			}
 		}
 		$text = isset( $change['text'] ) ? (string) preg_replace( array( '#\r\n?#', '#[ \t]*<br\s*/?>[ \t]*#i' ), "\n", (string) $change['text'] ) : $plain( $inner );
+		// url "" without link_text takes the one link out and keeps its words as plain text, such as the head of a mega
+		// menu column that names a topic without a page of its own.
+		if ( $links < 2 && isset( $change['url'] ) && '' === trim( (string) $change['url'] ) && ! isset( $change['link_text'] ) ) {
+			return $esc( $text );
+		}
 		if ( 0 === $links ) {
 			if ( ! isset( $change['url'] ) ) {
 				return $esc( $text );
@@ -1690,14 +1744,14 @@ final class Block_Edit {
 			}
 		}
 		// Presets of a support with a class on the element of the block, see preset().
-		foreach ( array_intersect_key( self::presets( $block ), $attrs ) as $key => $allowed ) {
+		foreach ( array_intersect_key( self::presets( $block, self::in_header( $target ) ), $attrs ) as $key => $allowed ) {
 			$block = self::preset( $block, $key, $attrs[ $key ], $allowed, $target, $rebuild );
 			$attrs = array_diff_key( $attrs, array( $key => true ) );
 			if ( is_wp_error( $block ) || ! $attrs ) {
 				return $block;
 			}
 		}
-		$core  = self::CORE_ATTRIBUTES[ $name ] ?? null;
+		$core  = self::core_attributes( $name );
 		$entry = $core ? array( 'attributes' => array( 'properties' => $core ) ) : array_column( \LeitviaStudio\Blocks\Catalog::get(), null, 'name' )[ $name ] ?? null;
 		if ( ! $entry ) {
 			return self::invalid( 'attributes', __( 'This block is not in the block catalog; its attributes cannot be set.', 'leitvia-studio' ), $target, 'leitvia/list-blocks' );
@@ -2496,15 +2550,18 @@ final class Block_Edit {
 	 * Presets a block takes as attribute, with the values allowed: fontSize with the font sizes of the theme and
 	 * textColor with the text roles of TEXT_COLORS on a heading or paragraph, fontSize on a quote, backgroundColor surface or surface-alt on a
 	 * group whose ground is light already. A dark or accent ground carries text colors of its own; such a band comes
-	 * from the block style Inverse or from another pattern. A block of Studio or an add-on whose supports name
+	 * from the block style Inverse or from another pattern. A group of a header template part takes ink as well (a
+	 * dark header or a dark navigation bar): the theme gives it the text color surface and its menu links the pair of
+	 * the band, and the contract checks surface, stroke, focus and band-accent on ink. A block of Studio or an add-on whose supports name
 	 * color.text, typography.fontSize or typography.__experimentalFontFamily, such as leitvia/icon, leitvia/icon-list and
 	 * leitvia/marquee, takes textColor with the color roles of the contract, fontSize with the font sizes and fontFamily
 	 * with the font roles.
 	 *
-	 * @param array<string, mixed> $block Parsed block.
+	 * @param array<string, mixed> $block  Parsed block.
+	 * @param bool                 $header Whether the block is in a header template part, see in_header().
 	 * @return array<string, list<string>>
 	 */
-	public static function presets( array $block ): array {
+	public static function presets( array $block, bool $header = false ): array {
 		$name  = (string) $block['blockName'];
 		$sizes = static function (): array {
 			$sizes = (array) wp_get_global_settings( array( 'typography', 'fontSizes' ) );
@@ -2543,12 +2600,32 @@ final class Block_Edit {
 		}
 		// The extra surfaces of the token set are light grounds too: ink passes on each by the rules of the set, and links
 		// on a weak one turn ink when the block renders (Tokens\Compiler::ink_links()).
-		$light = array_merge( array( 'surface', 'surface-alt' ), self::extra_surfaces() );
+		$light = array_merge( array( 'surface', 'surface-alt' ), self::extra_surfaces(), $header ? array( 'ink' ) : array() );
 		$color = (array) ( $block['attrs']['style']['color'] ?? array() );
 		if ( 'core/group' === $name && in_array( $block['attrs']['backgroundColor'] ?? 'surface', $light, true ) && ! isset( $block['attrs']['gradient'] ) && ! isset( $color['background'] ) && ! isset( $color['gradient'] ) ) {
 			return array( 'backgroundColor' => $light );
 		}
 		return array();
+	}
+
+	/**
+	 * Whether the target of an edit is a template part of the area header: by name (update-template-part, part) or as
+	 * the saved part (update-block, post).
+	 *
+	 * @param array<string, mixed> $target Target.
+	 */
+	public static function in_header( array $target ): bool {
+		$post = (int) ( $target['post'] ?? 0 );
+		if ( $post && 'wp_template_part' === get_post_type( $post ) ) {
+			$area = wp_get_post_terms( $post, 'wp_template_part_area', array( 'fields' => 'slugs' ) );
+			return is_array( $area ) && in_array( 'header', $area, true );
+		}
+		$part = (string) ( $target['part'] ?? '' );
+		if ( '' === $part ) {
+			return false;
+		}
+		$template = get_block_template( get_stylesheet() . '//' . $part, 'wp_template_part' );
+		return $template ? 'header' === $template->area : str_starts_with( $part, 'header' );
 	}
 
 	/**

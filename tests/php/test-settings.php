@@ -120,7 +120,7 @@ class Test_Settings extends WP_UnitTestCase {
 	public function test_schema_of_lists_and_organization(): void {
 		$properties = get_registered_settings()['leitvia_studio_settings']['show_in_rest']['schema']['properties'];
 		$this->assertSame(
-			array( 'organization_contact_type', 'consent_providers', 'organization_type', 'organization_founding_date', 'organization_founder', 'organization_copyright_since', 'organization_copyright_holder', 'organization_area_served', 'organization_opening_hours', 'organization_same_as', 'organization_people', 'organization_rating_value', 'organization_rating_count', 'organization_rating_source', 'organization_rating_confirmed', 'ai_crawlers', 'llms_txt', 'llms_summary', 'llms_pages', 'redirects', 'organization_description', 'organization_logo', 'robots_disallow', 'llms_news' ),
+			array( 'organization_contact_type', 'consent_providers', 'organization_type', 'organization_founding_date', 'organization_founder', 'organization_copyright_since', 'organization_copyright_holder', 'organization_area_served', 'organization_opening_hours', 'organization_same_as', 'organization_people', 'organization_rating_value', 'organization_rating_count', 'organization_rating_source', 'organization_rating_confirmed', 'ai_crawlers', 'llms_txt', 'llms_summary', 'llms_pages', 'redirects', 'organization_description', 'organization_logo', 'robots_disallow', 'llms_news', 'page_tags' ),
 			array_keys( array_slice( $properties, 20 ) )
 		);
 		$this->assertSame( 'array', $properties['consent_providers']['type'] );
@@ -203,6 +203,8 @@ class Test_Settings extends WP_UnitTestCase {
 		$this->assertFalse( has_action( 'wp_head', 'print_emoji_detection_script' ) );
 		$this->assertFalse( has_action( 'admin_print_scripts', 'print_emoji_detection_script' ) );
 		$this->assertFalse( has_filter( 'wp_mail', 'wp_staticize_emoji_for_email' ) );
+		// A fresh request: styles an earlier test enqueued (block-style-variation-styles without global-styles) would warn.
+		$GLOBALS['wp_styles'] = null; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- A fresh request.
 		ob_start();
 		wp_head();
 		$this->assertStringNotContainsString( 'wpemojiSettings', (string) ob_get_clean() );
@@ -270,6 +272,7 @@ class Test_Settings extends WP_UnitTestCase {
 				'organization_logo'             => 0,
 				'robots_disallow'               => array(),
 				'llms_news'                     => 0,
+				'page_tags'                     => false,
 			),
 			get_option( 'leitvia_studio_settings' )
 		);
@@ -389,6 +392,7 @@ class Test_Settings extends WP_UnitTestCase {
 				'organization_logo'             => 0,
 				'robots_disallow'               => array(),
 				'llms_news'                     => 0,
+				'page_tags'                     => false,
 			),
 			$response->get_data()['leitvia_studio_settings']
 		);
@@ -442,11 +446,38 @@ class Test_Settings extends WP_UnitTestCase {
 				'organization_logo'             => 0,
 				'robots_disallow'               => array(),
 				'llms_news'                     => 0,
+				'page_tags'                     => false,
 			),
 			rest_do_request( $request )->get_data()['leitvia_studio_settings']
 		);
 
 		$request->set_body_params( array( 'leitvia_studio_settings' => array( 'unknown' => true ) ) );
 		$this->assertSame( 400, rest_do_request( $request )->get_status() );
+	}
+
+	/**
+	 * Tags for pages: off by default; with page_tags on, pages take tags and the tag archive lists the post and the page
+	 * with the tag, while a query for one post type keeps it.
+	 */
+	public function test_page_tags(): void {
+		\LeitviaStudio\Admin\Settings::register_page_tags();
+		$this->assertNotContains( 'post_tag', get_object_taxonomies( 'page' ), 'off by default' );
+
+		update_option( 'leitvia_studio_settings', array( 'page_tags' => true ) );
+		\LeitviaStudio\Admin\Settings::register_page_tags();
+		$this->assertContains( 'post_tag', get_object_taxonomies( 'page' ) );
+
+		$tag  = self::factory()->tag->create( array( 'slug' => 'printing' ) );
+		$post = self::factory()->post->create();
+		$page = self::factory()->post->create( array( 'post_type' => 'page' ) );
+		wp_set_post_terms( $post, array( $tag ), 'post_tag' );
+		wp_set_post_terms( $page, array( $tag ), 'post_tag' );
+		$this->go_to( get_tag_link( $tag ) );
+		$this->assertTrue( is_tag() );
+		$this->assertEqualsCanonicalizing( array( $post, $page ), wp_list_pluck( $GLOBALS['wp_query']->posts, 'ID' ) );
+
+		$this->go_to( add_query_arg( 'post_type', 'page', get_tag_link( $tag ) ) );
+		$this->assertSame( array( $page ), wp_list_pluck( $GLOBALS['wp_query']->posts, 'ID' ), 'a set post type stays' );
+		unregister_taxonomy_for_object_type( 'post_tag', 'page' );
 	}
 }

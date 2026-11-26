@@ -192,7 +192,7 @@ final class Content {
 		Abilities::read(
 			'leitvia/list-content',
 			__( 'List content', 'leitvia-studio' ),
-			__( 'Lists posts, pages and entries of the content model, newest first, with hash, terms and the open package that waits for each. Per item: ID, type, status, title, slug, date, modified, author (ID) and author_name as visitors see it, excerpt, terms, fields, rows of repeaters, link, hash and package. Filter by type, status, search text, modified since and published after a date. Only content agents may read; no comments, users or form entries.', 'leitvia-studio' ),
+			__( 'Lists posts, pages and entries of the content model, newest first, with hash, terms and the open package that waits for each. Per item: ID, type, status, title, slug, date, modified, author (ID) and author_name as visitors see it, excerpt, terms, fields, rows of repeaters, link, hash and package. Filter by type, status, search text, modified since and published after a date. terms_of adds the terms of one taxonomy with their IDs (term_list), such as the categories for taxQuery of a query loop. Only content agents may read; no comments, users or form entries.', 'leitvia-studio' ),
 			array(
 				'type'                 => 'object',
 				'properties'           => array(
@@ -209,10 +209,43 @@ final class Content {
 					'after'     => $date + array( 'description' => __( 'Only content dated after this date.', 'leitvia-studio' ) ),
 					'limit'     => $limit,
 					'page'      => $page,
+					'terms_of'  => array(
+						'type'        => 'string',
+						'pattern'     => '^[a-z0-9_-]+$',
+						'description' => __( 'A taxonomy of the listed content types, such as category or post_tag: term_list then names all its terms with id, slug, name, count of posts, parent, description and hash, for taxQuery of a query loop, terms of a post or leitvia/update-term. Combine with limit 1 when only the terms count.', 'leitvia-studio' ),
+					),
 				),
 				'additionalProperties' => false,
 			),
-			$list,
+			array_replace_recursive(
+				$list,
+				array(
+					'properties' => array(
+						'term_list' => array(
+							'type'        => 'array',
+							'description' => __( 'Terms of terms_of by name, up to 500; only with terms_of.', 'leitvia-studio' ),
+							'items'       => array(
+								'type'       => 'object',
+								'properties' => array(
+									'id'          => array( 'type' => 'integer' ),
+									'slug'        => array( 'type' => 'string' ),
+									'name'        => array( 'type' => 'string' ),
+									'count'       => array( 'type' => 'integer' ),
+									'parent'      => array( 'type' => 'integer' ),
+									'description' => array(
+										'type'        => 'string',
+										'description' => __( 'Description of the term, the intro of its archive, as HTML.', 'leitvia-studio' ),
+									),
+									'hash'        => array(
+										'type'        => 'string',
+										'description' => __( 'base_hash of leitvia/update-term for this term.', 'leitvia-studio' ),
+									),
+								),
+							),
+						),
+					),
+				)
+			),
 			static fn( $input ) => self::list( is_array( $input ) ? $input : array() )
 		);
 		Abilities::read(
@@ -414,6 +447,26 @@ final class Content {
 	public static function types(): array {
 		$model = array_filter( Registrar::post_types(), static fn( string $type ): bool => ! Registrar::is_repeater( $type ) );
 		return array_values( array_intersect( array_merge( array( 'post', 'page' ), $model ), Scope::post_types() ) );
+	}
+
+	/**
+	 * Meta keys of add-ons in the state of a post of a content type, see the filter leitvia_studio_post_meta. Hashes
+	 * leaves them out while they are empty, so the hash of every other post stays as it was.
+	 *
+	 * @param string $type Post type.
+	 * @return list<string>
+	 */
+	public static function addon_meta( string $type ): array {
+		/**
+		 * Filters the post meta keys of add-ons that belong to the state of a post, by post type, so writes through the
+		 * pipeline set them, change packages and rollbacks restore them and hashes cover them. Only post types agents
+		 * may edit (post, page and the types of the content model) take them. For example the dates of an add-on on
+		 * posts: $keys['post'][] = '_my_addon_date'.
+		 *
+		 * @param array<string, list<string>> $keys Meta keys by post type.
+		 */
+		$keys = (array) apply_filters( 'leitvia_studio_post_meta', array() );
+		return array_values( array_filter( array_map( 'strval', (array) ( $keys[ $type ] ?? array() ) ) ) );
 	}
 
 	/**
@@ -660,6 +713,9 @@ final class Content {
 		}
 		foreach ( array_merge( array_keys( self::fields( $type ) ), Seo::keys(), 'page' === $type ? self::PAGE_META : array() ) as $key ) {
 			$state['meta_input'][ $key ] = get_post_meta( $id, $key, true );
+		}
+		foreach ( self::addon_meta( $type ) as $key ) {
+			$state['meta_input'][ $key ] ??= get_post_meta( $id, $key, true );
 		}
 		if ( 'page' === $type ) {
 			// The offerings of an add-on a page names (set-page-structure offerings); Hashes leaves them out while they
@@ -1169,6 +1225,12 @@ final class Content {
 		if ( ! $types ) {
 			return Block_Edit::invalid( 'post_type', __( 'Use post, page or a post type of the content model that agents may read.', 'leitvia-studio' ), array(), 'leitvia/get-content-model' );
 		}
+		$terms_of = (string) ( $input['terms_of'] ?? '' );
+		$allowed  = array_unique( array_merge( ...array_map( array( self::class, 'taxonomies' ), $types ) ) );
+		if ( '' !== $terms_of && ! in_array( $terms_of, $allowed, true ) ) {
+			/* translators: %s: taxonomies, separated by commas. */
+			return Block_Edit::invalid( 'terms_of', sprintf( __( 'terms_of is a taxonomy of the listed content types: %s.', 'leitvia-studio' ), implode( ', ', $allowed ) ), array(), 'leitvia/get-content-model' );
+		}
 		$status = (string) ( $input['status'] ?? 'any' );
 		$args   = array(
 			'post_type'   => array_values( $types ),
@@ -1223,6 +1285,37 @@ final class Content {
 			'items' => $items,
 			'total' => $query['total'],
 			'pages' => $query['pages'],
+		) + ( '' === $terms_of ? array() : array( 'term_list' => self::term_list( $terms_of ) ) );
+	}
+
+	/**
+	 * Terms of a taxonomy for list-content (terms_of), by name, empty ones included, up to 500, each with its description
+	 * and the hash leitvia/update-term takes as base_hash.
+	 *
+	 * @param string $taxonomy Taxonomy.
+	 * @return list<array{id: int, slug: string, name: string, count: int, parent: int, description: string, hash: string}>
+	 */
+	private static function term_list( string $taxonomy ): array {
+		$terms = get_terms(
+			array(
+				'taxonomy'   => $taxonomy,
+				'hide_empty' => false,
+				'orderby'    => 'name',
+				'number'     => 500,
+			)
+		);
+		return array_map(
+			static fn( \WP_Term $term ): array => array(
+				'id'          => $term->term_id,
+				'slug'        => $term->slug,
+				// Plain names: core stores term names with entities (&amp;).
+				'name'        => html_entity_decode( $term->name, ENT_QUOTES | ENT_HTML5, 'UTF-8' ),
+				'count'       => $term->count,
+				'parent'      => $term->parent,
+				'description' => $term->description,
+				'hash'        => Hashes::term( $term->term_id ),
+			),
+			is_array( $terms ) ? array_values( $terms ) : array()
 		);
 	}
 

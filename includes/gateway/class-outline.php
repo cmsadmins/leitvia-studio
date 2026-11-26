@@ -212,7 +212,16 @@ final class Outline {
 	 */
 	public static function plain( string $html, bool $shortcodes = true ): string {
 		$html = $shortcodes && str_contains( $html, '[' ) ? do_shortcode( $html ) : $html;
-		return self::one_line( html_entity_decode( wp_strip_all_tags( $html ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
+		return self::one_line( self::decoded( $html ) );
+	}
+
+	/**
+	 * Text of markup without tags and entities, trimmed; unlike plain() it keeps line breaks and runs of spaces inside.
+	 *
+	 * @param string $html Markup.
+	 */
+	public static function decoded( string $html ): string {
+		return trim( html_entity_decode( wp_strip_all_tags( $html ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
 	}
 
 	/**

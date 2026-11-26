@@ -1,6 +1,6 @@
 # leitvia/set-llms
 
-Generated from Leitvia Studio 1.3.61. Do not edit. Group: Set up. How to call abilities, hashes, autonomy and rejections: [agent handbook](../README.md).
+Generated from Leitvia Studio 1.3.62. Do not edit. Group: Set up. How to call abilities, hashes, autonomy and rejections: [agent handbook](../README.md).
 
 **Set llms.txt and AI crawlers.** Sets llms.txt, the file at the root of the site that tells AI assistants what the site is about, and whether robots.txt lets AI crawlers in. llms.txt is built on each request: the site name, summary (at most 500 characters, empty for the tagline), the pages with the page frame hub, the pages with a service and price (leitvia/set-page-structure), the extra pages of pages (IDs, published) and, with news above 0, that many latest posts with title and excerpt (at most 50, 0 by default). enabled switches the file off and on, ai_crawlers false disallows the crawlers of AI search and assistants in robots.txt (default true, they may crawl as every other crawler). disallow closes paths of the site to every crawler in robots.txt, such as /downloads/ (each with a leading slash, no spaces or line breaks, at most 20; the list replaces the saved one, an empty list removes all). Without an SEO plugin and only on a site open to search engines: otherwise the setting is saved and notice says what holds the file back, get-seo shows llms.requested, llms.enabled and llms.held_back. Only the fields you send change. base_hash is empty. Like every setting it waits in a change package for a person.
 

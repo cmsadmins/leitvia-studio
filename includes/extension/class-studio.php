@@ -113,13 +113,6 @@ final class Studio {
 	}
 
 	/**
-	 * Whether leitvia_studio_init is running, the only time add-ons and entries can register.
-	 */
-	public function is_initializing(): bool {
-		return $this->initializing;
-	}
-
-	/**
 	 * Lets add-ons register; Studio itself is always in the add-on list. Runs on init, priority 5.
 	 */
 	public function initialize(): void {

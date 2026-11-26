@@ -15,15 +15,13 @@ You read a site and tell its owner, in their words, how it stands and what to do
 
 ## Inputs required
 
-- Access as the agent user: [handbook, Access over MCP and REST](../../handbook/README.md#access-over-mcp-and-rest); the scope `leitvia:read` is enough.
+- Access with the scope `leitvia:read` is enough.
 - Reader, purpose and format of the report (step 1).
 - Read before the first call: the [agent handbook](../../handbook/README.md). Read the page of each ability before you first call it (the handbook index links them): `audit-site`, `get-site-health`, `list-content`, `get-seo`, `get-tokens`, `list-packages`, for an export `export`. Layout, severity and wording: [report format](references/format.md).
 
 ## Ground rules
 
-- Follow the [rules for every task](../../handbook/README.md#rules-for-every-task).
 - **Read only.** This skill calls no write ability and sends no `package` key.
-- **Facts are never guessed.** Organization data, prices, legal texts, figures, quotes and people come only from a source you can name: the person, a page of the site or a read ability, with the source in your report. Without one, stop at a checkpoint; never write a placeholder that looks like a fact.
 - **Every figure has a source:** the ability or public URL and the date you read it. A count you did not finish (paging stopped, a rejection) is marked as partial.
 - **No verdicts the data cannot carry.** Automated checks never make a site accessible, secure or legally compliant; say what was checked and what was not.
 - **No personal data in the report** beyond what the person gave you: no user names, emails or comments. Plugin and theme names are fine.
@@ -63,8 +61,6 @@ For a handover or a copy of the content, call `leitvia/export`: pages (block mar
 
 ## Failure modes / debugging
 
-Every code with its retry rule: [rejections](../../handbook/rejections.md).
-
 - `leitvia_forbidden` from `leitvia/get-site-health`: the agent user may not read versions; note it as missing.
 - `leitvia_rate_limited`, or over OAuth HTTP 429 with `Retry-After` (120 reads per minute and tool): wait that long and read again.
 - `leitvia_no_contract`: the active theme is not Leitvia, or its contract is broken; say so in the report.
@@ -80,15 +76,11 @@ Stop and ask the person at these checkpoints, then continue with the answer:
 - **Reader:** who reads the report and what for, when the request does not say it.
 - **Format:** chat, a Markdown file or another format the person needs.
 - **Scope:** a site with more than 200 published pages: all, or the most important ones.
-- **Second rejection** of the same call, or a rejection with `retry: never`.
 
 ## Unattended
-
-When no person answers (a scheduled or hosted run), do not wait at a checkpoint. This skill writes nothing: never apply, roll back or publish anything. Take facts only from a source you name in the report; without one the fact stays out and becomes an open question. A second rejection, or `retry: never`, stops that part. End with the report and the open questions. Each checkpoint gets this answer:
 
 | Checkpoint | Answer without a person |
 |---|---|
 | Reader | The owner, without technical knowledge. |
 | Format | Markdown, in the language of the briefing. |
 | Scope | All published pages; mark counts as partial when paging stops early. |
-| Second rejection | Leave that source out and name it as missing. |

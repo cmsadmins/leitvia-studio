@@ -364,7 +364,7 @@ final class Table_Of_Contents {
 		if ( ! $tags->next_tag() || null !== $tags->get_attribute( 'id' ) ) {
 			return $content;
 		}
-		$text = self::text( (string) ( $block['innerHTML'] ?? '' ) );
+		$text = Outline::plain( (string) ( $block['innerHTML'] ?? '' ) );
 		$seen = self::$handed[ $text ] ?? 0;
 		$part = self::rendered_part( self::pages( $post ) );
 		foreach ( self::entries( $post->ID, $levels ?? self::post_levels( $post ) ) as $entry ) {
@@ -452,7 +452,7 @@ final class Table_Of_Contents {
 				$id         = $tags->next_tag() ? (string) $tags->get_attribute( 'id' ) : '';
 				$headings[] = array(
 					'level' => (int) ( $attrs['level'] ?? 2 ),
-					'text'  => self::text( $html ),
+					'text'  => Outline::plain( $html ),
 					'id'    => $id,
 					'part'  => $part,
 				);
@@ -469,17 +469,6 @@ final class Table_Of_Contents {
 			}
 			self::collect( $inner, $headings, $seen, $part );
 		}
-	}
-
-	/**
-	 * Plain text of a heading's saved HTML, its shortcodes resolved as the page shows them (such as [leitvia_price]), so
-	 * the list and the generated id never carry the raw shortcode. Non-breaking spaces of the heading stay, so "ab 14,90 €"
-	 * does not break in a narrow list either.
-	 *
-	 * @param string $html Heading HTML.
-	 */
-	private static function text( string $html ): string {
-		return Outline::plain( $html );
 	}
 
 	/**

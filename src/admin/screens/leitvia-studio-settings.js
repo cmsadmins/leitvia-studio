@@ -713,6 +713,16 @@ const FIELDS = [
 		Edit: 'toggle',
 	},
 	{
+		id: 'page_tags',
+		label: __( 'Tags for pages', 'leitvia-studio' ),
+		description: __(
+			'Off by default. When on, pages take tags as posts do, and a tag archive lists the posts and pages with that tag.',
+			'leitvia-studio'
+		),
+		type: 'boolean',
+		Edit: 'toggle',
+	},
+	{
 		id: 'editorial_page',
 		label: __( 'Page with your editorial guidelines', 'leitvia-studio' ),
 		description: __(
@@ -969,6 +979,7 @@ function DesignAndSearch( { form } ) {
 				'news_sitemap',
 				'title_site_name',
 				'editorial_page',
+				'page_tags',
 			] ) }
 			<More>
 				<Background

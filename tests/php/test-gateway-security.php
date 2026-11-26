@@ -428,6 +428,15 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 			'leitvia/set-organization'      => static fn(): array => array( 'city' => 'Berlin' ),
 			'leitvia/set-site-identity'     => static fn(): array => array( 'tagline' => 'Made to measure' ),
 			'leitvia/set-motion'            => static fn(): array => array( 'motion' => 'bold' ),
+			'leitvia/set-post-details'      => static fn(): array => array( 'updated_label' => 'As of %s' ),
+			'leitvia/update-term'           => static function (): array {
+				$term = self::factory()->category->create();
+				return array(
+					'term'        => $term,
+					'description' => '<p>Everything about the topic.</p>',
+					'base_hash'   => LeitviaStudio\Gateway\Hashes::term( $term ),
+				);
+			},
 			'leitvia/set-seo-titles'        => static fn(): array => array( 'site_name' => false ),
 			'leitvia/set-redirects'         => static fn(): array => array(
 				'redirects' => array(
@@ -716,6 +725,7 @@ class Test_Gateway_Security extends WP_UnitTestCase {
 				'block' => 'aaaa1111',
 			),
 			'leitvia/get-pattern'       => array( 'slug' => 'leitvia/content-quote' ),
+			'leitvia/get-template'      => array( 'template' => 'single' ),
 			'leitvia/get-seo'           => array( 'posts' => array( $page ) ),
 			'leitvia/get-package'       => array( 'id' => $package ),
 			'leitvia/check-composition' => array( 'slugs' => array( 'leitvia/hero-cover-image', 'leitvia/content-quote' ) ),

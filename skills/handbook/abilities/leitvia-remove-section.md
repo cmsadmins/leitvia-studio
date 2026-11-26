@@ -1,6 +1,6 @@
 # leitvia/remove-section
 
-Generated from Leitvia Studio 1.3.61. Do not edit. Group: Maintain. How to call abilities, hashes, autonomy and rejections: [agent handbook](../README.md).
+Generated from Leitvia Studio 1.3.62. Do not edit. Group: Maintain. How to call abilities, hashes, autonomy and rejections: [agent handbook](../README.md).
 
 **Remove section.** Takes one top-level section out of the content of a post, page or entry; the rest of the content stays as it is. block is its block ID or path ID from the outline. The last section stays: a whole post goes with leitvia/trash-content. leitvia/rollback of the package brings the section back. Read the post with leitvia/get-page-outline first and send its hash as base_hash.
 

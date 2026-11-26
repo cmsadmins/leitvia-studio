@@ -42,6 +42,20 @@ final class Setup {
 	private const SHOP_TERM_TEMPLATES = array( 'taxonomy-product_cat', 'taxonomy-product_tag' );
 
 	/**
+	 * Option of set-post-details: the texts and choices of the single post that the theme Leitvia reads through the
+	 * filter leitvia_post_details, only the keys set (the others keep the default of the theme).
+	 */
+	public const POST_DETAILS_OPTION = 'leitvia_studio_post_details';
+
+	/**
+	 * Values of set-post-details with a list of choices, by key; the other keys are texts.
+	 */
+	public const POST_DETAILS_CHOICES = array(
+		'related_by'  => array( 'categories', 'primary', 'tags' ),
+		'image_ratio' => array( 'auto', '1', '4/3', '3/2', '16/9', '21/9' ),
+	);
+
+	/**
 	 * Settings of a core/navigation in a template part that update-template-part keeps, see keep_navigation().
 	 */
 	/**
@@ -156,7 +170,7 @@ final class Setup {
 			'leitvia/set-permalinks',
 			__( 'Set permalinks', 'leitvia-studio' ),
 			/* translators: %postname%, %post_id%, %year%, %monthnum% and %category% are permalink tags of WordPress, keep them as they are. */
-			__( 'Sets the permalink structure of posts and the bases of category and tag addresses, as in Settings, Permalinks, for a migration that keeps the addresses of the old site: structure such as /news/%postname%/ or /%postname%/ (needs %postname% or %post_id%), category_base and tag_base such as topic (empty for the default). Pages keep their addresses, posts take the structure. Only the fields you send change; the rewrite rules are rebuilt on the next request. base_hash is empty. Like every setting it waits in a change package for a person; notice warns when published posts change their address, which leitvia/set-redirects can lead from the old addresses.', 'leitvia-studio' ),
+			__( 'Sets the permalink structure of posts and the bases of category and tag addresses, as in Settings, Permalinks, for a migration that keeps the addresses of the old site: structure such as /news/%postname%/ or /%postname%/ (needs %postname% or %post_id%), category_base and tag_base such as topic (empty for the default). Pages keep their addresses, posts take the structure. page_tags true lets pages take tags too, and tag archives then list posts and pages. Only the fields you send change; the rewrite rules are rebuilt on the next request. base_hash is empty. Like every setting it waits in a change package for a person; notice warns when published posts change their address, which leitvia/set-redirects can lead from the old addresses.', 'leitvia-studio' ),
 			'setup',
 			$replace,
 			array(
@@ -179,6 +193,10 @@ final class Setup {
 						'maxLength'   => 100,
 						'pattern'     => '^[a-z0-9-]*$',
 						'description' => __( 'Base of tag addresses, empty for tag.', 'leitvia-studio' ),
+					),
+					'page_tags'     => array(
+						'type'        => 'boolean',
+						'description' => __( 'Whether pages take tags as posts do (Studio setting page_tags, off by default).', 'leitvia-studio' ),
 					),
 				),
 			) + $object,
@@ -481,6 +499,49 @@ final class Setup {
 				),
 			) + $object,
 			array( self::class, 'describe_set_llms' )
+		);
+		Abilities::write(
+			'leitvia/set-post-details',
+			__( 'Set post details', 'leitvia-studio' ),
+			/* translators: %s stays as it is, the place of the date in the label. */
+			__( 'Sets texts and choices of every single post in the theme Leitvia: the labels before the publish and update date in byline and sidebar, such as "As of %s" for the date of the last update, the heading of the related posts below the post, where they come from (categories: all categories of the post, primary: its primary category from Yoast SEO or Rank Math, else its first, tags: its tags) and the aspect ratio of the featured image above the text (auto keeps the ratio of each image). Only the fields you send change; "" brings back the default of the theme. leitvia/get-template with template single returns the values in effect as post_details. Blocks after the text or in the sidebar go into the template parts post-after-content and post-aside (leitvia/update-template-part). base_hash is empty. Like every setting it waits in a change package for a person.', 'leitvia-studio' ),
+			'setup',
+			$replace,
+			array(
+				'properties'    => array(
+					'published_label' => array(
+						'type'        => 'string',
+						'maxLength'   => 60,
+						'pattern'     => '^$|^[^%]*%s[^%]*$',
+						/* translators: %s stays as it is, the place of the date in the label. */
+						'description' => __( 'Label of the publish date with the placeholder of the date, such as Published %s; "" for the default.', 'leitvia-studio' ),
+					),
+					'updated_label'   => array(
+						'type'        => 'string',
+						'maxLength'   => 60,
+						'pattern'     => '^$|^[^%]*%s[^%]*$',
+						/* translators: %s stays as it is, the place of the date in the label. */
+						'description' => __( 'Label of the date of the last update with the placeholder of the date, such as As of %s; "" for the default.', 'leitvia-studio' ),
+					),
+					'related_heading' => array(
+						'type'        => 'string',
+						'maxLength'   => 80,
+						'description' => __( 'Heading of the related posts, such as More from this category; "" for the default.', 'leitvia-studio' ),
+					),
+					'related_by'      => array(
+						'type'        => 'string',
+						'enum'        => self::POST_DETAILS_CHOICES['related_by'],
+						'description' => __( 'Where the related posts come from: categories (the default), primary or tags.', 'leitvia-studio' ),
+					),
+					'image_ratio'     => array(
+						'type'        => 'string',
+						'enum'        => self::POST_DETAILS_CHOICES['image_ratio'],
+						'description' => __( 'Aspect ratio of the featured image above the text, 16/9 by default; auto keeps the ratio of each image.', 'leitvia-studio' ),
+					),
+				),
+				'minProperties' => 1,
+			) + $object,
+			array( self::class, 'describe_set_post_details' )
 		);
 		Abilities::write(
 			'leitvia/set-motion',
@@ -1108,6 +1169,42 @@ final class Setup {
 	}
 
 	/**
+	 * Operation of set-post-details: the fields sent over the saved ones in POST_DETAILS_OPTION, "" removes a field.
+	 *
+	 * @param array<string, mixed> $input Input.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public static function describe_set_post_details( array $input ) {
+		$fields = array_map( static fn( $value ): string => trim( (string) $value ), array_intersect_key( $input, array_flip( array( 'published_label', 'updated_label', 'related_heading', 'related_by', 'image_ratio' ) ) ) );
+		if ( ! $fields ) {
+			return Block_Edit::invalid( 'change', __( 'Name what to change: published_label, updated_label, related_heading, related_by or image_ratio.', 'leitvia-studio' ), array() );
+		}
+		foreach ( array( 'published_label', 'updated_label' ) as $key ) {
+			if ( '' !== ( $fields[ $key ] ?? '' ) && 1 !== substr_count( $fields[ $key ], '%s' ) ) {
+				/* translators: 1: field name, 2: the placeholder %s. */
+				return Block_Edit::invalid( $key, sprintf( __( '%1$s holds %2$s once, the place of the date.', 'leitvia-studio' ), $key, '%s' ), array() );
+			}
+		}
+		return array(
+			'area'      => 'structure',
+			'target'    => array( 'option' => self::POST_DETAILS_OPTION ),
+			'base_hash' => Hashes::of( (string) wp_json_encode( get_option( self::POST_DETAILS_OPTION ) ) ),
+			'change'    => static fn( array $state ): array => array( 'value' => array_filter( $fields + ( is_array( $state['value'] ) ? $state['value'] : array() ), static fn( $value ): bool => '' !== $value ) ),
+		);
+	}
+
+	/**
+	 * The saved values of set-post-details over those of the theme. Runs on leitvia_post_details.
+	 *
+	 * @param mixed $details Values of the theme by key.
+	 * @return array<string, mixed>
+	 */
+	public static function post_details( $details ): array {
+		$saved = get_option( self::POST_DETAILS_OPTION );
+		return array_filter( is_array( $saved ) ? $saved : array(), 'is_string' ) + (array) $details;
+	}
+
+	/**
 	 * Operation of set-motion: the site setting motion over the saved Studio settings.
 	 *
 	 * @param array<string, mixed> $input Input.
@@ -1124,9 +1221,9 @@ final class Setup {
 	}
 
 	/**
-	 * Operations of set-permalinks: permalink_structure, category_base and tag_base, one per field sent. A structure
-	 * needs a tag that names one post. While the site has published posts and the structure changes, notice says that
-	 * their addresses move.
+	 * Operations of set-permalinks: permalink_structure, category_base, tag_base and the Studio setting page_tags, one per
+	 * field sent. A structure needs a tag that names one post. While the site has published posts and the structure
+	 * changes, notice says that their addresses move.
 	 *
 	 * @param array<string, mixed> $input Input.
 	 * @return array<string, mixed>|\WP_Error
@@ -1154,8 +1251,17 @@ final class Setup {
 				$ops[] = self::option_op( $option, sanitize_title( (string) $input[ $key ] ) );
 			}
 		}
+		if ( array_key_exists( 'page_tags', $input ) ) {
+			$page_tags = (bool) $input['page_tags'];
+			$ops[]     = array(
+				'area'      => 'structure',
+				'target'    => array( 'option' => Settings::OPTION ),
+				'base_hash' => Hashes::of( (string) wp_json_encode( get_option( Settings::OPTION ) ) ),
+				'change'    => static fn( array $state ): array => array( 'value' => array( 'page_tags' => $page_tags ) + (array) $state['value'] ),
+			);
+		}
 		if ( ! $ops ) {
-			return Block_Edit::invalid( 'change', __( 'Name what to change: structure, category_base or tag_base.', 'leitvia-studio' ), $target );
+			return Block_Edit::invalid( 'change', __( 'Name what to change: structure, category_base, tag_base or page_tags.', 'leitvia-studio' ), $target );
 		}
 		return 1 === count( $ops ) ? $ops[0] : array( 'batch' => $ops );
 	}

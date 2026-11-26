@@ -1,6 +1,9 @@
-== Changelog of Leitvia Studio, versions 1.0.0 to 1.3.56 ==
+== Changelog of Leitvia Studio, versions 1.0.0 to 1.3.57 ==
 
 Newer versions are listed in readme.txt.
+
+= 1.3.57 =
+* Change: leitvia/insert-section with wrap sets the h2 of the new section at the wide edge, where the headings of the patterns start.
 
 = 1.3.56 =
 * New: leitvia/insert-section takes template: the post switches to another template of the contract in the same operation, so a page gets a hero with its h1 and the template page-landing at once while its other blocks stay as they are.

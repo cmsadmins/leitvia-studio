@@ -15,21 +15,18 @@ A pattern is a reusable section of block markup. New patterns start in the Lab o
 
 ## Inputs required
 
-- Access as the agent user: [handbook, Access over MCP and REST](../../handbook/README.md#access-over-mcp-and-rest).
 - The section the page needs, and fixed texts and images from the person.
 - Read before the first call: the [agent handbook](../../handbook/README.md). Read the page of each ability before you first call it (the handbook index links them): `get-contract`, `list-patterns`, `get-pattern`, `list-blocks`, `create-pattern`, `vary-pattern`, `get-page-outline`, `replace-pattern`. Markup rules and how to replace deprecated patterns: [markup details](references/markup.md). Effects on scroll: [animation](references/animation.md).
 
 ## Modes
 
-- **direct:** The autonomy levels decide. Lab patterns belong to the area `structure`; with the default level a new pattern is saved as a draft. Send no `package` key: a key always means a package.
-- **package:** send the same `package` key on every write of the task, so a person reviews one change package. With a key nothing goes live, whatever the autonomy levels allow.
+- **direct:** Lab patterns belong to the area `structure`; with the default level a new pattern is saved as a draft.
+- **package:** one key for the task, so a person reviews the pattern in one change package.
 
 ## Ground rules
 
-- Follow the [rules for every task](../../handbook/README.md#rules-for-every-task).
 - Custom blocks go into a plugin from `leitvia-block-starter` (WordPress skill `wp-block-development`), never into a theme.
-- **Facts are never guessed.** Organization data, prices, legal texts, figures, quotes and people come only from a source you can name: the person, a page of the site or a read ability, with the source in your report. Without one, stop at a checkpoint; never write a placeholder that looks like a fact.
-- Texts and images that stay fixed in a pattern on every page are facts of this kind: they come from the person.
+- Texts and images that stay fixed in a pattern on every page are facts: they come from the person.
 
 ## Procedure
 
@@ -62,7 +59,7 @@ Create it with `leitvia/create-pattern`: `title`, `content`, `base_hash: ""`, `p
 
 ### 4. Handle rejections
 
-The write result or the rejection lists `findings` with check, block path and a fix. Correct the markup **once** following each fix (for example `#1a1a1a` on a dark band becomes `backgroundColor: "ink"` with `textColor: "surface"`) and call again. A second rejection, or any `retry: never`, is a checkpoint.
+The write result or the rejection lists `findings` with check, block path and a fix. Correct the markup **once** following each fix (for example `#1a1a1a` on a dark band becomes `backgroundColor: "ink"` with `textColor: "surface"`) and call again. A second rejection, or any `retry: never`, stops this pattern; report its findings too.
 
 ### 5. Review in the Lab
 
@@ -80,8 +77,6 @@ Every new pattern and variant starts with Lab status `draft` and version 0.1.0. 
 
 ## Failure modes / debugging
 
-Every code with its retry rule: [rejections](../../handbook/rejections.md).
-
 - `leitvia_check_failed`: a raw color or size, a missing role pair; follow the fix of each finding (step 4).
 - `leitvia_attributes_lost`: block comments without valid JSON attributes; send them as `serialize_block()` writes them.
 - `leitvia_unsafe_content`: scripts, event attributes or Custom HTML; use registered blocks.
@@ -97,18 +92,14 @@ Stop and ask the person at these checkpoints, then continue with the answer:
 
 - **Need confirmed:** no existing pattern or edit covers the section.
 - **Fixed texts and images:** texts and images that will stay in the pattern on every page come from the person.
-- **Second rejection** of the same call, or a rejection with `retry: never`.
 - **Review in the Lab:** the person reviews the draft, moves it to review and approves it. Do not use a draft pattern on live pages before that.
 - **Deprecated without replacement:** `leitvia_no_replacement`.
 
 ## Unattended
 
-When no person answers (a scheduled or hosted run), do not wait at a checkpoint. Send the `package` key on every write, even when the briefing says nobody visits the site (mode `direct` needs a person who is present); never apply, roll back or publish anything. Take facts only from a source you name in the report (briefing, a page of the site, a read ability); without one the fact stays out and becomes an open question. A second rejection, or `retry: never`, stops that part. End with the package ID, what it holds and the open questions. Each checkpoint gets this answer:
-
 | Checkpoint | Answer without a person |
 |---|---|
 | Need confirmed | Build only when step 1 found no pattern and no page edit that fits; report the candidates you rejected and why. |
 | Fixed texts and images | Fixed texts only from the briefing; otherwise leave the slot for a page edit, never a sample text. |
-| Second rejection | Stop this pattern; report code, message and findings. |
 | Review in the Lab | Expected: the pattern stays a draft in the package; no page uses it in this run. |
 | Deprecated without replacement | Leave the section as it is; list post and pattern. |

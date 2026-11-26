@@ -1348,6 +1348,9 @@ final class Commerce {
 		if ( ! $term instanceof \WP_Term || ! Scope::term_readable( $id ) ) {
 			return self::out_of_scope( $target );
 		}
+		if ( in_array( $term->taxonomy, Scope::POST_TAXONOMIES, true ) ) {
+			return Block_Edit::invalid( 'term', __( 'Categories and tags of posts change with leitvia/update-term.', 'leitvia-studio' ), $target, 'leitvia/update-term' );
+		}
 		$fields = array_filter(
 			array(
 				'name'         => $input['name'] ?? null,

@@ -124,7 +124,7 @@ final class Maintain {
 								'url'          => array(
 									'type'        => 'string',
 									'maxLength'   => 2000,
-									'description' => __( 'Link of a button, or of the one link in a paragraph, heading or list item (mailto: and tel: work too).', 'leitvia-studio' ),
+									'description' => __( 'Link of a button, or of the one link in a paragraph, heading or list item (mailto: and tel: work too); "" without link_text takes that link out and keeps its words.', 'leitvia-studio' ),
 								),
 								'add_link'     => Build::add_link_schema(),
 								'replace_text' => Build::replace_text_schema(),
@@ -396,6 +396,35 @@ final class Maintain {
 				'additionalProperties' => false,
 			),
 			array( self::class, 'describe_remove_section' )
+		);
+		Abilities::write(
+			'leitvia/update-term',
+			__( 'Update term', 'leitvia-studio' ),
+			__( 'Changes name and description of a category, a tag or a term of a taxonomy of the content model, such as the intro of a topic archive. The archive of the term shows its description below its title, the h1 of the page, so the description takes paragraphs, lists, links and headings from h2 down, never an h1. IDs, current descriptions and hashes come from terms_of of leitvia/list-content; send the hash of the term as base_hash. The slug stays, so the address of the archive stays. Product categories and tags change with leitvia/update-product-category. Visitors see the change, so where the area content is not autonomous it waits in a change package; leitvia/rollback undoes it.', 'leitvia-studio' ),
+			'maintain',
+			$overwrite,
+			array(
+				'properties'           => array(
+					'term'        => array(
+						'type'        => 'integer',
+						'minimum'     => 1,
+						'description' => __( 'Term ID from terms_of of leitvia/list-content.', 'leitvia-studio' ),
+					),
+					'name'        => array(
+						'type'      => 'string',
+						'minLength' => 1,
+						'maxLength' => 200,
+					),
+					'description' => array(
+						'type'        => 'string',
+						'maxLength'   => 10000,
+						'description' => __( 'Intro of the archive as HTML (p, h2 to h4, ul, ol, a, strong, em), "" for none.', 'leitvia-studio' ),
+					),
+				),
+				'required'             => array( 'term' ),
+				'additionalProperties' => false,
+			),
+			array( self::class, 'describe_update_term' )
 		);
 		$remove = array(
 			'destructive' => true,
@@ -1081,7 +1110,7 @@ final class Maintain {
 				$found[] = array(
 					'name' => $name,
 					'path' => $here,
-					'text' => trim( html_entity_decode( wp_strip_all_tags( $html ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) ),
+					'text' => Outline::decoded( $html ),
 					'url'  => is_string( $url ) ? $url : '',
 				);
 			}
@@ -1318,9 +1347,8 @@ final class Maintain {
 				);
 			} elseif ( isset( Block_Edit::TEXT_BLOCKS[ $name ] ) ) {
 				$html  = implode( '', array_filter( (array) $block['innerContent'], 'is_string' ) );
-				$plain = static fn( string $markup ): string => trim( html_entity_decode( wp_strip_all_tags( $markup ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
-				$text  = $plain( $html );
-				$link  = preg_match( '#<a\b[^>]*>(.*?)</a>#s', $html, $match ) ? $plain( $match[1] ) : '';
+				$text  = Outline::decoded( $html );
+				$link  = preg_match( '#<a\b[^>]*>(.*?)</a>#s', $html, $match ) ? Outline::decoded( $match[1] ) : '';
 				$tags  = new \WP_HTML_Tag_Processor( $html );
 				$url   = $tags->next_tag( array( 'tag_name' => 'a' ) ) ? $tags->get_attribute( 'href' ) : '';
 				$class = (string) ( $block['attrs']['className'] ?? '' );
@@ -1384,6 +1412,47 @@ final class Maintain {
 			return Block_Edit::invalid( 'parent', __( 'A page cannot go below itself or one of its subpages. Move the subpage first.', 'leitvia-studio' ), $target + array( 'parent' => $above ) );
 		}
 		return null;
+	}
+
+	/**
+	 * Operation of update-term: name and description of a term of POST_TAXONOMIES or of a taxonomy of the content model
+	 * in scope. A description with an h1 is refused, the archive title is the h1 of its page.
+	 *
+	 * @param array<string, mixed> $input Input.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public static function describe_update_term( array $input ) {
+		$id     = (int) ( $input['term'] ?? 0 );
+		$target = array( 'term' => $id );
+		$term   = get_term( $id );
+		if ( ! $term instanceof \WP_Term || ! Scope::term_readable( $id ) ) {
+			return Rejection::make( 'leitvia_out_of_scope', __( 'Agents may not change this term. Categories, tags and taxonomies of the content model are open to them.', 'leitvia-studio' ), 403, 'scope', $target, 'leitvia/list-content', 'never' );
+		}
+		if ( in_array( $term->taxonomy, Scope::TAXONOMIES, true ) ) {
+			return Block_Edit::invalid( 'term', __( 'Product categories and tags change with leitvia/update-product-category.', 'leitvia-studio' ), $target, 'leitvia/update-product-category' );
+		}
+		$fields = array_filter( array_intersect_key( $input, array_flip( array( 'name', 'description' ) ) ), 'is_string' );
+		if ( isset( $fields['name'] ) ) {
+			$fields['name'] = trim( (string) preg_replace( '/\s+/u', ' ', $fields['name'] ) );
+			if ( '' === $fields['name'] ) {
+				return Block_Edit::invalid( 'name', __( 'A term needs a name.', 'leitvia-studio' ), $target );
+			}
+		}
+		if ( ! $fields ) {
+			return Block_Edit::invalid( 'change', __( 'Name what to change: name or description.', 'leitvia-studio' ), $target );
+		}
+		if ( preg_match( '/<h1[\s>]/i', (string) ( $fields['description'] ?? '' ) ) ) {
+			return Block_Edit::invalid( 'description', __( 'The archive title is the h1 of the page: start the headings of the description at h2.', 'leitvia-studio' ), $target );
+		}
+		return array(
+			'area'   => 'content',
+			'target' => $target,
+			'record' => true,
+			'change' => static function ( array $state ) use ( $fields ): array {
+				$state['term'] = $fields + (array) $state['term'];
+				return $state;
+			},
+		);
 	}
 
 	/**

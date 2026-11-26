@@ -92,7 +92,7 @@ class Test_Child_Theme extends WP_UnitTestCase {
 		$this->assertCount( count( $parent->patterns() ) + 1, $contract->patterns() );
 		$this->assertSame( 'Starter section', $contract->pattern( 'leitvia-child-test/content-starter' )['title'] ?? null );
 		$this->assertSame( $parent->pattern( 'leitvia/cta-banner' ), $contract->pattern( 'leitvia/cta-banner' ) );
-		$this->assertSame( $parent->color_roles(), $contract->color_roles() );
+		$this->assertSame( $parent->preset_roles()['color'], $contract->preset_roles()['color'] );
 		$this->assertSame( $parent->pairs(), $contract->pairs() );
 	}
 

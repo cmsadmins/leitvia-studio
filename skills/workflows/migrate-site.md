@@ -71,4 +71,3 @@ In the language of the person: the packages with ID, state and inbox link; per p
 3. **Contrast correction accepted** (step 3, only when a brand value changed).
 4. **Sample of three** and **Open items** (step 4).
 5. **Package applied** after steps 4, 5 and 6.
-6. **Second rejection** of the same call, or a rejection with `retry: never`, in any step.

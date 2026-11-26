@@ -4,7 +4,7 @@ Tags: ai agent, mcp, abilities api, design tokens, block theme
 Requires at least: 7.1
 Tested up to: 7.1
 Requires PHP: 8.2
-Stable tag: 1.3.61
+Stable tag: 1.3.62
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -12,7 +12,7 @@ AI agents such as Claude Code or claude.ai build and maintain block theme sites 
 
 == Description ==
 
-Leitvia Studio lets AI agents such as Claude Code, Codex or Cursor build and maintain WordPress sites with block themes through 74 abilities, and every change passes checks for design, accessibility and content before it goes live. It is free and made for developers, agencies and site owners who want an AI agent to do the work without administrator rights.
+Leitvia Studio lets AI agents such as Claude Code, Codex or Cursor build and maintain WordPress sites with block themes through 77 abilities, and every change passes checks for design, accessibility and content before it goes live. It is free and made for developers, agencies and site owners who want an AI agent to do the work without administrator rights.
 
 The abilities belong to the WordPress [Abilities API](https://developer.wordpress.org/apis/abilities-api/) and run over MCP or the REST API. Everything Studio creates is stored in WordPress core structures (patterns, global styles, post types, block bindings), so the site keeps working when you deactivate the plugin. It works with any block theme and fits best with the free theme [Leitvia](https://github.com/cmsadmins/leitvia).
 
@@ -120,7 +120,7 @@ The `src/` folder contains the source code of the files in `build/`, and `webpac
 
 = What is Leitvia Studio? =
 
-Leitvia Studio is a free WordPress plugin that lets AI agents build and maintain sites with block themes through 74 abilities of the WordPress Abilities API, with checks, an autonomy level per area, a review inbox and rollback. It also adds a Pattern Lab, design tokens in the DTCG format, a content model with block bindings, site recipes and blocks for privacy, accessibility and offers. It needs WordPress 7.1 and PHP 8.2 or later.
+Leitvia Studio is a free WordPress plugin that lets AI agents build and maintain sites with block themes through 77 abilities of the WordPress Abilities API, with checks, an autonomy level per area, a review inbox and rollback. It also adds a Pattern Lab, design tokens in the DTCG format, a content model with block bindings, site recipes and blocks for privacy, accessibility and offers. It needs WordPress 7.1 and PHP 8.2 or later.
 
 = Does Leitvia Studio work with Claude, ChatGPT or Cursor? =
 
@@ -286,6 +286,18 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 
 == Changelog ==
 
+= 1.3.62 =
+* New: leitvia/get-template reads a template or template part, stored or from the theme, with hash, outline and patterns; for single also the post details in effect. leitvia/set-post-details sets the date labels (such as "Updated %s"), heading and source of related posts and the aspect ratio of the featured image.
+* New: leitvia/update-term changes name and description of categories, tags and taxonomies of the content model through the pipeline. Descriptions keep paragraphs, headings and lists; leitvia/audit-site reports an h1 in a term description (leitvia/term-h1).
+* New: leitvia/update-block and the edits of compose-page and insert-pattern take taxQuery for core/query in both formats of core and keys that add-ons declare as JSON schema (filter leitvia_studio_query_attribute_keys). leitvia/list-content takes terms_of and returns term_list with ID, slug, name, count, parent, description and hash.
+* New: Setting page_tags (off by default) gives pages tags, so tag archives list posts and pages; field page_tags in leitvia/set-permalinks.
+* New: Groups of a header part take backgroundColor ink in edits, for a dark header. Studio measures the first row of header-two-rows, which scrolls away, and counts only the bar as the height of a tall header.
+* New: An edit with url "" and no link_text removes the one link of a paragraph, heading or list item and keeps its words, such as the head of a mega menu column without a page of its own.
+* New: Filter leitvia_studio_post_meta lets post meta of add-ons pass the pipeline with state, hash and rollback.
+* Fix: The DTCG export reads hsl() colors; before they came out black.
+* Fix: The check after a write reports 401 and 403, such as a site behind basic auth, as unverifiable (leitvia_verify_forbidden) instead of failed.
+* Change: The code is simpler in many places with the same behavior.
+
 = 1.3.61 =
 * New: A table of contents with 12 entries or more starts closed. Its title and the number of sections open it; the open list scrolls within itself, at most half the screen high, so the end of a long list stays reachable in a sticky sidebar. Add-ons extend the closed list through the class __details.
 * Change: Without a theme contract, the instructions of the MCP server say that a person activates the theme, and name leitvia-migrate for a classic site.
@@ -323,6 +335,3 @@ Disclaimer: Leitvia Studio is free software under the GNU GPL, version 2 or late
 * New: ai_generated on leitvia/add-media and leitvia/set-alt-text marks images and videos made with AI, leitvia/list-media returns it; the filter leitvia_studio_ai_image_note shows a short note at such images (off by default). focalPoint on a core/cover through block edits.
 * New: leitvia/check-composition reports firstScreen when the text of the stage is longer than its pattern allows, so the main button may fall below the first screen.
 * Change: A text edit at a block without text, such as a row of buttons, is refused with a message that explains how IDs move up after remove.
-
-= 1.3.57 =
-* Change: leitvia/insert-section with wrap sets the h2 of the new section at the wide edge, where the headings of the patterns start.

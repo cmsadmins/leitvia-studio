@@ -1,6 +1,6 @@
 # leitvia/update-product-review
 
-Generated from Leitvia Studio 1.3.61. Do not edit. Group: Maintain. How to call abilities, hashes, autonomy and rejections: [agent handbook](../README.md).
+Generated from Leitvia Studio 1.3.62. Do not edit. Group: Maintain. How to call abilities, hashes, autonomy and rejections: [agent handbook](../README.md).
 
 **Update product review.** Sets rating, verified flag or status of a product review. Its text and author stay. Read the review with leitvia/list-product-reviews and send its hash as base_hash. The average rating and the review count of the product follow. Without the capability of the reviews screen of WooCommerce (moderate_comments) only a missing rating of an approved review can be set.
 

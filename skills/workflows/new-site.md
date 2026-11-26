@@ -119,4 +119,3 @@ Give the person, in their language: the packages with ID, state and inbox link; 
 3. **Outline confirmed** per extra page (step 3).
 4. **Package applied** after steps 3, 5 and 6.
 5. **Legal texts supplied by the human** (step 5).
-6. **Second rejection** of the same call, or a rejection with `retry: never`, in any step.

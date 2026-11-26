@@ -15,19 +15,17 @@ Product care takes a shop that already sells and makes its catalog clearer: bett
 
 ## Inputs required
 
-- Access as the agent user: [handbook, Access over MCP and REST](../../handbook/README.md#access-over-mcp-and-rest).
 - WooCommerce is active. Prices, product facts and the products to feature come from the person or a source they name.
 - Read before the first call: the [agent handbook](../../handbook/README.md). Read the page of each ability before you first call it (the handbook index links them): `list-products`, `get-product`, `update-product`, `update-product-category`, `set-merchandising`, `list-product-attributes`, `update-product-attribute`, `list-product-reviews`, `update-product-review`, `create-product`, `add-media`, `set-alt-text`, `list-packages`, `get-package`.
 
 ## Modes
 
-- **package** (default): send the same `package` key on every write of the task, for example `catalog-2026-10`. One task, one package for a person.
-- **direct:** only when the person asks for it. The area `products` is `draft` by default: changes to drafts are written, changes to published products wait in a package of their own. Send no `package` key: a key always means a package.
+- **package** (default): one key for the task, for example `catalog-2026-10`.
+- **direct:** only when the person asks. The area `products` is `draft` by default: changes to drafts are written, changes to published products wait in a package of their own.
 
 ## Ground rules
 
-- Follow the [rules for every task](../../handbook/README.md#rules-for-every-task). No REST routes of WooCommerce (`/wp-json/wc/...`) either. The product abilities exist only while WooCommerce is active.
-- **Facts are never guessed.** Organization data, prices, legal texts, figures, quotes and people come only from a source you can name: the person, a page of the site or a read ability, with the source in your report. Without one, stop at a checkpoint; never write a placeholder that looks like a fact.
+- No REST routes of WooCommerce (`/wp-json/wc/...`). The product abilities exist only while WooCommerce is active.
 - Product facts are facts too: material, size, weight, origin, care, certificates, delivery times and claims such as "handmade" or "organic" come from the product data (`attributes`, the current texts), a page of the site or the person. Better wording of a known fact is your work; a new fact is not.
 - **Prices are never invented,** not even as a rounded or "psychological" price. `regular_price` and `sale_price` take a decimal number with a dot, from the person or a price list they named. A sale of "20 percent off" is computed from the current `price.regular` of `leitvia/get-product`; show the number at checkpoint **Facts from the person**. Changes to prices, tax and shipping land at most as a suggestion (content kinds `prices`, `tax`, `shipping`) until a person unlocked them; agents cannot unlock them.
 - Orders, refunds, coupons, customers and sales figures are out of reach: every such object answers `leitvia_out_of_scope` with `retry: never`. Never infer best sellers; the person names them.
@@ -82,8 +80,6 @@ After the person applied the package, read each product again with `leitvia/get-
 
 ## Failure modes / debugging
 
-Every code with its retry rule: [rejections](../../handbook/rejections.md).
-
 - `leitvia/list-products` is unknown: WooCommerce is not active; stop and tell the person.
 - `leitvia_check_failed` with `next_ability` `leitvia/set-alt-text`: a product image has no alt text; set it first.
 - `leitvia_out_of_scope`: orders, refunds, coupons and customers are out of reach (`retry: never`).
@@ -105,15 +101,11 @@ Stop and ask the person at these checkpoints, then continue with the answer:
 - **Plan confirmed:** the products and changes of step 2, before the first write.
 - **Facts from the person:** prices, product facts or claims without a source, and every computed sale price.
 - **Package applied:** the person reviews and applies the package in the inbox before you check the shop or set images of a second package.
-- **Second rejection** of the same call, or a rejection with `retry: never`.
 
 ## Unattended
-
-When no person answers (a scheduled or hosted run), do not wait at a checkpoint. Send the `package` key on every write, even when the briefing says nobody visits the site (mode `direct` needs a person who is present); never apply, roll back or publish anything. Take facts only from a source you name in the report (briefing, a page of the site, a read ability); without one the fact stays out and becomes an open question. A second rejection, or `retry: never`, stops that part. End with the package ID, what it holds and the open questions. Each checkpoint gets this answer:
 
 | Checkpoint | Answer without a person |
 |---|---|
 | Plan confirmed | Only the changes the briefing names; the plan goes into the report. |
 | Facts from the person | Only prices and facts the briefing or a page of the site states, with that source in the report; a computed sale price or a fact without a source stays out and is listed as a question. |
 | Package applied | Stop after step 8; the check of the shop and images of a second package belong to the next run. |
-| Second rejection | Stop that product; report code and message. |

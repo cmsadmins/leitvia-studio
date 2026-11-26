@@ -1,6 +1,6 @@
 # leitvia/update-product-attribute
 
-Generated from Leitvia Studio 1.3.61. Do not edit. Group: Maintain. How to call abilities, hashes, autonomy and rejections: [agent handbook](../README.md).
+Generated from Leitvia Studio 1.3.62. Do not edit. Group: Maintain. How to call abilities, hashes, autonomy and rejections: [agent handbook](../README.md).
 
 **Update product attribute.** Renames a global product attribute and its values and sorts the values, in one operation. Read the attribute with leitvia/list-product-attributes and send its hash as base_hash. Values are named by their ID; order lists every value ID in the new order and sorts the attribute by it (order_by menu_order). Slugs stay, so filters and links keep working.
 

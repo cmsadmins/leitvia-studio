@@ -1,6 +1,6 @@
 # leitvia/add-media
 
-Generated from Leitvia Studio 1.3.61. Do not edit. Group: Build. How to call abilities, hashes, autonomy and rejections: [agent handbook](../README.md).
+Generated from Leitvia Studio 1.3.62. Do not edit. Group: Build. How to call abilities, hashes, autonomy and rejections: [agent handbook](../README.md).
 
 **Add media.** Adds an image to the media library from a URL of this site or as Base64 data up to 5 MB, with alt text or marked as decorative. It also takes a WebVTT file with captions for a video (.vtt, UTF-8, starts with WEBVTT, no alt text) and a video hosted on this site, MP4 (H.264) or WebM up to 50 MB, with poster and caption instead of alt text (poster_file names a poster image that still waits in the same package), and a PDF up to 5 MB (.pdf, with the PDF signature at its start) with a title that says what the document is, without alt text; no other document type. It needs the right to upload files. URLs of other hosts are rejected; nothing is fetched from them. base_hash is empty. With replace the file takes the place of the file of an attachment under the same ID and address, for a new cut of a video or a corrected PDF; a person applies that. Images already in the library are used by their ID in compose-page and update-block, a WebVTT file by its ID in tracks of update-block, a video by its ID in the field video of update-block, a PDF by its URL from the result or leitvia/list-media in url or add_link of update-block.
 

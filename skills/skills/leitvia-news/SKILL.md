@@ -15,18 +15,16 @@ One run, at most one post: find what is new in the sources of the brief, drop wh
 
 ## Inputs required
 
-- Access as the agent user: [handbook, Access over MCP and REST](../../handbook/README.md#access-over-mcp-and-rest).
 - The news brief of the operator (step 1).
 - Read before the first call: the [agent handbook](../../handbook/README.md). Read the page of each ability before you first call it (the handbook index links them): `get-contract`, `list-content`, `create-content`, `get-seo`, `update-seo`, `list-packages`, `get-package`. The brief, the duplicate check, the sources, the post format and the limits for SEO and GEO: [news details](references/brief.md). Overview, archives and post page come from the theme; setting up the blog itself: [blog or journal](../leitvia-page/references/blog.md).
 
 ## Modes
 
-- **package** (the only mode of this skill): send one `package` key per run, for example `news-2026-43` (year and week), on every write. The post is created as a draft in that package; a person reviews, publishes or rejects it in the inbox of Leitvia Studio.
+- **package** (the only mode of this skill): one key per run, for example `news-2026-43` (year and week). The post is created as a draft in that package; a person reviews, publishes or rejects it in the inbox.
 
 ## Ground rules
 
-- Follow the [rules for every task](../../handbook/README.md#rules-for-every-task). Reading the sources in the brief is fine.
-- **Facts are never guessed.** Organization data, prices, legal texts, figures, quotes and people come only from a source you can name: the person, a page of the site or a read ability, with the source in your report. Without one, stop at a checkpoint; never write a placeholder that looks like a fact.
+- Reading the sources in the brief is fine.
 - In a news post the source of every fact is a source item of the brief, listed under the post. Quotes are short, marked and attributed; the rest is your own wording.
 - At most one post per run, and never one that covers what the site already has (duplicate check).
 - Never publish or schedule, never delete existing posts and never change them beyond the SEO title and description of step 5.
@@ -70,8 +68,6 @@ Call `leitvia/create-content` with `post_type` `post` (or the type of the conten
 
 ## Failure modes / debugging
 
-Every code with its retry rule: [rejections](../../handbook/rejections.md).
-
 - `leitvia_check_failed`: the featured image needs alt text; set it with `leitvia/set-alt-text` or mark the image as decorative.
 - `leitvia_out_of_scope`: a status other than `draft`; this skill never sets one.
 
@@ -87,12 +83,9 @@ Stop and ask the person at these checkpoints, then continue with the answer:
 - **No news:** every candidate is a duplicate, or the cadence says it is too early. Report it; nothing to write.
 - **Facts from the person:** a fact the post needs is in no source item.
 - **Site hidden from search:** `indexable` is false ("Discourage search engines" in the reading settings). Only the person turns it off.
-- **Second rejection** of the same call, or a rejection with `retry: never`.
 - **Package applied:** a person reviews the draft, publishes or rejects it.
 
 ## Unattended
-
-When no person answers (a scheduled or hosted run), do not wait at a checkpoint. Send the `package` key on every write, even when the briefing says nobody visits the site (mode `direct` needs a person who is present); never apply, roll back or publish anything. Take facts only from a source you name in the report (briefing, a page of the site, a read ability); without one the fact stays out and becomes an open question. A second rejection, or `retry: never`, stops that part. End with the package ID, what it holds and the open questions. Each checkpoint gets this answer:
 
 | Checkpoint | Answer without a person |
 |---|---|
@@ -100,5 +93,4 @@ When no person answers (a scheduled or hosted run), do not wait at a checkpoint.
 | No news | Write nothing; report the candidates and why each was dropped. |
 | Facts from the person | Leave the fact out; when the post makes no sense without it, write nothing. |
 | Site hidden from search | Write the draft all the same; name it first in the report, as high, with the step of the person: Settings, Reading, untick "Discourage search engines". |
-| Second rejection | Stop; report code and message. |
 | Package applied | Expected: the draft waits in the package; the run ends with the report. |

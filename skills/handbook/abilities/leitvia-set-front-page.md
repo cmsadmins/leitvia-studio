@@ -1,6 +1,6 @@
 # leitvia/set-front-page
 
-Generated from Leitvia Studio 1.3.61. Do not edit. Group: Set up. How to call abilities, hashes, autonomy and rejections: [agent handbook](../README.md).
+Generated from Leitvia Studio 1.3.62. Do not edit. Group: Set up. How to call abilities, hashes, autonomy and rejections: [agent handbook](../README.md).
 
 **Set front page.** Makes an existing page the static front page; 0 shows the latest posts there again. The front page is the page the address of the site shows. base_hash is empty. The page must exist, so create it first and wait until a package with it is applied; the posts page cannot be the front page as well. Like every setting it waits in a change package for a person. notice says so while the page is not published. Set the posts page with leitvia/set-posts-page.
 

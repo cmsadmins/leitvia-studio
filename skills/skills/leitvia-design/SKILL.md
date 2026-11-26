@@ -15,15 +15,13 @@ Bring a brand onto a Leitvia site as a token set: one DTCG document with every r
 
 ## Inputs required
 
-- Access as the agent user: [handbook, Access over MCP and REST](../../handbook/README.md#access-over-mcp-and-rest).
 - The brand source the person names (style guide, design file, existing site), or the request to design the brand.
 - Read before the first call: the [agent handbook](../../handbook/README.md). Read the page of each ability before you first call it (the handbook index links them): `get-contract`, `get-tokens`, `create-token-set`, `preview-token-set`, `activate-token-set`, `set-variation`, `audit-site`. Roles, token format, the contrast formula, fonts and what a token set cannot carry: [token details](references/tokens.md).
 
 ## Ground rules
 
-- Follow the [rules for every task](../../handbook/README.md#rules-for-every-task). No CSS and no child theme of your own.
+- No CSS and no child theme of your own.
 - Token sets and their activation are in the area `design`, which by default only suggests: every write lands in a change package for a person. Send one `package` key for the task, for example `brand-2026-10`.
-- **Facts are never guessed.** Organization data, prices, legal texts, figures, quotes and people come only from a source you can name: the person, a page of the site or a read ability, with the source in your report. Without one, stop at a checkpoint; never write a placeholder that looks like a fact.
 - Brand values are facts too: they come from the brand source the person names (style guide, design file, existing site). Never guess a brand color or font; a value you cannot find is a question to the person. The one exception: the person asks you to design the brand ("own brand, your proposal", an invented demo site). Then choose the values, compute every pair and call the set a proposal in its `$description` and in your report.
 - Roles, slugs and the contrast pairs come from `leitvia/get-contract`, never from memory or from files of the theme.
 
@@ -88,8 +86,6 @@ After the person applied the activation:
 
 ## Failure modes / debugging
 
-Every code with its retry rule: [rejections](../../handbook/rejections.md).
-
 - `leitvia_check_failed` on `leitvia/create-token-set`: a pair misses its ratio; step 5 has the one correction.
 - `leitvia_stale_hash` on activation or variation: the global styles changed since your read; read `leitvia/get-tokens` again and send its `hash` once.
 - `leitvia_forbidden` on a preview: the agent user may not edit theme options; a person grants it or previews.
@@ -104,8 +100,6 @@ Stop and wait for the person at each of these checkpoints. Report the values, th
 3. **Package applied:** the person applied the package with the token set, and later the package with the activation, in the inbox of Leitvia Studio.
 
 ## Unattended
-
-When no person answers (a scheduled or hosted run), do not wait at a checkpoint. Send the `package` key on every write, even when the briefing says nobody visits the site (mode `direct` needs a person who is present); never apply, roll back or publish anything. Take facts only from a source you name in the report (briefing, a page of the site, a read ability); without one the fact stays out and becomes an open question. A second rejection, or `retry: never`, stops that part. End with the package ID, what it holds and the open questions. Each checkpoint gets this answer:
 
 | Checkpoint | Answer without a person |
 |---|---|
